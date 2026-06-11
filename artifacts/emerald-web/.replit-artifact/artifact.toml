@@ -1,0 +1,34 @@
+kind = "web"
+previewPath = "/"
+title = "Emerald AI"
+version = "1.0.0"
+id = "artifacts/emerald-web"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21680
+
+[services.development]
+run = "cd /home/runner/workspace/emerald-ai && PORT=21680 node index.js"
+
+[services.production]
+
+[services.production.build]
+args = ["sh", "-c", "cd emerald-ai && npm install --omit=dev && mkdir -p outputs"]
+
+[services.production.run]
+args = ["node", "emerald-ai/index.js"]
+
+[services.production.run.env]
+PORT = "21680"
+NODE_ENV = "production"
+
+[services.env]
+PORT = "21680"
+BASE_PATH = "/"
