@@ -23,13 +23,10 @@ app.get('/', (req, res) => {
   const htmlPath = path.join(__dirname, 'public', 'index.html');
   let html = fs.readFileSync(htmlPath, 'utf8');
   const env = {
-    SERPER_KEY:     process.env.SERPER_KEY     || '',
-    CLAUDE_KEY:     process.env.CLAUDE_KEY      || '',
-    OPENAI_KEY:     process.env.OPENAI_KEY      || '',
-    PERPLEXITY_KEY: process.env.PERPLEXITY_KEY  || '',
-    GEMINI_KEY:     process.env.GEMINI_KEY       || '',
-    TWITTER_KEY:    process.env.TWITTER_KEY      || '',
-    YOUTUBE_KEY:    process.env.YOUTUBE_KEY      || ''
+    TWITTER_KEY:           process.env.TWITTER_KEY           || '',
+    YOUTUBE_KEY:           process.env.YOUTUBE_KEY           || '',
+    YOUTUBE_CLIENT_ID:     process.env.YOUTUBE_CLIENT_ID     || '',
+    YOUTUBE_CLIENT_SECRET: process.env.YOUTUBE_CLIENT_SECRET || ''
   };
   const envMeta = "<meta name='env' content='" + JSON.stringify(env).replace(/'/g, '&apos;') + "'>";
   html = html.replace('<head>', '<head>\n' + envMeta);
@@ -56,8 +53,10 @@ app.post('/run', async (req, res) => {
     PERPLEXITY_KEY:body.perplexityKey|| process.env.PERPLEXITY_KEY|| '',
     GEMINI_KEY:    body.geminiKey    || process.env.GEMINI_KEY    || '',
     // Optional — Social
-    TWITTER_KEY:   body.twitterKey   || process.env.TWITTER_KEY   || '',
-    YOUTUBE_KEY:   body.youtubeKey   || process.env.YOUTUBE_KEY   || '',
+    TWITTER_KEY:           body.twitterKey          || process.env.TWITTER_KEY           || '',
+    YOUTUBE_KEY:           body.youtubeKey          || process.env.YOUTUBE_KEY           || '',
+    YOUTUBE_CLIENT_ID:     body.youtubeClientId     || process.env.YOUTUBE_CLIENT_ID     || '',
+    YOUTUBE_CLIENT_SECRET: body.youtubeClientSecret || process.env.YOUTUBE_CLIENT_SECRET || '',
     outDir: OUT_DIR
   };
 

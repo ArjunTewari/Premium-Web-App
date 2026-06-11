@@ -27,6 +27,7 @@ html,body{min-height:100vh;background:var(--ink);color:var(--tx);font-family:'In
 .fld .hint{font-size:10px;color:var(--mt);margin-top:3px}
 .fld .hint a{color:var(--amb);text-decoration:none}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .run-btn{width:100%;background:var(--amb);color:#0a0e17;border:none;border-radius:7px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin:20px 0 0;transition:background .15s}
 .run-btn:hover{background:#e0a030}.run-btn:disabled{opacity:.5;cursor:not-allowed}
 .progress-wrap{margin-top:16px;display:none}
@@ -54,9 +55,8 @@ html,body{min-height:100vh;background:var(--ink);color:var(--tx);font-family:'In
 .prev-item-meta{color:var(--mt);font-family:monospace;font-size:10px;margin:0 10px;flex-shrink:0}
 .prev-item a{color:var(--amb);font-size:11px;text-decoration:none;flex-shrink:0;margin-left:6px}
 .prev-item a:hover{text-decoration:underline}
-.warn-box{background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.25);border-radius:6px;padding:10px 14px;font-size:11px;color:var(--mt2);margin-bottom:16px;line-height:1.7}
-.warn-box strong{color:var(--warn)}
-.section-sep{margin:20px 0 0;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mt);padding-bottom:8px;border-bottom:1px solid var(--bdr)}
+.info-box{background:rgba(76,175,116,.07);border:1px solid rgba(76,175,116,.25);border-radius:6px;padding:10px 14px;font-size:11px;color:var(--mt2);margin-bottom:16px;line-height:1.7}
+.info-box strong{color:var(--good)}
 </style>
 </head>
 <body>
@@ -68,47 +68,30 @@ html,body{min-height:100vh;background:var(--ink);color:var(--tx);font-family:'In
     <p>Generate comparative air quality media intelligence reports with LLM visibility and social media analysis.</p>
   </div>
 
-  <div class="warn-box">
-    <strong>API keys are sent from your browser to this server only.</strong> They are never stored or logged. Add keys to Replit Secrets (padlock icon) to pre-populate fields on every visit.
+  <div class="info-box">
+    <strong>API keys are pre-loaded from server secrets.</strong> Serper, Claude, OpenAI, Perplexity, and Gemini keys are configured server-side and applied automatically on every run.
   </div>
 
-  <!-- Required keys -->
-  <div class="grid">
-    <div class="card">
-      <div class="card-title">Required keys <span class="badge">Required</span></div>
-      <div class="fld">
-        <label>Serper API Key</label>
-        <input id="serperKey" type="password" placeholder="ea3ed82..." value="">
-        <div class="hint">News search + article scraping · <a href="https://serper.dev" target="_blank">serper.dev</a></div>
+  <!-- Report settings -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Report settings</div>
+    <div class="fld">
+      <label>Organisations <span id="orgCount" style="color:var(--amb);font-family:monospace">(2 selected)</span></label>
+      <div id="orgCheckboxes" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px 12px;background:var(--sur2);border:1px solid var(--bdr);border-radius:5px;padding:10px 12px;max-height:200px;overflow-y:auto"></div>
+      <div style="margin-top:7px;display:flex;gap:6px;flex-wrap:wrap">
+        <input id="orgCustom" placeholder="Add custom org name..." style="flex:1;min-width:160px;background:var(--sur2);border:1px solid var(--bdr);border-radius:5px;padding:6px 9px;color:var(--tx);font-size:11px;font-family:monospace;outline:none">
+        <button onclick="addCustomOrg()" style="background:var(--bdr);color:var(--mt2);border:none;border-radius:5px;padding:6px 12px;font-size:11px;cursor:pointer">+ Add</button>
       </div>
-      <div class="fld">
-        <label>Claude API Key (Anthropic)</label>
-        <input id="claudeKey" type="password" placeholder="sk-ant-..." value="">
-        <div class="hint">Article classification + AI analysis · <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></div>
-      </div>
-
+      <div class="hint">Select up to 13. Each org adds ~5 Serper queries + ~2 Claude API calls.</div>
     </div>
-
-    <div class="card">
-      <div class="card-title">Report settings</div>
+    <div class="row3">
       <div class="fld">
-        <label>Organisations <span id="orgCount" style="color:var(--amb);font-family:monospace">(2 selected)</span></label>
-        <div id="orgCheckboxes" style="display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;background:var(--sur2);border:1px solid var(--bdr);border-radius:5px;padding:10px 12px;max-height:200px;overflow-y:auto"></div>
-        <div style="margin-top:7px;display:flex;gap:6px;flex-wrap:wrap">
-          <input id="orgCustom" placeholder="Add custom org name..." style="flex:1;min-width:160px;background:var(--sur2);border:1px solid var(--bdr);border-radius:5px;padding:6px 9px;color:var(--tx);font-size:11px;font-family:monospace;outline:none">
-          <button onclick="addCustomOrg()" style="background:var(--bdr);color:var(--mt2);border:none;border-radius:5px;padding:6px 12px;font-size:11px;cursor:pointer">+ Add</button>
-        </div>
-        <div class="hint">Select up to 13. Each org adds ~5 Serper queries + ~2 Claude API calls.</div>
+        <label>Date From</label>
+        <input id="dateFrom" value="2026-03-08" placeholder="YYYY-MM-DD">
       </div>
-      <div class="row2">
-        <div class="fld">
-          <label>Date From</label>
-          <input id="dateFrom" value="2026-03-08" placeholder="YYYY-MM-DD">
-        </div>
-        <div class="fld">
-          <label>Date To</label>
-          <input id="dateTo" value="2026-06-08" placeholder="YYYY-MM-DD">
-        </div>
+      <div class="fld">
+        <label>Date To</label>
+        <input id="dateTo" value="2026-06-08" placeholder="YYYY-MM-DD">
       </div>
       <div class="fld">
         <label>Client Name (appears in footer)</label>
@@ -117,40 +100,33 @@ html,body{min-height:100vh;background:var(--ink);color:var(--tx);font-family:'In
     </div>
   </div>
 
-  <!-- AEO keys -->
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-title">AEO / LLM Visibility keys <span class="badge badge-opt">Optional — contributes 30% of score</span></div>
-    <p style="font-size:12px;color:var(--mt2);margin-bottom:14px">Leave blank to skip. When provided, each LLM is asked 5 standard AQ questions per org; mention rate = AEO score. Get keys at <a href="https://platform.openai.com" target="_blank" style="color:var(--amb)">OpenAI</a> · <a href="https://www.perplexity.ai/settings/api" target="_blank" style="color:var(--amb)">Perplexity</a> · <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--amb)">Google AI Studio</a></p>
-    <div class="grid" style="margin-bottom:0">
-      <div class="fld">
-        <label>OpenAI API Key (GPT-4o mini)</label>
-        <input id="openaiKey" type="password" placeholder="sk-...">
-      </div>
-      <div class="fld">
-        <label>Perplexity API Key (sonar)</label>
-        <input id="perplexityKey" type="password" placeholder="pplx-...">
-      </div>
-      <div class="fld">
-        <label>Google Gemini API Key (gemini-1.5-flash)</label>
-        <input id="geminiKey" type="password" placeholder="AIza...">
-      </div>
-    </div>
-  </div>
-
   <!-- Social media keys -->
   <div class="card" style="margin-bottom:0">
     <div class="card-title">Social Media keys <span class="badge badge-opt">Optional — not scored</span></div>
-    <p style="font-size:12px;color:var(--mt2);margin-bottom:14px">Leave blank to skip. Twitter/X search is limited to last 7 days on the free tier. Instagram and LinkedIn do not have public search APIs. Get keys at <a href="https://developer.twitter.com" target="_blank" style="color:var(--amb)">Twitter Developer Portal</a> · <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" style="color:var(--amb)">Google Cloud Console</a></p>
-    <div class="grid" style="margin-bottom:0">
+    <p style="font-size:12px;color:var(--mt2);margin-bottom:14px">Leave blank to skip. Twitter/X search is limited to last 7 days on the free tier. Get keys at <a href="https://developer.twitter.com" target="_blank" style="color:var(--amb)">Twitter Developer Portal</a> · <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" style="color:var(--amb)">Google Cloud Console</a></p>
+
+    <div class="fld" style="margin-bottom:16px">
+      <label>Twitter / X Bearer Token</label>
+      <input id="twitterKey" type="password" placeholder="AAAA...">
+      <div class="hint">Free tier: recent search, last 7 days, ~500k tweets/month</div>
+    </div>
+
+    <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mt);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bdr)">YouTube Data API v3</div>
+    <div class="row3">
       <div class="fld">
-        <label>Twitter / X Bearer Token</label>
-        <input id="twitterKey" type="password" placeholder="AAAA...">
-        <div class="hint">Free tier: recent search, last 7 days, ~500k tweets/month</div>
+        <label>API Key</label>
+        <input id="youtubeKey" type="password" placeholder="AIza...">
+        <div class="hint">10,000 units/day free · Search = 100 units/call</div>
       </div>
       <div class="fld">
-        <label>YouTube Data API v3 Key</label>
-        <input id="youtubeKey" type="password" placeholder="AIza...">
-        <div class="hint">Free: 10,000 units/day · Search = 100 units/call</div>
+        <label>OAuth Client ID</label>
+        <input id="youtubeClientId" type="password" placeholder="...apps.googleusercontent.com">
+        <div class="hint">From Google Cloud Console → Credentials</div>
+      </div>
+      <div class="fld">
+        <label>OAuth Client Secret</label>
+        <input id="youtubeClientSecret" type="password" placeholder="GOCSPX-...">
+        <div class="hint">From Google Cloud Console → Credentials</div>
       </div>
     </div>
   </div>
@@ -184,8 +160,7 @@ html,body{min-height:100vh;background:var(--ink);color:var(--tx);font-family:'In
 </div>
 
 <script>
-// Pre-populate from environment (Replit Secrets exposed as meta tags by server)
-// ── Org selector ───────────────────────────────────────────────────────────
+// ── Org selector ────────────────────────────────────────────────────────────
 const DEFAULT_ORGS = [
   'CEEW','CSTEP','TERI','CSE','WRI India','Greenpeace India',
   'Climate Trends','iForest','Urban Emissions','CREA','ATREE','Respirer Living Sciences','CLEAN'
@@ -214,7 +189,6 @@ function updateOrgCount() {
   const sel = getSelectedOrgs();
   const countEl = document.getElementById('orgCount');
   if (sel.length > 13) {
-    // Uncheck the last-checked one
     const all = document.querySelectorAll('#orgCheckboxes input[type=checkbox]');
     let unchecked = false;
     all.forEach(cb => { if (cb.checked && !unchecked && getSelectedOrgs().length > 13) { cb.checked = false; unchecked = true; } });
@@ -231,153 +205,141 @@ function addCustomOrg() {
   customOrgs.push(val);
   input.value = '';
   renderOrgCheckboxes();
-  // Auto-check the newly added org
   const cbs = document.querySelectorAll('#orgCheckboxes input[type=checkbox]');
   cbs.forEach(cb => { if (cb.value === val) cb.checked = true; });
   updateOrgCount();
 }
 
-// Allow Enter key in custom org input
 document.addEventListener('DOMContentLoaded', () => {
   renderOrgCheckboxes();
   const orgInput = document.getElementById('orgCustom');
   if (orgInput) orgInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addCustomOrg(); } });
 });
 
+// Pre-populate social keys from server-injected env meta tag
 (function prePopulate(){
   const meta = document.querySelector('meta[name="env"]');
   if(!meta) return;
-  try{const env=JSON.parse(meta.content);
-    if(env.SERPER_KEY)  document.getElementById('serperKey').value=env.SERPER_KEY;
-    if(env.CLAUDE_KEY)  document.getElementById('claudeKey').value=env.CLAUDE_KEY;
-    if(env.OPENAI_KEY)  document.getElementById('openaiKey').value=env.OPENAI_KEY;
-    if(env.PERPLEXITY_KEY) document.getElementById('perplexityKey').value=env.PERPLEXITY_KEY;
-    if(env.GEMINI_KEY)  document.getElementById('geminiKey').value=env.GEMINI_KEY;
-    if(env.TWITTER_KEY) document.getElementById('twitterKey').value=env.TWITTER_KEY;
-    if(env.YOUTUBE_KEY) document.getElementById('youtubeKey').value=env.YOUTUBE_KEY;
+  try{
+    const env = JSON.parse(meta.content);
+    if(env.TWITTER_KEY)           document.getElementById('twitterKey').value          = env.TWITTER_KEY;
+    if(env.YOUTUBE_KEY)           document.getElementById('youtubeKey').value           = env.YOUTUBE_KEY;
+    if(env.YOUTUBE_CLIENT_ID)     document.getElementById('youtubeClientId').value      = env.YOUTUBE_CLIENT_ID;
+    if(env.YOUTUBE_CLIENT_SECRET) document.getElementById('youtubeClientSecret').value  = env.YOUTUBE_CLIENT_SECRET;
   }catch(e){}
 })();
 
 // Load previous reports
 async function loadPrev(){
   try{
-    const res=await fetch('/outputs');
-    const files=await res.json();
+    const res = await fetch('/outputs');
+    const files = await res.json();
     if(!files.length) return;
-    const list=document.getElementById('prevList');
-    list.innerHTML='';
-    files.slice(0,10).forEach(f=>{
-      const row=document.createElement('div');
-      row.className='prev-item';
-      const ext=f.name.endsWith('.pptx')?'📊':'📄';
-      row.innerHTML=`<span class="prev-item-name">${ext} ${esc(f.name)}</span><span class="prev-item-meta">${f.size}KB · ${f.mtime}</span><a href="/download/${encodeURIComponent(f.name)}" download>download</a>`;
+    const list = document.getElementById('prevList');
+    list.innerHTML = '';
+    files.slice(0,10).forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'prev-item';
+      const ext = f.name.endsWith('.pptx') ? '📊' : '📄';
+      row.innerHTML = `<span class="prev-item-name">${ext} ${esc(f.name)}</span><span class="prev-item-meta">${f.size}KB · ${f.mtime}</span><a href="/download/${encodeURIComponent(f.name)}" download>download</a>`;
       list.appendChild(row);
     });
-    document.getElementById('prevReports').style.display='block';
+    document.getElementById('prevReports').style.display = 'block';
   }catch(e){}
 }
 
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-function logLine(msg,level){
-  const box=document.getElementById('logBox');
-  const line=document.createElement('div');
-  line.className=level==='head'?'lhd':level==='ok'?'lok':level==='warn'?'lwn':level==='err'?'ler':'';
-  line.textContent=msg;
+function logLine(msg, level){
+  const box = document.getElementById('logBox');
+  const line = document.createElement('div');
+  line.className = level==='head'?'lhd':level==='ok'?'lok':level==='warn'?'lwn':level==='err'?'ler':'';
+  line.textContent = msg;
   box.appendChild(line);
-  box.scrollTop=box.scrollHeight;
+  box.scrollTop = box.scrollHeight;
 }
 
-// Rough step counter for progress bar
-const TOTAL_STEPS=60;
-let stepCount=0;
-function bumpProgress(){ stepCount=Math.min(stepCount+1,TOTAL_STEPS-1); document.getElementById('progFill').style.width=Math.round(stepCount/TOTAL_STEPS*100)+'%'; }
+const TOTAL_STEPS = 60;
+let stepCount = 0;
+function bumpProgress(){ stepCount = Math.min(stepCount+1, TOTAL_STEPS-1); document.getElementById('progFill').style.width = Math.round(stepCount/TOTAL_STEPS*100)+'%'; }
 
 async function startRun(){
-  const btn=document.getElementById('runBtn');
-  const serperKey=document.getElementById('serperKey').value.trim();
-  const claudeKey=document.getElementById('claudeKey').value.trim();
+  const btn = document.getElementById('runBtn');
   const selectedOrgs = getSelectedOrgs();
-  if(!selectedOrgs.length){alert('Select at least one organisation.');return;}
-  if(!serperKey){alert('Serper API key is required.');return;}
-  if(!claudeKey){alert('Claude API key is required.');return;}
+  if(!selectedOrgs.length){ alert('Select at least one organisation.'); return; }
 
-  btn.disabled=true;
-  document.getElementById('runBtnIcon').textContent='⟳';
-  document.getElementById('runBtnText').textContent='Running...';
+  btn.disabled = true;
+  document.getElementById('runBtnIcon').textContent = '⟳';
+  document.getElementById('runBtnText').textContent = 'Running...';
   document.getElementById('progressWrap').classList.add('on');
   document.getElementById('results').classList.remove('on');
-  document.getElementById('logBox').innerHTML='';
-  stepCount=0;
-  document.getElementById('progFill').style.width='0';
+  document.getElementById('logBox').innerHTML = '';
+  stepCount = 0;
+  document.getElementById('progFill').style.width = '0';
 
-  const payload={
-    orgs:         getSelectedOrgs(),
-    dateFrom:     document.getElementById('dateFrom').value,
-    dateTo:       document.getElementById('dateTo').value,
-    clientName:   document.getElementById('clientName').value,
-    serperKey,
-    claudeKey,
-
-    openaiKey:    document.getElementById('openaiKey').value.trim(),
-    perplexityKey:document.getElementById('perplexityKey').value.trim(),
-    geminiKey:    document.getElementById('geminiKey').value.trim(),
-    twitterKey:   document.getElementById('twitterKey').value.trim(),
-    youtubeKey:   document.getElementById('youtubeKey').value.trim()
+  const payload = {
+    orgs:                getSelectedOrgs(),
+    dateFrom:            document.getElementById('dateFrom').value,
+    dateTo:              document.getElementById('dateTo').value,
+    clientName:          document.getElementById('clientName').value,
+    twitterKey:          document.getElementById('twitterKey').value.trim(),
+    youtubeKey:          document.getElementById('youtubeKey').value.trim(),
+    youtubeClientId:     document.getElementById('youtubeClientId').value.trim(),
+    youtubeClientSecret: document.getElementById('youtubeClientSecret').value.trim()
   };
 
   try{
-    const res=await fetch('/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    if(!res.ok){const err=await res.json();alert('Error: '+(err.error||res.status));btn.disabled=false;document.getElementById('runBtnIcon').textContent='▶';document.getElementById('runBtnText').textContent='Generate Report';return;}
+    const res = await fetch('/run', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    if(!res.ok){ const err = await res.json(); alert('Error: '+(err.error||res.status)); btn.disabled=false; document.getElementById('runBtnIcon').textContent='▶'; document.getElementById('runBtnText').textContent='Generate Report'; return; }
 
-    const reader=res.body.getReader();
-    const dec=new TextDecoder();
-    let buf='';
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
 
     while(true){
-      const {done,value}=await reader.read();
+      const {done, value} = await reader.read();
       if(done) break;
-      buf+=dec.decode(value,{stream:true});
-      const parts=buf.split('\n\n');
-      buf=parts.pop()||'';
+      buf += dec.decode(value, {stream:true});
+      const parts = buf.split('\n\n');
+      buf = parts.pop() || '';
       for(const block of parts){
         if(!block.trim()) continue;
-        const lines=block.split('\n');
-        let event='message',data='';
+        const lines = block.split('\n');
+        let event = 'message', data = '';
         for(const line of lines){
-          if(line.startsWith('event:')) event=line.slice(6).trim();
-          if(line.startsWith('data:')) data=line.slice(5).trim();
+          if(line.startsWith('event:')) event = line.slice(6).trim();
+          if(line.startsWith('data:')) data = line.slice(5).trim();
         }
         if(!data) continue;
         let parsed;
-        try{parsed=JSON.parse(data);}catch{continue;}
+        try{ parsed = JSON.parse(data); }catch{ continue; }
 
-        if(event==='log'){
-          logLine(parsed.msg,parsed.level||'');
+        if(event === 'log'){
+          logLine(parsed.msg, parsed.level||'');
           bumpProgress();
-        } else if(event==='done'){
-          document.getElementById('progFill').style.width='100%';
-          document.getElementById('dlHtml').href='/download/'+encodeURIComponent(parsed.htmlName);
-          document.getElementById('dlHtml').download=parsed.htmlName;
-          document.getElementById('dlPptx').href='/download/'+encodeURIComponent(parsed.pptxName);
-          document.getElementById('dlPptx').download=parsed.pptxName;
+        } else if(event === 'done'){
+          document.getElementById('progFill').style.width = '100%';
+          document.getElementById('dlHtml').href = '/download/'+encodeURIComponent(parsed.htmlName);
+          document.getElementById('dlHtml').download = parsed.htmlName;
+          document.getElementById('dlPptx').href = '/download/'+encodeURIComponent(parsed.pptxName);
+          document.getElementById('dlPptx').download = parsed.pptxName;
           document.getElementById('results').classList.add('on');
           await loadPrev();
-        } else if(event==='error'){
-          logLine('✗ Fatal error: '+parsed.msg,'err');
+        } else if(event === 'error'){
+          logLine('✗ Fatal error: '+parsed.msg, 'err');
         }
       }
     }
   }catch(e){
-    logLine('✗ Connection error: '+e.message,'err');
+    logLine('✗ Connection error: '+e.message, 'err');
   }
 
-  btn.disabled=false;
-  document.getElementById('runBtnIcon').textContent='▶';
-  document.getElementById('runBtnText').textContent='Generate Report';
+  btn.disabled = false;
+  document.getElementById('runBtnIcon').textContent = '▶';
+  document.getElementById('runBtnText').textContent = 'Generate Report';
 }
 
-window.addEventListener('DOMContentLoaded',loadPrev);
+window.addEventListener('DOMContentLoaded', loadPrev);
 </script>
 </body>
 </html>
