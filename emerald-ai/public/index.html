@@ -69,7 +69,7 @@ html,body{min-height:100vh;background:var(--ink);color:var(--tx);font-family:'In
   </div>
 
   <div class="info-box">
-    <strong>API keys are pre-loaded from server secrets.</strong> Serper, Claude, OpenAI, Perplexity, and Gemini keys are configured server-side and applied automatically on every run.
+    <strong>API keys are pre-loaded from server secrets.</strong> Serper, Claude, OpenAI, Perplexity, Gemini, and social media keys are configured server-side and applied automatically on every run.
   </div>
 
   <!-- Report settings -->
@@ -100,36 +100,6 @@ html,body{min-height:100vh;background:var(--ink);color:var(--tx);font-family:'In
     </div>
   </div>
 
-  <!-- Social media keys -->
-  <div class="card" style="margin-bottom:0">
-    <div class="card-title">Social Media keys <span class="badge badge-opt">Optional — not scored</span></div>
-    <p style="font-size:12px;color:var(--mt2);margin-bottom:14px">Leave blank to skip. Twitter/X search is limited to last 7 days on the free tier. Get keys at <a href="https://developer.twitter.com" target="_blank" style="color:var(--amb)">Twitter Developer Portal</a> · <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" style="color:var(--amb)">Google Cloud Console</a></p>
-
-    <div class="fld" style="margin-bottom:16px">
-      <label>Twitter / X Bearer Token</label>
-      <input id="twitterKey" type="password" placeholder="AAAA...">
-      <div class="hint">Free tier: recent search, last 7 days, ~500k tweets/month</div>
-    </div>
-
-    <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mt);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bdr)">YouTube OAuth</div>
-    <div class="row3">
-      <div class="fld">
-        <label>Client ID</label>
-        <input id="youtubeClientId" type="password" placeholder="...apps.googleusercontent.com">
-        <div class="hint">From Google Cloud Console → Credentials</div>
-      </div>
-      <div class="fld">
-        <label>Client Secret</label>
-        <input id="youtubeClientSecret" type="password" placeholder="GOCSPX-...">
-        <div class="hint">From Google Cloud Console → Credentials</div>
-      </div>
-      <div class="fld">
-        <label>Authorized Redirect URI</label>
-        <input id="youtubeAuthorizedUri" type="password" placeholder="https://.../oauth/callback">
-        <div class="hint">From Google Cloud Console → Authorized redirect URIs</div>
-      </div>
-    </div>
-  </div>
 
   <button class="run-btn" id="runBtn" onclick="startRun()">
     <span id="runBtnIcon">▶</span>
@@ -216,18 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (orgInput) orgInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addCustomOrg(); } });
 });
 
-// Pre-populate social keys from server-injected env meta tag
-(function prePopulate(){
-  const meta = document.querySelector('meta[name="env"]');
-  if(!meta) return;
-  try{
-    const env = JSON.parse(meta.content);
-    if(env.TWITTER_KEY)           document.getElementById('twitterKey').value          = env.TWITTER_KEY;
-    if(env.YOUTUBE_CLIENT_ID)     document.getElementById('youtubeClientId').value      = env.YOUTUBE_CLIENT_ID;
-    if(env.YOUTUBE_CLIENT_SECRET) document.getElementById('youtubeClientSecret').value  = env.YOUTUBE_CLIENT_SECRET;
-    if(env.YOUTUBE_AUTHORIZED_URI)document.getElementById('youtubeAuthorizedUri').value = env.YOUTUBE_AUTHORIZED_URI;
-  }catch(e){}
-})();
 
 // Load previous reports
 async function loadPrev(){
@@ -278,14 +236,10 @@ async function startRun(){
   document.getElementById('progFill').style.width = '0';
 
   const payload = {
-    orgs:                getSelectedOrgs(),
-    dateFrom:            document.getElementById('dateFrom').value,
-    dateTo:              document.getElementById('dateTo').value,
-    clientName:          document.getElementById('clientName').value,
-    twitterKey:          document.getElementById('twitterKey').value.trim(),
-    youtubeClientId:     document.getElementById('youtubeClientId').value.trim(),
-    youtubeClientSecret: document.getElementById('youtubeClientSecret').value.trim(),
-    youtubeAuthorizedUri:document.getElementById('youtubeAuthorizedUri').value.trim()
+    orgs:       getSelectedOrgs(),
+    dateFrom:   document.getElementById('dateFrom').value,
+    dateTo:     document.getElementById('dateTo').value,
+    clientName: document.getElementById('clientName').value
   };
 
   try{
