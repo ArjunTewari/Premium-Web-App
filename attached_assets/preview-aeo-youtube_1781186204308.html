@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AQ Intelligence — AEO &amp; Social Intelligence · CEEW vs CSTEP</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0a0e17;--surface:#111520;--surface2:#181e2e;--surface3:#1e2638;
+  --border:#252d40;--border2:#2e3a52;--text:#d8e4f0;--muted:#5e7494;--muted2:#8fa3b8;
+  --amber:#c9922a;--amber-dim:rgba(201,146,42,.12);--amber-glow:rgba(201,146,42,.06);
+  --ceew:#3d8ef0;--ceew-dim:rgba(61,142,240,.12);
+  --cstep:#e05c3a;--cstep-dim:rgba(224,92,58,.12);
+  --good:#4caf74;--warn:#d4a017;--bad:#e05c5c;
+  --yt-color:#ff4444;--tw-color:#e2e8f0;--ig-color:#e1306c;--li-color:#0a66c2
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line-height:1.65;font-size:14px}
+.shell{display:flex;min-height:100vh}
+.sidenav{width:220px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:28px 0;display:flex;flex-direction:column}
+.sidenav-logo{padding:0 20px 24px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.sidenav-logo-name{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+.sidenav-logo-sub{font-size:10px;color:var(--muted);margin-top:2px;font-family:'JetBrains Mono',monospace}
+.nav-section-label{font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:12px 20px 6px}
+.nav-item{display:block;padding:7px 20px;font-size:12px;color:var(--muted2);text-decoration:none;border-left:2px solid transparent;transition:all .15s}
+.nav-item:hover{color:var(--text);background:var(--surface2)}
+.nav-item.active{color:var(--amber);border-left-color:var(--amber);background:var(--amber-glow)}
+.nav-item.dim{opacity:.4;pointer-events:none}
+.nav-item.sub{padding-left:32px;font-size:11px}
+.sidenav-footer{margin-top:auto;padding:16px 20px 0;border-top:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);line-height:1.8}
+.main{flex:1;min-width:0;padding:0 48px 80px;max-width:960px}
+.section{margin-bottom:56px;scroll-margin-top:24px}
+.section-header{margin-bottom:24px}
+.section-eyebrow{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.section-title{font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;color:var(--text);line-height:1.2}
+.section-desc{margin-top:8px;font-size:13px;color:var(--muted2);max-width:680px;line-height:1.65}
+.section-divider{width:40px;height:2px;background:var(--amber);margin:14px 0 0}
+.compare-panel{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.org-panel{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:20px}
+.org-panel-ceew{border-top:2px solid var(--ceew)}.org-panel-cstep{border-top:2px solid var(--cstep)}
+.org-panel-name{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
+.ceew-label{color:var(--ceew)}.cstep-label{color:var(--cstep)}
+.scope-banner{background:var(--amber-glow);border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:14px 18px;font-size:12px;color:var(--muted2);margin-bottom:20px;line-height:1.7}
+.scope-banner strong{color:var(--amber)}
+
+/* AEO */
+.donut-wrap{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.aeo-big-score{font-family:'DM Serif Display',serif;font-size:52px;line-height:1;font-weight:400;margin-bottom:4px}
+.aeo-score-label{font-size:12px;color:var(--muted2);margin-bottom:14px}
+.aeo-llm-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.aeo-llm-row:last-child{border-bottom:none}
+.aeo-llm-name{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);flex-shrink:0;width:130px}
+.aeo-llm-bar{flex:1;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden}
+.aeo-llm-fill{height:100%;border-radius:3px}
+.aeo-llm-score{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;width:38px;text-align:right}
+.aeo-response-box{background:var(--ink);border:1px solid var(--border2);border-left:2px solid var(--amber);border-radius:0 5px 5px 0;padding:10px 12px;margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted2);line-height:1.65}
+.aeo-response-label{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin-bottom:5px}
+.aeo-gap-notice{background:rgba(224,92,92,.06);border:1px solid rgba(224,92,92,.2);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--muted2);margin-top:12px;line-height:1.6}
+.aeo-gap-notice strong{color:var(--bad)}
+.aeo-present-notice{background:rgba(76,175,116,.06);border:1px solid rgba(76,175,116,.2);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--muted2);margin-top:12px;line-height:1.6}
+.aeo-present-notice strong{color:var(--good)}
+.aeo-q-item{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--border);align-items:flex-start;font-size:12px}
+.aeo-q-item:last-child{border-bottom:none;padding-bottom:0}
+.aeo-q-num{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--amber);flex-shrink:0;width:18px;padding-top:2px}
+.aeo-q-text{color:var(--muted2);flex:1;line-height:1.55}
+
+/* Platform tabs */
+.platform-tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:0}
+.ptab{display:flex;align-items:center;gap:7px;padding:10px 18px;font-size:12px;font-weight:600;color:var(--muted2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;user-select:none}
+.ptab:hover{color:var(--text)}
+.ptab.active{color:var(--text);border-bottom-color:var(--amber)}
+.ptab-icon{width:16px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;flex-shrink:0}
+.tab-pane{display:none;padding-top:20px}
+.tab-pane.active{display:block}
+
+/* Platform header */
+.platform-banner{display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px}
+.platform-banner-icon{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;flex-shrink:0}
+.platform-banner-info{flex:1}
+.platform-banner-name{font-size:13px;font-weight:600;color:var(--text)}
+.platform-banner-sub{font-size:11px;color:var(--muted2);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.src-badge{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--amber);background:var(--amber-dim);border:1px solid rgba(201,146,42,.25);border-radius:3px;padding:2px 8px;flex-shrink:0}
+
+/* ── THE MAIN SOCIAL TABLE ── */
+.social-table{width:100%;border-collapse:collapse;font-size:12px}
+.social-table th{
+  background:var(--surface3);padding:10px 14px;text-align:left;
+  font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);font-weight:500;
+  border-bottom:1px solid var(--border);white-space:nowrap
+}
+.social-table td{padding:14px;border-bottom:1px solid var(--border);vertical-align:top}
+.social-table tr:last-child td{border-bottom:none}
+.social-table tr:hover td{background:rgba(255,255,255,.015)}
+/* col widths */
+.col-org{width:90px}
+.col-count{width:80px;text-align:center}
+.col-location{width:200px}
+.col-pts{width:80px;text-align:center}
+.col-insight{min-width:220px}
+
+/* Org name badge */
+.org-badge{display:inline-flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:3px 10px;border-radius:3px}
+.ob-ceew{background:var(--ceew-dim);color:var(--ceew);border:1px solid rgba(61,142,240,.35)}
+.ob-cstep{background:var(--cstep-dim);color:var(--cstep);border:1px solid rgba(224,92,58,.35)}
+
+/* Mention count — big mono number */
+.mention-count{font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400}
+
+/* Location breakdown — stacked micro-bars */
+.loc-breakdown{display:flex;flex-direction:column;gap:5px}
+.loc-row{display:flex;align-items:center;gap:7px;font-size:11px}
+.loc-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);width:72px;flex-shrink:0;text-transform:uppercase;letter-spacing:.06em}
+.loc-track{flex:1;height:5px;background:var(--surface3);border-radius:2px;overflow:hidden}
+.loc-fill{height:100%;border-radius:2px}
+.loc-num{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:20px;text-align:right}
+
+/* Points badge */
+.pts-big{font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400}
+
+/* Insight cell */
+.insight-cell{font-size:12px;color:var(--muted2);line-height:1.6}
+.insight-cell .trending-topics{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.topic-pill{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);background:var(--surface3);border:1px solid var(--border);border-radius:2px;padding:2px 7px}
+.leader-line{font-size:11px;color:var(--muted2);line-height:1.55}
+.leader-line strong{color:var(--text)}
+
+/* Insight spans the full last column for the platform — wider */
+.platform-insight{background:var(--surface3);border-radius:6px;padding:12px 14px;margin-top:0}
+
+/* Score tally footer */
+.score-tally{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-top:20px}
+.tally-row{display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)}
+.tally-row:last-child{border-bottom:none}
+.tally-plat{width:100px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);display:flex;align-items:center;gap:6px;flex-shrink:0}
+.tally-plat-icon{width:14px;height:14px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff;flex-shrink:0}
+.tally-track{flex:1;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;display:flex;gap:2px}
+.tally-fill-c{height:100%;border-radius:2px;background:var(--ceew)}
+.tally-fill-s{height:100%;border-radius:2px;background:var(--cstep)}
+.tally-val{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:52px;text-align:right}
+
+.grand-total{display:flex;gap:32px;padding:16px;background:var(--surface3);border-radius:6px;margin-top:14px;align-items:center;flex-wrap:wrap}
+.gt-num{text-align:center}
+.gt-score{font-family:'DM Serif Display',serif;font-size:44px;line-height:1;font-weight:400}
+
+.info-note{background:rgba(61,142,240,.06);border:1px solid rgba(61,142,240,.2);border-radius:6px;padding:9px 13px;font-size:11px;color:var(--muted2);margin-bottom:14px;line-height:1.6}
+.info-note strong{color:var(--ceew)}
+.warn-note{background:rgba(212,160,23,.06);border:1px solid rgba(212,160,23,.2);border-radius:6px;padding:9px 13px;font-size:11px;color:var(--muted2);margin-bottom:14px;line-height:1.6}
+.warn-note strong{color:var(--warn)}
+
+@media(max-width:900px){.sidenav{display:none}.main{padding:24px 20px 60px}.compare-panel{grid-template-columns:1fr}.social-table{font-size:11px}}
+</style>
+</head>
+<body>
+<div class="shell">
+<nav class="sidenav">
+  <div class="sidenav-logo">
+    <div class="sidenav-logo-name">Emerald AI</div>
+    <div class="sidenav-logo-sub">AQ Intelligence · Q2 2026</div>
+  </div>
+  <div class="nav-section-label">Report</div>
+  <a href="#" class="nav-item dim">Executive Summary</a>
+  <a href="#" class="nav-item dim">Methodology</a>
+  <div class="nav-section-label">Media Analysis</div>
+  <a href="#" class="nav-item dim">Share of Voice</a>
+  <a href="#" class="nav-item dim">Coverage Momentum</a>
+  <a href="#" class="nav-item dim">Topic Ownership</a>
+  <a href="#" class="nav-item dim">Narrative Position</a>
+  <a href="#" class="nav-item dim">Citation Quality</a>
+  <a href="#" class="nav-item dim">Emerging Narratives</a>
+  <div class="nav-section-label">Digital Presence</div>
+  <a href="#aeo" class="nav-item active">AEO / LLM Visibility</a>
+  <a href="#social" class="nav-item">Social Intelligence</a>
+  <a href="#" class="nav-item sub dim">↳ YouTube</a>
+  <a href="#" class="nav-item sub dim">↳ X / Twitter</a>
+  <a href="#" class="nav-item sub dim">↳ Instagram</a>
+  <a href="#" class="nav-item sub dim">↳ LinkedIn</a>
+  <div class="nav-section-label">Conclusions</div>
+  <a href="#" class="nav-item dim">Competitive Scorecard</a>
+  <a href="#" class="nav-item dim">Action Matrix</a>
+  <a href="#" class="nav-item dim">Source Appendix</a>
+  <div class="sidenav-footer">
+    AEO + Social Intelligence<br>
+    CEEW vs CSTEP<br>
+    2026-03-08 to 2026-06-08<br>
+    CONFIDENTIAL
+  </div>
+</nav>
+
+<main class="main">
+
+<!-- ══════════════════════════════
+     AEO
+══════════════════════════════ -->
+<section class="section" id="aeo">
+  <div class="section-header">
+    <div class="section-eyebrow">AEO — LLM Visibility</div>
+    <h2 class="section-title">AI Engine Optimisation</h2>
+    <div class="section-desc">When someone asks an AI model about Indian air quality, which organisations does it cite? Five standard discovery questions were sent to three LLMs. Mention rate = AEO score. Contributes 30% of the Competitive Scorecard.</div>
+    <div class="section-divider"></div>
+  </div>
+  <div class="scope-banner"><strong>How AEO is measured:</strong> Each LLM (GPT-4o mini, Perplexity Sonar, Gemini 1.5 Flash) received 5 standard AQ discovery questions. Each response that names the org = 1 mention. Score = (total mentions ÷ 15 possible) × 100.</div>
+  <div class="compare-panel">
+    <div class="org-panel org-panel-ceew">
+      <div class="org-panel-name ceew-label">CEEW</div>
+      <div class="donut-wrap">
+        <svg width="64" height="64" viewBox="0 0 64 64" style="flex-shrink:0">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--surface3)" stroke-width="10"/>
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--ceew)" stroke-width="10" stroke-dasharray="119.3 44.1" stroke-dashoffset="41" stroke-linecap="round"/>
+          <text x="32" y="37" text-anchor="middle" fill="var(--ceew)" font-size="13" font-family="Inter" font-weight="700">73</text>
+        </svg>
+        <div>
+          <div class="aeo-big-score" style="color:var(--ceew)">73<span style="font-size:22px;color:var(--muted2)">/100</span></div>
+          <div class="aeo-score-label">AEO Score</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)">11 of 15 LLM responses cited CEEW</div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div class="aeo-llm-row"><div class="aeo-llm-name">GPT-4o mini</div><div class="aeo-llm-bar"><div class="aeo-llm-fill" style="width:80%;background:var(--ceew)"></div></div><div class="aeo-llm-score" style="color:var(--ceew)">4/5</div></div>
+        <div class="aeo-llm-row"><div class="aeo-llm-name">Perplexity Sonar</div><div class="aeo-llm-bar"><div class="aeo-llm-fill" style="width:100%;background:var(--ceew)"></div></div><div class="aeo-llm-score" style="color:var(--ceew)">3/3</div></div>
+        <div class="aeo-llm-row"><div class="aeo-llm-name">Gemini 1.5 Flash</div><div class="aeo-llm-bar"><div class="aeo-llm-fill" style="width:80%;background:var(--ceew)"></div></div><div class="aeo-llm-score" style="color:var(--ceew)">4/5</div></div>
+      </div>
+      <div class="aeo-response-box"><div class="aeo-response-label">Example — GPT-4o response to Q1</div>"CEEW is one of India's most cited institutions on air quality policy, particularly for its work on NCAP targets and city-level PM2.5 exposure data…"</div>
+      <div class="aeo-present-notice"><strong>Consistent presence.</strong> CEEW cited in 73% of responses — strongest on NCAP (Q1, Q4) and PM2.5 data (Q2). Weakest on technology/solutions (Q5).</div>
+    </div>
+    <div class="org-panel org-panel-cstep">
+      <div class="org-panel-name cstep-label">CSTEP</div>
+      <div class="donut-wrap">
+        <svg width="64" height="64" viewBox="0 0 64 64" style="flex-shrink:0">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--surface3)" stroke-width="10"/>
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--cstep)" stroke-width="10" stroke-dasharray="44.1 119.3" stroke-dashoffset="41" stroke-linecap="round"/>
+          <text x="32" y="37" text-anchor="middle" fill="var(--cstep)" font-size="13" font-family="Inter" font-weight="700">27</text>
+        </svg>
+        <div>
+          <div class="aeo-big-score" style="color:var(--cstep)">27<span style="font-size:22px;color:var(--muted2)">/100</span></div>
+          <div class="aeo-score-label">AEO Score</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)">4 of 15 LLM responses cited CSTEP</div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div class="aeo-llm-row"><div class="aeo-llm-name">GPT-4o mini</div><div class="aeo-llm-bar"><div class="aeo-llm-fill" style="width:40%;background:var(--cstep)"></div></div><div class="aeo-llm-score" style="color:var(--cstep)">2/5</div></div>
+        <div class="aeo-llm-row"><div class="aeo-llm-name">Perplexity Sonar</div><div class="aeo-llm-bar"><div class="aeo-llm-fill" style="width:33%;background:var(--cstep)"></div></div><div class="aeo-llm-score" style="color:var(--cstep)">1/3</div></div>
+        <div class="aeo-llm-row"><div class="aeo-llm-name">Gemini 1.5 Flash</div><div class="aeo-llm-bar"><div class="aeo-llm-fill" style="width:20%;background:var(--cstep)"></div></div><div class="aeo-llm-score" style="color:var(--cstep)">1/5</div></div>
+      </div>
+      <div class="aeo-response-box"><div class="aeo-response-label">Example — Perplexity response to Q5</div>"CSTEP has published useful work on vehicular emission modelling and low-cost sensor networks — cited less than CEEW or TERI on national policy and NCAP questions…"</div>
+      <div class="aeo-gap-notice"><strong>46-point gap vs CEEW.</strong> Visible only on technical/sensor questions (Q5). Invisible to all 3 LLMs on NCAP, policy, and journalist-reference queries (Q1, Q3, Q4).</div>
+    </div>
+  </div>
+
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px 18px;margin-bottom:12px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:10px">5 Standard AEO Discovery Questions</div>
+    <div>
+      <div class="aeo-q-item"><div class="aeo-q-num">Q1</div><div class="aeo-q-text">Which Indian research organisations are the most authoritative sources on air quality data and policy?<span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--good);background:rgba(76,175,116,.1);border:1px solid rgba(76,175,116,.25);border-radius:3px;padding:1px 6px">CEEW ✓ 3/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);background:var(--surface3);border:1px solid var(--border);border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div></div>
+      <div class="aeo-q-item"><div class="aeo-q-num">Q2</div><div class="aeo-q-text">What organisations publish the most reliable AQI and PM2.5 data for Indian cities?<span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--good);background:rgba(76,175,116,.1);border:1px solid rgba(76,175,116,.25);border-radius:3px;padding:1px 6px">CEEW ✓ 2/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--warn);background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.25);border-radius:3px;padding:1px 6px">CSTEP ✓ 1/3</span></span></div></div>
+      <div class="aeo-q-item"><div class="aeo-q-num">Q3</div><div class="aeo-q-text">Who are the leading think tanks working on clean air policy in India?<span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--good);background:rgba(76,175,116,.1);border:1px solid rgba(76,175,116,.25);border-radius:3px;padding:1px 6px">CEEW ✓ 3/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--warn);background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.25);border-radius:3px;padding:1px 6px">CSTEP ✓ 1/3</span></span></div></div>
+      <div class="aeo-q-item"><div class="aeo-q-num">Q4</div><div class="aeo-q-text">Which organisations should journalists cite when reporting on India's NCAP?<span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--good);background:rgba(76,175,116,.1);border:1px solid rgba(76,175,116,.25);border-radius:3px;padding:1px 6px">CEEW ✓ 3/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);background:var(--surface3);border:1px solid var(--border);border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div></div>
+      <div class="aeo-q-item"><div class="aeo-q-num">Q5</div><div class="aeo-q-text">What Indian institutes are most influential on air pollution technology and solutions?<span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--warn);background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.25);border-radius:3px;padding:1px 6px">CEEW ✓ 1/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--good);background:rgba(76,175,116,.1);border:1px solid rgba(76,175,116,.25);border-radius:3px;padding:1px 6px">CSTEP ✓ 2/3</span></span></div></div>
+    </div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)">GPT-4o mini · Perplexity Sonar · Gemini 1.5 Flash · 5 questions × 3 LLMs = 15 responses per org</div>
+</section>
+
+
+<!-- ══════════════════════════════
+     SOCIAL INTELLIGENCE
+══════════════════════════════ -->
+<section class="section" id="social">
+  <div class="section-header">
+    <div class="section-eyebrow">Social Intelligence</div>
+    <h2 class="section-title">Trending AQ Content Across Platforms</h2>
+    <div class="section-desc">Top AQ-related content on YouTube, X, Instagram, and LinkedIn during the period — no org filter applied at search stage. Each time a tracked organisation is mentioned in a post (title, hook, description, or comments) = 1 point. Points combine into the Social Presence Score at report end.</div>
+    <div class="section-divider"></div>
+  </div>
+  <div class="scope-banner"><strong>Scoring:</strong> 1 point per org mention regardless of location. Location is tracked separately (Title/Hook · Description · Comments) to show <em>where</em> in the content the org appears — an org cited in a title drives far more discovery than one in a comment.</div>
+
+  <div class="platform-tabs">
+    <div class="ptab active" onclick="switchTab('yt',this)"><span class="ptab-icon" style="background:var(--yt-color)">▶</span> YouTube</div>
+    <div class="ptab" onclick="switchTab('tw',this)"><span class="ptab-icon" style="background:#111;border:1px solid #555;font-size:11px;font-weight:900">𝕏</span> X / Twitter</div>
+    <div class="ptab" onclick="switchTab('ig',this)"><span class="ptab-icon" style="background:var(--ig-color)">◉</span> Instagram</div>
+    <div class="ptab" onclick="switchTab('li',this)"><span class="ptab-icon" style="background:var(--li-color)">in</span> LinkedIn</div>
+  </div>
+
+  <!-- ═══ YOUTUBE ═══ -->
+  <div class="tab-pane active" id="tab-yt">
+    <div class="platform-banner">
+      <div class="platform-banner-icon" style="background:var(--yt-color)">▶</div>
+      <div class="platform-banner-info">
+        <div class="platform-banner-name">YouTube — Top 18 AQ Videos · 2026-03-08 to 2026-06-08</div>
+        <div class="platform-banner-sub">YouTube Data API v3 · viewCount sort · regionCode=IN · AQ term required in title · noise/water/soil excluded</div>
+      </div>
+      <span class="src-badge">YouTube Data API v3</span>
+    </div>
+
+    <table class="social-table">
+      <thead>
+        <tr>
+          <th class="col-org">Organisation</th>
+          <th class="col-count">Mention<br>Count</th>
+          <th class="col-location">Location of Mentions<br><span style="font-weight:400;opacity:.6">Title/Hook · Description · Comments</span></th>
+          <th class="col-pts">Total<br>Points</th>
+          <th class="col-insight">Trending Topics &amp; Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="org-badge ob-ceew">CEEW</span></td>
+          <td style="text-align:center"><span class="mention-count" style="color:var(--ceew)">9</span></td>
+          <td>
+            <div class="loc-breakdown">
+              <div class="loc-row">
+                <span class="loc-label">Title/Hook</span>
+                <div class="loc-track"><div class="loc-fill" style="width:44%;background:var(--ceew)"></div></div>
+                <span class="loc-num" style="color:var(--ceew)">4</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Description</span>
+                <div class="loc-track"><div class="loc-fill" style="width:33%;background:var(--ceew);opacity:.7"></div></div>
+                <span class="loc-num" style="color:var(--ceew);opacity:.8">3</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Comments</span>
+                <div class="loc-track"><div class="loc-fill" style="width:22%;background:var(--ceew);opacity:.5"></div></div>
+                <span class="loc-num" style="color:var(--muted)">2</span>
+              </div>
+            </div>
+          </td>
+          <td style="text-align:center"><span class="pts-big" style="color:var(--ceew)">9</span></td>
+          <td rowspan="2" style="vertical-align:top">
+            <div class="platform-insight">
+              <div class="trending-topics">
+                <span class="topic-pill">GRAP IV crisis · Apr 2026</span>
+                <span class="topic-pill">Budget 2026 NCAP zero</span>
+                <span class="topic-pill">PM2.5 × WHO gap</span>
+                <span class="topic-pill">Stubble burning</span>
+                <span class="topic-pill">EV–AQI nexus</span>
+                <span class="topic-pill">Heat-pollution compound</span>
+                <span class="topic-pill">Sensor accuracy</span>
+              </div>
+              <div class="leader-line"><strong>CEEW</strong> leads overall (9 pts) but tied with CSTEP in raw count. CEEW dominates policy and NCAP-adjacent content; <strong>CSTEP</strong> leads on technical videos (sensor calibration, vehicular source apportionment, black carbon). Heat-pollution compound and sensor accuracy topics saw <em>zero</em> org citations despite both having primary research there — the largest gap of the period.</div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><span class="org-badge ob-cstep">CSTEP</span></td>
+          <td style="text-align:center"><span class="mention-count" style="color:var(--cstep)">9</span></td>
+          <td>
+            <div class="loc-breakdown">
+              <div class="loc-row">
+                <span class="loc-label">Title/Hook</span>
+                <div class="loc-track"><div class="loc-fill" style="width:22%;background:var(--cstep)"></div></div>
+                <span class="loc-num" style="color:var(--cstep)">2</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Description</span>
+                <div class="loc-track"><div class="loc-fill" style="width:44%;background:var(--cstep);opacity:.7"></div></div>
+                <span class="loc-num" style="color:var(--cstep);opacity:.8">4</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Comments</span>
+                <div class="loc-track"><div class="loc-fill" style="width:33%;background:var(--cstep);opacity:.5"></div></div>
+                <span class="loc-num" style="color:var(--muted)">3</span>
+              </div>
+            </div>
+          </td>
+          <td style="text-align:center"><span class="pts-big" style="color:var(--cstep)">9</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-top:8px">18 videos analysed · 5 broad AQ search queries · Points = total mentions across all 18 videos · Location tracks where in the content the org appears</div>
+  </div>
+
+  <!-- ═══ TWITTER / X ═══ -->
+  <div class="tab-pane" id="tab-tw">
+    <div class="platform-banner">
+      <div class="platform-banner-icon" style="background:#111;border:1px solid #444;font-size:18px;font-weight:900;color:#fff">𝕏</div>
+      <div class="platform-banner-info">
+        <div class="platform-banner-name">X / Twitter — Top 20 AQ Posts · 2026-03-08 to 2026-06-08</div>
+        <div class="platform-banner-sub">Serper Search · site:x.com site:twitter.com · AQ + India queries · Google-indexed high-engagement public posts</div>
+      </div>
+      <span class="src-badge">Serper Search API</span>
+    </div>
+    <div class="info-note"><strong>Data method:</strong> Serper web search with <code style="background:var(--surface3);padding:1px 4px;border-radius:2px;font-size:10px">site:twitter.com OR site:x.com</code> + AQ terms. Google indexes high-engagement public posts — this surfaces threads and tweets with significant reach without a paid subscription. "Title/Hook" = tweet text; "Description" = thread body or quote tweet; "Comments" = replies.</div>
+
+    <table class="social-table">
+      <thead>
+        <tr>
+          <th class="col-org">Organisation</th>
+          <th class="col-count">Mention<br>Count</th>
+          <th class="col-location">Location of Mentions<br><span style="font-weight:400;opacity:.6">Title/Hook · Description · Comments</span></th>
+          <th class="col-pts">Total<br>Points</th>
+          <th class="col-insight">Trending Topics &amp; Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="org-badge ob-ceew">CEEW</span></td>
+          <td style="text-align:center"><span class="mention-count" style="color:var(--ceew)">13</span></td>
+          <td>
+            <div class="loc-breakdown">
+              <div class="loc-row">
+                <span class="loc-label">Title/Hook</span>
+                <div class="loc-track"><div class="loc-fill" style="width:46%;background:var(--ceew)"></div></div>
+                <span class="loc-num" style="color:var(--ceew)">6</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Description</span>
+                <div class="loc-track"><div class="loc-fill" style="width:31%;background:var(--ceew);opacity:.7"></div></div>
+                <span class="loc-num" style="color:var(--ceew);opacity:.8">4</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Comments</span>
+                <div class="loc-track"><div class="loc-fill" style="width:23%;background:var(--ceew);opacity:.5"></div></div>
+                <span class="loc-num" style="color:var(--muted)">3</span>
+              </div>
+            </div>
+          </td>
+          <td style="text-align:center"><span class="pts-big" style="color:var(--ceew)">13</span></td>
+          <td rowspan="2" style="vertical-align:top">
+            <div class="platform-insight">
+              <div class="trending-topics">
+                <span class="topic-pill">GRAP IV failure analysis</span>
+                <span class="topic-pill">Budget 2026 NCAP gap</span>
+                <span class="topic-pill">Sensor accuracy debate</span>
+                <span class="topic-pill">Children's lung health</span>
+                <span class="topic-pill">EV policy vs AQI</span>
+                <span class="topic-pill">WHO standards gap</span>
+                <span class="topic-pill">Stubble burning data</span>
+                <span class="topic-pill">Black carbon</span>
+              </div>
+              <div class="leader-line"><strong>CEEW leads clearly</strong> (13 vs 9 pts). Dominates researcher and journalist threads — particularly NCAP tracking, GRAP analysis, and child health burden data. <strong>CSTEP</strong> is the go-to citation for technical threads (sensor calibration, source apportionment, DG-set emissions). X is the strongest platform for both orgs in raw mention count, driven by engaged researcher and advocate community sharing citations actively.</div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><span class="org-badge ob-cstep">CSTEP</span></td>
+          <td style="text-align:center"><span class="mention-count" style="color:var(--cstep)">9</span></td>
+          <td>
+            <div class="loc-breakdown">
+              <div class="loc-row">
+                <span class="loc-label">Title/Hook</span>
+                <div class="loc-track"><div class="loc-fill" style="width:33%;background:var(--cstep)"></div></div>
+                <span class="loc-num" style="color:var(--cstep)">3</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Description</span>
+                <div class="loc-track"><div class="loc-fill" style="width:22%;background:var(--cstep);opacity:.7"></div></div>
+                <span class="loc-num" style="color:var(--cstep);opacity:.8">2</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Comments</span>
+                <div class="loc-track"><div class="loc-fill" style="width:44%;background:var(--cstep);opacity:.5"></div></div>
+                <span class="loc-num" style="color:var(--muted)">4</span>
+              </div>
+            </div>
+          </td>
+          <td style="text-align:center"><span class="pts-big" style="color:var(--cstep)">9</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-top:8px">20 posts/threads analysed · Serper site:twitter.com/x.com search · Google freshness + engagement proxy ranking</div>
+  </div>
+
+  <!-- ═══ INSTAGRAM ═══ -->
+  <div class="tab-pane" id="tab-ig">
+    <div class="platform-banner">
+      <div class="platform-banner-icon" style="background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)">◉</div>
+      <div class="platform-banner-info">
+        <div class="platform-banner-name">Instagram — Top 17 AQ Posts · 2026-03-08 to 2026-06-08</div>
+        <div class="platform-banner-sub">Serper Search · site:instagram.com · AQ queries · Google-indexed public posts only</div>
+      </div>
+      <span class="src-badge">Serper Search API</span>
+    </div>
+    <div class="warn-note"><strong>Coverage note:</strong> Instagram's API restricts access to own-account data only. Posts sourced via <code style="background:var(--surface3);padding:1px 4px;border-radius:2px;font-size:10px">site:instagram.com</code> Google search. Only publicly visible posts from non-restricted accounts appear — private accounts and Reels without captions may be under-represented. "Title/Hook" = first line of caption; "Description" = full caption body.</div>
+
+    <table class="social-table">
+      <thead>
+        <tr>
+          <th class="col-org">Organisation</th>
+          <th class="col-count">Mention<br>Count</th>
+          <th class="col-location">Location of Mentions<br><span style="font-weight:400;opacity:.6">Title/Hook · Description · Comments</span></th>
+          <th class="col-pts">Total<br>Points</th>
+          <th class="col-insight">Trending Topics &amp; Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="org-badge ob-ceew">CEEW</span></td>
+          <td style="text-align:center"><span class="mention-count" style="color:var(--ceew)">9</span></td>
+          <td>
+            <div class="loc-breakdown">
+              <div class="loc-row">
+                <span class="loc-label">Title/Hook</span>
+                <div class="loc-track"><div class="loc-fill" style="width:33%;background:var(--ceew)"></div></div>
+                <span class="loc-num" style="color:var(--ceew)">3</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Description</span>
+                <div class="loc-track"><div class="loc-fill" style="width:56%;background:var(--ceew);opacity:.7"></div></div>
+                <span class="loc-num" style="color:var(--ceew);opacity:.8">5</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Comments</span>
+                <div class="loc-track"><div class="loc-fill" style="width:11%;background:var(--ceew);opacity:.5"></div></div>
+                <span class="loc-num" style="color:var(--muted)">1</span>
+              </div>
+            </div>
+          </td>
+          <td style="text-align:center"><span class="pts-big" style="color:var(--ceew)">9</span></td>
+          <td rowspan="2" style="vertical-align:top">
+            <div class="platform-insight">
+              <div class="trending-topics">
+                <span class="topic-pill">Delhi smog carousels</span>
+                <span class="topic-pill">NCAP infographics</span>
+                <span class="topic-pill">Children's AQ health</span>
+                <span class="topic-pill">EV–AQI awareness</span>
+                <span class="topic-pill">Sensor DIY content</span>
+                <span class="topic-pill">Stubble satellite maps</span>
+                <span class="topic-pill">Clean air finance</span>
+              </div>
+              <div class="leader-line"><strong>CEEW leads</strong> (9 vs 6 pts). Most citations are in descriptions/captions — Instagram creators reference research data in caption body rather than hooking with org names. <strong>CSTEP</strong> appears primarily via data-driven technical creators (sensor DIY, Bengaluru AQ, black carbon). Instagram audience engages most with crisis visuals and infographics; text-heavy research posts see low organic reach.</div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><span class="org-badge ob-cstep">CSTEP</span></td>
+          <td style="text-align:center"><span class="mention-count" style="color:var(--cstep)">6</span></td>
+          <td>
+            <div class="loc-breakdown">
+              <div class="loc-row">
+                <span class="loc-label">Title/Hook</span>
+                <div class="loc-track"><div class="loc-fill" style="width:17%;background:var(--cstep)"></div></div>
+                <span class="loc-num" style="color:var(--cstep)">1</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Description</span>
+                <div class="loc-track"><div class="loc-fill" style="width:67%;background:var(--cstep);opacity:.7"></div></div>
+                <span class="loc-num" style="color:var(--cstep);opacity:.8">4</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Comments</span>
+                <div class="loc-track"><div class="loc-fill" style="width:17%;background:var(--cstep);opacity:.5"></div></div>
+                <span class="loc-num" style="color:var(--muted)">1</span>
+              </div>
+            </div>
+          </td>
+          <td style="text-align:center"><span class="pts-big" style="color:var(--cstep)">6</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-top:8px">17 posts analysed · Serper site:instagram.com search · public posts indexed by Google · 17 of 20 passed AQ filter</div>
+  </div>
+
+  <!-- ═══ LINKEDIN ═══ -->
+  <div class="tab-pane" id="tab-li">
+    <div class="platform-banner">
+      <div class="platform-banner-icon" style="background:var(--li-color)">in</div>
+      <div class="platform-banner-info">
+        <div class="platform-banner-name">LinkedIn — Top 18 AQ Posts · 2026-03-08 to 2026-06-08</div>
+        <div class="platform-banner-sub">Serper Search · site:linkedin.com/posts · AQ queries · Google-indexed public posts · researcher &amp; professional accounts</div>
+      </div>
+      <span class="src-badge">Serper Search API</span>
+    </div>
+    <div class="warn-note"><strong>Coverage note:</strong> LinkedIn's API is restricted to own-account analytics. Posts sourced via <code style="background:var(--surface3);padding:1px 4px;border-radius:2px;font-size:10px">site:linkedin.com/posts</code> Google search. This naturally surfaces higher-engagement content from researchers, journalists, and institutional accounts with public visibility.</div>
+
+    <table class="social-table">
+      <thead>
+        <tr>
+          <th class="col-org">Organisation</th>
+          <th class="col-count">Mention<br>Count</th>
+          <th class="col-location">Location of Mentions<br><span style="font-weight:400;opacity:.6">Title/Hook · Description · Comments</span></th>
+          <th class="col-pts">Total<br>Points</th>
+          <th class="col-insight">Trending Topics &amp; Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="org-badge ob-ceew">CEEW</span></td>
+          <td style="text-align:center"><span class="mention-count" style="color:var(--ceew)">11</span></td>
+          <td>
+            <div class="loc-breakdown">
+              <div class="loc-row">
+                <span class="loc-label">Title/Hook</span>
+                <div class="loc-track"><div class="loc-fill" style="width:27%;background:var(--ceew)"></div></div>
+                <span class="loc-num" style="color:var(--ceew)">3</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Description</span>
+                <div class="loc-track"><div class="loc-fill" style="width:64%;background:var(--ceew);opacity:.7"></div></div>
+                <span class="loc-num" style="color:var(--ceew);opacity:.8">7</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Comments</span>
+                <div class="loc-track"><div class="loc-fill" style="width:9%;background:var(--ceew);opacity:.5"></div></div>
+                <span class="loc-num" style="color:var(--muted)">1</span>
+              </div>
+            </div>
+          </td>
+          <td style="text-align:center"><span class="pts-big" style="color:var(--ceew)">11</span></td>
+          <td rowspan="2" style="vertical-align:top">
+            <div class="platform-insight">
+              <div class="trending-topics">
+                <span class="topic-pill">NCAP progress analysis</span>
+                <span class="topic-pill">Clean air financing</span>
+                <span class="topic-pill">Health burden economics</span>
+                <span class="topic-pill">EV–AQI policy</span>
+                <span class="topic-pill">Sensor infrastructure</span>
+                <span class="topic-pill">Budget 2026 gaps</span>
+                <span class="topic-pill">AQ data transparency</span>
+              </div>
+              <div class="leader-line"><strong>CEEW leads</strong> (11 vs 8 pts), strongest on LinkedIn of all platforms. Both orgs' <strong>official accounts</strong> post directly here — CSTEP's sensor validation post and CEEW's GRAP policy brief are the highest-engagement institutional posts of the period. LinkedIn is the most professional-audience platform: citations appear in post bodies by academics, policy professionals, and sustainability consultants. Comments rarely cite orgs — engagement is through resharing, not replies.</div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td><span class="org-badge ob-cstep">CSTEP</span></td>
+          <td style="text-align:center"><span class="mention-count" style="color:var(--cstep)">8</span></td>
+          <td>
+            <div class="loc-breakdown">
+              <div class="loc-row">
+                <span class="loc-label">Title/Hook</span>
+                <div class="loc-track"><div class="loc-fill" style="width:25%;background:var(--cstep)"></div></div>
+                <span class="loc-num" style="color:var(--cstep)">2</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Description</span>
+                <div class="loc-track"><div class="loc-fill" style="width:62%;background:var(--cstep);opacity:.7"></div></div>
+                <span class="loc-num" style="color:var(--cstep);opacity:.8">5</span>
+              </div>
+              <div class="loc-row">
+                <span class="loc-label">Comments</span>
+                <div class="loc-track"><div class="loc-fill" style="width:12%;background:var(--cstep);opacity:.5"></div></div>
+                <span class="loc-num" style="color:var(--muted)">1</span>
+              </div>
+            </div>
+          </td>
+          <td style="text-align:center"><span class="pts-big" style="color:var(--cstep)">8</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-top:8px">18 posts analysed · Serper site:linkedin.com/posts search · 18 of 20 passed AQ filter</div>
+  </div>
+
+  <!-- ══ SOCIAL PRESENCE SCORE TALLY ══ -->
+  <div style="margin-top:28px">
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Social Presence Score — All Platforms</div>
+    <div style="font-size:12px;color:var(--muted2);margin-bottom:16px">Each mention = 1 pt · tallied across all 73 posts and videos · feeds into the Competitive Scorecard</div>
+    <div class="score-tally">
+      <div class="tally-row">
+        <span class="tally-plat"><span class="tally-plat-icon" style="background:var(--yt-color)">▶</span> YouTube</span>
+        <div class="tally-track"><div class="tally-fill-c" style="width:50%"></div><div class="tally-fill-s" style="width:50%"></div></div>
+        <span class="tally-val" style="color:var(--ceew)">CEEW 9</span>
+        <span class="tally-val" style="color:var(--cstep)">CSTEP 9</span>
+      </div>
+      <div class="tally-row">
+        <span class="tally-plat"><span class="tally-plat-icon" style="background:#222;border:1px solid #444;font-weight:900;font-size:10px">𝕏</span> X / Twitter</span>
+        <div class="tally-track"><div class="tally-fill-c" style="width:59%"></div><div class="tally-fill-s" style="width:41%"></div></div>
+        <span class="tally-val" style="color:var(--ceew)">CEEW 13</span>
+        <span class="tally-val" style="color:var(--cstep)">CSTEP 9</span>
+      </div>
+      <div class="tally-row">
+        <span class="tally-plat"><span class="tally-plat-icon" style="background:var(--ig-color)">◉</span> Instagram</span>
+        <div class="tally-track"><div class="tally-fill-c" style="width:60%"></div><div class="tally-fill-s" style="width:40%"></div></div>
+        <span class="tally-val" style="color:var(--ceew)">CEEW 9</span>
+        <span class="tally-val" style="color:var(--cstep)">CSTEP 6</span>
+      </div>
+      <div class="tally-row">
+        <span class="tally-plat"><span class="tally-plat-icon" style="background:var(--li-color)">in</span> LinkedIn</span>
+        <div class="tally-track"><div class="tally-fill-c" style="width:58%"></div><div class="tally-fill-s" style="width:42%"></div></div>
+        <span class="tally-val" style="color:var(--ceew)">CEEW 11</span>
+        <span class="tally-val" style="color:var(--cstep)">CSTEP 8</span>
+      </div>
+      <div class="grand-total">
+        <div style="flex:1;min-width:200px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Combined Social Presence Score</div>
+          <div style="font-size:11px;color:var(--muted2)">73 posts · 4 platforms · normalised 0–100 in Competitive Scorecard</div>
+        </div>
+        <div style="display:flex;gap:28px;flex-shrink:0">
+          <div class="gt-num">
+            <div class="gt-score" style="color:var(--ceew)">42</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ceew);margin-top:2px">CEEW</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted)">58/100 normalised</div>
+          </div>
+          <div style="width:1px;background:var(--border)"></div>
+          <div class="gt-num">
+            <div class="gt-score" style="color:var(--cstep)">32</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--cstep);margin-top:2px">CSTEP</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted)">44/100 normalised</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+</main>
+</div>
+
+<script>
+function switchTab(id,el){
+  document.querySelectorAll('.tab-pane').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.ptab').forEach(function(t){t.classList.remove('active');});
+  document.getElementById('tab-'+id).classList.add('active');
+  el.classList.add('active');
+}
+var secs=document.querySelectorAll('.section[id]');
+var nis=document.querySelectorAll('.nav-item:not(.dim)');
+secs.forEach(function(s){
+  new IntersectionObserver(function(es){es.forEach(function(e){
+    if(e.isIntersecting){nis.forEach(function(n){n.classList.remove('active');});
+    var a=document.querySelector('.nav-item[href="#'+e.target.id+'"]');if(a)a.classList.add('active');}
+  });},{threshold:0.25,rootMargin:'-10% 0px -60% 0px'}).observe(s);
+});
+</script>
+</body>
+</html>

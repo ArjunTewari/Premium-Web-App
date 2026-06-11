@@ -8,6 +8,7 @@ const axios   = require('axios');
 const fs      = require('fs');
 const path    = require('path');
 const PptxGen = require('pptxgenjs');
+const SI      = require('./social-intelligence');
 
 const OUTLETS = [
   'Times of India','Hindustan Times','The Hindu','India Today',
@@ -328,9 +329,9 @@ function aggregateOrg(artList, clsList, dateFrom) {
   };
 }
 
-function computeScore(d, aeoScore) {
-  const tot = Math.round(d.sov*0.25 + d.authPct*0.25 + d.dataPct*0.20 + aeoScore*0.30);
-  return { ...d, aeo: aeoScore, score: tot, grade: tot>=80?'A':tot>=65?'B':tot>=50?'C+':tot>=35?'D':'F' };
+function computeScore(d, aeoScore, socialScore=0) {
+  const tot = Math.round(d.sov*0.20 + d.authPct*0.20 + d.dataPct*0.15 + aeoScore*0.25 + socialScore*0.20);
+  return { ...d, aeo: aeoScore, social: socialScore, score: tot, grade: tot>=80?'A':tot>=65?'B':tot>=50?'C+':tot>=35?'D':'F' };
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -457,45 +458,24 @@ ${txt}`;
     cb(`  ${org} total classified: ${cls[org].length}`, cls[org].length>0?'ok':'err');
   }
 
-  // ── STEP 3: AEO Visibility ────────────────────────────────
+  // ── STEP 3: AEO Visibility (via Social Intelligence module) ──
   cb(`\nSTEP 3/6 — AEO / LLM Visibility...`, 'head');
-  const hasAEO = cfg.OPENAI_KEY || cfg.PERPLEXITY_KEY || cfg.GEMINI_KEY;
   let aeoResults = {};
-  for (const org of ORGS) aeoResults[org] = { score:0, mentions:0, llmBreakdown:{}, topResponse:'' };
+  for (const org of ORGS) aeoResults[org] = { score:0, mentions:0, llmBreakdown:{}, topResponse:'', questionResults:{} };
+  try {
+    aeoResults = await SI.runAEO(cfg, ORGS, cb);
+    for (const org of ORGS) cb(`  ${org} AEO score: ${aeoResults[org].score}`, aeoResults[org].score>0?'ok':'warn');
+  } catch(e) { cb(`  AEO error: ${e.message}`, 'err'); }
 
-  if (hasAEO) {
-    try {
-      aeoResults = await probeAEO(cfg, ORGS, cb);
-      for (const org of ORGS) cb(`  ${org} AEO score: ${aeoResults[org].score}`, aeoResults[org].score>0?'ok':'warn');
-    } catch(e) { cb(`  AEO error: ${e.message}`, 'err'); }
-  } else {
-    cb(`  No LLM API keys provided — AEO score = 0 for all orgs`, 'warn');
-  }
-
-  // ── STEP 4: Social Media ──────────────────────────────────
-  cb(`\nSTEP 4/6 — Social Media...`, 'head');
-  const hasTwitter = !!cfg.TWITTER_KEY;
-  const hasYouTube = !!cfg.YOUTUBE_KEY;
-  let twitterData = {}, youtubeData = {};
+  // ── STEP 4: Social Media (YouTube · X/Twitter · Instagram · LinkedIn) ──
+  cb(`\nSTEP 4/6 — Social Media Intelligence...`, 'head');
+  let siSocial = { youtube: null, twitter: null, instagram: null, linkedin: null };
+  try {
+    siSocial = await SI.runSocial(cfg, ORGS, cb);
+  } catch(e) { cb(`  Social error: ${e.message}`, 'err'); }
+  const socialScores = SI.computeSocialScore(siSocial, ORGS);
   for (const org of ORGS) {
-    twitterData[org] = { tweetCount:0, topTweet:null };
-    youtubeData[org] = { videoCount:0, topVideo:null };
-  }
-
-  if (hasTwitter) {
-    cb(`  Fetching Twitter/X data...`);
-    try { twitterData = await fetchTwitter(cfg, ORGS, cb); }
-    catch(e) { cb(`  Twitter error: ${e.message}`, 'err'); }
-  } else {
-    cb(`  No Twitter Bearer Token — skipping X/Twitter`, 'warn');
-  }
-
-  if (hasYouTube) {
-    cb(`  Fetching YouTube data...`);
-    try { youtubeData = await fetchYouTube(cfg, ORGS, cb); }
-    catch(e) { cb(`  YouTube error: ${e.message}`, 'err'); }
-  } else {
-    cb(`  No YouTube API Key — skipping YouTube`, 'warn');
+    cb(`  Social score: ${org} = ${socialScores[org].total} pts (${socialScores[org].normalised}/100 normalised)`, 'ok');
   }
 
   // ── STEP 5: Aggregate + Score ─────────────────────────────
@@ -503,14 +483,14 @@ ${txt}`;
   const data={};
   for(const org of ORGS){
     const base = aggregateOrg(arts[org], cls[org], DATE_FROM);
-    data[org] = computeScore(base, aeoResults[org].score);
-    cb(`  ${org}: ${data[org].total} arts | ${data[org].authPct}% auth | ${data[org].dataPct}% data-specific | AEO ${data[org].aeo} | score ${data[org].score} (${data[org].grade})`, 'ok');
+    data[org] = computeScore(base, aeoResults[org].score, socialScores[org]?.normalised||0);
+    cb(`  ${org}: ${data[org].total} arts | ${data[org].authPct}% auth | ${data[org].dataPct}% data | AEO ${data[org].aeo} | Social ${data[org].social} | score ${data[org].score} (${data[org].grade})`, 'ok');
   }
 
   // ── STEP 5b: AI analysis ───────────────────────────────────
   cb(`\nSTEP 5b/6 — AI analysis (executive summary, emerging, actions)...`, 'head');
   const combined = ORGS.flatMap(o=>arts[o]).slice(0,30).map(a=>`${a.title}|${a.snippet.slice(0,120)}`).join('\n');
-  const orgSummary = ORGS.map(o=>`${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO score ${data[o].aeo}, top outlet: ${data[o].topOutlet}, topics 2+: ${Object.entries(data[o].topicCounts).filter(([,v])=>v>=2).map(([k])=>k).join(',')||'none'}, Twitter: ${twitterData[o]?.tweetCount||0} tweets, YouTube: ${youtubeData[o]?.videoCount||0} videos`).join('\n');
+  const orgSummary = ORGS.map(o=>`${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo}/100, Social ${data[o].social}/100 (YT=${siSocial.youtube?.orgMentions?.[o]?.total||0} TW=${siSocial.twitter?.orgMentions?.[o]?.total||0} IG=${siSocial.instagram?.orgMentions?.[o]?.total||0} LI=${siSocial.linkedin?.orgMentions?.[o]?.total||0}), top outlet: ${data[o].topOutlet}, topics 2+: ${Object.entries(data[o].topicCounts).filter(([,v])=>v>=2).map(([k])=>k).join(',')||'none'}`).join('\n');
   let emerging=[], execF=[], actions=[];
 
   try{
@@ -557,10 +537,10 @@ ${txt}`;
   const pptxFile= path.join(cfg.outDir, `${base}.pptx`);
   const pptxName= `${base}.pptx`;
 
-  await buildPPTX(data,compCounts,emerging,execF,actions,arts,aeoResults,twitterData,youtubeData,pptxFile,cfg);
+  await buildPPTX(data,compCounts,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,pptxFile,cfg);
   cb(`  PPTX: ${pptxName}`, 'ok');
 
-  const html=buildHTML(data,compCounts,emerging,execF,actions,arts,aeoResults,twitterData,youtubeData,pptxName,cfg);
+  const html=buildHTML(data,compCounts,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,pptxName,cfg);
   fs.writeFileSync(htmlFile, html, 'utf8');
   cb(`  HTML: ${base}.html (${Math.round(html.length/1024)}KB)`, 'ok');
 
@@ -571,7 +551,7 @@ ${txt}`;
 // ══════════════════════════════════════════════════════════════════════════
 //  PPTX BUILDER
 // ══════════════════════════════════════════════════════════════════════════
-async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,twitterData,youtubeData,outFile,cfg) {
+async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,outFile,cfg) {
   const {ORGS,DATE_FROM,DATE_TO,CLIENT_NAME} = cfg;
   const pres=new PptxGen();
   pres.layout='LAYOUT_WIDE'; pres.author='Emerald AI';
@@ -610,10 +590,12 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,twitt
     // AEO indicator on cover
     const hasAEO = Object.values(aeoResults).some(v=>v.score>0);
     if(hasAEO) sl.addText('✓ LLM Visibility',{x:8,y:3.2,w:2.5,h:0.26,fontSize:10,color:GOOD,fontFace:'Calibri'});
-    const hasTwitter = Object.values(twitterData).some(v=>v.tweetCount>0);
-    const hasYouTube = Object.values(youtubeData).some(v=>v.videoCount>0);
-    const socials = [hasTwitter&&'Twitter/X', hasYouTube&&'YouTube'].filter(Boolean).join(' · ');
-    if(socials) sl.addText(`✓ Social: ${socials}`,{x:8,y:3.52,w:4,h:0.26,fontSize:10,color:GOOD,fontFace:'Calibri'});
+    const hasTwSI  = (siSocial.twitter?.posts?.length||0) > 0;
+    const hasYTSI  = (siSocial.youtube?.videos?.length||0) > 0;
+    const hasIGSI  = (siSocial.instagram?.posts?.length||0) > 0;
+    const hasLISI  = (siSocial.linkedin?.posts?.length||0) > 0;
+    const socials = [hasTwSI&&'X/Twitter', hasYTSI&&'YouTube', hasIGSI&&'Instagram', hasLISI&&'LinkedIn'].filter(Boolean).join(' · ');
+    if(socials) sl.addText(`✓ Social: ${socials}`,{x:8,y:3.52,w:5.3,h:0.26,fontSize:10,color:GOOD,fontFace:'Calibri'});
     sl.addText(`Prepared for ${CLIENT_NAME||'client'} · Generated ${new Date().toISOString().slice(0,10)} · CONFIDENTIAL`,{x:0.6,y:7.1,w:12,h:0.26,fontSize:9,color:MUTED,fontFace:'Calibri'});
   }
 
@@ -794,44 +776,53 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,twitt
     footer(sl);
   }
 
-  // Slide 8: Social Media
+  // Slide 8: Social Media (all 4 platforms from SI module)
   {
-    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Social Media Intelligence'); stitle(sl,'Twitter/X & YouTube');
-    const hasTw = Object.values(twitterData).some(v=>v.tweetCount>0);
-    const hasYT = Object.values(youtubeData).some(v=>v.videoCount>0);
+    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Social Media Intelligence'); stitle(sl,'Platform Presence Scorecard');
+    sl.addText('Org mentions in top AQ content across YouTube · X/Twitter · Instagram · LinkedIn — Serper Search + YouTube Data API.',{x:0.5,y:1.12,w:12.3,h:0.32,fontSize:12,color:MUTED,fontFace:'Calibri'});
 
-    if(!hasTw && !hasYT){
+    const platforms4=[
+      {label:'YouTube',key:'youtube',icon:'YT',col:'ff4444'},
+      {label:'X/Twitter',key:'twitter',icon:'X',col:'e2e8f0'},
+      {label:'Instagram',key:'instagram',icon:'IG',col:'e1306c'},
+      {label:'LinkedIn',key:'linkedin',icon:'LI',col:'0a66c2'}
+    ];
+    const hasSocial = platforms4.some(p=>(siSocial[p.key]?.orgMentions && Object.values(siSocial[p.key]?.orgMentions||{}).some(v=>v.total>0)));
+
+    if(!hasSocial){
       card(sl,0.5,1.55,12.3,2.0);
       sl.addText('Social media data not collected this run.',{x:0.5,y:2.3,w:12.3,h:0.4,fontSize:16,color:MUTED,fontFace:'Calibri',align:'center'});
-      sl.addText('Add TWITTER_BEARER_TOKEN and/or YOUTUBE_API_KEY to enable.',{x:0.5,y:2.76,w:12.3,h:0.4,fontSize:12,color:WARN,fontFace:'Calibri',align:'center'});
+      sl.addText('Add social media API keys and/or Serper key to enable.',{x:0.5,y:2.76,w:12.3,h:0.4,fontSize:12,color:WARN,fontFace:'Calibri',align:'center'});
     } else {
-      if(hasTw){
-        sl.addText('Twitter / X',{x:0.5,y:1.2,w:5.9,h:0.3,fontSize:13,bold:true,color:TXT,fontFace:'Calibri'});
-        ORGS.forEach((org,i)=>{
-          const tw=twitterData[org]; const y=1.6+i*1.3;
-          card(sl,0.5,y,5.9,1.18);
-          sl.addText(org,{x:0.65,y:y+0.08,w:5.5,h:0.26,fontSize:11,bold:true,color:orgPptx(i),fontFace:'Calibri'});
-          sl.addText(`${tw.tweetCount||0} tweets found`,{x:0.65,y:y+0.38,w:2.5,h:0.3,fontSize:20,bold:true,color:TXT,fontFace:'Calibri'});
-          if(tw.topTweet){
-            sl.addText(tw.topTweet.text?.slice(0,90)||'',{x:0.65,y:y+0.72,w:5.5,h:0.36,fontSize:8,color:MUTED,fontFace:'Calibri',italic:true});
-          }
-        });
-      }
-      if(hasYT){
-        sl.addText('YouTube',{x:6.9,y:1.2,w:5.9,h:0.3,fontSize:13,bold:true,color:TXT,fontFace:'Calibri'});
-        ORGS.forEach((org,i)=>{
-          const yt=youtubeData[org]; const y=1.6+i*1.3;
-          card(sl,6.9,y,5.9,1.18);
-          sl.addText(org,{x:7.05,y:y+0.08,w:5.5,h:0.26,fontSize:11,bold:true,color:orgPptx(i),fontFace:'Calibri'});
-          sl.addText(`${yt.videoCount||0} videos found`,{x:7.05,y:y+0.38,w:2.5,h:0.3,fontSize:20,bold:true,color:TXT,fontFace:'Calibri'});
-          if(yt.topVideo){
-            sl.addText(yt.topVideo.title?.slice(0,80)||'',{x:7.05,y:y+0.72,w:5.5,h:0.2,fontSize:8,color:MUTED,fontFace:'Calibri',italic:true});
-            sl.addText(`${yt.topVideo.channel||''}`,{x:7.05,y:y+0.94,w:5.5,h:0.18,fontSize:8,color:AMBER,fontFace:'Calibri'});
-          }
-        });
-      }
+      // Platform × Org grid — 4 platform rows, Org columns
+      const trows=[
+        [{text:'Platform',options:{bold:true,color:MUTED,fontSize:9,fill:{color:'181e2e'}}},
+         ...ORGS.map((o,i)=>({text:o,options:{bold:true,color:orgPptx(i),fontSize:10,fill:{color:'181e2e'},align:'center'}})),
+         {text:'Platform Total',options:{bold:true,color:AMBER,fontSize:9,fill:{color:'181e2e'},align:'center'}}],
+        ...platforms4.map(p=>{
+          const orgCells=ORGS.map((org,i)=>{
+            const pts=siSocial[p.key]?.orgMentions?.[org]?.total||0;
+            return {text:String(pts),options:{color:pts>0?orgPptx(i):MUTED,fontSize:12,fill:{color:'111520'},align:'center',bold:pts>0}};
+          });
+          const platTotal=ORGS.reduce((s,o)=>s+(siSocial[p.key]?.orgMentions?.[o]?.total||0),0);
+          return [{text:p.label,options:{bold:true,color:TXT,fontSize:11,fill:{color:'111520'}}},
+            ...orgCells,
+            {text:String(platTotal),options:{color:AMBER,fontSize:12,fill:{color:'111520'},align:'center',bold:true}}];
+        }),
+        [{text:'Social Score (0–100)',options:{bold:true,color:AMBER,fontSize:9,fill:{color:'181e2e'}}},
+         ...ORGS.map((o,i)=>({text:String(socialScores[o]?.normalised||0),options:{bold:true,color:orgPptx(i),fontSize:12,fill:{color:'181e2e'},align:'center'}})),
+         {text:'',options:{fill:{color:'181e2e'}}}]
+      ];
+      const colW=[2.2,...ORGS.map(()=>Math.min(2.0,(10.1-0.1*(ORGS.length-1))/ORGS.length)),1.5];
+      sl.addTable(trows,{x:0.5,y:1.55,w:12.3,colW,rowH:0.44,border:{pt:0.5,color:BORD},fontFace:'Calibri'});
+
+      // Trending topics boxes from YouTube and Twitter
+      const ytTopics=(siSocial.youtube?.trendingTopics||[]).slice(0,5).join('  ·  ');
+      const twTopics=(siSocial.twitter?.trendingTopics||[]).slice(0,5).join('  ·  ');
+      if(ytTopics){sl.addText(`YT trending: ${ytTopics}`,{x:0.5,y:4.85,w:12.3,h:0.26,fontSize:10,color:MUTED,fontFace:'Calibri',italic:true});}
+      if(twTopics){sl.addText(`X trending:  ${twTopics}`,{x:0.5,y:5.15,w:12.3,h:0.26,fontSize:10,color:MUTED,fontFace:'Calibri',italic:true});}
     }
-    sl.addText('Note: Twitter/X search limited to 7 days (free tier). YouTube results based on relevance search. Instagram & LinkedIn not available via public API.',{x:0.5,y:6.98,w:12.3,h:0.24,fontSize:8,color:MUTED,fontFace:'Calibri',italic:true});
+    sl.addText('YouTube: Data API v3 broad AQ search · X/Twitter/Instagram/LinkedIn: Serper site: search · mention detection across title, description, comments',{x:0.5,y:6.98,w:12.3,h:0.24,fontSize:8,color:MUTED,fontFace:'Calibri',italic:true});
     footer(sl);
   }
 
@@ -913,7 +904,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,twitt
 // ══════════════════════════════════════════════════════════════════════════
 //  HTML BUILDER  (adds AEO + Social sections)
 // ══════════════════════════════════════════════════════════════════════════
-function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,twitterData,youtubeData,pptxFilename,cfg){
+function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,pptxFilename,cfg){
   const {ORGS,DATE_FROM,DATE_TO,CLIENT_NAME} = cfg;
   const now=new Date().toUTCString();
   const tot=ORGS.reduce((s,o)=>s+(data[o]?.total||0),0);
@@ -1089,7 +1080,7 @@ ${d.authExamples[0]?`<div class="cqe cqd"><div class="cqet">Data-specific exampl
     const d=data[org];
     return `<div class="sca" style="border-top:3px solid ${orgHex(i)}"><div class="scn" style="color:${orgHex(i)}">${esc(org)}</div><div class="scg" style="color:${gradeCol(d.grade)}">${d.grade}</div><div class="scs">${d.score} / 100</div>
 <div style="display:flex;flex-direction:column;gap:8px;text-align:left">
-${scRow('Share of Voice',d.sov,orgHex(i))}${scRow('Narrative',d.authPct,orgHex(i))}${scRow('Citation',d.dataPct,orgHex(i))}${scRow('AEO',d.aeo,d.aeo>0?orgHex(i):'#5e7494')}
+${scRow('Share of Voice',d.sov,orgHex(i))}${scRow('Narrative',d.authPct,orgHex(i))}${scRow('Citation',d.dataPct,orgHex(i))}${scRow('AEO',d.aeo,d.aeo>0?orgHex(i):'#5e7494')}${scRow('Social',d.social||0,d.social>0?orgHex(i):'#5e7494')}
 </div></div>`;
   }).join('');
 
@@ -1241,7 +1232,7 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
 <div class="mc"><div class="ml">News Coverage</div><div class="mt">Serper News API &middot; 5 queries per org &middot; Date-filtered &middot; ${tot} in-range articles</div></div>
 <div class="mc"><div class="ml">AI Classification</div><div class="mt">Claude Haiku 4.5 classifies each article: Authoritative/Peripheral &middot; Data-specific/Vague &middot; AQ sub-topic &middot; Evidence quote.</div></div>
 <div class="mc"><div class="ml">AEO Probing</div><div class="mt">5 AQ questions asked to GPT-4o, Perplexity, Gemini. Org mention rate converted to 0–100 score. Contributes 30% of total score.</div></div>
-<div class="mc"><div class="ml">Social Media</div><div class="mt">Twitter/X: recent search API (7-day window, free tier). YouTube: Data API v3 relevance search. Instagram & LinkedIn: no public search API available.</div></div>
+<div class="mc"><div class="ml">Social Media</div><div class="mt">YouTube: Data API v3 broad AQ video search · X/Twitter, Instagram, LinkedIn: Serper site: search (Google-indexed public posts) · Org mention detection across title, description, comments.</div></div>
 </div></section>
 
 <section class="sec" id="sov"><div class="sh"><div class="se">Section 03</div><h2 class="st">Share of Voice</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
@@ -1276,12 +1267,12 @@ ${clsNotice}<div class="mg">${citPanels}</div></section>
 <section class="sec" id="em"><div class="sh"><div class="se">Section 08</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining momentum where none of the tracked orgs currently dominates.</div><div class="sdiv"></div></div>
 ${emergingCards}</section>
 
-${aeoSection()}
-${socialSection()}
+${SI.buildAEOHtml(aeoResults, ORGS)}
+${SI.buildSocialHtml(siSocial, socialScores, ORGS)}
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Weighted composite. Formula shown in full. AEO now populated from LLM probing.</div><div class="sdiv"></div></div>
-<div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Narrative&times;0.25)+(Citation&times;0.20)+(AEO&times;0.30)<br>
-<span style="color:var(--muted)">${ORGS.map(o=>`${esc(o)}: ${data[o].sov}&times;0.25+${data[o].authPct}&times;0.25+${data[o].dataPct}&times;0.20+${data[o].aeo}&times;0.30=${data[o].score}`).join(' &middot; ')}</span></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Weighted composite: media · LLM visibility · social. Formula shown in full.</div><div class="sdiv"></div></div>
+<div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.20)+(Narrative&times;0.20)+(Citation&times;0.15)+(AEO&times;0.25)+(Social&times;0.20)<br>
+<span style="color:var(--muted)">${ORGS.map(o=>`${esc(o)}: ${data[o].sov}&times;0.20+${data[o].authPct}&times;0.20+${data[o].dataPct}&times;0.15+${data[o].aeo}&times;0.25+${data[o].social}&times;0.20=${data[o].score}`).join(' &middot; ')}</span></div>
 <div class="scc">${scorecards}</div></section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including AEO and social media actions.</div><div class="sdiv"></div></div>
