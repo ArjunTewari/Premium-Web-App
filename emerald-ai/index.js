@@ -24,9 +24,9 @@ app.get('/', (req, res) => {
   let html = fs.readFileSync(htmlPath, 'utf8');
   const env = {
     TWITTER_KEY:           process.env.TWITTER_KEY           || '',
-    YOUTUBE_KEY:           process.env.YOUTUBE_KEY           || '',
     YOUTUBE_CLIENT_ID:     process.env.YOUTUBE_CLIENT_ID     || '',
-    YOUTUBE_CLIENT_SECRET: process.env.YOUTUBE_CLIENT_SECRET || ''
+    YOUTUBE_CLIENT_SECRET: process.env.YOUTUBE_CLIENT_SECRET || '',
+    YOUTUBE_AUTHORIZED_URI:process.env.YOUTUBE_AUTHORIZED_URI|| ''
   };
   const envMeta = "<meta name='env' content='" + JSON.stringify(env).replace(/'/g, '&apos;') + "'>";
   html = html.replace('<head>', '<head>\n' + envMeta);
@@ -54,9 +54,9 @@ app.post('/run', async (req, res) => {
     GEMINI_KEY:    body.geminiKey    || process.env.GEMINI_KEY    || '',
     // Optional — Social
     TWITTER_KEY:           body.twitterKey          || process.env.TWITTER_KEY           || '',
-    YOUTUBE_KEY:           body.youtubeKey          || process.env.YOUTUBE_KEY           || '',
     YOUTUBE_CLIENT_ID:     body.youtubeClientId     || process.env.YOUTUBE_CLIENT_ID     || '',
     YOUTUBE_CLIENT_SECRET: body.youtubeClientSecret || process.env.YOUTUBE_CLIENT_SECRET || '',
+    YOUTUBE_AUTHORIZED_URI:body.youtubeAuthorizedUri|| process.env.YOUTUBE_AUTHORIZED_URI|| '',
     outDir: OUT_DIR
   };
 

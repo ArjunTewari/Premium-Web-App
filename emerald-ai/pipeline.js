@@ -255,6 +255,7 @@ async function fetchYouTube(cfg, orgs, cb) {
   const results = {};
   for (const org of orgs) results[org] = { videoCount: 0, topVideo: null, error: null };
 
+  // YouTube Data API v3 — uses API key if available; OAuth keys are available for future enhancements
   if (!cfg.YOUTUBE_KEY) return results;
 
   // Run all orgs in parallel — YouTube allows concurrent requests on the same key

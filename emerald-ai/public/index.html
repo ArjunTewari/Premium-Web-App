@@ -111,22 +111,22 @@ html,body{min-height:100vh;background:var(--ink);color:var(--tx);font-family:'In
       <div class="hint">Free tier: recent search, last 7 days, ~500k tweets/month</div>
     </div>
 
-    <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mt);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bdr)">YouTube Data API v3</div>
+    <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mt);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bdr)">YouTube OAuth</div>
     <div class="row3">
       <div class="fld">
-        <label>API Key</label>
-        <input id="youtubeKey" type="password" placeholder="AIza...">
-        <div class="hint">10,000 units/day free · Search = 100 units/call</div>
-      </div>
-      <div class="fld">
-        <label>OAuth Client ID</label>
+        <label>Client ID</label>
         <input id="youtubeClientId" type="password" placeholder="...apps.googleusercontent.com">
         <div class="hint">From Google Cloud Console → Credentials</div>
       </div>
       <div class="fld">
-        <label>OAuth Client Secret</label>
+        <label>Client Secret</label>
         <input id="youtubeClientSecret" type="password" placeholder="GOCSPX-...">
         <div class="hint">From Google Cloud Console → Credentials</div>
+      </div>
+      <div class="fld">
+        <label>Authorized Redirect URI</label>
+        <input id="youtubeAuthorizedUri" type="password" placeholder="https://.../oauth/callback">
+        <div class="hint">From Google Cloud Console → Authorized redirect URIs</div>
       </div>
     </div>
   </div>
@@ -223,9 +223,9 @@ document.addEventListener('DOMContentLoaded', () => {
   try{
     const env = JSON.parse(meta.content);
     if(env.TWITTER_KEY)           document.getElementById('twitterKey').value          = env.TWITTER_KEY;
-    if(env.YOUTUBE_KEY)           document.getElementById('youtubeKey').value           = env.YOUTUBE_KEY;
     if(env.YOUTUBE_CLIENT_ID)     document.getElementById('youtubeClientId').value      = env.YOUTUBE_CLIENT_ID;
     if(env.YOUTUBE_CLIENT_SECRET) document.getElementById('youtubeClientSecret').value  = env.YOUTUBE_CLIENT_SECRET;
+    if(env.YOUTUBE_AUTHORIZED_URI)document.getElementById('youtubeAuthorizedUri').value = env.YOUTUBE_AUTHORIZED_URI;
   }catch(e){}
 })();
 
@@ -283,9 +283,9 @@ async function startRun(){
     dateTo:              document.getElementById('dateTo').value,
     clientName:          document.getElementById('clientName').value,
     twitterKey:          document.getElementById('twitterKey').value.trim(),
-    youtubeKey:          document.getElementById('youtubeKey').value.trim(),
     youtubeClientId:     document.getElementById('youtubeClientId').value.trim(),
-    youtubeClientSecret: document.getElementById('youtubeClientSecret').value.trim()
+    youtubeClientSecret: document.getElementById('youtubeClientSecret').value.trim(),
+    youtubeAuthorizedUri:document.getElementById('youtubeAuthorizedUri').value.trim()
   };
 
   try{
