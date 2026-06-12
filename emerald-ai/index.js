@@ -31,7 +31,7 @@ app.post('/run', async (req, res) => {
 
   // Build config from form inputs (fall back to env vars)
   const cfg = {
-    ORGS:          (body.orgs || '').split(',').map(s => s.trim()).filter(Boolean),
+    ORGS:          Array.isArray(body.orgs) ? body.orgs.filter(Boolean) : (body.orgs || '').split(',').map(s => s.trim()).filter(Boolean),
     DATE_FROM:     body.dateFrom  || '2026-03-08',
     DATE_TO:       body.dateTo    || '2026-06-08',
     CLIENT_NAME:   body.clientName || 'Chetan Bhattacharji',
