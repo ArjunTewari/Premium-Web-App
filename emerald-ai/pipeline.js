@@ -294,8 +294,8 @@ function aggregateOrg(artList, clsList, dateFrom) {
   artList.forEach(a => { const c=canonOutlet(a.source||''); if(c&&oc.hasOwnProperty(c))oc[c]++; });
   clsList.forEach(c => { const cn=canonOutlet(c.outlet||''); if(cn&&oc.hasOwnProperty(cn)&&oc[cn]===0)oc[cn]=1; });
   const so = Object.entries(oc).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  const ac = clsList.filter(c=>c.narrative_position==='Authoritative').length;
-  const dc = clsList.filter(c=>c.citation_quality==='Data-specific').length;
+  const ac = clsList.filter(c=>c.narrative_position==='Primary Source').length;
+  const dc = clsList.filter(c=>c.citation_quality==='Data Cited').length;
   const tc = {}; TOPICS.forEach(t=>tc[t]=0);
   clsList.forEach(c=>{
     const t=(c.aq_subtopic||'').replace('-',' ');
@@ -323,8 +323,8 @@ function aggregateOrg(artList, clsList, dateFrom) {
     outletCounts:oc, sortedOutlets:so,
     topOutlet:so[0]?.[0]||'N/A', topOutlets:so.slice(0,3).map(([o])=>o),
     topicCounts:tc, weeklyData:wk,
-    authExamples:clsList.filter(c=>c.narrative_position==='Authoritative').slice(0,2),
-    vagueExamples:clsList.filter(c=>c.citation_quality==='Vague').slice(0,2),
+    authExamples:clsList.filter(c=>c.citation_quality==='Data Cited').slice(0,2),
+    vagueExamples:clsList.filter(c=>c.citation_quality==='Named Mention').slice(0,2),
     classifications:clsList, sov, authPct, dataPct
   };
 }
@@ -381,13 +381,6 @@ async function run(cfg, cb) {
     cb(`  ${org}: ${arts[org].length} articles`, 'ok');
   }
 
-  const compCounts={};
-  for(const comp of ['TERI','Greenpeace India']){
-    try{const r=await serperSearch(`"${comp}" air quality India`, cfg.SERPER_KEY);compCounts[comp]=r.length;}
-    catch{compCounts[comp]=0;}
-    await sleep(200);
-  }
-  cb(`  Competitors: ${Object.entries(compCounts).map(([k,v])=>k+':'+v).join(', ')}`, 'ok');
 
   // ── STEP 1b: Scrape article text ───────────────────────────
   cb(`\nSTEP 1b/6 — Scraping full article text...`, 'head');
@@ -401,7 +394,7 @@ async function run(cfg, cb) {
         a.fullText=txt;
         cb(`  [${org} ${i+1}/${toEnrich.length}] scraped ${txt.length} chars`, 'ok');
       } else {
-        a.fullText=`TITLE: ${a.title}\nSNIPPET: ${a.snippet}\n[Full text unavailable. If ${org} is not explicitly cited with data, mark Peripheral.]`;
+        a.fullText=`TITLE: ${a.title}\nSNIPPET: ${a.snippet}\n[Full text unavailable. If ${org} is not explicitly cited with data, mark Secondary Mention.]`;
         cb(`  [${org} ${i+1}/${toEnrich.length}] snippet fallback`, 'warn');
       }
       await sleep(250);
@@ -427,16 +420,16 @@ async function run(cfg, cb) {
       const prompt=`You are a media intelligence analyst classifying Indian news articles about air quality for the organisation "${org}".
 
 For EACH numbered article, return one JSON object with:
-- narrative_position: "Authoritative" ONLY if "${org}" is EXPLICITLY named AND their own data/finding is directly quoted. "Peripheral" if just mentioned. "Absent" if not mentioned.
-- citation_quality: "Data-specific" if a number, %, stat, or named report FROM "${org}" appears. "Vague" otherwise.
+- narrative_position: "Primary Source" ONLY if "${org}" is EXPLICITLY named AND their own specific data, finding, or spokesperson is directly quoted. "Secondary Mention" if org is named but no specific data from them is cited. "Not Mentioned" if org does not appear.
+- citation_quality: "Data Cited" if a specific number, %, statistic, or named report FROM "${org}" appears in the article. "Named Mention" otherwise (org named but no data cited).
 - aq_subtopic: EXACTLY one of: NCAP/Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance, Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI, General AQ
-- evidence_quote: exact phrase ≤12 words from content. "not mentioned" if absent.
+- evidence_quote: exact phrase ≤12 words from content supporting the classification. "not mentioned" if absent.
 - outlet: publication from SOURCE field
 - date: date from DATE field
 - confidence: "High" or "Low"
 
 Return ONLY a JSON array. No preamble, no markdown.
-[{"index":0,"outlet":"Times of India","date":"Mar 5, 2026","narrative_position":"Authoritative","citation_quality":"Data-specific","aq_subtopic":"NCAP/Policy","evidence_quote":"CEEW found 23 of 131 cities met targets","confidence":"High"}]
+[{"index":0,"outlet":"Times of India","date":"Mar 5, 2026","narrative_position":"Primary Source","citation_quality":"Data Cited","aq_subtopic":"NCAP/Policy","evidence_quote":"CEEW found 23 of 131 cities met targets","confidence":"High"}]
 
 ARTICLES:
 ${txt}`;
@@ -496,7 +489,7 @@ ${txt}`;
   try{
     cb('  Executive summary...');
     const r=await callClaude(
-      `Write 3 comparative findings for a media intelligence report comparing these orgs on Indian air quality coverage ${DATE_FROM} to ${DATE_TO}.\nOrgs: ${ORGS.join(', ')}\n\nDATA (includes AEO/LLM visibility and social media):\n${orgSummary}\n\nInclude AEO and social media in at least one finding. Each finding must cite specific numbers.\nReturn ONLY JSON array of 3: [{"headline":"max 12 words","detail":"2-3 sentences with numbers","section_ref":"..."}]`,
+      `Write 3 comparative findings for a media intelligence report comparing these orgs on Indian air quality coverage ${DATE_FROM} to ${DATE_TO}.\nOrgs: ${ORGS.join(', ')}\n\nDATA (includes AEO/LLM visibility and social media):\n${orgSummary}\n\nRULES — follow strictly:\n- Cite ONLY directly observable counts and scores. NEVER use these phrases: "authoritative tone", "institutional credibility", "greater credibility", "more trustworthy".\n- When EITHER compared value is below 10, use raw counts (e.g. "4 vs 1 articles") not percentages. Use "Nx" ratios only when BOTH values are ≥5.\n- Each headline max 12 words. Each detail 2-3 sentences with specific numbers.\n- section_ref must be one of: "§03 Share of Voice", "§05 Topic Ownership", "§06 Narrative Position", "§07 Citation Quality", "§AEO LLM Visibility", "§Social Media".\nReturn ONLY JSON array of 3: [{"headline":"...","detail":"...","section_ref":"§03 Share of Voice"}]`,
       cfg.CLAUDE_KEY, 1200
     );
     execF=parseJ(r)||[];
@@ -537,10 +530,10 @@ ${txt}`;
   const pptxFile= path.join(cfg.outDir, `${base}.pptx`);
   const pptxName= `${base}.pptx`;
 
-  await buildPPTX(data,compCounts,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,pptxFile,cfg);
+  await buildPPTX(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,pptxFile,cfg);
   cb(`  PPTX: ${pptxName}`, 'ok');
 
-  const html=buildHTML(data,compCounts,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,pptxName,cfg);
+  const html=buildHTML(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,pptxName,cfg);
   fs.writeFileSync(htmlFile, html, 'utf8');
   cb(`  HTML: ${base}.html (${Math.round(html.length/1024)}KB)`, 'ok');
 
@@ -571,7 +564,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
     const sl=pres.addSlide(); darkBg(sl);
     sl.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:13.3,h:2.4,fill:{color:'111520'},line:{color:'111520'}});
     sl.addText('AIR QUALITY MEDIA INTELLIGENCE',{x:0.6,y:0.48,w:12,h:0.38,fontSize:11,color:AMBER,charSpacing:4,bold:true,fontFace:'Calibri'});
-    sl.addText('Who Owns the\nClean Air Narrative?',{x:0.6,y:0.92,w:10,h:1.3,fontSize:36,bold:true,color:TXT,fontFace:'Cambria'});
+    sl.addText('Air Quality\nTRIPLE Media Analytics',{x:0.6,y:0.92,w:10,h:1.3,fontSize:36,bold:true,color:TXT,fontFace:'Cambria'});
     // Org pills: 2 rows if >6 orgs, pill width adapts to count
     {
       const pillsPerRow = ORGS.length <= 6 ? ORGS.length : Math.ceil(ORGS.length / 2);
@@ -604,7 +597,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
     const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Section 01'); stitle(sl,'Executive Summary');
     const findings=execF.length>0?execF.slice(0,3):[
       {headline:`${ORGS[0]} leads AQ coverage`,detail:ORGS.map(o=>`${o}: ${data[o]?.total||0} articles`).join(', ')+'.',section_ref:'§03'},
-      {headline:'Authoritative citation rates vary across orgs',detail:ORGS.map(o=>`${o}: ${data[o]?.authPct||0}% authoritative`).join(', ')+'.',section_ref:'§06'},
+      {headline:'Primary Source rates vary across orgs',detail:ORGS.map(o=>`${o}: ${data[o]?.authPct||0}% primary source`).join(', ')+'.',section_ref:'§06 Narrative Position'},
       {headline:'AEO/LLM visibility remains a shared gap',detail:ORGS.map(o=>`${o}: AEO ${data[o]?.aeo||0}/100`).join(', ')+'.',section_ref:'§AEO'}
     ];
     findings.forEach((f,i)=>{
@@ -621,8 +614,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
   {
     const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Section 03'); stitle(sl,'Share of Voice');
     const total=ORGS.reduce((s,o)=>s+(data[o]?.total||0),0);
-    const grand=total+Object.values(comps).reduce((a,b)=>a+b,0);
-    const chartData=[{name:'AQ Articles',labels:[...ORGS,...Object.keys(comps)],values:[...ORGS.map(o=>data[o]?.total||0),...Object.values(comps)]}];
+    const chartData=[{name:'AQ Articles',labels:ORGS,values:ORGS.map(o=>data[o]?.total||0)}];
     sl.addChart(pres.charts.BAR,chartData,{
       x:0.5,y:1.22,w:7.8,h:4.6,barDir:'col',
       chartColors:[...ORGS.map((_,i)=>orgPptx(i)),BORD,BORD],
@@ -639,7 +631,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
         sl.addText(org,{x:8.78,y:y+0.1,w:3.8,h:0.28,fontSize:11,bold:true,color:orgPptx(i),fontFace:'Calibri',charSpacing:1});
         sl.addText(String(d?.total||0),{x:8.78,y:y+0.38,w:1.4,h:0.55,fontSize:34,bold:true,color:TXT,fontFace:'Calibri'});
         sl.addText('articles',{x:8.78,y:y+0.9,w:1.4,h:0.22,fontSize:10,color:MUTED,fontFace:'Calibri'});
-        const pct=grand>0?Math.round((d?.total||0)/grand*100):0;
+        const pct=tot>0?Math.round((d?.total||0)/tot*100):0;
         sl.addText(`${pct}% share`,{x:10.3,y:y+0.38,w:2.3,h:0.28,fontSize:12,color:AMBER,fontFace:'Calibri',bold:true});
         sl.addText(`Top: ${d?.topOutlet||'N/A'}`,{x:10.3,y:y+0.7,w:2.3,h:0.22,fontSize:10,color:MUTED,fontFace:'Calibri'});
       });
@@ -649,7 +641,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
         [{text:'Org',options:{bold:true,color:MUTED,fontSize:9,fill:{color:CARD2}}},{text:'Articles',options:{bold:true,color:MUTED,fontSize:9,fill:{color:CARD2},align:'center'}},{text:'Share',options:{bold:true,color:AMBER,fontSize:9,fill:{color:CARD2},align:'center'}},{text:'Top Outlet',options:{bold:true,color:MUTED,fontSize:9,fill:{color:CARD2}}}],
         ...ORGS.map((org,i)=>{
           const d=data[org];
-          const pct=grand>0?Math.round((d?.total||0)/grand*100):0;
+          const pct=tot>0?Math.round((d?.total||0)/tot*100):0;
           return [{text:org,options:{bold:true,color:orgPptx(i),fontSize:10,fill:{color:CARD}}},{text:String(d?.total||0),options:{color:TXT,fontSize:11,fill:{color:CARD},align:'center'}},{text:pct+'%',options:{color:AMBER,fontSize:11,fill:{color:CARD},align:'center'}},{text:d?.topOutlet||'N/A',options:{color:MUTED,fontSize:9,fill:{color:CARD}}}];
         })
       ];
@@ -715,10 +707,10 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
       card(sl,x,1.28,cw,cardH);
       sl.addText(org,{x:x+0.15,y:1.38,w:cw-0.3,h:0.28,fontSize:11,bold:true,color:orgPptx(i),fontFace:'Calibri',charSpacing:1});
       sl.addText(`${d.authPct}%`,{x:x+0.15,y:1.7,w:cw*0.48,h:0.68,fontSize:bigFontSz,bold:true,color:orgPptx(i),fontFace:'Calibri'});
-      sl.addText('Authoritative',{x:x+0.15,y:2.36,w:cw*0.48,h:0.24,fontSize:10,color:MUTED,fontFace:'Calibri'});
+      sl.addText('Primary Source',{x:x+0.15,y:2.36,w:cw*0.48,h:0.24,fontSize:10,color:MUTED,fontFace:'Calibri'});
       sl.addShape(pres.shapes.LINE,{x:x+cw*0.5+0.08,y:1.7,w:0,h:0.9,line:{color:BORD,width:0.5}});
       sl.addText(`${d.dataPct}%`,{x:x+cw*0.5+0.18,y:1.7,w:cw*0.48,h:0.68,fontSize:bigFontSz,bold:true,color:AMBER,fontFace:'Calibri'});
-      sl.addText('Data-specific',{x:x+cw*0.5+0.18,y:2.36,w:cw*0.48,h:0.24,fontSize:10,color:MUTED,fontFace:'Calibri'});
+      sl.addText('Data Cited',{x:x+cw*0.5+0.18,y:2.36,w:cw*0.48,h:0.24,fontSize:10,color:MUTED,fontFace:'Calibri'});
       const ex=d.authExamples[0];
       if(ex?.evidence_quote){
         sl.addText(`"${ex.evidence_quote}"`,{x:x+0.15,y:2.72,w:cw-0.3,h:0.45,fontSize:9,color:MUTED,fontFace:'Calibri',italic:true});
@@ -726,7 +718,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
       }
     });
     sl.addChart(pres.charts.BAR,
-      [{name:'Authoritative %',labels:ORGS,values:ORGS.map(o=>data[o].authPct||0)},{name:'Data-specific %',labels:ORGS,values:ORGS.map(o=>data[o].dataPct||0)}],
+      [{name:'Primary Source %',labels:ORGS,values:ORGS.map(o=>data[o].authPct||0)},{name:'Data Cited %',labels:ORGS,values:ORGS.map(o=>data[o].dataPct||0)}],
       {x:0.5,y:4.2,w:12.3,h:2.7,barDir:'col',barGrouping:'clustered',
         chartColors:[GOOD,AMBER],chartArea:{fill:{color:CARD2}},
         catAxisLabelColor:MUTED,valAxisLabelColor:MUTED,
@@ -908,7 +900,6 @@ function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,so
   const {ORGS,DATE_FROM,DATE_TO,CLIENT_NAME} = cfg;
   const now=new Date().toUTCString();
   const tot=ORGS.reduce((s,o)=>s+(data[o]?.total||0),0);
-  const grand=tot+Object.values(comps).reduce((a,b)=>a+b,0);
   const gradeCol=g=>g==='A'?'#4caf74':g==='B'?'#3d8ef0':g==='C+'?'#d4a017':g==='D'?'#f0883e':'#e05c5c';
 
   function weekBars(){
@@ -921,25 +912,26 @@ function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,so
   }
 
   function sovBar(){
-    const bars=ORGS.map((org,i)=>{const pct=grand>0?Math.round((data[org]?.total||0)/grand*100):0;return `<div style="background:${orgHex(i)};width:${pct}%;display:flex;align-items:center;padding-left:9px;font-family:monospace;font-size:11px;font-weight:500;color:#fff;min-width:0">${data[org]?.total||0} (${pct}%)</div>`;}).join('');
-    return `<div style="height:28px;background:#1e2638;border-radius:4px;overflow:hidden;display:flex;margin-bottom:12px">${bars}<div style="flex:1;background:#1e2638;border-left:1px solid #2e3a52;display:flex;align-items:center;padding-left:7px;font-family:monospace;font-size:10px;color:#5e7494">Others: ${grand-tot}</div></div>`;
+    const bars=ORGS.map((org,i)=>{const pct=tot>0?Math.round((data[org]?.total||0)/tot*100):0;return `<div style="background:${orgHex(i)};width:${pct}%;display:flex;align-items:center;padding-left:9px;font-family:monospace;font-size:11px;font-weight:500;color:#fff;min-width:0;overflow:hidden">${data[org]?.total||0}</div>`;}).join('');
+    return `<div style="height:28px;background:#1e2638;border-radius:4px;overflow:hidden;display:flex;margin-bottom:12px">${bars}</div>`;
   }
 
   function outletRows(){
     return OUTLETS.map(outlet=>{
       if(!ORGS.some(o=>(data[o]?.outletCounts[outlet]||0)>0)) return '';
-      const counts=ORGS.map(o=>data[o]?.outletCounts[outlet]||0);
-      const cells=ORGS.map((org,i)=>`<td style="color:${orgHex(i)};font-family:monospace;font-weight:600">${counts[i]}</td>`).join('');
-      const max=Math.max(...counts),winners=ORGS.filter((_,i)=>counts[i]===max&&max>0);
-      const adv=winners.length===ORGS.length?'Equal':`${winners.join('/')} leads`;
+      const orgCnts=ORGS.map((o,i)=>({o,i,n:data[o]?.outletCounts[outlet]||0})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+      if(!orgCnts.length) return '';
+      const total=orgCnts.reduce((s,x)=>s+x.n,0);
+      const top3=orgCnts.slice(0,3).map(x=>`<span style="display:inline-flex;align-items:center;gap:4px;font-family:monospace;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;background:${orgHex(x.i)}1a;color:${orgHex(x.i)};border:1px solid ${orgHex(x.i)}4d;white-space:nowrap">${esc(x.o)} (${x.n})</span>`).join(' ');
+      const more=orgCnts.length>3?`<span style="font-family:monospace;font-size:10px;color:var(--muted)"> +${orgCnts.length-3} more</span>`:'';
       const eid='ot'+outlet.replace(/\W/g,'');
       let evItems='';
-      ORGS.forEach((org,oi)=>{const a=arts[org].find(a=>canonOutlet(a.source||'')==outlet);if(a)evItems+=`<div class="ei"><div class="en" style="color:${orgHex(oi)};font-weight:600">${org}</div><div class="eb"><div class="eq">${esc((a.snippet||a.title).slice(0,130))}</div><div class="es">${esc(outlet)} &middot; ${esc(a.date)}${a.url?`<br><a href="${esc(a.url)}" target="_blank">${esc(a.url.slice(0,65))}</a>`:''}</div></div></div>`;});
-      return `<tr><td style="font-weight:600">${esc(outlet)}</td>${cells}<td style="font-family:monospace;font-size:11px;color:#8fa3b8">${esc(adv)}</td><td>${evItems?`<a class="ctag" onclick="td('${eid}')">&#8599; articles</a><div class="evd" id="${eid}">${evItems}</div>`:'<span class="lc">&#9888; no articles</span>'}</td></tr>`;
+      orgCnts.slice(0,5).forEach(x=>{const a=arts[x.o].find(a=>canonOutlet(a.source||'')==outlet);if(a)evItems+=`<div class="ei"><div class="en" style="color:${orgHex(x.i)};font-weight:600">${esc(x.o)}</div><div class="eb"><div class="eq">${esc((a.snippet||a.title).slice(0,130))}</div><div class="es">${esc(outlet)} &middot; ${esc(a.date)}${a.url?`<br><a href="${esc(a.url)}" target="_blank">${esc(a.url.slice(0,65))}</a>`:''}</div></div></div>`;});
+      return `<tr><td style="font-weight:600">${esc(outlet)}</td><td style="font-family:monospace;font-size:13px;font-weight:700;color:var(--muted2)">${total}</td><td style="line-height:2.2">${top3}${more}</td><td>${evItems?`<a class="ctag" onclick="td('${eid}')">&#8599; articles</a><div class="evd" id="${eid}">${evItems}</div>`:'<span class="lc">&#9888; no articles</span>'}</td></tr>`;
     }).join('');
   }
 
-  function topicGrid(){
+  function topicCards(){
     const tdefs=[
       {k:'NCAP/Policy',s:'National Clean Air Programme & compliance'},
       {k:'PM2.5 Exposure',s:'City & ward-level exposure data, health burden'},
@@ -948,35 +940,49 @@ function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,so
       {k:'Vehicular Pollution',s:'EV targets, transport emissions, FAME'},
       {k:'Health Impact',s:'Mortality, hospital admissions, DALY data'},
       {k:'Industrial Pollution',s:'Factory emissions, thermal plants'},
-      {k:'Heat-AQI',s:'Summer heat compounding PM2.5 impacts ↑ emerging'}
+      {k:'Heat-AQI',s:'Summer heat compounding PM2.5 impacts'}
     ];
     return tdefs.map(t=>{
-      const cells=ORGS.map((org,i)=>{
+      const orgData=ORGS.map((org,i)=>{
         const cv=data[org]?.topicCounts[t.k]||0;
-        const cb=cv>=5?'badge-owns':cv>=2?'badge-con':'badge-absent';
-        const cs=cv>=5?'owns':cv>=2?'con':'';
         const ex=data[org]?.classifications.find(c=>c.aq_subtopic&&c.aq_subtopic.replace('-',' ').toLowerCase().includes(t.k.replace('-',' ').toLowerCase().split('/')[0]));
-        return `<div class="tc ${cs}"><div class="ob ${cb}">${cv>=5?'Owns':cv>=2?'Contests':'Absent'} &middot; ${cv}</div>${ex?.evidence_quote?`<div class="cell-hl">&ldquo;${esc(ex.evidence_quote)}&rdquo;</div>`:''}</div>`;
+        return {org,i,cv,ex};
+      }).sort((a,b)=>b.cv-a.cv);
+      const maxCv=orgData[0]?.cv||1;
+      const owning=orgData.filter(x=>x.cv>=5);
+      const contesting=orgData.filter(x=>x.cv>=2&&x.cv<5);
+      const absent=orgData.filter(x=>x.cv<2);
+      const bars=[...owning,...contesting].map(x=>{
+        const pct=Math.round(x.cv/maxCv*100);
+        const badge=x.cv>=5?'badge-owns':'badge-con';
+        const lbl=x.cv>=5?'Owns':'Contests';
+        const link=x.ex?.url?`<a href="${esc(x.ex.url)}" target="_blank" style="color:var(--amber);font-family:monospace;font-size:10px;text-decoration:none;flex-shrink:0" title="${esc(x.ex.evidence_quote||'')}">&#8599;</a>`:
+          (x.ex?.evidence_quote?`<span style="font-family:monospace;font-size:10px;color:var(--muted);flex-shrink:0;cursor:default" title="${esc(x.ex.evidence_quote||'')}">&#9432;</span>`:'');
+        return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:11px;font-weight:600;color:${orgHex(x.i)};width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.org)}</span><div style="flex:1;height:7px;background:var(--surface3);border-radius:4px;overflow:hidden"><div style="height:100%;background:${orgHex(x.i)};width:${pct}%;border-radius:4px"></div></div><span style="font-family:monospace;font-size:11px;font-weight:700;width:20px;text-align:right;color:${orgHex(x.i)};flex-shrink:0">${x.cv}</span><span class="ob ${badge}" style="flex-shrink:0">${lbl}</span>${link}</div>`;
       }).join('');
-      return `<div class="tc"><div class="tn">${esc(t.k)}</div><div style="font-size:11px;color:var(--muted)">${esc(t.s)}</div></div>${cells}`;
+      const absentId='abs'+t.k.replace(/\W/g,'');
+      const absentList=absent.map(x=>`<span style="font-family:monospace;font-size:10px;color:var(--muted)">${esc(x.org)} (${x.cv})</span>`).join('  ');
+      const absentBlock=absent.length?`<div style="margin-top:8px"><a class="ctag" onclick="td('${absentId}')">${absent.length} absent (0–1 art${absent.length!==1?'s':''})</a><div class="evd" id="${absentId}" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px">${absentList}</div></div></div>`:'';
+      return `<div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">${esc(t.k)}</div><div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(t.s)}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0">${owning.length?`<span style="font-family:monospace;font-size:10px;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.25);border-radius:3px;padding:2px 7px">${owning.length} owns</span>`:''}${contesting.length?`<span style="font-family:monospace;font-size:10px;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.25);border-radius:3px;padding:2px 7px">${contesting.length} contests</span>`:''}</div></div>${bars||`<div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div>`}${absentBlock}</div>`;
     }).join('');
   }
 
-  function narrRows(){
-    return OUTLETS.map(outlet=>{
-      if(!ORGS.some(o=>(data[o]?.outletCounts[outlet]||0)>0)) return '';
-      const cells=ORGS.map((org,i)=>{
-        const cv=data[org]?.outletCounts[outlet]||0;
-        const ca=data[org]?.classifications.filter(c=>canonOutlet(c.outlet||'')==outlet)||[];
-        const pa=ca.length===0?'Absent':ca.filter(c=>c.narrative_position==='Authoritative').length>ca.length/2?'Authoritative':'Peripheral';
-        const pcls={Authoritative:'pos-auth',Peripheral:'pos-per',Absent:'pos-abs'};
-        return `<td><span class="${pcls[pa]}">${pa}</span>${cv?` <span style="font-family:monospace;font-size:10px;color:var(--muted)">${cv}</span>`:''}`;
-      }).join('');
-      const eid='nr'+outlet.replace(/\W/g,'');
-      let evs='';
-      ORGS.forEach((org,i)=>{const ca=data[org]?.classifications.filter(c=>canonOutlet(c.outlet||'')==outlet)||[];if(ca[0])evs+=`<div class="ei"><div class="en" style="color:${orgHex(i)};font-weight:600">${org}</div><div class="eb"><div class="eq">${esc(ca[0].evidence_quote||'not mentioned')}</div><div class="es">${esc(outlet)} &middot; ${esc(ca[0].date||'')}</div></div></div>`;});
-      return `<tr><td style="font-weight:600">${esc(outlet)}</td>${cells}<td>${evs?`<a class="ctag" onclick="td('${eid}')">&#8599; evidence</a><div class="evd" id="${eid}">${evs}</div>`:'<span class="lc">&#9888; no data</span>'}</td></tr>`;
-    }).join('');
+  function narrTable(){
+    const rows=ORGS.map((org,i)=>{
+      const cls=data[org]?.classifications||[];
+      const primary=cls.filter(c=>c.narrative_position==='Primary Source').length;
+      const secondary=cls.filter(c=>c.narrative_position==='Secondary Mention').length;
+      const notM=cls.filter(c=>c.narrative_position==='Not Mentioned').length;
+      const total=cls.length;
+      const pct=total>0?Math.round(primary/total*100):0;
+      const exs=cls.filter(c=>c.narrative_position==='Primary Source').slice(0,2);
+      const eid='nex'+org.replace(/\W/g,'');
+      const exHtml=exs.length?`<a class="ctag" onclick="td('${eid}')">examples</a><div class="evd" id="${eid}">${exs.map(c=>`<div class="ei"><div class="eb"><div class="eq">${esc(c.evidence_quote||'')}</div><div class="es">${esc(c.outlet||'')} &middot; ${esc(c.date||'')}</div></div></div>`).join('')}</div>`:'—';
+      return {org,i,primary,secondary,notM,total,pct,exHtml};
+    }).sort((a,b)=>b.pct-a.pct);
+    return `<table class="nt"><thead><tr><th>Org</th><th>Primary Source</th><th>Secondary Mention</th><th>Not Mentioned</th><th>Primary Source %</th><th>Examples</th></tr></thead><tbody>${
+      rows.map(r=>`<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(r.i)}">${esc(r.org)}</span></td><td style="font-family:monospace;font-weight:700;color:var(--good)">${r.primary}</td><td style="font-family:monospace;color:var(--muted2)">${r.secondary}</td><td style="font-family:monospace;color:var(--muted)">${r.notM}</td><td><span style="font-family:monospace;font-weight:700;color:${orgHex(r.i)}">${r.pct}%</span></td><td>${r.exHtml}</td></tr>`).join('')
+    }</tbody></table>`;
   }
 
   function donut(pct,color){const da=(pct/100*163.4).toFixed(1),db=(163.4-da).toFixed(1);return `<svg width="64" height="64" viewBox="0 0 64 64" style="flex-shrink:0"><circle cx="32" cy="32" r="26" fill="none" stroke="#1e2638" stroke-width="10"/><circle cx="32" cy="32" r="26" fill="none" stroke="${color}" stroke-width="10" stroke-dasharray="${da} ${db}" stroke-dashoffset="41" stroke-linecap="round"/><text x="32" y="37" text-anchor="middle" fill="${color}" font-size="13" font-family="Inter" font-weight="700">${pct}%</text></svg>`;}
@@ -1058,23 +1064,24 @@ ${hasYT?`<div style="font-size:13px;font-weight:600;color:var(--text);margin:20p
   const topicCols=`175px ${ORGS.map(()=>'1fr').join(' ')}`;
   const orgChips=ORGS.map((o,i)=>`<span class="chip" style="background:${orgHex(i)}1a;color:${orgHex(i)};border:1px solid ${orgHex(i)}4d"><span style="width:7px;height:7px;border-radius:50%;display:inline-block;background:${orgHex(i)}"></span>${esc(o)}</span>`).join('');
   const navOrgs=ORGS.map(o=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2);padding:3px 20px"><div style="width:8px;height:8px;border-radius:2px;background:${orgHex(ORGS.indexOf(o))}"></div>${esc(o)}: ${data[o].total} arts</div>`).join('');
-  const outletTh=ORGS.map((o,i)=>`<th style="color:${orgHex(i)}">${esc(o)}</th>`).join('');
-  const narrTh=ORGS.map((o,i)=>`<th style="color:${orgHex(i)}">${esc(o)} position</th>`).join('');
 
-  const citPanels=ORGS.map((org,i)=>{
-    const d=data[org];
-    return `<div class="cqp"><div class="opn" style="color:${orgHex(i)};margin-bottom:10px">${esc(org)}</div>
-<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">${donut(d.dataPct,orgHex(i))}
-<div><div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--muted2)"><span>Data-specific</span><span style="color:var(--good);font-family:monospace">${d.dataCount}/${d.classified}</span></div>
-<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--muted2)"><span>Vague</span><span style="font-family:monospace">${d.classified-d.dataCount}/${d.classified}</span></div></div></div>
-${d.authExamples[0]?`<div class="cqe cqd"><div class="cqet">Data-specific example</div><div class="cqetx">&ldquo;${esc(d.authExamples[0].evidence_quote||'')}&rdquo;</div><div style="color:var(--muted);font-family:monospace;font-size:10px;margin-top:3px">${esc(d.authExamples[0].outlet||'')} &middot; ${esc(d.authExamples[0].date||'')}</div></div>`:''}
-</div>`;
-  }).join('');
+  function citTable(){
+    const all=ORGS.flatMap((org,i)=>(data[org]?.classifications||[]).filter(c=>c.citation_quality==='Data Cited').map(c=>({...c,org,orgI:i}))).slice(0,3);
+    const rows=ORGS.map((org,i)=>{
+      const cls=data[org]?.classifications||[];
+      const total=cls.length;
+      const cited=cls.filter(c=>c.citation_quality==='Data Cited').length;
+      const named=cls.filter(c=>c.citation_quality==='Named Mention').length;
+      const notM=total-cited-named;
+      const pct=total>0?Math.round(cited/total*100):0;
+      return {org,i,total,cited,named,notM,pct};
+    }).sort((a,b)=>b.pct-a.pct);
+    const highlights=all.length?`<div style="margin-top:16px;background:rgba(76,175,116,.06);border:1px solid rgba(76,175,116,.2);border-radius:8px;padding:16px"><div style="font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--good);margin-bottom:12px">Data Cited highlights (report-wide)</div>${all.map(c=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-family:monospace;font-size:10px;font-weight:700;color:${orgHex(c.orgI)}">${esc(c.org)}</span><span style="font-family:monospace;font-size:10px;color:var(--muted)">${esc(c.outlet||'')} &middot; ${esc(c.date||'')}</span></div><div class="eq">&ldquo;${esc(c.evidence_quote||'')}&rdquo;</div></div>`).join('')}</div>`:'';
+    return `<table class="nt"><thead><tr><th>Org</th><th>Total Mentions</th><th>Data Cited</th><th>Named Mention</th><th>Not Mentioned</th></tr></thead><tbody>${
+      rows.map(r=>`<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(r.i)}">${esc(r.org)}</span></td><td style="font-family:monospace">${r.total}</td><td><span style="font-family:monospace;font-weight:700;color:var(--good)">${r.cited}</span> <span style="font-family:monospace;font-size:10px;color:var(--muted)">(${r.pct}%)</span></td><td style="font-family:monospace;color:var(--muted2)">${r.named}</td><td style="font-family:monospace;color:var(--muted)">${r.notM}</td></tr>`).join('')
+    }</tbody></table>${highlights}`;
+  }
 
-  const narrativePanels=ORGS.map((org,i)=>{
-    const d=data[org];
-    return `<div class="op" style="border-top:2px solid ${orgHex(i)}"><div class="opn" style="color:${orgHex(i)}">${esc(org)}</div><div style="font-family:monospace;font-size:25px;font-weight:700;color:${orgHex(i)};margin-bottom:4px">${d.authPct}%</div><div style="font-size:12px;color:var(--muted2)">Authoritative</div><div style="font-size:11px;color:var(--muted);margin-top:5px;font-family:monospace">${d.authCount} auth &middot; ${d.classified-d.authCount} peripheral (${d.classified} classified)</div></div>`;
-  }).join('');
 
   const scorecards=ORGS.map((org,i)=>{
     const d=data[org];
@@ -1203,12 +1210,25 @@ body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line
 .rat{font-size:11px;color:var(--muted);font-family:monospace;line-height:1.55}
 .apt td{font-family:monospace;color:var(--muted2);font-size:11px}.apt td a{color:var(--amber);text-decoration:none}
 .rf{border-top:1px solid var(--border);padding:28px 0 0;font-family:monospace;font-size:10px;color:var(--muted);line-height:2}
+.edit-bar{position:fixed;top:14px;right:18px;z-index:2000;display:flex;gap:8px;align-items:center}
+.edit-btn{background:#1e2638;border:1px solid var(--border2);border-radius:5px;padding:6px 13px;font-family:monospace;font-size:11px;color:var(--muted2);cursor:pointer;transition:all .15s;line-height:1.4}
+.edit-btn:hover,.edit-btn.on{background:rgba(201,146,42,.15);border-color:rgba(201,146,42,.4);color:var(--amber)}
+.edit-dl{color:var(--good)!important;border-color:rgba(76,175,116,.3)!important;background:rgba(76,175,116,.07)!important;display:none}
+body.edit-mode .edit-dl{display:inline-block}
+body.edit-mode [contenteditable="true"]:hover{outline:1.5px dashed rgba(201,146,42,.55);border-radius:2px;cursor:text}
+body.edit-mode [contenteditable="true"]:focus{outline:1.5px solid rgba(201,146,42,.7);border-radius:2px}
+.sec-x{display:none;position:absolute;top:10px;right:14px;width:22px;height:22px;border-radius:4px;background:rgba(224,92,92,.12);border:1px solid rgba(224,92,92,.3);color:var(--bad);font-size:15px;cursor:pointer;align-items:center;justify-content:center;line-height:1;font-weight:700}
+.sec-x:hover{background:rgba(224,92,92,.28)}
+body.edit-mode .sec-x{display:flex}
+.sec.sec-hidden{display:none}
 @media(max-width:900px){.sidenav{display:none}.main{padding:24px 20px 60px}.cp,.scc,.mg{grid-template-columns:1fr}.tg{grid-template-columns:1fr!important}.rt{font-size:28px}}`;
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AQ Intelligence &mdash; ${esc(ORGS.join(' vs '))}</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>${CSS}</style></head><body><div class="shell">
+<style>${CSS}</style></head><body>
+<div class="edit-bar" id="edit-bar"><button class="edit-btn" id="edit-btn" onclick="toggleEdit()">&#9998; Edit Mode</button><button class="edit-btn edit-dl" id="dl-btn" onclick="dlEdit()">&#8595; Download Edited</button></div>
+<div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a><a href="#method" class="nav-a">Methodology</a>
 <div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#narr" class="nav-a">Narrative Position</a><a href="#cit" class="nav-a">Citation Quality</a><a href="#em" class="nav-a">Emerging Narratives</a>
@@ -1217,21 +1237,28 @@ body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0,10)}<br>${navOrgs}CONFIDENTIAL</div></nav>
 <main class="main">
 <header class="rh" id="header"><div class="ey">Air Quality Media Intelligence &middot; India &middot; ${esc(DATE_FROM)} to ${esc(DATE_TO)}</div>
-<h1 class="rt">Who Owns the<br><span class="rti">Clean Air Narrative?</span></h1>
+<h1 class="rt">Air Quality<br><span class="rti">TRIPLE Media Analytics</span></h1>
 <div class="rm">Period: ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)} &middot; ${tot} AQ articles &middot; ${now}</div>
 <div class="chips">${orgChips}</div>
-<div class="dn"><strong>Live data:</strong> Serper News API + Claude Haiku 4.5 + LLM probing &middot; ${now}</div>
+<div class="dn"><strong>Publicly available data</strong> Insight linked to evidence &middot; ${now}</div>
 ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;gap:12px;background:rgba(61,142,240,.08);border:1px solid rgba(61,142,240,.25);border-radius:6px;padding:12px 16px;font-size:13px"><div style="flex:1;color:var(--text)"><strong style="font-weight:600">PowerPoint version available.</strong> Open the <code style="background:var(--surface3);padding:1px 5px;border-radius:3px;font-size:11px">.pptx</code> file in the same folder.</div><div style="font-family:monospace;font-size:11px;color:var(--muted2);flex-shrink:0">📁 ${esc(pptxFilename)}</div></div>` : ''}
 </header>
 
-<section class="sec" id="exec"><div class="sh"><div class="se">Section 01</div><h2 class="st">Executive Summary</h2><div class="sd">Headline comparative findings across ${ORGS.length} organisations — media, LLM visibility, and social.</div><div class="sdiv"></div></div>${execCards}</section>
+<section class="sec" id="exec"><div class="sh"><div class="se">Section 01</div><h2 class="st">Executive Summary</h2><div class="sd">Headline comparative findings across ${ORGS.length} organisations — media, LLM visibility, and social.</div><div class="sdiv"></div></div>
+<div style="background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.2);border-radius:8px;overflow:hidden;margin-bottom:4px">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;cursor:pointer;user-select:none" onclick="toggleExecDraft()">
+<span style="font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)">Draft Executive Summary <span style="font-weight:400;color:var(--muted2)">(AI-generated &mdash; review before sharing)</span></span>
+<span id="exec-draft-icon" style="font-family:monospace;font-size:12px;color:var(--amber)">&#9660; Show draft</span>
+</div>
+<div id="exec-draft" style="display:none;padding:0 18px 18px">${execCards}</div>
+</div></section>
 
 <section class="sec" id="method"><div class="sh"><div class="se">Section 02</div><h2 class="st">Methodology</h2><div class="sd">How data was collected, filtered, and analysed.</div><div class="sdiv"></div></div>
-<div class="sb-scope"><strong>AQ scope filter:</strong> Content must reference air quality, AQI, PM2.5, PM10, air pollution, smog, clean air, NCAP, or GRAP. Articles outside ${esc(DATE_FROM)} to ${esc(DATE_TO)} are discarded. Tracked: <strong>${esc(ORGS.join(', '))}</strong></div>
+<div class="sb-scope"><strong>AQ scope filter:</strong> Content must reference air quality, AQI, PM2.5, PM10, air pollution, smog, clean air, NCAP, or GRAP. Tracked: <strong>${esc(ORGS.join(', '))}</strong></div>
 <div class="mg">
 <div class="mc"><div class="ml">News Coverage</div><div class="mt">Serper News API &middot; 5 queries per org &middot; Date-filtered &middot; ${tot} in-range articles</div></div>
-<div class="mc"><div class="ml">AI Classification</div><div class="mt">Claude Haiku 4.5 classifies each article: Authoritative/Peripheral &middot; Data-specific/Vague &middot; AQ sub-topic &middot; Evidence quote.</div></div>
-<div class="mc"><div class="ml">AEO Probing</div><div class="mt">5 AQ questions asked to GPT-4o, Perplexity, Gemini. Org mention rate converted to 0–100 score. Contributes 30% of total score.</div></div>
+<div class="mc"><div class="ml">AI Classification</div><div class="mt">Claude Haiku 4.5 classifies each article: Primary Source / Secondary Mention / Not Mentioned &middot; Data Cited / Named Mention &middot; AQ sub-topic (NCAP/Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance, Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI) &middot; Evidence quote.</div></div>
+<div class="mc"><div class="ml">AEO Probing</div><div class="mt">5 AQ questions asked to GPT-4o, Perplexity, Gemini. Org mention rate converted to 0–100 score. Contributes 25% of total score.</div></div>
 <div class="mc"><div class="ml">Social Media</div><div class="mt">YouTube: Data API v3 broad AQ video search · X/Twitter, Instagram, LinkedIn: Serper site: search (Google-indexed public posts) · Org mention detection across title, description, comments.</div></div>
 </div></section>
 
@@ -1239,10 +1266,10 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
 <div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div>
 <div style="display:flex;gap:12px;flex-wrap:wrap">${ORGS.map((o,i)=>`<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:12px;height:12px;border-radius:2px;background:${orgHex(i)}"></div>${esc(o)}</div>`).join('')}</div></div>
 ${sovBar()}
-<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o,i)=>`<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join('')}${Object.entries(comps).map(([k,v])=>`<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--muted);margin-right:5px"></span>${esc(k)}: ${v}</div>`).join('')}</div>
+<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o,i)=>`<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join('')}</div>
 </div>
-<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-family:monospace;font-size:11px;color:var(--muted2)"><strong style="color:var(--amber)">Reading this table:</strong> Each cell = number of AQ-scoped articles an org had at that outlet. Advantage = which org leads at each outlet.</div>
-<table class="nt"><thead><tr><th>Outlet</th>${outletTh}<th>Advantage</th><th>Evidence</th></tr></thead><tbody>${outletRows()}</tbody></table></section>
+<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-family:monospace;font-size:11px;color:var(--muted2)"><strong style="color:var(--amber)">Reading this table:</strong> Total = all AQ-scoped articles across orgs at that outlet. Top orgs shows the three highest-coverage orgs as badges.</div>
+<table class="nt"><thead><tr><th>Outlet</th><th>Total</th><th>Top orgs by coverage</th><th>Evidence</th></tr></thead><tbody>${outletRows()}</tbody></table></section>
 
 <section class="sec" id="momentum"><div class="sh"><div class="se">Section 04</div><h2 class="st">Coverage Momentum</h2>
 <div class="sd">Weekly article volume per org. Taller = more articles. Dates parsed from Serper metadata.</div><div class="sdiv"></div></div>
@@ -1251,18 +1278,28 @@ ${sovBar()}
 <div class="wbars">${weekBars()}</div></div></section>
 
 <section class="sec" id="topics"><div class="sh"><div class="se">Section 05</div><h2 class="st">Topic Ownership Map</h2>
-<div class="sd">8 fixed AQ sub-topics clustered by Claude. <strong style="color:var(--good)">Owns</strong> = 5+ &middot; <strong style="color:var(--amber)">Contests</strong> = 2&ndash;4 &middot; <strong style="color:var(--muted2)">Absent</strong> = 0&ndash;1.</div><div class="sdiv"></div></div>
+<div class="sd">8 AQ sub-topics: NCAP/Policy &middot; PM2.5 Exposure &middot; Stubble Burning &middot; Clean Air Finance &middot; Vehicular Pollution &middot; Health Impact &middot; Industrial Pollution &middot; Heat-AQI.</div><div class="sdiv"></div></div>
 ${clsNotice}
-<div class="tg"><div class="tgh">AQ Sub-topic</div>${ORGS.map((o,i)=>`<div class="tgh" style="color:${orgHex(i)}">${esc(o)}</div>`).join('')}${topicGrid()}</div></section>
+<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:20px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--muted2)">
+<span><span class="ob badge-owns">Owns</span> = 5+ articles</span>
+<span><span class="ob badge-con">Contests</span> = 2&ndash;4 articles</span>
+<span><span class="ob badge-absent">Absent</span> = 0&ndash;1 articles</span>
+</div>
+${topicCards()}</section>
 
 <section class="sec" id="narr"><div class="sh"><div class="se">Section 06</div><h2 class="st">Narrative Position</h2>
-<div class="sd">Authoritative = org is primary cited expert with own data quoted. Peripheral = mentioned among peers.</div><div class="sdiv"></div></div>
-${clsNotice}<div class="cp">${narrativePanels}</div>
-<table class="nt"><thead><tr><th>Outlet</th>${narrTh}<th>Evidence</th></tr></thead><tbody>${narrRows()}</tbody></table></section>
+<div class="sd">How often is each org the primary cited expert vs. named in passing? Ranked by Primary Source rate.</div><div class="sdiv"></div></div>
+${clsNotice}
+<div style="background:rgba(61,142,240,.06);border:1px solid rgba(61,142,240,.2);border-radius:8px;padding:14px 18px;font-size:12px;color:var(--muted2);margin-bottom:20px;line-height:1.9">
+<strong style="color:#3d8ef0">Primary Source:</strong> Article directly quotes or cites this org&rsquo;s own named research, data, or spokesperson.<br>
+<strong style="color:var(--muted2)">Secondary Mention:</strong> Org is named but no specific data or quote from them is cited (e.g. listed among several orgs).<br>
+<strong style="color:var(--muted)">Not Mentioned:</strong> Org does not appear in the article at all.
+</div>
+${narrTable()}</section>
 
 <section class="sec" id="cit"><div class="sh"><div class="se">Section 07</div><h2 class="st">Citation Quality</h2>
-<div class="sd">Data-specific = org cited with specific number, stat, or named report. Vague = org mentioned by name only.</div><div class="sdiv"></div></div>
-${clsNotice}<div class="mg">${citPanels}</div></section>
+<div class="sd"><strong style="color:var(--good)">Data Cited</strong> = a specific number, statistic, or named report from this org is cited. <strong style="color:var(--muted2)">Named Mention</strong> = org named but no specific data cited. Sorted by Data Cited %.</div><div class="sdiv"></div></div>
+${clsNotice}${citTable()}</section>
 
 <section class="sec" id="em"><div class="sh"><div class="se">Section 08</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining momentum where none of the tracked orgs currently dominates.</div><div class="sdiv"></div></div>
 ${emergingCards}</section>
@@ -1290,6 +1327,38 @@ function td(id){var e=document.getElementById(id);if(e)e.classList.toggle('open'
 var secs=document.querySelectorAll('.sec[id],header[id]');
 var nis=document.querySelectorAll('.nav-a');
 secs.forEach(function(s){new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){nis.forEach(function(n){n.classList.remove('active');});var a=document.querySelector('.nav-a[href="#'+e.target.id+'"]');if(a)a.classList.add('active');}});},{threshold:0.25,rootMargin:'-10% 0px -60% 0px'}).observe(s);});
+function toggleExecDraft(){var d=document.getElementById('exec-draft');var ic=document.getElementById('exec-draft-icon');if(!d)return;var open=d.style.display!=='none';d.style.display=open?'none':'block';if(ic)ic.textContent=open?'\\u25bc Show draft':'\\u25b2 Hide draft';}
+function toggleEdit(){
+  var on=!document.body.classList.contains('edit-mode');
+  document.body.classList.toggle('edit-mode',on);
+  var btn=document.getElementById('edit-btn');
+  if(btn){btn.textContent=on?'\\u2715 Exit Edit':'\\u9998 Edit Mode';btn.classList.toggle('on',on);}
+  document.querySelectorAll('.sd,.fd,.rat,.em-body,.em-inf,.eq,.cqetx').forEach(function(el){el.contentEditable=on?'true':'false';});
+  if(on)addHideButtons();
+}
+function addHideButtons(){
+  document.querySelectorAll('.sec[id],.rh[id]').forEach(function(s){
+    if(s.querySelector('.sec-x'))return;
+    var btn=document.createElement('button');
+    btn.className='sec-x';btn.title='Hide section';btn.innerHTML='&times;';
+    btn.onclick=function(){s.classList.add('sec-hidden');};
+    s.style.position='relative';
+    s.appendChild(btn);
+  });
+}
+function dlEdit(){
+  var bar=document.getElementById('edit-bar');
+  var oldMode=document.body.classList.contains('edit-mode');
+  document.body.classList.remove('edit-mode');
+  document.querySelectorAll('.sd,.fd,.rat,.em-body,.em-inf,.eq,.cqetx').forEach(function(el){el.contentEditable='false';});
+  if(bar)bar.style.display='none';
+  var html='<!DOCTYPE html>'+document.documentElement.outerHTML;
+  if(bar)bar.style.display='';
+  if(oldMode)document.body.classList.add('edit-mode');
+  var b=new Blob([html],{type:'text/html'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download='aq-report-edited.html';a.click();URL.revokeObjectURL(a.href);
+}
 <\/script></body></html>`;
 }
 

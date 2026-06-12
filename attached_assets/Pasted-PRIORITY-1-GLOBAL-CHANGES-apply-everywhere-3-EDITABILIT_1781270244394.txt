@@ -1,0 +1,146 @@
+PRIORITY 1 — GLOBAL CHANGES (apply everywhere)
+
+3. EDITABILITY: Add a fixed-position "Edit Mode" toggle button (top-right,
+   visible on scroll). When ON:
+   - Add contenteditable="true" to: all section descriptions, exec summary
+     card text, all "insight"/"context" narrative paragraphs (narrative
+     position, citation quality, social intelligence insights, action
+     matrix rationale text), and the AEO/social platform insight blocks.
+   - Add a subtle dashed outline on hover for editable elements so the
+     client knows what's editable.
+   - Add a "Download Edited Report" button next to the toggle that
+     serialises the current DOM (document.documentElement.outerHTML, minus
+     the edit-mode UI itself) into a downloadable .html file via Blob, so
+     the client can edit wording/omit sections and save their own copy.
+   - Add a "Hide section" (×) button on each <section> when Edit Mode is
+     on, so the client can remove sections they don't want before
+     downloading.
+
+4. ORG COLOUR CONSISTENCY: Audit every section for hardcoded CEEW
+   (blue)/CSTEP (orange) colours — e.g. var(--ceew), var(--cstep), .ceew-label,
+   .cstep-label, ob-ceew, ob-cstep, mention-ceew, mention-cstep classes in
+   social-intelligence.js and pipeline.js. Replace all of these with the
+   dynamic ORG_COLORS[i % ORG_COLORS.length] / orgHex(i) pattern already used
+   in the Share of Voice section, so all 11 orgs get correct distinct colours
+   everywhere (AEO panels, social tables, narrative panels, citation panels,
+   scorecards). This fixes the "blue/orange formatting issue" in Section 03
+   and prevents the same bug from appearing in AEO/Social sections at 11 orgs.
+
+5. Wrap the Executive Summary section in a collapsed-by-default container
+   with a clear header: "Draft Executive Summary (AI-generated — review
+   before sharing)" and a "Show draft" toggle. When generating the findings
+   text via Claude, update the prompt with these rules:
+   - Never use percentage framing when either compared value is below 10
+     (e.g. "4 vs 1 articles" not "300% more coverage"). Use raw counts or
+     simple ratios like "4x" only when both numbers are ≥5.
+   - Ban these unsubstantiated phrases entirely from the prompt's
+     instructions: "authoritative tone", "institutional credibility",
+     "greater credibility", "more trustworthy". Findings must cite only
+     directly observable counts (article counts, mention counts, score
+     deltas) — no interpretive quality judgments.
+   - Each finding must end with a link/anchor to the section that supports
+     it (e.g. "→ §06 Narrative Position").
+
+═══════════════════════════════════════════════════════════════
+PRIORITY 3 — SECTION 02 (Methodology)
+═══════════════════════════════════════════════════════════════
+
+6. Align terminology: the methodology card describing AQ scope/sub-topics
+   must use the EXACT same 8 topic names as Section 05's topic ownership
+   table (NCAP/Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance,
+   Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI) —
+   currently they may be described generically. List them by name here.
+═══════════════════════════════════════════════════════════════
+PRIORITY 4 — SECTION 03 (Share of Voice): bug fixes + simplify
+═══════════════════════════════════════════════════════════════
+
+8. REMOVE the hardcoded TERI/Greenpeace India "competitor" fetch
+   (compCounts in pipeline.js, the loop over ['TERI','Greenpeace India'] and
+   the "Others: {grand-tot}" segment of the SOV bar). These appear with no
+   explanation to the client. Either delete this entirely, OR — only if
+   ORGS.length is small — add a clearly labeled "Reference organisations
+   (for context, not tracked)" sub-row with a one-line explanation of why
+   they're shown. Default to deleting it; simplicity wins, especially at
+   11 orgs where this adds noise.
+
+12. SCALE TEST: with 11 orgs, the outlet breakdown table will have 11 org
+    columns + outlet name + advantage + evidence = 14 columns. This will not
+    fit. Redesign: make the table ROWS = org (not outlet), columns = Outlet 1
+    article count, Outlet 2, etc. is equally bad. Instead: for each outlet,
+    show only the TOP 3 orgs by count as inline badges (e.g. "CEEW (4) ·
+    TERI (2) · CSTEP (1)") plus a "+{N} more orgs with 0" note, rather than
+    one column per org. Keep the Evidence link per outlet (linking to the
+    top org's example article).
+
+═══════════════════════════════════════════════════════════════
+PRIORITY 5 — SECTION 05 (Topic Ownership): scale + clarity
+═══════════════════════════════════════════════════════════════
+
+13. ADD A PERSISTENT LEGEND at the top of this section, always visible (not
+    just in a tooltip): "Owns = 5+ articles on this topic · Contests = 2–4 ·
+    Absent = 0–1". This directly answers "what does Absent · 1 mean" — it
+    means the org has 0 or 1 articles on that topic, which the badge already
+    encodes but the label needs the legend to be self-explanatory.
+
+14. ADD SOURCE LINKS: wherever an org's name/quote appears in this section
+    (e.g. "experts at CEEW found..."), wrap the org name or the supporting
+    phrase in a link to the source article URL if one exists in the
+    underlying article data. Use a small superscript link icon if inline
+    linking breaks the sentence flow.
+
+15. SCALE TO 11 ORGS: redesign the topic ownership table from "1 row per
+    topic × 1 column per org" (which becomes a 8x11 grid) to "1 card per
+    topic" containing: topic name, then a ranked horizontal bar list showing
+    only orgs with 2+ articles (Owns/Contests), sorted by count descending,
+    each as a labeled bar. Orgs with 0-1 articles on that topic are
+    summarised as "{N} orgs absent (0–1 articles): {comma list or count}"
+    below the bars, collapsed by default with a "show" toggle. This keeps
+    each topic card readable regardless of org count.
+
+═══════════════════════════════════════════════════════════════
+PRIORITY 6 — SECTION 06 (Narrative Position): define terms + scale
+═══════════════════════════════════════════════════════════════
+
+16. ADD A DEFINITION BOX at the top of this section, before any data, with
+    OBJECTIVE criteria (replace "Authoritative"/"Peripheral" labels with
+    these neutral terms throughout the section and in pipeline.js):
+    - "Primary Source": the article directly quotes or cites this org's own
+      named research, data, or spokesperson.
+    - "Secondary Mention": the org is named but no specific data/quote from
+      them is cited (e.g. listed among several orgs).
+    - "Not Mentioned": this org does not appear in the article at all.
+    Rename narrative_position values from Authoritative/Peripheral to
+    Primary Source/Secondary Mention in the Claude classification prompt AND
+    in all HTML rendering, so the labels match their definitions everywhere.
+
+17. SCALE TO 11 ORGS: replace the per-org narrative panels (which become 11
+    cards) with a single ranked table: columns = Org | Primary Source count |
+    Secondary Mention count | Not Mentioned count | Primary Source rate (%).
+    Sort by Primary Source rate descending. Keep 1-2 example quote+link
+    expandable per org (click to expand row), don't show all examples by
+    default.
+
+═══════════════════════════════════════════════════════════════
+PRIORITY 7 — SECTION 07 (Citation Quality): rename + scale + clarify
+═══════════════════════════════════════════════════════════════
+
+18. RENAME "Vague" → "Named Mention" (org is named in the article but no
+    specific statistic/report/finding from them is cited) and rename
+    "Data-specific" → "Data Cited" (a specific number, statistic, or named
+    report FROM this org is cited). Update both the Claude classification
+    prompt's citation_quality values and all HTML labels/badges.
+
+19. FIX THE ATTRIBUTION AMBIGUITY: every row/card in this section MUST name
+    which tracked org it refers to — never show a bare "not mentioned" or
+    "Vague" badge without the org name attached. If the current per-org
+    panel structure doesn't make this clear at a glance, add the org name +
+    colour badge to every example shown.
+
+20. SCALE TO 11 ORGS WITH 2-5 STORIES/WEEK (~26-65 articles per org over 13
+    weeks): replace the per-org citation quality panels with a single
+    summary table: columns = Org | Total Mentions | Data Cited (count, %) |
+    Named Mention (count, %) | Not Mentioned (count). One row per org,
+    sorted by Data Cited % descending. Below the table, show 2-3 example
+    "Data Cited" quotes (with source links) as a separate small callout —
+    not one example per org, just 2-3 report-wide highlights so the section
+    stays compact regardless of org count.

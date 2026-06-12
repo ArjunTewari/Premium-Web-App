@@ -515,7 +515,7 @@ function computeSocialScore(social, orgs) {
 // ══════════════════════════════════════════════════════════════════════════
 
 // Colour helpers
-const ORG_COLORS = ['#3d8ef0', '#e05c3a', '#4caf74', '#c9922a', '#a371f7', '#e05c5c'];
+const ORG_COLORS = ['#3d8ef0','#e05c3a','#4caf74','#c9922a','#a371f7','#e05c5c','#14b8a6','#f97316','#8b5cf6','#06b6d4','#84cc16','#ef4444','#ec4899'];
 const orgColor   = (org, orgs) => ORG_COLORS[orgs.indexOf(org) % ORG_COLORS.length] || '#8fa3b8';
 
 function escHtml(s) {
@@ -587,7 +587,7 @@ function platformTableHtml(orgs, orgMentions, trendingTopics, insightByOrg, orgC
 
 /** AEO section HTML */
 function buildAEOHtml(aeoResults, orgs) {
-  const orgColorList = ['#3d8ef0', '#e05c3a', '#4caf74', '#c9922a', '#a371f7', '#e05c5c'];
+  const orgColorList = ['#3d8ef0','#e05c3a','#4caf74','#c9922a','#a371f7','#e05c5c','#14b8a6','#f97316','#8b5cf6','#06b6d4','#84cc16','#ef4444','#ec4899'];
 
   const orgPanels = orgs.map((org, oi) => {
     const col = orgColorList[oi % orgColorList.length];
