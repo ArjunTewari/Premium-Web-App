@@ -613,11 +613,11 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
   // Slide 3: Share of Voice
   {
     const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Section 03'); stitle(sl,'Share of Voice');
-    const total=ORGS.reduce((s,o)=>s+(data[o]?.total||0),0);
+    const tot=ORGS.reduce((s,o)=>s+(data[o]?.total||0),0);
     const chartData=[{name:'AQ Articles',labels:ORGS,values:ORGS.map(o=>data[o]?.total||0)}];
     sl.addChart(pres.charts.BAR,chartData,{
       x:0.5,y:1.22,w:7.8,h:4.6,barDir:'col',
-      chartColors:[...ORGS.map((_,i)=>orgPptx(i)),BORD,BORD],
+      chartColors:ORGS.map((_,i)=>orgPptx(i)),
       chartArea:{fill:{color:CARD2}},catAxisLabelColor:MUTED,valAxisLabelColor:MUTED,
       valGridLine:{color:BORD,size:0.5},catGridLine:{style:'none'},
       showValue:true,dataLabelColor:TXT,dataLabelFontSize:11,
