@@ -248,11 +248,57 @@ async function runAEO(cfg, orgs, cb) {
 // ══════════════════════════════════════════════════════════════════════════
 //  STEP 2: YOUTUBE INTELLIGENCE
 // ══════════════════════════════════════════════════════════════════════════
+// ── YouTube OAuth helpers ─────────────────────────────────────────────────
+const YT_TOKENS_FILE = require('path').join(__dirname, 'youtube_tokens.json');
+
+function loadYtTokens() {
+  try { return JSON.parse(require('fs').readFileSync(YT_TOKENS_FILE, 'utf8')); }
+  catch { return null; }
+}
+
+async function getYtAccessToken(cfg) {
+  const tokens = loadYtTokens();
+  if (!tokens?.refresh_token) return null;
+
+  // Refresh if expired (or no expiry recorded)
+  const expiry = tokens.expiry_date || 0;
+  if (Date.now() < expiry - 60000) return tokens.access_token;
+
+  try {
+    const res = await axios.post('https://oauth2.googleapis.com/token', null, {
+      params: {
+        client_id:     cfg.YOUTUBE_CLIENT_ID,
+        client_secret: cfg.YOUTUBE_CLIENT_SECRET,
+        refresh_token: tokens.refresh_token,
+        grant_type:    'refresh_token'
+      },
+      timeout: 10000
+    });
+    const updated = {
+      ...tokens,
+      access_token: res.data.access_token,
+      expiry_date:  Date.now() + (res.data.expires_in || 3600) * 1000
+    };
+    require('fs').writeFileSync(YT_TOKENS_FILE, JSON.stringify(updated, null, 2));
+    return updated.access_token;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function runYouTube(cfg, orgs, cb) {
-  if (!cfg.YOUTUBE_KEY) {
-    cb('  No YOUTUBE_KEY — skipping YouTube', 'warn');
+  if (!cfg.YOUTUBE_CLIENT_ID) {
+    cb('  No YOUTUBE_CLIENT_ID — skipping YouTube', 'warn');
     return { videos: [], orgMentions: {}, trendingTopics: [], insightHtml: '' };
   }
+
+  const accessToken = await getYtAccessToken(cfg);
+  if (!accessToken) {
+    cb('  YouTube not authorised — visit /auth/youtube to complete one-time OAuth setup', 'warn');
+    return { videos: [], orgMentions: {}, trendingTopics: [], insightHtml: '' };
+  }
+
+  const authHeader = { Authorization: `Bearer ${accessToken}` };
 
   cb('  Fetching top AQ videos from YouTube...');
   const publishedAfter = new Date(cfg.DATE_FROM).toISOString();
@@ -272,12 +318,12 @@ async function runYouTube(cfg, orgs, cb) {
   for (const q of queries) {
     try {
       const res = await axios.get('https://www.googleapis.com/youtube/v3/search', {
+        headers: authHeader,
         params: {
           part: 'snippet', q, type: 'video',
           maxResults: 50, order: 'viewCount',
           publishedAfter, publishedBefore,
-          relevanceLanguage: 'en', regionCode: 'IN',
-          key: cfg.YOUTUBE_KEY
+          relevanceLanguage: 'en', regionCode: 'IN'
         },
         timeout: 15000
       });
@@ -296,7 +342,8 @@ async function runYouTube(cfg, orgs, cb) {
   for (let i = 0; i < candidates.length; i += 50) {
     try {
       const res = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
-        params: { part: 'snippet,statistics', id: candidates.slice(i, i + 50).join(','), key: cfg.YOUTUBE_KEY },
+        headers: authHeader,
+        params: { part: 'snippet,statistics', id: candidates.slice(i, i + 50).join(',') },
         timeout: 15000
       });
       details = details.concat(res.data.items || []);

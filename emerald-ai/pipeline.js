@@ -24,12 +24,18 @@ const orgHex  = i => '#' + ORG_COLORS_HEX[i % ORG_COLORS_HEX.length];
 const orgPptx = i => ORG_COLORS_HEX[i % ORG_COLORS_HEX.length];
 
 // AQ questions asked to each LLM for AEO scoring
+// Intentionally generic — no org names — so mentions in responses are fully organic
 const AEO_QUESTIONS = [
-  'Which Indian research organisations are the most authoritative sources on air quality data and policy in India?',
-  'What organisations publish the most reliable air quality index and PM2.5 data for Indian cities?',
-  'Who are the leading think tanks and research bodies working on clean air policy in India?',
-  'Which organisations should journalists cite when writing about India\'s National Clean Air Programme?',
-  'What Indian NGOs or research institutes are most influential on air pollution solutions?'
+  'What does the latest research say about PM2.5 health impacts in Indian cities?',
+  'How effective has India\'s National Clean Air Programme been so far, and what does the evidence show?',
+  'What are the main sources of air pollution in Indian cities and what data exists on their relative contribution?',
+  'What are the most trusted data sources for monitoring air quality across Indian cities?',
+  'What scientific evidence exists on the health burden of air pollution in India?',
+  'What policy interventions have been most effective at reducing air pollution in Indian cities?',
+  'How is coal-based power generation contributing to air quality problems in India?',
+  'What is known about seasonal air quality patterns in North India — what drives the winter smog?',
+  'How do Indian cities compare on air quality improvement, and which approaches are working best?',
+  'What are the key gaps in India\'s air quality monitoring and reporting infrastructure?'
 ];
 
 // ── Utilities ──────────────────────────────────────────────────────────────
