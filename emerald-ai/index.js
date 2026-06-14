@@ -35,6 +35,7 @@ app.post('/run', async (req, res) => {
     DATE_FROM:     body.dateFrom  || '2026-03-08',
     DATE_TO:       body.dateTo    || '2026-06-08',
     CLIENT_NAME:   body.clientName || 'Chetan Bhattacharji',
+    SCOPE_KEYWORDS: Array.isArray(body.scopeKeywords) ? body.scopeKeywords : [],
     SERPER_KEY:    body.serperKey  || process.env.SERPER_KEY  || '',
     CLAUDE_KEY:    body.claudeKey  || process.env.CLAUDE_KEY  || '',
     // Model is hardcoded in pipeline.js to claude-haiku-4-5-20251001

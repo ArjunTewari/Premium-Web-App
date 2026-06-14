@@ -101,6 +101,22 @@ html,body{min-height:100vh;background:var(--ink);color:var(--tx);font-family:'In
   </div>
 
 
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title" onclick="toggleScope()" style="cursor:pointer">
+      Scope Keywords <span class="badge badge-opt">optional</span>
+      <span id="scopeToggleIcon" style="margin-left:auto;font-size:10px">&#9660; show</span>
+    </div>
+    <div id="scopePanel" style="display:none">
+      <div class="hint" style="margin-bottom:10px">Keywords that must appear in articles for them to be counted as AQ coverage. All of these are searched in addition to the org name.</div>
+      <div id="scopeTags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+      <div style="display:flex;gap:6px">
+        <input id="scopeInput" placeholder="Add keyword..." style="flex:1;background:var(--sur2);border:1px solid var(--bdr);border-radius:5px;padding:6px 9px;color:var(--tx);font-size:11px;font-family:monospace;outline:none">
+        <button onclick="addScope()" style="background:var(--bdr);color:var(--mt2);border:none;border-radius:5px;padding:6px 12px;font-size:11px;cursor:pointer">+ Add</button>
+        <button onclick="resetScope()" style="background:var(--bdr);color:var(--mt);border:none;border-radius:5px;padding:6px 12px;font-size:11px;cursor:pointer">Reset</button>
+      </div>
+    </div>
+  </div>
+
   <button class="run-btn" id="runBtn" onclick="startRun()">
     <span id="runBtnIcon">▶</span>
     <span id="runBtnText">Generate Report</span>
@@ -180,10 +196,47 @@ function addCustomOrg() {
   updateOrgCount();
 }
 
+const DEFAULT_SCOPE = ['AQI','PM2.5','PM10','air pollution','air quality','smog','clean air','NCAP','GRAP','Black Carbon','Ozone','Ammonia','Carbon Monoxide','Nitrogen Dioxide','Methane'];
+let scopeKeywords = [...DEFAULT_SCOPE];
+
+function escKw(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderScopeTags() {
+  const c = document.getElementById('scopeTags');
+  if(!c) return;
+  c.innerHTML = scopeKeywords.map(kw =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(201,146,42,.12);color:var(--amb);border:1px solid rgba(201,146,42,.3);border-radius:4px;padding:3px 8px;font-size:11px;font-family:monospace">
+      ${escKw(kw)}
+      <span onclick="removeScope('${kw.replace(/\\/g,'\\\\').replace(/'/g,'\\\'')}')" style="cursor:pointer;opacity:.6;margin-left:2px">&times;</span>
+    </span>`
+  ).join('');
+}
+
+function addScope() {
+  const val = document.getElementById('scopeInput').value.trim();
+  if(val && !scopeKeywords.includes(val)) { scopeKeywords.push(val); renderScopeTags(); }
+  document.getElementById('scopeInput').value = '';
+}
+
+function removeScope(kw) { scopeKeywords = scopeKeywords.filter(k => k !== kw); renderScopeTags(); }
+function resetScope() { scopeKeywords = [...DEFAULT_SCOPE]; renderScopeTags(); }
+function getScopeKeywords() { return scopeKeywords; }
+
+function toggleScope() {
+  const p = document.getElementById('scopePanel');
+  const i = document.getElementById('scopeToggleIcon');
+  const open = p.style.display !== 'none';
+  p.style.display = open ? 'none' : 'block';
+  if(i) i.innerHTML = open ? '&#9660; show' : '&#9650; hide';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   renderOrgCheckboxes();
+  renderScopeTags();
   const orgInput = document.getElementById('orgCustom');
-  if (orgInput) orgInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addCustomOrg(); } });
+  if(orgInput) orgInput.addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();addCustomOrg();} });
+  const scopeInput = document.getElementById('scopeInput');
+  if(scopeInput) scopeInput.addEventListener('keydown', e => { if(e.key==='Enter'){e.preventDefault();addScope();} });
 });
 
 
@@ -236,10 +289,11 @@ async function startRun(){
   document.getElementById('progFill').style.width = '0';
 
   const payload = {
-    orgs:       getSelectedOrgs(),
-    dateFrom:   document.getElementById('dateFrom').value,
-    dateTo:     document.getElementById('dateTo').value,
-    clientName: document.getElementById('clientName').value
+    orgs:          getSelectedOrgs(),
+    dateFrom:      document.getElementById('dateFrom').value,
+    dateTo:        document.getElementById('dateTo').value,
+    clientName:    document.getElementById('clientName').value,
+    scopeKeywords: getScopeKeywords()
   };
 
   try{

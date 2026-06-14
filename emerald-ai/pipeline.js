@@ -11,12 +11,20 @@ const PptxGen = require('pptxgenjs');
 const SI      = require('./social-intelligence');
 
 const OUTLETS = [
-  'Times of India','Hindustan Times','The Hindu','India Today',
-  'NDTV','News18','The Print','Scroll','Indian Express','Business Standard'
+  'Times of India','Hindustan Times','The Hindu','Indian Express','Business Standard',
+  'The Print','Scroll','Deccan Herald',
+  'NDTV','News18','India Today',
+  'Aaj Tak','India TV','ABP News'
 ];
+const TV_CHANNELS_ENGLISH = ['NDTV','News18','India Today'];
+const TV_CHANNELS_HINDI   = ['Aaj Tak','India TV','ABP News'];
+const ALL_TV_CHANNELS     = [...TV_CHANNELS_ENGLISH, ...TV_CHANNELS_HINDI];
 const TOPICS = [
-  'NCAP/Policy','PM2.5 Exposure','Stubble Burning','Clean Air Finance',
-  'Vehicular Pollution','Health Impact','Industrial Pollution','Heat-AQI'
+  'NCAP','Policy','PM2.5 Exposure','Stubble Burning','Clean Air Finance',
+  'Vehicular Pollution','Health Impact','Industrial Pollution','Heat-AQI',
+  'Brick Kilns','Petrol Emissions','Diesel Emissions','Super Emitters',
+  'Thermal Power Plants','Household Pollution','Indoor Pollution',
+  'Biomass Air Pollution','Rice Residue Burning','Wheat Residue Burning','Road Dust'
 ];
 // 13 visually distinct colours — one per org slot
 const ORG_COLORS_HEX = ['3d8ef0','e05c3a','4caf74','c9922a','a371f7','e05c5c','14b8a6','f97316','8b5cf6','06b6d4','84cc16','ef4444','ec4899'];
@@ -83,6 +91,10 @@ function canonOutlet(src) {
   if(s.includes('scroll'))return 'Scroll';
   if(s.includes('indian express')||s.includes('indianexpress'))return 'Indian Express';
   if(s.includes('business standard')||s.includes('bsind'))return 'Business Standard';
+  if(s.includes('deccan herald')||s.includes('deccanherald'))return 'Deccan Herald';
+  if(s.includes('aaj tak')||s.includes('aajtak'))return 'Aaj Tak';
+  if(s.includes('india tv')||s.includes('indiatv'))return 'India TV';
+  if(s.includes('abp news')||s.includes('abplive'))return 'ABP News';
   return null;
 }
 
@@ -300,15 +312,14 @@ function aggregateOrg(artList, clsList, dateFrom) {
   artList.forEach(a => { const c=canonOutlet(a.source||''); if(c&&oc.hasOwnProperty(c))oc[c]++; });
   clsList.forEach(c => { const cn=canonOutlet(c.outlet||''); if(cn&&oc.hasOwnProperty(cn)&&oc[cn]===0)oc[cn]=1; });
   const so = Object.entries(oc).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  const ac = clsList.filter(c=>c.narrative_position==='Primary Source').length;
+  const ac = 0;
   const dc = clsList.filter(c=>c.citation_quality==='Data Cited').length;
   const tc = {}; TOPICS.forEach(t=>tc[t]=0);
   clsList.forEach(c=>{
-    const t=(c.aq_subtopic||'').replace('-',' ');
+    const t=(c.aq_subtopic||'').trim();
     const match=TOPICS.find(tp=>
-      tp.toLowerCase().replace('-',' ')===t.toLowerCase()||
-      tp.toLowerCase().split('/')[0]===t.toLowerCase().split('/')[0]||
-      t.toLowerCase().includes(tp.toLowerCase().split(/[\/ ]/)[0])
+      tp.toLowerCase()===t.toLowerCase()||
+      t.toLowerCase().includes(tp.toLowerCase().split(' ')[0].toLowerCase())
     );
     if(match) tc[match]++;
   });
@@ -336,8 +347,34 @@ function aggregateOrg(artList, clsList, dateFrom) {
 }
 
 function computeScore(d, aeoScore, socialScore=0) {
-  const tot = Math.round(d.sov*0.20 + d.authPct*0.20 + d.dataPct*0.15 + aeoScore*0.25 + socialScore*0.20);
+  const tot = Math.round(d.sov*0.25 + d.dataPct*0.25 + aeoScore*0.30 + socialScore*0.20);
   return { ...d, aeo: aeoScore, social: socialScore, score: tot, grade: tot>=80?'A':tot>=65?'B':tot>=50?'C+':tot>=35?'D':'F' };
+}
+
+// PR wire sites and org's own domain — never count as third-party coverage
+const PR_WIRE_DOMAINS = [
+  'prnewswire.com','businesswire.com','globenewswire.com',
+  'newswire.com','prlog.org','einpresswire.com','pib.gov.in','prwire.in',
+  'prnewswire.co.in','accesswire.com'
+];
+const ORG_DOMAIN_HINTS = {
+  'ceew': ['ceew.in'], 'cstep': ['cstep.in'], 'wri': ['wri.org'],
+  'icct': ['theicct.org'], 'teri': ['teriin.org','teri.res.in'],
+  'cse': ['cseindia.org'], 'care4air': ['care4air.org'],
+  'iforest': ['indiaforrenewables.org']
+};
+function isThirdParty(url, orgName) {
+  const u = (url||'').toLowerCase();
+  if (PR_WIRE_DOMAINS.some(d => u.includes(d))) return false;
+  const orgKey = orgName.toLowerCase().replace(/[^a-z]/g,'');
+  for (const [key, domains] of Object.entries(ORG_DOMAIN_HINTS)) {
+    if (orgKey.includes(key) && domains.some(d => u.includes(d))) return false;
+  }
+  const abbrev = orgKey.slice(0, Math.min(6, orgKey.length));
+  if (abbrev.length >= 4) {
+    try { if (new URL(url).hostname.includes(abbrev)) return false; } catch {}
+  }
+  return true;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -349,6 +386,11 @@ async function run(cfg, cb) {
   // cb(message, level) — streams log lines
 
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
+
+  const SCOPE_KEYWORDS = cfg.SCOPE_KEYWORDS?.length
+    ? cfg.SCOPE_KEYWORDS
+    : ['air quality','AQI','PM2.5','PM10','air pollution','clean air','smog',
+       'Black Carbon','Ozone','Ammonia','Carbon Monoxide','Nitrogen Dioxide','Methane','NCAP','GRAP'];
 
   const inRange = dateStr => {
     const d=parseDateStr(dateStr); if(!d) return true;
@@ -365,7 +407,7 @@ async function run(cfg, cb) {
 
   for(const org of ORGS){
     const seen=new Set(); let skipped=0;
-    for(const kw of ['air quality','AQI','PM2.5','air pollution','clean air']){
+    for(const kw of SCOPE_KEYWORDS.slice(0,8)){
       const q=`"${org}" ${kw} India`;
       cb(`  ${q}`);
       try{
@@ -376,8 +418,10 @@ async function run(cfg, cb) {
           if(!seen.has(k)){
             seen.add(k);
             if(!inRange(r.date||'')){skipped++;continue;}
-            arts[org].push({title:r.title||'',snippet:r.snippet||'',source:r.source||dom(r.link||''),url:r.link||'',date:r.date||''});
-            added++;
+            if(isThirdParty(r.link||'', org)){
+              arts[org].push({title:r.title||'',snippet:r.snippet||'',source:r.source||dom(r.link||''),url:r.link||'',date:r.date||''});
+              added++;
+            }
           }
         }
         cb(`  +${added} kept, ${skipped} outside date range`, 'ok');
@@ -426,16 +470,15 @@ async function run(cfg, cb) {
       const prompt=`You are a media intelligence analyst classifying Indian news articles about air quality for the organisation "${org}".
 
 For EACH numbered article, return one JSON object with:
-- narrative_position: "Primary Source" ONLY if "${org}" is EXPLICITLY named AND their own specific data, finding, or spokesperson is directly quoted. "Secondary Mention" if org is named but no specific data from them is cited. "Not Mentioned" if org does not appear.
-- citation_quality: "Data Cited" if a specific number, %, statistic, or named report FROM "${org}" appears in the article. "Named Mention" otherwise (org named but no data cited).
-- aq_subtopic: EXACTLY one of: NCAP/Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance, Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI, General AQ
-- evidence_quote: exact phrase ≤12 words from content supporting the classification. "not mentioned" if absent.
+- citation_quality: "Data Cited" if a specific number, %, statistic, or named report FROM "${org}" appears in the article. "Named Mention" if org is named but no specific data cited. "Not Mentioned" if org does not appear.
+- aq_subtopic: EXACTLY one of: NCAP, Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance, Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI, Brick Kilns, Petrol Emissions, Diesel Emissions, Super Emitters, Thermal Power Plants, Household Pollution, Indoor Pollution, Biomass Air Pollution, Rice Residue Burning, Wheat Residue Burning, Road Dust, General AQ
+- evidence_quote: exact phrase ≤12 words from content. "not mentioned" if absent.
 - outlet: publication from SOURCE field
 - date: date from DATE field
 - confidence: "High" or "Low"
 
 Return ONLY a JSON array. No preamble, no markdown.
-[{"index":0,"outlet":"Times of India","date":"Mar 5, 2026","narrative_position":"Primary Source","citation_quality":"Data Cited","aq_subtopic":"NCAP/Policy","evidence_quote":"CEEW found 23 of 131 cities met targets","confidence":"High"}]
+[{"index":0,"outlet":"Times of India","date":"Mar 5, 2026","citation_quality":"Data Cited","aq_subtopic":"NCAP","evidence_quote":"CEEW found 23 of 131 cities met targets","confidence":"High"}]
 
 ARTICLES:
 ${txt}`;
@@ -488,7 +531,7 @@ ${txt}`;
 
   // ── STEP 5b: AI analysis ───────────────────────────────────
   cb(`\nSTEP 5b/6 — AI analysis (executive summary, emerging, actions)...`, 'head');
-  const combined = ORGS.flatMap(o=>arts[o]).slice(0,30).map(a=>`${a.title}|${a.snippet.slice(0,120)}`).join('\n');
+  const combined = ORGS.flatMap(o=>arts[o]).slice(0,40).map(a=>`${a.title}|${a.url||''}|${a.snippet.slice(0,100)}`).join('\n');
   const orgSummary = ORGS.map(o=>`${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo}/100, Social ${data[o].social}/100 (YT=${siSocial.youtube?.orgMentions?.[o]?.total||0} TW=${siSocial.twitter?.orgMentions?.[o]?.total||0} IG=${siSocial.instagram?.orgMentions?.[o]?.total||0} LI=${siSocial.linkedin?.orgMentions?.[o]?.total||0}), top outlet: ${data[o].topOutlet}, topics 2+: ${Object.entries(data[o].topicCounts).filter(([,v])=>v>=2).map(([k])=>k).join(',')||'none'}`).join('\n');
   let emerging=[], execF=[], actions=[];
 
@@ -506,8 +549,8 @@ ${txt}`;
   try{
     cb('  Emerging narratives...');
     const r=await callClaude(
-      `From these Indian air quality article titles/snippets (${DATE_FROM} to ${DATE_TO}), identify 2 topics gaining coverage momentum where none of [${ORGS.join(', ')}] currently dominates.\nReturn ONLY JSON array of 2: [{"topic":"...","description":"1 sentence","momentum":"e.g. 3 in May vs 0 in March","inference":"labelled as inference","supporting_headlines":["h1","h2"]}]\n\nARTICLES:\n${combined}`,
-      cfg.CLAUDE_KEY, 1000
+      `From these Indian air quality article titles (${DATE_FROM} to ${DATE_TO}), identify 2-4 topics gaining coverage momentum.\nReturn ONLY JSON array: [{"topic":"...","description":"1 sentence","momentum":"e.g. 3 in May vs 0 in March","inference":"Why this looks like an emerging pattern from the data (1 sentence — label this as AI inference)","supporting_articles":[{"title":"headline","url":"article url"}]}]\n\nARTICLES (title|url|snippet):\n${combined}`,
+      cfg.CLAUDE_KEY, 1200
     );
     emerging=parseJ(r)||[];
     cb(`  ${emerging.length} narratives`, emerging.length>0?'ok':'warn');
@@ -938,16 +981,29 @@ function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,so
   }
 
   function topicCards(){
-    const tdefs=[
-      {k:'NCAP/Policy',s:'National Clean Air Programme & compliance'},
-      {k:'PM2.5 Exposure',s:'City & ward-level exposure data, health burden'},
-      {k:'Stubble Burning',s:'Parali, enforcement, seasonal contribution'},
-      {k:'Clean Air Finance',s:'Funding flows, investment gaps, budgets'},
-      {k:'Vehicular Pollution',s:'EV targets, transport emissions, FAME'},
-      {k:'Health Impact',s:'Mortality, hospital admissions, DALY data'},
-      {k:'Industrial Pollution',s:'Factory emissions, thermal plants'},
-      {k:'Heat-AQI',s:'Summer heat compounding PM2.5 impacts'}
-    ];
+    const topicSubtitles={
+      'NCAP':'National Clean Air Programme — targets and compliance',
+      'Policy':'Air quality regulations, standards, government actions',
+      'PM2.5 Exposure':'City & ward-level exposure data, health burden',
+      'Stubble Burning':'Parali, enforcement, seasonal contribution',
+      'Clean Air Finance':'Funding flows, investment gaps, budgets',
+      'Vehicular Pollution':'EV targets, transport emissions, FAME',
+      'Health Impact':'Mortality, hospital admissions, DALY data',
+      'Industrial Pollution':'Factory emissions, cement, steel plants',
+      'Heat-AQI':'Summer heat compounding PM2.5 impacts',
+      'Brick Kilns':'Brick kiln emissions, FCBTK, zig-zag technology',
+      'Petrol Emissions':'Petrol vehicle tailpipe pollution',
+      'Diesel Emissions':'Diesel generators, trucks, buses',
+      'Super Emitters':'High-emission point sources, hotspots',
+      'Thermal Power Plants':'Coal power plant emissions, FGD',
+      'Household Pollution':'Cooking fuel, biomass, LPG substitution',
+      'Indoor Pollution':'Indoor air quality, IAQ monitoring',
+      'Biomass Air Pollution':'Wood, crop residue, biomass burning',
+      'Rice Residue Burning':'Paddy straw burning, Punjab, Haryana',
+      'Wheat Residue Burning':'Wheat stubble burning, post-harvest',
+      'Road Dust':'Resuspended road dust, unpaved roads'
+    };
+    const tdefs=TOPICS.map(k=>({k,s:topicSubtitles[k]||k}));
     return tdefs.map(t=>{
       const orgData=ORGS.map((org,i)=>{
         const cv=data[org]?.topicCounts[t.k]||0;
@@ -995,18 +1051,31 @@ function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,so
 
   // AEO Section HTML
   function aeoSection(){
+    function aeoGrade(score){
+      if(score>=65)return{g:'S',label:'Sector Leader'};
+      if(score>=45)return{g:'A',label:'Strong Visibility'};
+      if(score>=28)return{g:'B',label:'Good Visibility'};
+      if(score>=12)return{g:'C',label:'Developing'};
+      if(score>=3) return{g:'D',label:'Limited'};
+      return           {g:'E',label:'Not yet visible'};
+    }
+    function donutGrade(score,color){
+      const {g}=aeoGrade(score);
+      const da=(score/100*163.4).toFixed(1),db=(163.4-da).toFixed(1);
+      return `<svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="#1e2638" stroke-width="10"/><circle cx="32" cy="32" r="26" fill="none" stroke="${color}" stroke-width="10" stroke-dasharray="${da} ${db}" stroke-dashoffset="41" stroke-linecap="round"/><text x="32" y="38" text-anchor="middle" fill="${color}" font-size="18" font-family="Inter" font-weight="700">${g}</text></svg>`;
+    }
     const hasAEO = Object.values(aeoResults).some(v=>v.score>0);
     const llmNames = [...new Set(Object.values(aeoResults).flatMap(v=>Object.keys(v.llmBreakdown)))];
     const aeoQs = AEO_QUESTIONS.map((q,i)=>`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><div style="font-family:monospace;font-size:10px;color:var(--amber);flex-shrink:0;padding-top:2px">${i+1}</div><div style="color:var(--muted2)">${esc(q)}</div></div>`).join('');
     const cards = ORGS.map((org,i)=>{
       const a=aeoResults[org];
       const col=orgHex(i);
-      const bk=Object.entries(a.llmBreakdown||{}).map(([llm,v])=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted2)">${esc(llm)}</span><span style="font-family:monospace;font-weight:600;color:${col}">${v.mentions}/${v.mentions>=3?5:3} mentions</span></div>`).join('');
+      const bk=Object.entries(a.llmBreakdown||{}).map(([llm,v])=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted2)">${esc(llm)}</span><span style="font-family:monospace;font-weight:600;color:${col}">${v.mentions}/${v.total||'?'} mentions</span></div>`).join('');
       return `<div class="cqp" style="border-top:2px solid ${col}">
         <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${col};margin-bottom:12px">${esc(org)}</div>
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-          ${donut(a.score,col)}
-          <div><div style="font-size:12px;color:var(--muted2);margin-bottom:4px">AEO Score</div><div style="font-family:monospace;font-size:18px;font-weight:700;color:${col}">${a.score}/100</div><div style="font-size:11px;color:var(--muted);margin-top:2px">${a.mentions} total LLM mentions</div></div>
+          ${donutGrade(a.score,col)}
+          <div><div style="font-size:12px;color:var(--muted2);margin-bottom:4px">AEO Score</div><div style="font-family:monospace;font-size:18px;font-weight:700;color:${col}">${aeoGrade(a.score).g} <span style="font-size:12px;color:var(--muted)">(${a.score}/100)</span></div><div style="font-size:11px;color:var(--muted);margin-top:2px">${a.mentions} total LLM mentions</div></div>
         </div>
         ${bk||'<div style="font-size:11px;color:var(--muted)">No LLM data collected</div>'}
         ${a.topResponse?`<div class="cqe cqd" style="margin-top:10px"><div class="cqet">Example LLM response</div><div style="color:var(--text);font-family:monospace;font-size:11px;line-height:1.5">&ldquo;${esc(a.topResponse)}&rdquo;</div></div>`:''}
@@ -1072,20 +1141,28 @@ ${hasYT?`<div style="font-size:13px;font-weight:600;color:var(--text);margin:20p
   const navOrgs=ORGS.map(o=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2);padding:3px 20px"><div style="width:8px;height:8px;border-radius:2px;background:${orgHex(ORGS.indexOf(o))}"></div>${esc(o)}: ${data[o].total} arts</div>`).join('');
 
   function citTable(){
-    const all=ORGS.flatMap((org,i)=>(data[org]?.classifications||[]).filter(c=>c.citation_quality==='Data Cited').map(c=>({...c,org,orgI:i}))).slice(0,3);
     const rows=ORGS.map((org,i)=>{
       const cls=data[org]?.classifications||[];
       const total=cls.length;
       const cited=cls.filter(c=>c.citation_quality==='Data Cited').length;
       const named=cls.filter(c=>c.citation_quality==='Named Mention').length;
-      const notM=total-cited-named;
       const pct=total>0?Math.round(cited/total*100):0;
-      return {org,i,total,cited,named,notM,pct};
+      // Match cited articles with their URLs via index alignment
+      const evidenceItems = cls.reduce((acc,c,ci)=>{
+        if(c.citation_quality==='Data Cited' && acc.length<3){
+          const art=arts[org]?.[ci];
+          acc.push({quote:c.evidence_quote||'',outlet:c.outlet||'',date:c.date||'',url:art?.url||''});
+        }
+        return acc;
+      },[]);
+      const evCell = evidenceItems.length
+        ? evidenceItems.map(e=>`<div style="margin-bottom:5px"><div style="font-family:monospace;font-size:10px;color:var(--amber);line-height:1.5">&ldquo;${esc(e.quote)}&rdquo;</div><div style="font-family:monospace;font-size:10px;color:var(--muted)">${esc(e.outlet)} &middot; ${esc(e.date)}</div>${e.url?`<a href="${esc(e.url)}" target="_blank" style="font-family:monospace;font-size:10px;color:var(--amber);text-decoration:none">&#8599; article</a>`:''}</div>`).join('')
+        : `<span style="color:var(--muted);font-family:monospace;font-size:11px">—</span>`;
+      return {org,i,total,cited,named,pct,evCell};
     }).sort((a,b)=>b.pct-a.pct);
-    const highlights=all.length?`<div style="margin-top:16px;background:rgba(76,175,116,.06);border:1px solid rgba(76,175,116,.2);border-radius:8px;padding:16px"><div style="font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--good);margin-bottom:12px">Data Cited highlights (report-wide)</div>${all.map(c=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-family:monospace;font-size:10px;font-weight:700;color:${orgHex(c.orgI)}">${esc(c.org)}</span><span style="font-family:monospace;font-size:10px;color:var(--muted)">${esc(c.outlet||'')} &middot; ${esc(c.date||'')}</span></div><div class="eq">&ldquo;${esc(c.evidence_quote||'')}&rdquo;</div></div>`).join('')}</div>`:'';
-    return `<table class="nt"><thead><tr><th>Org</th><th>Total Mentions</th><th>Data Cited</th><th>Named Mention</th><th>Not Mentioned</th></tr></thead><tbody>${
-      rows.map(r=>`<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(r.i)}">${esc(r.org)}</span></td><td style="font-family:monospace">${r.total}</td><td><span style="font-family:monospace;font-weight:700;color:var(--good)">${r.cited}</span> <span style="font-family:monospace;font-size:10px;color:var(--muted)">(${r.pct}%)</span></td><td style="font-family:monospace;color:var(--muted2)">${r.named}</td><td style="font-family:monospace;color:var(--muted)">${r.notM}</td></tr>`).join('')
-    }</tbody></table>${highlights}`;
+    return `<table class="nt"><thead><tr><th>Org</th><th>Total</th><th>Data Cited</th><th>Named Mention</th><th>Evidence (Data Cited articles)</th></tr></thead><tbody>${
+      rows.map(r=>`<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(r.i)}">${esc(r.org)}</span></td><td style="font-family:monospace">${r.total}</td><td><span style="font-family:monospace;font-weight:700;color:var(--good)">${r.cited}</span> <span style="font-family:monospace;font-size:10px;color:var(--muted)">(${r.pct}%)</span></td><td style="font-family:monospace;color:var(--muted2)">${r.named}</td><td>${r.evCell}</td></tr>`).join('')
+    }</tbody></table>`;
   }
 
 
@@ -1093,13 +1170,13 @@ ${hasYT?`<div style="font-size:13px;font-weight:600;color:var(--text);margin:20p
     const d=data[org];
     return `<div class="sca" style="border-top:3px solid ${orgHex(i)}"><div class="scn" style="color:${orgHex(i)}">${esc(org)}</div><div class="scg" style="color:${gradeCol(d.grade)}">${d.grade}</div><div class="scs">${d.score} / 100</div>
 <div style="display:flex;flex-direction:column;gap:8px;text-align:left">
-${scRow('Share of Voice',d.sov,orgHex(i))}${scRow('Narrative',d.authPct,orgHex(i))}${scRow('Citation',d.dataPct,orgHex(i))}${scRow('AEO',d.aeo,d.aeo>0?orgHex(i):'#5e7494')}${scRow('Social',d.social||0,d.social>0?orgHex(i):'#5e7494')}
+${scRow('Share of Voice',d.sov,orgHex(i))}${scRow('Citation',d.dataPct,orgHex(i))}${scRow('AEO',d.aeo,d.aeo>0?orgHex(i):'#5e7494')}${scRow('Social',d.social||0,d.social>0?orgHex(i):'#5e7494')}
 </div></div>`;
   }).join('');
 
   const appendixSections=ORGS.map(org=>{
     const d=data[org];
-    const rows=arts[org].slice(0,15).map((a,i)=>{const c=d.classifications[i]||{};return `<tr><td>${i+1}</td><td>${esc(a.source||'')}</td><td style="font-size:10px">${esc(a.date||'')}</td><td style="max-width:260px">${esc(a.title||'')}</td><td style="font-size:10px;font-family:monospace">${esc((c.narrative_position||'—')+' · '+(c.citation_quality||'—'))}</td><td>${a.url?`<a href="${esc(a.url)}" target="_blank">link</a>`:'—'}</td></tr>`;}).join('');
+    const rows=arts[org].slice(0,15).map((a,i)=>{const c=d.classifications[i]||{};return `<tr><td>${i+1}</td><td>${esc(a.source||'')}</td><td style="font-size:10px">${esc(a.date||'')}</td><td style="max-width:260px">${esc(a.title||'')}</td><td style="font-size:10px;font-family:monospace">${esc(c.citation_quality||'—')}</td><td>${a.url?`<a href="${esc(a.url)}" target="_blank">link</a>`:'—'}</td></tr>`;}).join('');
     return `<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:9px">${esc(org)} &mdash; ${d.total} articles</div>
 <table class="apt"><thead><tr><th>#</th><th>Outlet</th><th>Date</th><th>Headline</th><th>Classification</th><th>URL</th></tr></thead><tbody>${rows}</tbody></table><div style="margin-bottom:24px"></div>`;
   }).join('');
@@ -1109,8 +1186,16 @@ ${scRow('Share of Voice',d.sov,orgHex(i))}${scRow('Narrative',d.authPct,orgHex(i
   ).join('');
 
   const emergingCards=(!emerging||!emerging.length)
-    ?`<div class="em-card"><div class="em-topic">Insufficient data</div></div>`
-    :emerging.map(n=>`<div class="em-card"><div class="em-hdr"><div class="em-topic">${esc(n.topic)}</div><div class="em-mom">&#8593; ${esc(n.momentum||'')}</div></div><div class="em-body">${esc(n.description||'')}</div><div class="em-inf">${esc(n.inference||'')}</div>${(n.supporting_headlines||[]).length?`<div style="margin-top:8px">${(n.supporting_headlines||[]).map(h=>`<div class="em-src">${esc(h)}</div>`).join('')}</div>`:''}</div>`).join('');
+    ?`<div class="em-card"><div class="em-topic">Insufficient data</div><div class="em-body">Not enough articles to identify narrative patterns. Try broadening the date range.</div></div>`
+    :emerging.map(n=>{
+      const articleLinks=(n.supporting_articles||[]).map(a=>
+        a.url
+          ?`<div class="em-src"><a href="${esc(a.url)}" target="_blank" style="color:var(--amber);text-decoration:none">${esc(a.title)}</a></div>`
+          :`<div class="em-src">${esc(a.title||a)}</div>`
+      ).join('')||
+      (n.supporting_headlines||[]).map(h=>`<div class="em-src">${esc(h)}</div>`).join('');
+      return `<div class="em-card"><div class="em-hdr"><div class="em-topic">${esc(n.topic)}</div>${n.momentum?`<div class="em-mom">&#8593; ${esc(n.momentum)}</div>`:''}</div><div class="em-body">${esc(n.description||'')}</div>${n.inference?`<div class="em-inf">${esc(n.inference)}</div>`:''}<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">${articleLinks}</div></div>`;
+    }).join('');
 
   const pmap={'Fix Now':'pri-fix','Leverage':'pri-lev','Optimise':'pri-opt','Invest':'pri-inv'};
   const actionRows=(!actions||!actions.length)
@@ -1237,7 +1322,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a><a href="#method" class="nav-a">Methodology</a>
-<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#narr" class="nav-a">Narrative Position</a><a href="#cit" class="nav-a">Citation Quality</a><a href="#em" class="nav-a">Emerging Narratives</a>
+<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#cit" class="nav-a">Citation Quality</a><a href="#em" class="nav-a">Emerging Narratives</a>
 <div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a><a href="#social" class="nav-a">Social Media</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a><a href="#appendix" class="nav-a">Appendix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0,10)}<br>${navOrgs}CONFIDENTIAL</div></nav>
@@ -1259,14 +1344,7 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
 <div id="exec-draft" style="display:none;padding:0 18px 18px">${execCards}</div>
 </div></section>
 
-<section class="sec" id="method"><div class="sh"><div class="se">Section 02</div><h2 class="st">Methodology</h2><div class="sd">How data was collected, filtered, and analysed.</div><div class="sdiv"></div></div>
-<div class="sb-scope"><strong>AQ scope filter:</strong> Content must reference air quality, AQI, PM2.5, PM10, air pollution, smog, clean air, NCAP, or GRAP. Tracked: <strong>${esc(ORGS.join(', '))}</strong></div>
-<div class="mg">
-<div class="mc"><div class="ml">News Coverage</div><div class="mt">Serper News API &middot; 5 queries per org &middot; Date-filtered &middot; ${tot} in-range articles</div></div>
-<div class="mc"><div class="ml">AI Classification</div><div class="mt">Claude Haiku 4.5 classifies each article: Primary Source / Secondary Mention / Not Mentioned &middot; Data Cited / Named Mention &middot; AQ sub-topic (NCAP/Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance, Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI) &middot; Evidence quote.</div></div>
-<div class="mc"><div class="ml">AEO Probing</div><div class="mt">5 AQ questions asked to GPT-4o, Perplexity, Gemini. Org mention rate converted to 0–100 score. Contributes 25% of total score.</div></div>
-<div class="mc"><div class="ml">Social Media</div><div class="mt">YouTube: Data API v3 broad AQ video search · X/Twitter, Instagram, LinkedIn: Serper site: search (Google-indexed public posts) · Org mention detection across title, description, comments.</div></div>
-</div></section>
+<section class="sec" id="method"><div class="sh"><div class="se">Section 02</div><h2 class="st">Methodology</h2><div class="sd">How data was collected, filtered, and analysed. Serper News API for media coverage · Claude Haiku 4.5 for article classification · LLM probing (GPT-4o, Perplexity, Gemini) for AEO visibility · Social media: YouTube OAuth2, X/Twitter, Instagram, LinkedIn via Serper.</div><div class="sdiv"></div></div></section>
 
 <section class="sec" id="sov"><div class="sh"><div class="se">Section 03</div><h2 class="st">Share of Voice</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
 <div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div>
@@ -1277,6 +1355,19 @@ ${sovBar()}
 <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-family:monospace;font-size:11px;color:var(--muted2)"><strong style="color:var(--amber)">Reading this table:</strong> Total = all AQ-scoped articles across orgs at that outlet. Top orgs shows the three highest-coverage orgs as badges.</div>
 <table class="nt"><thead><tr><th>Outlet</th><th>Total</th><th>Top orgs by coverage</th><th>Evidence</th></tr></thead><tbody>${outletRows()}</tbody></table></section>
 
+<section class="sec" id="tv"><div class="sh"><div class="se">Section 03b</div><h2 class="st">TV Channel Coverage</h2>
+<div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (Aaj Tak, India TV, ABP News) channels.</div><div class="sdiv"></div></div>
+<div style="margin-bottom:16px">
+<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">English TV</div>
+<table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_ENGLISH.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
+${ORGS.map((org,i)=>`<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_ENGLISH.map(ch=>`<td style="font-family:monospace">${data[org]?.outletCounts[ch]||0}</td>`).join('')}</tr>`).join('')}
+</tbody></table></div>
+<div>
+<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Hindi TV</div>
+<table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_HINDI.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
+${ORGS.map((org,i)=>`<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_HINDI.map(ch=>`<td style="font-family:monospace">${data[org]?.outletCounts[ch]||0}</td>`).join('')}</tr>`).join('')}
+</tbody></table></div></section>
+
 <section class="sec" id="momentum"><div class="sh"><div class="se">Section 04</div><h2 class="st">Coverage Momentum</h2>
 <div class="sd">Weekly article volume per org. Taller = more articles. Dates parsed from Serper metadata.</div><div class="sdiv"></div></div>
 <div class="mch"><div class="ch-hdr"><div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">Weekly AQ volume</div><div style="font-size:11px;color:var(--muted)">${esc(DATE_FROM)} to ${esc(DATE_TO)} &middot; ${ORGS.map(o=>`${esc(o)}: ${data[o].total}`).join(' &middot; ')}</div></div>
@@ -1284,7 +1375,7 @@ ${sovBar()}
 <div class="wbars">${weekBars()}</div></div></section>
 
 <section class="sec" id="topics"><div class="sh"><div class="se">Section 05</div><h2 class="st">Topic Ownership Map</h2>
-<div class="sd">8 AQ sub-topics: NCAP/Policy &middot; PM2.5 Exposure &middot; Stubble Burning &middot; Clean Air Finance &middot; Vehicular Pollution &middot; Health Impact &middot; Industrial Pollution &middot; Heat-AQI.</div><div class="sdiv"></div></div>
+<div class="sd">${TOPICS.length} AQ sub-topics including NCAP &middot; Policy &middot; PM2.5 Exposure &middot; Stubble Burning &middot; Vehicular Pollution &middot; Health Impact &middot; Brick Kilns &middot; Thermal Power Plants &middot; and more.</div><div class="sdiv"></div></div>
 ${clsNotice}
 <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:20px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--muted2)">
 <span><span class="ob badge-owns">Owns</span> = 5+ articles</span>
@@ -1293,29 +1384,19 @@ ${clsNotice}
 </div>
 ${topicCards()}</section>
 
-<section class="sec" id="narr"><div class="sh"><div class="se">Section 06</div><h2 class="st">Narrative Position</h2>
-<div class="sd">How often is each org the primary cited expert vs. named in passing? Ranked by Primary Source rate.</div><div class="sdiv"></div></div>
-${clsNotice}
-<div style="background:rgba(61,142,240,.06);border:1px solid rgba(61,142,240,.2);border-radius:8px;padding:14px 18px;font-size:12px;color:var(--muted2);margin-bottom:20px;line-height:1.9">
-<strong style="color:#3d8ef0">Primary Source:</strong> Article directly quotes or cites this org&rsquo;s own named research, data, or spokesperson.<br>
-<strong style="color:var(--muted2)">Secondary Mention:</strong> Org is named but no specific data or quote from them is cited (e.g. listed among several orgs).<br>
-<strong style="color:var(--muted)">Not Mentioned:</strong> Org does not appear in the article at all.
-</div>
-${narrTable()}</section>
-
 <section class="sec" id="cit"><div class="sh"><div class="se">Section 07</div><h2 class="st">Citation Quality</h2>
 <div class="sd"><strong style="color:var(--good)">Data Cited</strong> = a specific number, statistic, or named report from this org is cited. <strong style="color:var(--muted2)">Named Mention</strong> = org named but no specific data cited. Sorted by Data Cited %.</div><div class="sdiv"></div></div>
 ${clsNotice}${citTable()}</section>
 
-<section class="sec" id="em"><div class="sh"><div class="se">Section 08</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining momentum where none of the tracked orgs currently dominates.</div><div class="sdiv"></div></div>
+<section class="sec" id="em"><div class="sh"><div class="se">Section 08</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining coverage momentum where none of the tracked orgs currently dominates &mdash; inferred by AI from article patterns. <strong style="color:var(--warn)">INFERENCE</strong> = the AI identified this pattern from article titles and snippets; it was not supplied as an input. Treat as a signal to investigate, not a definitive conclusion. Article links = the actual articles used as evidence for this pattern.</div><div class="sdiv"></div></div>
 ${emergingCards}</section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS)}
 ${SI.buildSocialHtml(siSocial, socialScores, ORGS)}
 
 <section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Weighted composite: media · LLM visibility · social. Formula shown in full.</div><div class="sdiv"></div></div>
-<div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.20)+(Narrative&times;0.20)+(Citation&times;0.15)+(AEO&times;0.25)+(Social&times;0.20)<br>
-<span style="color:var(--muted)">${ORGS.map(o=>`${esc(o)}: ${data[o].sov}&times;0.20+${data[o].authPct}&times;0.20+${data[o].dataPct}&times;0.15+${data[o].aeo}&times;0.25+${data[o].social}&times;0.20=${data[o].score}`).join(' &middot; ')}</span></div>
+<div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social&times;0.20)<br>
+<span style="color:var(--muted)">${ORGS.map(o=>`${esc(o)}: ${data[o].sov}&times;0.25+${data[o].dataPct}&times;0.25+${data[o].aeo}&times;0.30+${data[o].social}&times;0.20=${data[o].score}`).join(' &middot; ')}</span></div>
 <div class="scc">${scorecards}</div></section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including AEO and social media actions.</div><div class="sdiv"></div></div>

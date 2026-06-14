@@ -636,13 +636,26 @@ function platformTableHtml(orgs, orgMentions, trendingTopics, insightByOrg, orgC
 function buildAEOHtml(aeoResults, orgs) {
   const orgColorList = ['#3d8ef0','#e05c3a','#4caf74','#c9922a','#a371f7','#e05c5c','#14b8a6','#f97316','#8b5cf6','#06b6d4','#84cc16','#ef4444','#ec4899'];
 
+  function aeoGrade(score){
+    if(score>=65)return{g:'S',label:'Sector Leader'};
+    if(score>=45)return{g:'A',label:'Strong Visibility'};
+    if(score>=28)return{g:'B',label:'Good Visibility'};
+    if(score>=12)return{g:'C',label:'Developing'};
+    if(score>=3) return{g:'D',label:'Limited'};
+    return           {g:'E',label:'Not yet visible'};
+  }
+  function donutGrade(score, color){
+    const {g} = aeoGrade(score);
+    const da = (score / 100 * 163.4).toFixed(1);
+    const db = (163.4 - da).toFixed(1);
+    return `<svg width="64" height="64" viewBox="0 0 64 64" style="flex-shrink:0"><circle cx="32" cy="32" r="26" fill="none" stroke="#1e2638" stroke-width="10"/><circle cx="32" cy="32" r="26" fill="none" stroke="${color}" stroke-width="10" stroke-dasharray="${da} ${db}" stroke-dashoffset="41" stroke-linecap="round"/><text x="32" y="38" text-anchor="middle" fill="${color}" font-size="18" font-family="Inter" font-weight="700">${g}</text></svg>`;
+  }
+
   const orgPanels = orgs.map((org, oi) => {
     const col = orgColorList[oi % orgColorList.length];
     const d = aeoResults[org] || { score: 0, llmBreakdown: {}, topResponse: '', questionResults: {} };
     const pct = d.score;
-    // SVG donut
-    const arc = (pct / 100 * 163.4).toFixed(1);
-    const gap = (163.4 - arc).toFixed(1);
+    const grade = aeoGrade(pct);
     const isGood = pct >= 50;
 
     const llmRows = Object.entries(d.llmBreakdown).map(([llm, v]) => `
@@ -658,22 +671,17 @@ function buildAEOHtml(aeoResults, orgs) {
     const noticeBorder = isGood ? 'rgba(76,175,116,.2)' : 'rgba(224,92,92,.2)';
     const noticeTextCol = isGood ? '#4caf74' : '#e05c5c';
     const noticeText = isGood
-      ? `<strong style="color:${noticeTextCol}">Consistent presence.</strong> ${escHtml(org)} cited in ${pct}% of LLM responses.`
-      : `<strong style="color:${noticeTextCol}">Visibility gap.</strong> ${escHtml(org)} cited in only ${pct}% of LLM responses. Key AEO action item.`;
+      ? `<strong style="color:${noticeTextCol}">Consistent presence.</strong> ${escHtml(org)} cited in ${pct}% of LLM responses. Grade: ${grade.g} — ${grade.label}.`
+      : `<strong style="color:${noticeTextCol}">Visibility gap.</strong> ${escHtml(org)} cited in only ${pct}% of LLM responses. Grade: ${grade.g} — ${grade.label}.`;
 
     return `
     <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:20px;border-top:2px solid ${col}">
       <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${col};margin-bottom:14px">${escHtml(org)}</div>
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-        <svg width="64" height="64" viewBox="0 0 64 64" style="flex-shrink:0">
-          <circle cx="32" cy="32" r="26" fill="none" stroke="#1e2638" stroke-width="10"/>
-          <circle cx="32" cy="32" r="26" fill="none" stroke="${col}" stroke-width="10"
-            stroke-dasharray="${arc} ${gap}" stroke-dashoffset="41" stroke-linecap="round"/>
-          <text x="32" y="37" text-anchor="middle" fill="${col}" font-size="13" font-family="Inter" font-weight="700">${pct}</text>
-        </svg>
+        ${donutGrade(pct, col)}
         <div>
-          <div style="font-family:'DM Serif Display',serif;font-size:52px;line-height:1;color:${col}">${pct}<span style="font-size:22px;color:#8fa3b8">/100</span></div>
-          <div style="font-size:12px;color:#8fa3b8;margin-bottom:6px">AEO Score</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:28px;line-height:1;font-weight:700;color:${col}">${grade.g} <span style="font-size:14px;color:#8fa3b8">(${pct}/100)</span></div>
+          <div style="font-size:12px;color:#8fa3b8;margin-top:4px;margin-bottom:6px">AEO Score — ${grade.label}</div>
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">${d.mentions} of ${Object.values(d.llmBreakdown).reduce((a, b) => a + b.total, 0)} LLM responses cited ${escHtml(org)}</div>
         </div>
       </div>
