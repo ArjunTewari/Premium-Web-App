@@ -45,6 +45,7 @@ app.post('/run', async (req, res) => {
     GEMINI_KEY:    body.geminiKey    || process.env.GEMINI_KEY    || '',
     // Social — always from server secrets
     TWITTER_KEY:           process.env.TWITTER_KEY           || '',
+    YOUTUBE_KEY:           process.env.YOUTUBE_KEY           || '',
     YOUTUBE_CLIENT_ID:     process.env.YOUTUBE_CLIENT_ID     || '',
     YOUTUBE_CLIENT_SECRET: process.env.YOUTUBE_CLIENT_SECRET || '',
     YOUTUBE_AUTHORIZED_URI:process.env.YOUTUBE_AUTHORIZED_URI|| '',

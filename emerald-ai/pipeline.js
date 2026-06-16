@@ -9,6 +9,7 @@ const fs      = require('fs');
 const path    = require('path');
 const PptxGen = require('pptxgenjs');
 const SI      = require('./social-intelligence');
+const TS      = require('./trend-social');
 
 const OUTLETS = [
   'Times of India','Hindustan Times','The Hindu','Indian Express','Business Standard',
@@ -351,6 +352,90 @@ function computeScore(d, aeoScore, socialScore=0) {
   return { ...d, aeo: aeoScore, social: socialScore, score: tot, grade: tot>=80?'A':tot>=65?'B':tot>=50?'C+':tot>=35?'D':'F' };
 }
 
+// ── Trend Detection ────────────────────────────────────────────────────────
+async function detectTrend(cls, arts, orgs, claudeKey, cb) {
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const topicCounts = {};
+  const topicArticles = {};
+
+  for (const org of orgs) {
+    const artList = arts[org] || [];
+    const clsList = cls[org] || [];
+    clsList.forEach((item, idx) => {
+      const art = artList[idx];
+      const dateStr = art?.date || item.date || '';
+      const d = parseDateStr(dateStr);
+      if (d && d < cutoff) return;
+      const topic = item.aq_subtopic || 'General AQ';
+      topicCounts[topic] = (topicCounts[topic] || 0) + 1;
+      if (!topicArticles[topic]) topicArticles[topic] = [];
+      topicArticles[topic].push({
+        title: art?.title || '',
+        snippet: art?.snippet || '',
+        source: art?.source || item.outlet || ''
+      });
+    });
+  }
+
+  const sorted = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]);
+  const [topTopic, topCount] = sorted[0] || ['', 0];
+
+  if (topCount < 4) {
+    cb(`[TREND] No spike detected. Skipping trend social fetch.`);
+    return { detected: false };
+  }
+
+  const trendArts = (topicArticles[topTopic] || []).slice(0, 20);
+  const articlesText = trendArts
+    .map(a => `- "${a.title}" (${a.source}): ${a.snippet.slice(0, 100)}`)
+    .join('\n');
+
+  const prompt = `You are analysing a batch of air quality news articles that spiked in the last 48 hours.
+
+Articles:
+${articlesText}
+
+Tracked organisations: ${orgs.join(', ')}
+
+Return JSON only, no markdown, no explanation:
+{
+  "trend_topic": "<2-5 word label for what is trending>",
+  "trend_summary": "<one sentence explaining why this is spiking now>",
+  "orgs_mentioned": ["<org name>", ...],
+  "orgs_implicated": ["<org name>", ...]
+}
+
+orgs_mentioned = orgs explicitly named in these articles.
+orgs_implicated = orgs whose known research areas directly overlap with this trend topic, even if not named.
+Only include org names from the tracked organisations list above.`;
+
+  try {
+    const raw = await callClaude(prompt, claudeKey, 800);
+    const parsed = parseJ(raw);
+    if (!parsed) {
+      cb(`[TREND] Analysis returned no valid JSON. Skipping trend fetch.`, 'warn');
+      return { detected: false };
+    }
+    const orgsMentioned  = (parsed.orgs_mentioned  || []).filter(o => orgs.includes(o));
+    const orgsImplicated = (parsed.orgs_implicated || []).filter(o => orgs.includes(o));
+    const orgsToFetch = [...new Set([...orgsMentioned, ...orgsImplicated])];
+    const trendEvent = {
+      detected: true,
+      topic: parsed.trend_topic || topTopic,
+      summary: parsed.trend_summary || '',
+      triggeredAt: new Date().toISOString(),
+      articleCount: topCount,
+      orgsMentioned,
+      orgsToFetch
+    };
+    cb(`[TREND] Spike detected: "${trendEvent.topic}" — ${topCount} articles in 48h. Orgs flagged: ${orgsToFetch.join(', ') || 'none'}`);
+    return trendEvent;
+  } catch (e) {
+    cb(`[TREND] Claude analysis error: ${e.message}`, 'warn');
+    return { detected: false };
+  }
+}
+
 // PR wire sites and org's own domain — never count as third-party coverage
 const PR_WIRE_DOMAINS = [
   'prnewswire.com','businesswire.com','globenewswire.com',
@@ -500,6 +585,17 @@ ${txt}`;
     cb(`  ${org} total classified: ${cls[org].length}`, cls[org].length>0?'ok':'err');
   }
 
+  // ── STEP 2.5: Trend Detection ─────────────────────────────
+  cb(`\nSTEP 2.5/6 — Trend Detection (48h spike analysis)...`, 'head');
+  const trendEvent = await detectTrend(cls, arts, ORGS, cfg.CLAUDE_KEY, cb);
+  let trendSocialData = null;
+  if (trendEvent.detected) {
+    cb(`[TREND] Fetching social data for: ${trendEvent.orgsToFetch.join(', ')}`);
+    trendSocialData = await TS.fetchTrendSocial(trendEvent, cfg, cb);
+  } else {
+    cb('[TREND] No trend spike. Trend social fetch skipped.');
+  }
+
   // ── STEP 3: AEO Visibility (via Social Intelligence module) ──
   cb(`\nSTEP 3/6 — AEO / LLM Visibility...`, 'head');
   let aeoResults = {};
@@ -579,10 +675,10 @@ ${txt}`;
   const pptxFile= path.join(cfg.outDir, `${base}.pptx`);
   const pptxName= `${base}.pptx`;
 
-  await buildPPTX(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,pptxFile,cfg);
+  await buildPPTX(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxFile,cfg);
   cb(`  PPTX: ${pptxName}`, 'ok');
 
-  const html=buildHTML(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,pptxName,cfg);
+  const html=buildHTML(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxName,cfg);
   fs.writeFileSync(htmlFile, html, 'utf8');
   cb(`  HTML: ${base}.html (${Math.round(html.length/1024)}KB)`, 'ok');
 
@@ -593,7 +689,7 @@ ${txt}`;
 // ══════════════════════════════════════════════════════════════════════════
 //  PPTX BUILDER
 // ══════════════════════════════════════════════════════════════════════════
-async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,outFile,cfg) {
+async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,outFile,cfg) {
   const {ORGS,DATE_FROM,DATE_TO,CLIENT_NAME} = cfg;
   const pres=new PptxGen();
   pres.layout='LAYOUT_WIDE'; pres.author='Emerald AI';
@@ -867,6 +963,45 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
     footer(sl);
   }
 
+  // Slide 8b: Trend Social Visibility (only when a spike was detected)
+  if (trendEvent?.detected && trendSocialData?.length) {
+    const sl=pres.addSlide(); darkBg(sl);
+    eyebrow(sl,'Trend Social Intelligence');
+    stitle(sl,'Trend Social Visibility');
+    sl.addText(`Spike: "${trendEvent.topic}" · ${trendEvent.articleCount} articles · ${trendEvent.triggeredAt.slice(0,10)} · ${trendEvent.summary}`,
+      {x:0.5,y:1.12,w:12.3,h:0.36,fontSize:10,color:MUTED,fontFace:'Calibri',italic:true});
+
+    const trows=[
+      [
+        {text:'Org',              options:{bold:true,color:MUTED,  fontSize:9,fill:{color:CARD2}}},
+        {text:'Relevance',        options:{bold:true,color:MUTED,  fontSize:9,fill:{color:CARD2},align:'center'}},
+        {text:'X/Twitter',        options:{bold:true,color:MUTED,  fontSize:9,fill:{color:CARD2},align:'center'}},
+        {text:'YouTube',          options:{bold:true,color:MUTED,  fontSize:9,fill:{color:CARD2},align:'center'}},
+        {text:'Instagram',        options:{bold:true,color:MUTED,  fontSize:9,fill:{color:CARD2},align:'center'}},
+        {text:'LinkedIn',         options:{bold:true,color:MUTED,  fontSize:9,fill:{color:CARD2},align:'center'}},
+        {text:'Score',            options:{bold:true,color:AMBER,  fontSize:9,fill:{color:CARD2},align:'center'}}
+      ],
+      ...trendSocialData.map((entry,i)=>{
+        const orgIdx=ORGS.indexOf(entry.org);
+        const oc=orgPptx(orgIdx>=0?orgIdx:i);
+        const relCol=entry.trendRelevance==='mentioned'?GOOD:WARN;
+        return [
+          {text:entry.org,                                           options:{bold:true,color:oc,    fontSize:10,fill:{color:CARD}}},
+          {text:entry.trendRelevance==='mentioned'?'Mentioned':'Implicated', options:{color:relCol,fontSize:9,fill:{color:CARD},align:'center'}},
+          {text:String(entry.platforms.x?.count||0),                options:{color:TXT,  fontSize:10,fill:{color:CARD},align:'center'}},
+          {text:String(entry.platforms.youtube?.count||0),          options:{color:TXT,  fontSize:10,fill:{color:CARD},align:'center'}},
+          {text:String(entry.platforms.instagram?.count||0),        options:{color:TXT,  fontSize:10,fill:{color:CARD},align:'center'}},
+          {text:String(entry.platforms.linkedin?.count||0),         options:{color:TXT,  fontSize:10,fill:{color:CARD},align:'center'}},
+          {text:String(entry.trendVisibilityScore),                 options:{bold:true,color:AMBER,fontSize:11,fill:{color:CARD},align:'center'}}
+        ];
+      })
+    ];
+    sl.addTable(trows,{x:0.5,y:1.55,w:12.3,colW:[2.5,1.5,1.5,2.0,1.5,1.5,1.8],rowH:0.42,border:{pt:0.5,color:BORD},fontFace:'Calibri'});
+    sl.addText('Score: X/Twitter +25 · YouTube +25 · Instagram +15 · LinkedIn +15 · Mentioned in news +20 · Cap 100',
+      {x:0.5,y:6.98,w:12.3,h:0.24,fontSize:8,color:MUTED,fontFace:'Calibri'});
+    footer(sl);
+  }
+
   // Slide 9: Emerging Narratives
   {
     const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Section 08'); stitle(sl,'Emerging Narratives');
@@ -945,7 +1080,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
 // ══════════════════════════════════════════════════════════════════════════
 //  HTML BUILDER  (adds AEO + Social sections)
 // ══════════════════════════════════════════════════════════════════════════
-function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,pptxFilename,cfg){
+function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxFilename,cfg){
   const {ORGS,DATE_FROM,DATE_TO,CLIENT_NAME} = cfg;
   const now=new Date().toUTCString();
   const tot=ORGS.reduce((s,o)=>s+(data[o]?.total||0),0);
@@ -1323,7 +1458,7 @@ body.edit-mode .sec-x{display:flex}
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a><a href="#method" class="nav-a">Methodology</a>
 <div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#cit" class="nav-a">Citation Quality</a><a href="#em" class="nav-a">Emerging Narratives</a>
-<div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a><a href="#social" class="nav-a">Social Media</a>
+<div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a><a href="#social" class="nav-a">Social Media</a>${trendEvent?.detected?'<a href="#trend-social" class="nav-a">Trend Social</a>':''}
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a><a href="#appendix" class="nav-a">Appendix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0,10)}<br>${navOrgs}CONFIDENTIAL</div></nav>
 <main class="main">
@@ -1393,6 +1528,7 @@ ${emergingCards}</section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS)}
 ${SI.buildSocialHtml(siSocial, socialScores, ORGS)}
+${trendEvent?.detected && trendSocialData?.length ? SI.buildTrendSocialHtml(trendEvent, trendSocialData, ORGS) : ''}
 
 <section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Weighted composite: media · LLM visibility · social. Formula shown in full.</div><div class="sdiv"></div></div>
 <div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social&times;0.20)<br>

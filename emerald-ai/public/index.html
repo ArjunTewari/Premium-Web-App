@@ -122,6 +122,9 @@ html,body{min-height:100vh;background:var(--ink);color:var(--tx);font-family:'In
     <span id="runBtnText">Generate Report</span>
   </button>
 
+  <!-- Trend status line -->
+  <div id="trendStatus" style="display:none;margin-top:8px;font-family:monospace;font-size:11px;padding:6px 12px;background:#181e2e;border:1px solid #252d40;border-radius:4px;color:#8fa3b8;line-height:1.6"></div>
+
   <!-- Progress + Log -->
   <div class="progress-wrap" id="progressWrap">
     <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
@@ -325,6 +328,25 @@ async function startRun(){
         if(event === 'log'){
           logLine(parsed.msg, parsed.level||'');
           bumpProgress();
+          // Update trend status line from [TREND] log messages
+          if(parsed.msg && parsed.msg.includes('[TREND]')){
+            const statusEl = document.getElementById('trendStatus');
+            if(statusEl){
+              statusEl.style.display = 'block';
+              const m = parsed.msg.trim();
+              if(m.includes('Spike detected')){
+                const match = m.match(/Spike detected: "([^"]+)"/);
+                const topic = match ? match[1] : 'trend';
+                statusEl.textContent = `Last run: Trend detected — "${topic}"`;
+                statusEl.style.color = '#4caf74';
+                statusEl.style.borderColor = 'rgba(76,175,116,.3)';
+              } else if(m.includes('No spike detected')){
+                statusEl.textContent = 'Last run: No trend spike detected';
+                statusEl.style.color = '#8fa3b8';
+                statusEl.style.borderColor = '#252d40';
+              }
+            }
+          }
         } else if(event === 'done'){
           document.getElementById('progFill').style.width = '100%';
           document.getElementById('dlHtml').href = '/download/'+encodeURIComponent(parsed.htmlName);
