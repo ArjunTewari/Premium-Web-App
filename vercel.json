@@ -1,5 +1,13 @@
 {
+  "version": 2,
   "buildCommand": "pnpm --filter @workspace/api-zod build && pnpm --filter @workspace/db build && pnpm --filter @workspace/api-server build",
-  "outputDirectory": "artifacts/api-server/dist",
-  "installCommand": "pnpm install"
+  "installCommand": "pnpm install",
+  "functions": {
+    "artifacts/api-server/dist/index.mjs": {
+      "runtime": "nodejs22.x"
+    }
+  },
+  "routes": [
+    { "src": "/(.*)", "dest": "artifacts/api-server/dist/index.mjs" }
+  ]
 }
