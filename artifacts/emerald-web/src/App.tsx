@@ -1,28 +1,67 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
+import Home from "@/pages/home";
+import Login from "@/pages/login";
+import Signup from "@/pages/signup";
+import Admin from "@/pages/admin";
+import { AuthProvider, useAuth } from "@/lib/auth";
 
 const queryClient = new QueryClient();
 
-function Home() {
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <FullScreenLoader />;
+  if (!user) return <Redirect to="/login" />;
+  return <Component />;
+}
+
+function PublicOnlyRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <FullScreenLoader />;
+  if (user) return <Redirect to="/" />;
+  return <Component />;
+}
+
+function FullScreenLoader() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Replit Agent is building...</h1>
-        <p className="mt-2 text-sm text-gray-600">Your app will appear here once it's ready.</p>
-      </div>
+    <div style={{
+      minHeight: "100vh",
+      background: "#0a0e17",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#64748b",
+      fontFamily: "'Inter', sans-serif",
+      fontSize: 14,
+    }}>
+      Loading…
     </div>
   );
 }
 
-function Router() {
+function AppRoutes() {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route component={NotFound} />
-    </Switch>
+    <WouterRouter base={base}>
+      <Switch>
+        <Route path="/login">
+          <PublicOnlyRoute component={Login} />
+        </Route>
+        <Route path="/signup">
+          <PublicOnlyRoute component={Signup} />
+        </Route>
+        <Route path="/admin">
+          <ProtectedRoute component={Admin} />
+        </Route>
+        <Route path="/">
+          <ProtectedRoute component={Home} />
+        </Route>
+        <Route component={NotFound} />
+      </Switch>
+    </WouterRouter>
   );
 }
 
@@ -30,9 +69,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
