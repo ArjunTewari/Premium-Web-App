@@ -15,19 +15,14 @@ paths = [ "/" ]
 localPort = 21680
 
 [services.development]
-run = "cd /home/runner/workspace/emerald-ai && PORT=21680 node index.js"
+run = "pnpm --filter @workspace/emerald-web run dev"
 
 [services.production]
+serve = "static"
+publicDir = "artifacts/emerald-web/dist"
 
 [services.production.build]
-args = ["sh", "-c", "cd emerald-ai && npm install --omit=dev && mkdir -p outputs"]
-
-[services.production.run]
-args = ["node", "emerald-ai/index.js"]
-
-[services.production.run.env]
-PORT = "21680"
-NODE_ENV = "production"
+args = ["pnpm", "--filter", "@workspace/emerald-web", "run", "build"]
 
 [services.env]
 PORT = "21680"

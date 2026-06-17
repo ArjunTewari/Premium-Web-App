@@ -39,5 +39,3 @@ externalPort = 3000
 
 [userenv.shared]
 YOUTUBE_AUTHORIZED_URI = "https://premium-web-app-lordarjun101.replit.app/auth/youtube/callback"
-YOUTUBE_CLIENT_ID = "702201480187-r3r0mvv37cc9g75o4gijvi3aufrd07ft.apps.googleusercontent.com"
-YOUTUBE_CLIENT_SECRET = "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"
