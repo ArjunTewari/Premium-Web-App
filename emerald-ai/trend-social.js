@@ -102,15 +102,15 @@ async function fetchLinkedIn(org, topic, serperKey) {
   };
 }
 
-// ── Trend Visibility Score (0–100) ─────────────────────────────────────────
+// ── Trend Visibility Score (0–10) ──────────────────────────────────────────
 function computeTrendScore(platforms, isMentioned) {
   let score = 0;
-  if ((platforms.x?.count        || 0) > 0) score += 25;
-  if ((platforms.youtube?.count  || 0) > 0) score += 25;
-  if ((platforms.instagram?.count|| 0) > 0) score += 15;
-  if ((platforms.linkedin?.count || 0) > 0) score += 15;
-  if (isMentioned)                           score += 20;
-  return Math.min(score, 100);
+  if ((platforms.x?.count        || 0) > 0) score += 3;
+  if ((platforms.youtube?.count  || 0) > 0) score += 3;
+  if ((platforms.instagram?.count|| 0) > 0) score += 2;
+  if ((platforms.linkedin?.count || 0) > 0) score += 2;
+  if (isMentioned)                           score += 2;
+  return Math.min(score, 10);
 }
 
 // ── Main export ────────────────────────────────────────────────────────────

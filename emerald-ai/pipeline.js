@@ -348,7 +348,8 @@ function aggregateOrg(artList, clsList, dateFrom) {
 }
 
 function computeScore(d, aeoScore, socialScore=0) {
-  const tot = Math.round(d.sov*0.25 + d.dataPct*0.25 + aeoScore*0.30 + socialScore*0.20);
+  // socialScore is 0–10; multiply ×2 to keep max 20-pt contribution like before
+  const tot = Math.round(d.sov*0.25 + d.dataPct*0.25 + aeoScore*0.30 + socialScore*2);
   return { ...d, aeo: aeoScore, social: socialScore, score: tot, grade: tot>=80?'A':tot>=65?'B':tot>=50?'C+':tot>=35?'D':'F' };
 }
 
@@ -613,7 +614,7 @@ ${txt}`;
   } catch(e) { cb(`  Social error: ${e.message}`, 'err'); }
   const socialScores = SI.computeSocialScore(siSocial, ORGS);
   for (const org of ORGS) {
-    cb(`  Social score: ${org} = ${socialScores[org].total} pts (${socialScores[org].normalised}/100 normalised)`, 'ok');
+    cb(`  Social score: ${org} = ${socialScores[org].total} pts (${socialScores[org].normalised}/10 normalised)`, 'ok');
   }
 
   // ── STEP 5: Aggregate + Score ─────────────────────────────
@@ -627,8 +628,8 @@ ${txt}`;
 
   // ── STEP 5b: AI analysis ───────────────────────────────────
   cb(`\nSTEP 5b/6 — AI analysis (executive summary, emerging, actions)...`, 'head');
-  const combined = ORGS.flatMap(o=>arts[o]).slice(0,40).map(a=>`${a.title}|${a.url||''}|${a.snippet.slice(0,100)}`).join('\n');
-  const orgSummary = ORGS.map(o=>`${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo}/100, Social ${data[o].social}/100 (YT=${siSocial.youtube?.orgMentions?.[o]?.total||0} TW=${siSocial.twitter?.orgMentions?.[o]?.total||0} IG=${siSocial.instagram?.orgMentions?.[o]?.total||0} LI=${siSocial.linkedin?.orgMentions?.[o]?.total||0}), top outlet: ${data[o].topOutlet}, topics 2+: ${Object.entries(data[o].topicCounts).filter(([,v])=>v>=2).map(([k])=>k).join(',')||'none'}`).join('\n');
+  const combined = ORGS.flatMap(o=>arts[o]).slice(0,40).map(a=>`${a.date||'unknown'}|${a.title}|${a.url||''}|${a.snippet.slice(0,100)}`).join('\n');
+  const orgSummary = ORGS.map(o=>`${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo}/100, Social ${data[o].social}/10 (YT=${siSocial.youtube?.orgMentions?.[o]?.total||0} TW=${siSocial.twitter?.orgMentions?.[o]?.total||0} IG=${siSocial.instagram?.orgMentions?.[o]?.total||0} LI=${siSocial.linkedin?.orgMentions?.[o]?.total||0}), top outlet: ${data[o].topOutlet}, topics 2+: ${Object.entries(data[o].topicCounts).filter(([,v])=>v>=2).map(([k])=>k).join(',')||'none'}`).join('\n');
   let emerging=[], execF=[], actions=[];
 
   try{
@@ -645,8 +646,8 @@ ${txt}`;
   try{
     cb('  Emerging narratives...');
     const r=await callClaude(
-      `From these Indian air quality article titles (${DATE_FROM} to ${DATE_TO}), identify 2-4 topics gaining coverage momentum.\nReturn ONLY JSON array: [{"topic":"...","description":"1 sentence","momentum":"e.g. 3 in May vs 0 in March","inference":"Why this looks like an emerging pattern from the data (1 sentence — label this as AI inference)","supporting_articles":[{"title":"headline","url":"article url"}]}]\n\nARTICLES (title|url|snippet):\n${combined}`,
-      cfg.CLAUDE_KEY, 1200
+      `Analyse these Indian air quality articles from ${DATE_FROM} to ${DATE_TO}. Each line: date|title|url|snippet.\n\nIdentify 2–3 topics where coverage is CONCENTRATED in the more recent part of the date range — meaning most articles on the topic appeared in the later weeks/months, NOT spread evenly throughout. A topic that has consistent coverage across the full period is NOT emerging.\n\nFor each genuinely emerging topic:\n- "momentum": exact date distribution, e.g. "4 articles Jun-2026, 0 before Jun-2026"\n- "inference": one sentence on WHY the date clustering suggests a new narrative (prefix with "AI INFERENCE:")\n- Only include supporting_articles that actually exist in the list below\n- If no genuinely date-clustered topic exists, return []\n\nReturn ONLY JSON array: [{"topic":"...","description":"1 sentence on what the topic is about","momentum":"date distribution","inference":"AI INFERENCE: ...","supporting_articles":[{"title":"...","url":"...","date":"YYYY-MM-DD"}]}]\n\nARTICLES (date|title|url|snippet):\n${combined}`,
+      cfg.CLAUDE_KEY, 1400
     );
     emerging=parseJ(r)||[];
     cb(`  ${emerging.length} narratives`, emerging.length>0?'ok':'warn');
@@ -946,7 +947,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
             ...orgCells,
             {text:String(platTotal),options:{color:AMBER,fontSize:12,fill:{color:'111520'},align:'center',bold:true}}];
         }),
-        [{text:'Social Score (0–100)',options:{bold:true,color:AMBER,fontSize:9,fill:{color:'181e2e'}}},
+        [{text:'Social Score (0–10)',options:{bold:true,color:AMBER,fontSize:9,fill:{color:'181e2e'}}},
          ...ORGS.map((o,i)=>({text:String(socialScores[o]?.normalised||0),options:{bold:true,color:orgPptx(i),fontSize:12,fill:{color:'181e2e'},align:'center'}})),
          {text:'',options:{fill:{color:'181e2e'}}}]
       ];
@@ -1269,7 +1270,7 @@ ${hasYT?`<div style="font-size:13px;font-weight:600;color:var(--text);margin:20p
   const clsNotice=ORGS.every(o=>(data[o]?.classified||0)===0)
     ?`<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:13px;color:var(--muted2)"><strong style="color:var(--warn)">&#9888; Classification unavailable</strong> &mdash; Claude API calls failed. Check CLAUDE_KEY and re-run.</div>`:'';
 
-  function scRow(label,val,color){return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--muted2)">${label}</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:${color};width:${val}%"></div></div><span style="font-family:monospace;font-size:11px;font-weight:600;width:30px;text-align:right;color:${color}">${val}</span></div>`;}
+  function scRow(label,val,color,barPct){return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--muted2)">${label}</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:${color};width:${barPct!==undefined?Math.min(barPct,100):val}%"></div></div><span style="font-family:monospace;font-size:11px;font-weight:600;width:30px;text-align:right;color:${color}">${val}</span></div>`;}
 
   const topicCols=`175px ${ORGS.map(()=>'1fr').join(' ')}`;
   const orgChips=ORGS.map((o,i)=>`<span class="chip" style="background:${orgHex(i)}1a;color:${orgHex(i)};border:1px solid ${orgHex(i)}4d"><span style="width:7px;height:7px;border-radius:50%;display:inline-block;background:${orgHex(i)}"></span>${esc(o)}</span>`).join('');
@@ -1305,7 +1306,7 @@ ${hasYT?`<div style="font-size:13px;font-weight:600;color:var(--text);margin:20p
     const d=data[org];
     return `<div class="sca" style="border-top:3px solid ${orgHex(i)}"><div class="scn" style="color:${orgHex(i)}">${esc(org)}</div><div class="scg" style="color:${gradeCol(d.grade)}">${d.grade}</div><div class="scs">${d.score} / 100</div>
 <div style="display:flex;flex-direction:column;gap:8px;text-align:left">
-${scRow('Share of Voice',d.sov,orgHex(i))}${scRow('Citation',d.dataPct,orgHex(i))}${scRow('AEO',d.aeo,d.aeo>0?orgHex(i):'#5e7494')}${scRow('Social',d.social||0,d.social>0?orgHex(i):'#5e7494')}
+${scRow('Share of Voice',d.sov,orgHex(i))}${scRow('Citation',d.dataPct,orgHex(i))}${scRow('AEO',d.aeo,d.aeo>0?orgHex(i):'#5e7494')}${scRow('Social',d.social||0,d.social>0?orgHex(i):'#5e7494',(d.social||0)*10)}
 </div></div>`;
   }).join('');
 
@@ -1520,10 +1521,10 @@ ${clsNotice}
 ${topicCards()}</section>
 
 <section class="sec" id="cit"><div class="sh"><div class="se">Section 07</div><h2 class="st">Citation Quality</h2>
-<div class="sd"><strong style="color:var(--good)">Data Cited</strong> = a specific number, statistic, or named report from this org is cited. <strong style="color:var(--muted2)">Named Mention</strong> = org named but no specific data cited. Sorted by Data Cited %.</div><div class="sdiv"></div></div>
+<div class="sd"><strong style="color:var(--good)">Data Cited</strong> = a specific number, statistic, or named report from this org is explicitly cited. <strong style="color:var(--muted2)">Named Mention</strong> = org is named but no specific data cited. <strong style="color:var(--muted)">Total</strong> = all articles retrieved by searching for this org&rsquo;s name &mdash; some may not directly name the org in the text (the search established the relevance connection; Claude classified each article individually). Sorted by Data Cited %.</div><div class="sdiv"></div></div>
 ${clsNotice}${citTable()}</section>
 
-<section class="sec" id="em"><div class="sh"><div class="se">Section 08</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining coverage momentum where none of the tracked orgs currently dominates &mdash; inferred by AI from article patterns. <strong style="color:var(--warn)">INFERENCE</strong> = the AI identified this pattern from article titles and snippets; it was not supplied as an input. Treat as a signal to investigate, not a definitive conclusion. Article links = the actual articles used as evidence for this pattern.</div><div class="sdiv"></div></div>
+<section class="sec" id="em"><div class="sh"><div class="se">Section 08</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics where coverage is <strong style="color:var(--text)">concentrated in the more recent part of the analysis period</strong> &mdash; suggesting a newly emerging news cycle rather than established coverage. A topic with articles spread evenly across the full date range is <em>not</em> listed here. <strong style="color:var(--warn)">AI INFERENCE</strong> = the AI identified this pattern from article publication dates; it was not supplied as an input. Treat as a signal to investigate, not a definitive conclusion. Article links = the actual articles from the input set used as evidence.</div><div class="sdiv"></div></div>
 ${emergingCards}</section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS)}
@@ -1531,8 +1532,8 @@ ${SI.buildSocialHtml(siSocial, socialScores, ORGS)}
 ${trendEvent?.detected && trendSocialData?.length ? SI.buildTrendSocialHtml(trendEvent, trendSocialData, ORGS) : ''}
 
 <section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Weighted composite: media · LLM visibility · social. Formula shown in full.</div><div class="sdiv"></div></div>
-<div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social&times;0.20)<br>
-<span style="color:var(--muted)">${ORGS.map(o=>`${esc(o)}: ${data[o].sov}&times;0.25+${data[o].dataPct}&times;0.25+${data[o].aeo}&times;0.30+${data[o].social}&times;0.20=${data[o].score}`).join(' &middot; ')}</span></div>
+<div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social/10&times;20)<br>
+<span style="color:var(--muted)">${ORGS.map(o=>`${esc(o)}: ${data[o].sov}&times;0.25+${data[o].dataPct}&times;0.25+${data[o].aeo}&times;0.30+${data[o].social}&times;2=${data[o].score}`).join(' &middot; ')}</span></div>
 <div class="scc">${scorecards}</div></section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including AEO and social media actions.</div><div class="sdiv"></div></div>

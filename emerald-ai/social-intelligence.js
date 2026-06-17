@@ -548,10 +548,10 @@ function computeSocialScore(social, orgs) {
                         scores[org].instagram + scores[org].linkedin;
   }
 
-  // Normalise 0–100 against max total
+  // Normalise 0–10 against max total
   const maxTotal = Math.max(...orgs.map(o => scores[o].total), 1);
   for (const org of orgs) {
-    scores[org].normalised = Math.round(scores[org].total / maxTotal * 100);
+    scores[org].normalised = Math.round(scores[org].total / maxTotal * 10);
   }
 
   return scores;
@@ -827,7 +827,7 @@ function buildSocialHtml(social, socialScores, orgs) {
     return `<div style="text-align:center">
       <div style="font-family:'DM Serif Display',serif;font-size:44px;line-height:1;color:${col}">${sc.total || 0}</div>
       <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:${col};margin-top:2px">${escHtml(org)}</div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494">${sc.normalised || 0}/100 normalised</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494">${sc.normalised || 0}/10 normalised</div>
     </div>`;
   });
 
@@ -893,9 +893,9 @@ function buildTrendSocialHtml(trendEvent, trendSocialData, orgs) {
   function scoreBar(score, color) {
     return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
       <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden">
-        <div style="height:100%;border-radius:3px;background:${color};width:${score}%"></div>
+        <div style="height:100%;border-radius:3px;background:${color};width:${score * 10}%"></div>
       </div>
-      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${color};width:42px;text-align:right">${score}/100</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${color};width:36px;text-align:right">${score}/10</span>
     </div>`;
   }
 
@@ -982,7 +982,7 @@ function buildTrendSocialHtml(trendEvent, trendSocialData, orgs) {
     <strong style="color:#c9922a">How this works:</strong> A news spike was detected in the <strong style="color:#d8e4f0">${escHtml(topic)}</strong> topic.
     Social data was fetched only for the <strong style="color:#d8e4f0">${orgsToFetch.length}</strong> org${orgsToFetch.length !== 1 ? 's' : ''} mentioned or implicated
     — reducing API calls by <strong style="color:#4caf74">${savings}%</strong> compared to a full org sweep.
-    Score: X/Twitter +25 · YouTube +25 · Instagram +15 · LinkedIn +15 · Mentioned in news +20.
+    Score (0–10): X/Twitter +3 · YouTube +3 · Instagram +2 · LinkedIn +2 · Mentioned in news +2.
   </div>
   ${orgCards}
   ${gapBlock}
