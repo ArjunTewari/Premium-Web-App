@@ -62,7 +62,7 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   };
 
   try {
-    const pipelinePath = path.resolve(__dirname, "../pipeline.cjs");
+    const pipelinePath = path.resolve(__dirname, "../../../emerald-ai/pipeline.js");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { run } = require(pipelinePath) as any;
     const result = await run(cfg, cb);

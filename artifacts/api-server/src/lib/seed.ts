@@ -6,7 +6,11 @@ export async function seedAdminIfNeeded() {
   try {
     const existing = await db.select().from(usersTable).limit(1);
     if (existing.length > 0) return;
-    const password = process.env.ADMIN_INITIAL_PASSWORD ?? "admin2026";
+    const password = process.env.ADMIN_INITIAL_PASSWORD;
+    if (!password) {
+      console.warn("Skipping admin seed: ADMIN_INITIAL_PASSWORD env var is not set.");
+      return;
+    }
     const hash = await bcrypt.hash(password, 10);
     await db.insert(usersTable).values({
       username: "admin",
@@ -14,7 +18,7 @@ export async function seedAdminIfNeeded() {
       role: "admin",
       totpEnabled: false,
     });
-    console.log("Seeded default admin user (development only).");
+    console.log("Seeded default admin user.");
   } catch (err) {
     console.error("Seed error (non-fatal):", err);
   }
