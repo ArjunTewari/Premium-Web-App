@@ -1,5 +1,5 @@
 {
-  "name": "emerald-ai-aq-intelligence",
+  "name": "@workspace/emerald-ai",
   "version": "1.0.0",
   "description": "Emerald AI — AQ Media Intelligence Platform",
   "main": "index.js",
