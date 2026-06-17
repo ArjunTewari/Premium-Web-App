@@ -44,7 +44,12 @@ const AEO_QUESTIONS = [
   'How is coal-based power generation contributing to air quality problems in India?',
   'What is known about seasonal air quality patterns in North India — what drives the winter smog?',
   'How do Indian cities compare on air quality improvement, and which approaches are working best?',
-  'What are the key gaps in India\'s air quality monitoring and reporting infrastructure?'
+  'What are the key gaps in India\'s air quality monitoring and reporting infrastructure?',
+  'What role do Indian think tanks and research organisations play in shaping clean air policy?',
+  'Which organisations are most active in advocating for stricter air quality standards in India?',
+  'What is the current scientific consensus on crop residue burning and its contribution to North India AQ?',
+  'How is India\'s electric vehicle transition contributing to improvements in urban air quality?',
+  'What are the most significant emerging air pollution sources in Indian cities that need attention?'
 ];
 
 // ── Utilities ──────────────────────────────────────────────────────────────
@@ -626,9 +631,38 @@ ${txt}`;
     cb(`  ${org}: ${data[org].total} arts | ${data[org].authPct}% auth | ${data[org].dataPct}% data | AEO ${data[org].aeo} | Social ${data[org].social} | score ${data[org].score} (${data[org].grade})`, 'ok');
   }
 
+  // ── STEP 5a: General AQ landscape fetch (white-space gap analysis) ────────
+  cb(`\nSTEP 5a/6 — Fetching general AQ landscape (white-space gaps)...`, 'head');
+  let whiteSpaceArticles = [];
+  try {
+    const orgExclusions = ORGS.map(o => `-"${o}"`).join(' ');
+    const generalQueries = [
+      `air quality India ${orgExclusions}`,
+      `air pollution India policy ${orgExclusions}`,
+      `India AQI PM2.5 health ${orgExclusions}`
+    ];
+    const rawGeneral = [];
+    for (const q of generalQueries) {
+      try {
+        const res = await serperSearch(q, cfg.SERPER_KEY);
+        rawGeneral.push(...res);
+        await sleep(200);
+      } catch(e) { cb(`  general query error: ${e.message}`, 'warn'); }
+    }
+    const seen = new Set();
+    const deduped = rawGeneral.filter(a => {
+      const u = a.link||a.url||''; if (!u||seen.has(u)) return false; seen.add(u); return true;
+    });
+    const orgLower = ORGS.map(o => o.toLowerCase());
+    whiteSpaceArticles = deduped.filter(a => {
+      const text = ((a.title||'') + ' ' + (a.snippet||'')).toLowerCase();
+      return !orgLower.some(o => text.includes(o));
+    });
+    cb(`  ${deduped.length} general AQ articles → ${whiteSpaceArticles.length} exclude tracked orgs`, whiteSpaceArticles.length>0?'ok':'warn');
+  } catch(e) { cb(`  general AQ fetch error: ${e.message}`, 'warn'); }
+
   // ── STEP 5b: AI analysis ───────────────────────────────────
-  cb(`\nSTEP 5b/6 — AI analysis (executive summary, emerging, actions)...`, 'head');
-  const combined = ORGS.flatMap(o=>arts[o]).slice(0,40).map(a=>`${a.date||'unknown'}|${a.title}|${a.url||''}|${a.snippet.slice(0,100)}`).join('\n');
+  cb(`\nSTEP 5b/6 — AI analysis (executive summary, gap narratives, actions)...`, 'head');
   const orgSummary = ORGS.map(o=>`${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo}/100, Social ${data[o].social}/10 (YT=${siSocial.youtube?.orgMentions?.[o]?.total||0} TW=${siSocial.twitter?.orgMentions?.[o]?.total||0} IG=${siSocial.instagram?.orgMentions?.[o]?.total||0} LI=${siSocial.linkedin?.orgMentions?.[o]?.total||0}), top outlet: ${data[o].topOutlet}, topics 2+: ${Object.entries(data[o].topicCounts).filter(([,v])=>v>=2).map(([k])=>k).join(',')||'none'}`).join('\n');
   let emerging=[], execF=[], actions=[];
 
@@ -644,20 +678,28 @@ ${txt}`;
   await sleep(300);
 
   try{
-    cb('  Emerging narratives...');
-    const r=await callClaude(
-      `Analyse these Indian air quality articles from ${DATE_FROM} to ${DATE_TO}. Each line: date|title|url|snippet.\n\nIdentify 2–3 topics where coverage is CONCENTRATED in the more recent part of the date range — meaning most articles on the topic appeared in the later weeks/months, NOT spread evenly throughout. A topic that has consistent coverage across the full period is NOT emerging.\n\nFor each genuinely emerging topic:\n- "momentum": exact date distribution, e.g. "4 articles Jun-2026, 0 before Jun-2026"\n- "inference": one sentence on WHY the date clustering suggests a new narrative (prefix with "AI INFERENCE:")\n- Only include supporting_articles that actually exist in the list below\n- If no genuinely date-clustered topic exists, return []\n\nReturn ONLY JSON array: [{"topic":"...","description":"1 sentence on what the topic is about","momentum":"date distribution","inference":"AI INFERENCE: ...","supporting_articles":[{"title":"...","url":"...","date":"YYYY-MM-DD"}]}]\n\nARTICLES (date|title|url|snippet):\n${combined}`,
-      cfg.CLAUDE_KEY, 1400
-    );
-    emerging=parseJ(r)||[];
-    cb(`  ${emerging.length} narratives`, emerging.length>0?'ok':'warn');
-  }catch(e){ cb(`  narratives err: ${e.message}`, 'warn'); }
+    cb('  White-space gap analysis...');
+    if (whiteSpaceArticles.length < 3) {
+      cb('  Not enough general AQ articles for gap analysis', 'warn');
+      emerging = [];
+    } else {
+      const wsCombined = whiteSpaceArticles.slice(0, 30).map(a=>
+        `${a.date||'unknown'}|${a.title||''}|${a.link||a.url||''}|${(a.snippet||'').slice(0,120)}`
+      ).join('\n');
+      const r = await callClaude(
+        `You are analysing the broader Indian air quality media landscape from ${DATE_FROM} to ${DATE_TO}.\n\nThe tracked organisations are: ${ORGS.join(', ')}.\n\nThe articles below are from GENERAL Indian AQ news coverage — these articles do NOT mention any of the tracked organisations. They represent the AQ media landscape where the tracked orgs are ABSENT.\n\nIdentify 2–3 distinct topic clusters from these articles that the tracked organisations are NOT participating in. These are white-space opportunities — genuine gaps where the AQ media conversation is active but the tracked orgs have no presence.\n\nFor each gap topic:\n- "topic": short name (3–5 words)\n- "description": 1 sentence on what this topic covers and why it matters\n- "gap_signal": specific evidence from the articles (e.g. "6 articles on X, none mentioning ${ORGS.join('/')}") \n- "opportunity": 1 actionable sentence — what a tracked org could publish or say to enter this conversation\n- Only include supporting_articles that actually appear in the list below\n\nReturn ONLY JSON array: [{"topic":"...","description":"...","gap_signal":"...","opportunity":"...","supporting_articles":[{"title":"...","url":"...","date":"YYYY-MM-DD"}]}]\n\nARTICLES (date|title|url|snippet):\n${wsCombined}`,
+        cfg.CLAUDE_KEY, 1600
+      );
+      emerging = parseJ(r)||[];
+      cb(`  ${emerging.length} white-space gaps identified`, emerging.length>0?'ok':'warn');
+    }
+  }catch(e){ cb(`  gap analysis err: ${e.message}`, 'warn'); }
   await sleep(300);
 
   try{
     cb('  Action matrix...');
     const r=await callClaude(
-      `Generate 4 actions for EACH of these orgs: ${ORGS.join(', ')} — based on Indian AQ media + AEO + social media intelligence.\n${orgSummary}\nEmerging unclaimed topics: ${emerging.map(e=>e.topic).join(',')||'none'}\nReturn ONLY JSON array of ${ORGS.length*4} objects: [{"org":"orgname","priority":"Fix Now|Leverage|Optimise|Invest","area":"Media|Topics|Narrative|AEO|Social","action":"...","rationale":"1-2 sentences with specific data"}]`,
+      `Generate 4 actions for EACH of these orgs: ${ORGS.join(', ')} — based on Indian AQ media + AEO + social media intelligence.\n${orgSummary}\nWhite-space gap topics (AQ media conversations tracked orgs are absent from): ${emerging.map(e=>e.topic).join(',')||'none'}\nReturn ONLY JSON array of ${ORGS.length*4} objects: [{"org":"orgname","priority":"Fix Now|Leverage|Optimise|Invest","area":"Media|Topics|Narrative|AEO|Social","action":"...","rationale":"1-2 sentences with specific data"}]`,
       cfg.CLAUDE_KEY, Math.min(4000, 1000 + ORGS.length * 250)
     );
     actions=parseJ(r)||[];
@@ -1003,19 +1045,19 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
     footer(sl);
   }
 
-  // Slide 9: Emerging Narratives
+  // Slide 9: White-Space Gaps
   {
-    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Section 08'); stitle(sl,'Emerging Narratives');
-    const narrs=emerging.length>0?emerging.slice(0,2):[{topic:'Insufficient data',description:'Broaden the date range.',momentum:'',inference:'',supporting_headlines:[]}];
+    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Section 08'); stitle(sl,'AQ Media White-Space Gaps');
+    sl.addText('Topics the broader AQ media is covering that tracked orgs are absent from — narrative opportunities.',
+      {x:0.5,y:1.12,w:12.3,h:0.32,fontSize:11,color:MUTED,fontFace:'Calibri',italic:true});
+    const narrs=emerging.length>0?emerging.slice(0,2):[{topic:'Insufficient data',description:'Not enough general AQ articles fetched to identify gaps.',gap_signal:'',opportunity:''}];
     narrs.forEach((n,i)=>{
-      const y=1.28+i*2.6; card(sl,0.5,y,12.3,2.42);
-      sl.addShape(pres.shapes.ROUNDED_RECTANGLE,{x:0.5,y,w:0.55,h:2.42,fill:{color:GOOD,transparency:78},line:{color:GOOD,width:0.5},rectRadius:0.04});
-      sl.addText(n.topic||'',{x:1.18,y:y+0.1,w:8.2,h:0.38,fontSize:14,bold:true,color:TXT,fontFace:'Calibri'});
-      if(n.momentum) sl.addText(`↑ ${n.momentum}`,{x:9.5,y:y+0.1,w:3.1,h:0.38,fontSize:11,color:GOOD,fontFace:'Calibri',align:'right'});
-      sl.addText(n.description||'',{x:1.18,y:y+0.55,w:11,h:0.34,fontSize:11,color:MUTED,fontFace:'Calibri'});
-      if(n.inference) sl.addText(`⚠ INFERENCE — ${n.inference}`,{x:1.18,y:y+0.94,w:11,h:0.4,fontSize:10,color:WARN,fontFace:'Calibri',italic:true});
-      const hl=(n.supporting_headlines||[]).slice(0,2);
-      if(hl.length) sl.addText(hl.map(h=>`→ ${h}`).join('\n'),{x:1.18,y:y+1.42,w:11,h:0.7,fontSize:10,color:MUTED,fontFace:'Calibri'});
+      const y=1.55+i*2.5; card(sl,0.5,y,12.3,2.32);
+      sl.addShape(pres.shapes.ROUNDED_RECTANGLE,{x:0.5,y,w:0.55,h:2.32,fill:{color:AMBER,transparency:78},line:{color:AMBER,width:0.5},rectRadius:0.04});
+      sl.addText(n.topic||'',{x:1.18,y:y+0.1,w:11.1,h:0.38,fontSize:14,bold:true,color:TXT,fontFace:'Calibri'});
+      sl.addText(n.description||'',{x:1.18,y:y+0.52,w:11.1,h:0.34,fontSize:11,color:MUTED,fontFace:'Calibri'});
+      if(n.gap_signal) sl.addText(`Gap: ${n.gap_signal}`,{x:1.18,y:y+0.9,w:11.1,h:0.34,fontSize:10,color:WARN,fontFace:'Calibri'});
+      if(n.opportunity) sl.addText(`Opportunity: ${n.opportunity}`,{x:1.18,y:y+1.3,w:11.1,h:0.7,fontSize:10,color:GOOD,fontFace:'Calibri'});
     });
     footer(sl);
   }
@@ -1322,15 +1364,20 @@ ${scRow('Share of Voice',d.sov,orgHex(i))}${scRow('Citation',d.dataPct,orgHex(i)
   ).join('');
 
   const emergingCards=(!emerging||!emerging.length)
-    ?`<div class="em-card"><div class="em-topic">Insufficient data</div><div class="em-body">Not enough articles to identify narrative patterns. Try broadening the date range.</div></div>`
+    ?`<div class="em-card"><div class="em-topic">Insufficient data</div><div class="em-body">Not enough general AQ articles were fetched to identify white-space gaps. Check the Serper key or broaden the date range.</div></div>`
     :emerging.map(n=>{
       const articleLinks=(n.supporting_articles||[]).map(a=>
         a.url
           ?`<div class="em-src"><a href="${esc(a.url)}" target="_blank" style="color:var(--amber);text-decoration:none">${esc(a.title)}</a></div>`
           :`<div class="em-src">${esc(a.title||a)}</div>`
-      ).join('')||
-      (n.supporting_headlines||[]).map(h=>`<div class="em-src">${esc(h)}</div>`).join('');
-      return `<div class="em-card"><div class="em-hdr"><div class="em-topic">${esc(n.topic)}</div>${n.momentum?`<div class="em-mom">&#8593; ${esc(n.momentum)}</div>`:''}</div><div class="em-body">${esc(n.description||'')}</div>${n.inference?`<div class="em-inf">${esc(n.inference)}</div>`:''}<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">${articleLinks}</div></div>`;
+      ).join('');
+      return `<div class="em-card">
+<div class="em-hdr"><div class="em-topic">${esc(n.topic)}</div></div>
+<div class="em-body">${esc(n.description||'')}</div>
+${n.gap_signal?`<div class="em-inf" style="color:var(--warn)">&#9888; Gap signal: ${esc(n.gap_signal)}</div>`:''}
+${n.opportunity?`<div class="em-inf" style="color:var(--good);margin-top:6px">&#8594; Opportunity: ${esc(n.opportunity)}</div>`:''}
+${articleLinks?`<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">${articleLinks}</div>`:''}
+</div>`;
     }).join('');
 
   const pmap={'Fix Now':'pri-fix','Leverage':'pri-lev','Optimise':'pri-opt','Invest':'pri-inv'};
@@ -1458,7 +1505,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a><a href="#method" class="nav-a">Methodology</a>
-<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#cit" class="nav-a">Citation Quality</a><a href="#em" class="nav-a">Emerging Narratives</a>
+<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#cit" class="nav-a">Citation Quality</a><a href="#em" class="nav-a">White-Space Gaps</a>
 <div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a><a href="#social" class="nav-a">Social Media</a>${trendEvent?.detected?'<a href="#trend-social" class="nav-a">Trend Social</a>':''}
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a><a href="#appendix" class="nav-a">Appendix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0,10)}<br>${navOrgs}CONFIDENTIAL</div></nav>
@@ -1524,7 +1571,7 @@ ${topicCards()}</section>
 <div class="sd"><strong style="color:var(--good)">Data Cited</strong> = a specific number, statistic, or named report from this org is explicitly cited. <strong style="color:var(--muted2)">Named Mention</strong> = org is named but no specific data cited. <strong style="color:var(--muted)">Total</strong> = all articles retrieved by searching for this org&rsquo;s name &mdash; some may not directly name the org in the text (the search established the relevance connection; Claude classified each article individually). Sorted by Data Cited %.</div><div class="sdiv"></div></div>
 ${clsNotice}${citTable()}</section>
 
-<section class="sec" id="em"><div class="sh"><div class="se">Section 08</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics where coverage is <strong style="color:var(--text)">concentrated in the more recent part of the analysis period</strong> &mdash; suggesting a newly emerging news cycle rather than established coverage. A topic with articles spread evenly across the full date range is <em>not</em> listed here. <strong style="color:var(--warn)">AI INFERENCE</strong> = the AI identified this pattern from article publication dates; it was not supplied as an input. Treat as a signal to investigate, not a definitive conclusion. Article links = the actual articles from the input set used as evidence.</div><div class="sdiv"></div></div>
+<section class="sec" id="em"><div class="sh"><div class="se">Section 08</div><h2 class="st">AQ Media White-Space Gaps</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations are <strong style="color:var(--warn)">not part of</strong> &mdash; identified by fetching general AQ news (no org name filter), removing any article that mentions a tracked org, then asking Claude to cluster the remaining articles into themes. These are genuine white-space opportunities: the AQ media conversation is active on these topics, but your orgs are absent. <strong>Gap signal</strong> = the evidence of absence. <strong>Opportunity</strong> = a concrete action to enter the conversation. Article links = source articles from the org-absent pool used as evidence.</div><div class="sdiv"></div></div>
 ${emergingCards}</section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS)}

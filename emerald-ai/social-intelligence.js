@@ -35,7 +35,17 @@ const AEO_QUESTIONS = [
   'What organisations publish the most reliable air quality index and PM2.5 data for Indian cities?',
   'Who are the leading think tanks and research bodies working on clean air policy in India?',
   'Which organisations should journalists cite when writing about India\'s National Clean Air Programme?',
-  'What Indian NGOs or research institutes are most influential on air pollution solutions and technology?'
+  'What Indian NGOs or research institutes are most influential on air pollution solutions and technology?',
+  'What research organisations in India are doing the most credible work on reducing vehicular air pollution?',
+  'Which Indian institutes publish peer-reviewed studies on indoor air quality and household pollution?',
+  'Who are the most cited Indian organisations in international climate and air quality policy discussions?',
+  'What organisations should I follow for the latest data on India\'s air quality improvement progress?',
+  'Which bodies produce the most reliable assessments of India\'s National Clean Air Programme targets?',
+  'What Indian think tanks and research centres are leading the conversation on clean air finance and investment?',
+  'Which organisations have the most credible data on PM2.5 health impacts in major Indian cities?',
+  'Who are the key institutional voices on stubble burning and crop residue burning policy in India?',
+  'What research organisations in India are tracking the health burden of air pollution most rigorously?',
+  'Which Indian organisations are most frequently cited in government air quality policy consultations?'
 ];
 
 // AQ terms required in a YouTube video title to pass the filter
@@ -163,12 +173,11 @@ async function runAEO(cfg, orgs, cb) {
       }
     })(),
 
-    // Perplexity Sonar (3 questions to save credits)
+    // Perplexity Sonar (all 15 questions)
     cfg.PERPLEXITY_KEY && (async () => {
       cb('  Probing Perplexity Sonar...');
-      const N = 3;
       const responses = await Promise.allSettled(
-        AEO_QUESTIONS.slice(0, N).map(q =>
+        AEO_QUESTIONS.map(q =>
           axios.post('https://api.perplexity.ai/chat/completions',
             { model: 'sonar', max_tokens: 400, messages: [{ role: 'user', content: q }] },
             { headers: { 'Authorization': `Bearer ${cfg.PERPLEXITY_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000 }
@@ -189,18 +198,18 @@ async function runAEO(cfg, orgs, cb) {
           results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Perplexity', cited: mentioned });
         });
         results[org].llmBreakdown['Perplexity'] = {
-          mentions: count, total: N, score: Math.round(count / N * 100)
+          mentions: count, total: AEO_QUESTIONS.length,
+          score: Math.round(count / AEO_QUESTIONS.length * 100)
         };
-        cb(`  Perplexity → ${org}: ${count}/${N}`, count > 0 ? 'ok' : 'warn');
+        cb(`  Perplexity → ${org}: ${count}/${AEO_QUESTIONS.length}`, count > 0 ? 'ok' : 'warn');
       }
     })(),
 
-    // Gemini 1.5 Flash (3 questions)
+    // Gemini 1.5 Flash (all 15 questions)
     cfg.GEMINI_KEY && (async () => {
       cb('  Probing Gemini 1.5 Flash...');
-      const N = 3;
       const responses = await Promise.allSettled(
-        AEO_QUESTIONS.slice(0, N).map(q =>
+        AEO_QUESTIONS.map(q =>
           axios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cfg.GEMINI_KEY}`,
             { contents: [{ parts: [{ text: q }] }], generationConfig: { maxOutputTokens: 400 } },
@@ -224,9 +233,10 @@ async function runAEO(cfg, orgs, cb) {
           results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Gemini', cited: mentioned });
         });
         results[org].llmBreakdown['Gemini 1.5 Flash'] = {
-          mentions: count, total: N, score: Math.round(count / N * 100)
+          mentions: count, total: AEO_QUESTIONS.length,
+          score: Math.round(count / AEO_QUESTIONS.length * 100)
         };
-        cb(`  Gemini → ${org}: ${count}/${N}`, count > 0 ? 'ok' : 'warn');
+        cb(`  Gemini → ${org}: ${count}/${AEO_QUESTIONS.length}`, count > 0 ? 'ok' : 'warn');
       }
     })()
   ].filter(Boolean));
