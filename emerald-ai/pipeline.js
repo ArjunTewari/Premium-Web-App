@@ -608,6 +608,7 @@ ${txt}`;
   for (const org of ORGS) aeoResults[org] = { score:0, mentions:0, llmBreakdown:{}, topResponse:'', questionResults:{} };
   try {
     aeoResults = await SI.runAEO(cfg, ORGS, cb);
+    delete aeoResults._queriesUsed; // remove metadata key — Object.values() calls later expect only org entries
     for (const org of ORGS) cb(`  ${org} AEO score: ${aeoResults[org].score}`, aeoResults[org].score>0?'ok':'warn');
   } catch(e) { cb(`  AEO error: ${e.message}`, 'err'); }
 
