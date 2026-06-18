@@ -38,4 +38,4 @@ externalPort = 3000
 [userenv]
 
 [userenv.shared]
-YOUTUBE_AUTHORIZED_URI = "https://premium-web-app-lordarjun101.replit.app/api/auth/youtube/callback"
+YOUTUBE_AUTHORIZED_URI = "https://premium-web-app-lordarjun101.replit.app/auth/youtube/callback"
