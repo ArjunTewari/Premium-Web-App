@@ -275,43 +275,6 @@ async function fetchTwitter(cfg, orgs, cb) {
   return results;
 }
 
-// ── Social Media: YouTube ─────────────────────────────────────────────────
-async function fetchYouTube(cfg, orgs, cb) {
-  const results = {};
-  for (const org of orgs) results[org] = { videoCount: 0, topVideo: null, error: null };
-
-  // YouTube Data API v3 — uses API key if available; OAuth keys are available for future enhancements
-  if (!cfg.YOUTUBE_KEY) return results;
-
-  // Run all orgs in parallel — YouTube allows concurrent requests on the same key
-  cb(`  Querying YouTube for ${orgs.length} orgs in parallel...`);
-  await Promise.allSettled(orgs.map(org =>
-    axios.get('https://www.googleapis.com/youtube/v3/search', {
-      params: {
-        part: 'snippet', q: `${org} air quality India`,
-        type: 'video', maxResults: 10, order: 'relevance',
-        key: cfg.YOUTUBE_KEY, relevanceLanguage: 'en'
-      },
-      timeout: 15000
-    }).then(res => {
-      const items = res.data.items || [];
-      results[org].videoCount = res.data.pageInfo?.totalResults || items.length;
-      if (items[0]) results[org].topVideo = {
-        title: items[0].snippet?.title?.slice(0,100)||'',
-        channel: items[0].snippet?.channelTitle||'',
-        date: (items[0].snippet?.publishedAt||'').slice(0,10),
-        videoId: items[0].id?.videoId||'',
-        url: `https://youtube.com/watch?v=${items[0].id?.videoId||''}`
-      };
-      cb(`  YouTube — ${org}: ${results[org].videoCount} videos`, results[org].videoCount > 0 ? 'ok' : 'warn');
-    }).catch(e => {
-      results[org].error = e.response?.data?.error?.message || e.message;
-      cb(`  YouTube error for ${org}: ${results[org].error}`, 'warn');
-    })
-  ));
-  return results;
-}
-
 // ── Core aggregation ───────────────────────────────────────────────────────
 function aggregateOrg(artList, clsList, dateFrom) {
   const oc = {}; OUTLETS.forEach(o => oc[o]=0);
@@ -473,7 +436,7 @@ function isThirdParty(url, orgName) {
 // ══════════════════════════════════════════════════════════════════════════
 async function run(cfg, cb) {
   // cfg: { ORGS[], DATE_FROM, DATE_TO, CLIENT_NAME, SERPER_KEY, CLAUDE_KEY, CLAUDE_MODEL,
-  //         OPENAI_KEY?, PERPLEXITY_KEY?, GEMINI_KEY?, TWITTER_KEY?, YOUTUBE_KEY?, outDir }
+  //         OPENAI_KEY?, PERPLEXITY_KEY?, GEMINI_KEY?, TWITTER_KEY?, outDir }
   // cb(message, level) — streams log lines
 
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
@@ -715,7 +678,7 @@ ${txt}`;
         `Generate 4 actions for EACH of these orgs: ${ORGS.join(', ')} — based on Indian AQ media + AEO + social media intelligence.\n${orgSummary}\nWhite-space gap topics (AQ media conversations tracked orgs are absent from): ${emerging.map(e=>e.topic).join(',')||'none'}\nReturn ONLY JSON array of ${ORGS.length*4} objects: [{"org":"orgname","priority":"Fix Now|Leverage|Optimise|Invest","area":"Media|Topics|Narrative|AEO|Social","action":"...","rationale":"1-2 sentences with specific data"}]`,
         cfg.CLAUDE_KEY, Math.min(4000, 1000 + ORGS.length * 250)
       ),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Action matrix timed out after 30s')),30000))
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Action matrix timed out after 60s')),60000))
     ]);
     actions=parseJ(r)||[];
     cb(`  ${actions.length} actions`, actions.length>0?'ok':'err');
@@ -1289,44 +1252,6 @@ ${!hasAEO?`<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212
 </div></section>`;
   }
 
-  // Social Media Section HTML
-  function socialSection(){
-    const hasTw = Object.values(twitterData).some(v=>v.tweetCount>0);
-    const hasYT = Object.values(youtubeData).some(v=>v.videoCount>0);
-    const twitterCards = hasTw ? ORGS.map((org,i)=>{
-      const tw=twitterData[org]; const col=orgHex(i);
-      return `<div class="cqp" style="border-top:2px solid ${col}">
-        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${col};margin-bottom:10px">${esc(org)}</div>
-        <div style="font-family:monospace;font-size:26px;font-weight:700;color:${col};margin-bottom:4px">${tw.tweetCount||0}</div>
-        <div style="font-size:12px;color:var(--muted2);margin-bottom:10px">tweets (last 7 days)</div>
-        ${tw.topTweet?`<div class="cqe cqd"><div class="cqet">Top tweet by engagement</div><div style="color:var(--text);font-family:monospace;font-size:11px;line-height:1.5">&ldquo;${esc(tw.topTweet.text)}&rdquo;</div><div style="color:var(--muted);font-family:monospace;font-size:10px;margin-top:4px">♥ ${tw.topTweet.likes} · ↺ ${tw.topTweet.retweets} · ${esc(tw.topTweet.date)}</div></div>`:'<div style="font-size:11px;color:var(--muted)">No tweets found in last 7 days</div>'}
-        ${tw.error?`<div style="font-size:10px;color:var(--warn);margin-top:6px;font-family:monospace">Error: ${esc(tw.error)}</div>`:''}
-      </div>`;
-    }).join('') : '';
-
-    const youtubeCards = hasYT ? ORGS.map((org,i)=>{
-      const yt=youtubeData[org]; const col=orgHex(i);
-      return `<div class="cqp" style="border-top:2px solid ${col}">
-        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${col};margin-bottom:10px">${esc(org)}</div>
-        <div style="font-family:monospace;font-size:26px;font-weight:700;color:${col};margin-bottom:4px">${yt.videoCount||0}</div>
-        <div style="font-size:12px;color:var(--muted2);margin-bottom:10px">videos found</div>
-        ${yt.topVideo?`<div class="cqe cqd"><div class="cqet">Top video by relevance</div><div style="color:var(--text);font-family:monospace;font-size:11px;line-height:1.5">&ldquo;${esc(yt.topVideo.title)}&rdquo;</div><div style="color:var(--muted);font-family:monospace;font-size:10px;margin-top:4px">${esc(yt.topVideo.channel)} · ${esc(yt.topVideo.date)}</div><a href="${esc(yt.topVideo.url)}" target="_blank" style="font-family:monospace;font-size:10px;color:var(--amber);text-decoration:none">${esc(yt.topVideo.url)}</a></div>`:'<div style="font-size:11px;color:var(--muted)">No videos found</div>'}
-        ${yt.error?`<div style="font-size:10px;color:var(--warn);margin-top:6px;font-family:monospace">Error: ${esc(yt.error)}</div>`:''}
-      </div>`;
-    }).join('') : '';
-
-    const noData = !hasTw && !hasYT;
-    const grid = `display:grid;grid-template-columns:repeat(${Math.min(ORGS.length,3)},1fr);gap:16px;margin-bottom:20px`;
-
-    return `
-<section class="sec" id="social"><div class="sh"><div class="se">Social Media Intelligence</div><h2 class="st">Twitter/X &amp; YouTube</h2>
-<div class="sd">Social media presence and engagement around each organisation&rsquo;s AQ coverage. ${noData?'No social media API keys provided.':'Twitter search is limited to the last 7 days (free tier). Instagram and LinkedIn are not available via public API.'}</div><div class="sdiv"></div></div>
-${noData?`<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:13px;color:var(--muted2)"><strong style="color:var(--warn)">⚠ Social media data not available</strong> — Add SERPER_KEY and re-run to enable X, Instagram, and LinkedIn intelligence.</div>`:''}
-${hasTw?`<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">🐦 Twitter / X <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:monospace">(7-day window, free tier)</span></div><div style="${grid}">${twitterCards}</div>`:''}
-${hasYT?`<div style="font-size:13px;font-weight:600;color:var(--text);margin:20px 0 12px">▶ YouTube <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:monospace">(relevance search)</span></div><div style="${grid}">${youtubeCards}</div>`:''}
-</section>`;
-  }
-
   const clsNotice=ORGS.every(o=>(data[o]?.classified||0)===0)
     ?`<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:13px;color:var(--muted2)"><strong style="color:var(--warn)">&#9888; Classification unavailable</strong> &mdash; Claude API calls failed. Check CLAUDE_KEY and re-run.</div>`:'';
 
@@ -1529,7 +1454,7 @@ body.edit-mode .sec-x{display:flex}
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a><a href="#method" class="nav-a">Methodology</a>
 <div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#cit" class="nav-a">Citation Quality</a><a href="#em" class="nav-a">White-Space Gaps</a>
-<div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a><a href="#social" class="nav-a">Social Media</a>${trendEvent?.detected?'<a href="#trend-social" class="nav-a">Trend Social</a>':''}
+<div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a><a href="#social" class="nav-a">Social Media</a>${trendEvent?.detected?'<a href="#trend-social" class="nav-a">Trend Social</a>':''}${socialERHtml?'<a href="#social-er" class="nav-a">Social ER</a>':''}
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a><a href="#appendix" class="nav-a">Appendix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0,10)}<br>${navOrgs}CONFIDENTIAL</div></nav>
 <main class="main">
@@ -1550,7 +1475,7 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
 <div id="exec-draft" style="display:none;padding:0 18px 18px">${execCards}</div>
 </div></section>
 
-<section class="sec" id="method"><div class="sh"><div class="se">Section 02</div><h2 class="st">Methodology</h2><div class="sd">How data was collected, filtered, and analysed. Serper News API for media coverage · Claude Haiku 4.5 for article classification · LLM probing (GPT-4o, Perplexity, Gemini) for AEO visibility · Social media: YouTube OAuth2, X/Twitter, Instagram, LinkedIn via Serper.</div><div class="sdiv"></div></div></section>
+<section class="sec" id="method"><div class="sh"><div class="se">Section 02</div><h2 class="st">Methodology</h2><div class="sd">How data was collected, filtered, and analysed. Serper News API for media coverage · Claude Haiku 4.5 for article classification · LLM probing (GPT-4o, Perplexity, Gemini) for AEO visibility · Social media: Apify (Twitter/X, Instagram, LinkedIn engagement rates) · Serper site-search for AQ content mentions · No YouTube.</div><div class="sdiv"></div></div></section>
 
 <section class="sec" id="sov"><div class="sh"><div class="se">Section 03</div><h2 class="st">Share of Voice</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
 <div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div>
