@@ -1,0 +1,471 @@
+# Replit Agent Prompt — Social ER Module + Action Matrix Fix + Remove YouTube OAuth
+
+## Context
+
+This is the Emerald AI AQ Media Intelligence Platform — a Node.js/Express web app on Replit. It tracks 13 AQ research organisations (WRI India, Air Pollution Action Group, Chintan Environmental Research and Action Group, IIT Kanpur, CSTEP, IIT Delhi, Health Effects Institute, ICCT, EPIC India, Council on Energy Environment and Water, Centre for Science and Environment, Climate Trends, Sustainable Futures Collaborative) and generates HTML + PPTX reports.
+
+**Read these files before touching anything:**
+- `pipeline.js` — main pipeline, Serper news fetch, Claude Haiku classifier, report builder
+- `social-intelligence.js` — exports run(), runAEO(), runYouTube(), runSocial(), buildAEOHtml(), buildSocialHtml()
+- `server.ts` — Express server, all routes including YouTube OAuth routes
+- `htmlGenerator.ts` — HTML report builder, all section renderers
+- `youtube-analyzer.js` — YouTube logic
+- `youtubeOAuth.ts` — OAuth logic (will be fully removed)
+
+---
+
+## Task 1 — Remove YouTube OAuth Entirely
+
+YouTube OAuth is broken and is being removed. Do NOT replace it with YouTube Data API. YouTube is not part of the ER module.
+
+### Files to modify:
+
+**`youtubeOAuth.ts` — DELETE this file.**
+
+**`server.ts` — Remove all YouTube OAuth routes:**
+Remove these completely:
+- `GET /youtube/auth` or `/auth/youtube`
+- `GET /youtube/callback` or `/auth/callback`
+- `GET /youtube/status`
+- `POST /youtube/disconnect`
+- Any `import` or `require` of `youtubeOAuth`
+- Any `isAuthorized()` calls
+
+**`social-intelligence.js` — Remove all OAuth-dependent YouTube code:**
+- Remove any calls to `getAuthUrl()`, `exchangeCode()`, `isAuthorized()`
+- Remove any reads of `youtube-tokens.json`
+- Remove any `oauth2Client` usage
+- The `runYouTube()` function can remain but must not use OAuth — leave it as a stub returning empty data for now:
+
+```javascript
+async function runYouTube(cfg, orgs, cb) {
+  cb?.('youtube', 'YouTube via OAuth removed. Skipping.');
+  return { videos: [], orgScores: {} };
+}
+```
+
+**`htmlGenerator.ts` — Remove YouTube OAuth UI:**
+- Remove any "Connect YouTube" button
+- Remove any YouTube auth status indicator (the connect button and status badge)
+- Remove any conditional rendering gated on `youtubeAuthorized`
+
+**`pipeline.js` — Remove OAuth gating:**
+- Remove any `if (!isAuthorized())` checks around YouTube
+- YouTube stub runs unconditionally and returns empty
+
+**`youtube-tokens.json` — DELETE if it exists.**
+
+Do NOT add any YouTube API key calls anywhere. YouTube is not being used right now.
+
+---
+
+## Task 2 — Build Social ER Module using Apify MCP
+
+Create a new file: `social-er.js`
+
+### Platforms: Twitter/X, Instagram, LinkedIn
+All three scraped via Apify. No Serper for metrics. No YouTube OAuth.
+
+### ER Formula:
+```
+Per-post ER  = (Likes + Comments + Shares) × 100 / Follower Count
+Org ER       = average of all post ERs across platforms
+```
+
+Note: Instagram does not always expose share counts. If shares unavailable use:
+```
+Instagram ER = (Likes + Comments) × 100 / Follower Count
+```
+
+### Apify MCP Integration:
+
+Apify exposes its scrapers via MCP server at: `https://mcp.apify.com/sse`
+Auth header: `Authorization: Bearer <APIFY_TOKEN>`
+
+The three Apify actors to use:
+
+| Platform | Apify Actor ID | Price |
+|---|---|---|
+| Twitter/X | `apidojo/tweet-scraper-v2` | $0.40/1,000 tweets |
+| Instagram | `apify/instagram-scraper` | $2.70/1,000 results |
+| LinkedIn | `harvestapi/linkedin-profile-posts-scraper` | $2.00/1,000 posts |
+
+Call each actor via the Apify REST API (runs the actor and waits for result):
+
+```javascript
+async function runApifyActor(actorId, input) {
+  const APIFY_TOKEN = process.env.APIFY_TOKEN;
+  // Start the actor run
+  const startRes = await axios.post(
+    `https://api.apify.com/v2/acts/${actorId}/runs?token=${APIFY_TOKEN}`,
+    input,
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+  const runId = startRes.data.data.id;
+
+  // Poll until finished (max 2 min)
+  for (let i = 0; i < 24; i++) {
+    await sleep(5000);
+    const statusRes = await axios.get(
+      `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`
+    );
+    const status = statusRes.data.data.status;
+    if (status === 'SUCCEEDED') break;
+    if (status === 'FAILED' || status === 'ABORTED') throw new Error(`Apify run ${status}`);
+  }
+
+  // Fetch dataset items
+  const dataRes = await axios.get(
+    `https://api.apify.com/v2/actor-runs/${runId}/dataset/items?token=${APIFY_TOKEN}`
+  );
+  return dataRes.data;
+}
+```
+
+### Org handles — used to target scraping:
+
+```javascript
+const ORG_HANDLES = {
+  'WRI India':                                   { twitter: 'WRIIndia',          instagram: 'wri_india',           linkedin: 'wri-india' },
+  'Air Pollution Action Group':                  { twitter: 'APAGIndia',         instagram: 'apagindia',           linkedin: 'air-pollution-action-group' },
+  'Chintan Environmental Research and Action Group': { twitter: 'ChintanIndia',  instagram: 'chintan_india',       linkedin: 'chintan-environmental-research-and-action-group' },
+  'IIT Kanpur':                                  { twitter: 'IITKanpur',         instagram: 'iitkanpur',           linkedin: 'iit-kanpur' },
+  'CSTEP':                                       { twitter: 'CSTEP_India',       instagram: 'cstep_india',         linkedin: 'cstep-india' },
+  'IIT Delhi':                                   { twitter: 'IITDelhi',          instagram: 'iitdelhi',            linkedin: 'iit-delhi' },
+  'Health Effects Institute':                    { twitter: 'HEIResearch',       instagram: 'heiresearch',         linkedin: 'health-effects-institute' },
+  'ICCT':                                        { twitter: 'TheICCT',           instagram: 'theicct',             linkedin: 'icct' },
+  'EPIC India':                                  { twitter: 'EPICIndia_',        instagram: 'epicindia_uchicago',  linkedin: 'epic-india' },
+  'Council on Energy, Environment and Water':    { twitter: 'CEEWIndia',         instagram: 'ceewindia',           linkedin: 'council-on-energy-environment-and-water' },
+  'Centre for Science and Environment':          { twitter: 'CSEIndia',          instagram: 'cseindia',            linkedin: 'centre-for-science-and-environment' },
+  'Climate Trends':                              { twitter: 'ClimateTrendsIN',   instagram: 'climatetrendsin',     linkedin: 'climate-trends' },
+  'Sustainable Futures Collaborative':           { twitter: 'SFC_India',         instagram: 'sfc_india',           linkedin: 'sustainable-futures-collaborative' },
+};
+```
+
+### Fetch logic per org (cap at 5 AQ-related posts per platform):
+
+```javascript
+async function fetchTwitterPosts(handle, dateFrom, dateTo) {
+  try {
+    const items = await runApifyActor('apidojo/tweet-scraper-v2', {
+      searchTerms: [`from:${handle} air quality OR "air pollution" OR AQI OR PM2.5`],
+      maxTweets: 10,
+      start: dateFrom,
+      end: dateTo,
+    });
+    return items.slice(0, 5).map(t => ({
+      platform: 'twitter',
+      url: t.url || t.tweetUrl,
+      text: t.text || t.fullText,
+      date: t.createdAt,
+      likes: t.likeCount || 0,
+      comments: t.replyCount || 0,
+      shares: t.retweetCount || 0,
+      followerCount: t.author?.followers || t.authorFollowersCount || 0,
+    }));
+  } catch (e) {
+    console.error(`[SocialER] Twitter fetch failed for ${handle}:`, e.message);
+    return [];
+  }
+}
+
+async function fetchInstagramPosts(handle, dateFrom, dateTo) {
+  try {
+    const items = await runApifyActor('apify/instagram-scraper', {
+      usernames: [handle],
+      resultsLimit: 10,
+      onlyPostsNewerThan: dateFrom,
+    });
+    // Filter AQ-related posts by caption keywords
+    const aqKeywords = /air quality|air pollution|aqi|pm2\.5|pm10|ncap|smog|particulate/i;
+    return items
+      .filter(p => aqKeywords.test(p.caption || p.alt || ''))
+      .slice(0, 5)
+      .map(p => ({
+        platform: 'instagram',
+        url: p.url || p.shortCode ? `https://instagram.com/p/${p.shortCode}` : '',
+        text: p.caption || '',
+        date: p.timestamp,
+        likes: p.likesCount || 0,
+        comments: p.commentsCount || 0,
+        shares: 0, // not publicly available on Instagram
+        followerCount: p.ownerFollowersCount || p.followersCount || 0,
+      }));
+  } catch (e) {
+    console.error(`[SocialER] Instagram fetch failed for ${handle}:`, e.message);
+    return [];
+  }
+}
+
+async function fetchLinkedInPosts(companySlug, dateFrom, dateTo) {
+  try {
+    const items = await runApifyActor('harvestapi/linkedin-profile-posts-scraper', {
+      profileUrls: [`https://www.linkedin.com/company/${companySlug}/`],
+      maxPosts: 10,
+    });
+    const aqKeywords = /air quality|air pollution|aqi|pm2\.5|pm10|ncap|smog|particulate/i;
+    const fromDate = new Date(dateFrom);
+    const toDate   = new Date(dateTo);
+    return items
+      .filter(p => {
+        const postDate = new Date(p.postedAt || p.date || 0);
+        return postDate >= fromDate && postDate <= toDate &&
+               aqKeywords.test((p.text || p.content || ''));
+      })
+      .slice(0, 5)
+      .map(p => ({
+        platform: 'linkedin',
+        url: p.postUrl || p.url || '',
+        text: p.text || p.content || '',
+        date: p.postedAt || p.date,
+        likes: p.likesCount || p.reactions || 0,
+        comments: p.commentsCount || p.comments || 0,
+        shares: 0,  // LinkedIn shares not publicly visible
+        followerCount: p.companyFollowersCount || p.followersCount || 0,
+      }));
+  } catch (e) {
+    console.error(`[SocialER] LinkedIn fetch failed for ${companySlug}:`, e.message);
+    return [];
+  }
+}
+```
+
+### ER calculation and ranking:
+
+```javascript
+function calcER(posts) {
+  const withFollowers = posts.filter(p => p.followerCount > 0);
+  if (!withFollowers.length) return 0;
+  const total = withFollowers.reduce((sum, p) => {
+    return sum + ((p.likes + p.comments + p.shares) * 100 / p.followerCount);
+  }, 0);
+  return parseFloat((total / withFollowers.length).toFixed(2));
+}
+
+function deriveInsight(posts) {
+  if (!posts.length) return 'No posts found in this period';
+  const totalLikes    = posts.reduce((s, p) => s + p.likes, 0);
+  const totalComments = posts.reduce((s, p) => s + p.comments, 0);
+  const totalShares   = posts.reduce((s, p) => s + p.shares, 0);
+  const totalEng      = totalLikes + totalComments + totalShares;
+  if (totalEng === 0) return 'No measurable engagement in this period';
+  const sharePct   = totalShares   / totalEng;
+  const commentPct = totalComments / totalEng;
+  if (sharePct > 0.5)                         return 'Strong amplification — share-heavy';
+  if (commentPct > 0.4)                       return 'High discussion — comment-driven';
+  if (sharePct > 0.3 && commentPct > 0.2)    return 'Balanced reach and discussion';
+  return 'Moderate engagement, primarily likes/reactions';
+}
+
+async function run(cfg, selectedOrgs, cb) {
+  cb?.('social-er', `Starting Social ER for ${selectedOrgs.length} orgs across Twitter, Instagram, LinkedIn…`);
+  const orgResults = [];
+
+  for (const orgName of selectedOrgs) {
+    const handles = ORG_HANDLES[orgName];
+    if (!handles) {
+      cb?.('social-er', `No handles found for ${orgName} — skipping`);
+      continue;
+    }
+    cb?.('social-er', `Fetching ${orgName}…`);
+
+    const [twPosts, igPosts, liPosts] = await Promise.allSettled([
+      fetchTwitterPosts(handles.twitter, cfg.DATE_FROM, cfg.DATE_TO),
+      fetchInstagramPosts(handles.instagram, cfg.DATE_FROM, cfg.DATE_TO),
+      fetchLinkedInPosts(handles.linkedin, cfg.DATE_FROM, cfg.DATE_TO),
+    ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : []));
+
+    const allPosts = [...twPosts, ...igPosts, ...liPosts];
+    const avgER = allPosts.length
+      ? parseFloat(((calcER(twPosts) + calcER(igPosts) + calcER(liPosts)) / 3).toFixed(2))
+      : 0;
+
+    const bestPost = [...allPosts].sort((a, b) =>
+      (b.likes + b.comments + b.shares) - (a.likes + a.comments + a.shares)
+    )[0] || null;
+
+    orgResults.push({
+      org:          orgName,
+      twitterER:   calcER(twPosts),
+      instagramER: calcER(igPosts),
+      linkedinER:  calcER(liPosts),
+      avgER,
+      twitterPosts:   twPosts.length,
+      instagramPosts: igPosts.length,
+      linkedinPosts:  liPosts.length,
+      totalPosts:   allPosts.length,
+      bestPost,
+      insight:      deriveInsight(allPosts),
+    });
+
+    cb?.('social-er', `${orgName} done — avgER: ${avgER}%`);
+  }
+
+  // Rank by avgER descending
+  orgResults.sort((a, b) => b.avgER - a.avgER);
+  orgResults.forEach((r, i) => { r.rank = i + 1; });
+
+  cb?.('social-er', 'Social ER complete');
+  return orgResults;
+}
+```
+
+### HTML output:
+
+```javascript
+function buildSocialERHtml(erResults) {
+  if (!erResults?.length) return '<p>No social ER data available.</p>';
+
+  const medals = ['🥇','🥈','🥉'];
+  const rows = erResults.map((r, i) => {
+    const medal = medals[i] || `#${r.rank}`;
+    const barW  = Math.min(r.avgER * 10, 100);
+    return `
+      <tr style="border-bottom:1px solid #f1f5f9">
+        <td style="padding:10px 12px;font-weight:600">${medal} ${r.org}</td>
+        <td style="padding:10px 12px">
+          ${r.avgER > 0
+            ? `<span style="font-weight:700">${r.avgER}%</span>
+               <div style="height:4px;background:#e5e7eb;border-radius:2px;margin-top:4px;width:120px">
+                 <div style="height:4px;width:${barW}%;background:#6366f1;border-radius:2px"></div>
+               </div>`
+            : '—'}
+        </td>
+        <td style="padding:10px 12px">${r.twitterER   > 0 ? r.twitterER   + '%' : '—'}</td>
+        <td style="padding:10px 12px">${r.instagramER > 0 ? r.instagramER + '%' : '—'}</td>
+        <td style="padding:10px 12px">${r.linkedinER  > 0 ? r.linkedinER  + '%' : '—'}</td>
+        <td style="padding:10px 12px;font-size:12px;color:#666">${r.twitterPosts}T / ${r.instagramPosts}IG / ${r.linkedinPosts}LI</td>
+        <td style="padding:10px 12px;font-size:12px;color:#555">${r.insight}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <section id="social-er" style="margin:32px 0">
+      <h2 style="font-size:18px;font-weight:700;margin-bottom:8px">
+        Social Engagement Rate — Comparative Ranking
+      </h2>
+      <p style="font-size:12px;color:#888;margin-bottom:16px">
+        ER = (Likes + Comments + Shares) × 100 ÷ Followers, averaged across AQ posts.
+        Instagram and LinkedIn shares not publicly available — excluded from those platform ERs.
+      </p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
+            <th style="text-align:left;padding:10px 12px">Organisation</th>
+            <th style="text-align:left;padding:10px 12px">Avg ER</th>
+            <th style="text-align:left;padding:10px 12px">Twitter ER</th>
+            <th style="text-align:left;padding:10px 12px">Instagram ER</th>
+            <th style="text-align:left;padding:10px 12px">LinkedIn ER</th>
+            <th style="text-align:left;padding:10px 12px">Posts</th>
+            <th style="text-align:left;padding:10px 12px">Why</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </section>`;
+}
+
+module.exports = { run, buildSocialERHtml };
+```
+
+---
+
+## Task 3 — Fix Action Matrix (Report Generation Stuck)
+
+The report is getting stuck at the Action Matrix section. Apply all three fixes:
+
+**Fix 1 — Wrap in try/catch:**
+```javascript
+let actionMatrixHtml = '';
+try {
+  actionMatrixHtml = buildActionMatrix(data);
+} catch (e) {
+  console.error('[ActionMatrix] Failed:', e.message);
+  actionMatrixHtml = `<section id="action-matrix">
+    <h2>Action Matrix</h2>
+    <p style="color:#888">Action matrix unavailable for this run. Error: ${e.message}</p>
+  </section>`;
+}
+```
+
+**Fix 2 — Add 30s timeout if it calls Claude:**
+```javascript
+const actionMatrixHtml = await Promise.race([
+  generateActionMatrixWithClaude(data),
+  new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Timed out after 30s')), 30000)
+  )
+]).catch(e => {
+  console.error('[ActionMatrix]', e.message);
+  return `<p style="color:#888">Action matrix unavailable: ${e.message}</p>`;
+});
+```
+
+**Fix 3 — Guard against empty data at top of buildActionMatrix:**
+```javascript
+function buildActionMatrix(data) {
+  if (!data || !data.orgs || data.orgs.length === 0) {
+    return '<p>No org data available for action matrix.</p>';
+  }
+  // rest of existing function unchanged
+}
+```
+
+---
+
+## Task 4 — Wire social-er.js into Pipeline
+
+In `pipeline.js`, add after the existing social section:
+
+```javascript
+const SocialER = require('./social-er');
+
+// After existing social intelligence runs:
+cb?.('Starting Social ER analysis…');
+let socialERResults = [];
+try {
+  socialERResults = await SocialER.run(cfg, selectedOrgs, cb);
+} catch (e) {
+  console.error('[SocialER] Failed:', e.message);
+}
+reportData.socialER        = socialERResults;
+reportData.socialERHtml    = SocialER.buildSocialERHtml(socialERResults);
+```
+
+In `htmlGenerator.ts`, inject after the existing social section:
+```javascript
+${data.socialERHtml || ''}
+```
+
+---
+
+## Task 5 — Environment Variables
+
+Add to `.env.example`:
+```
+APIFY_TOKEN=        # Get from apify.com → Settings → Integrations
+```
+
+Remove from `.env.example` and Replit Secrets:
+```
+YOUTUBE_CLIENT_ID
+YOUTUBE_CLIENT_SECRET
+YOUTUBE_REDIRECT_URI
+YOUTUBE_API_KEY     # Not being used
+```
+
+---
+
+## Summary
+
+| File | Action |
+|---|---|
+| `youtubeOAuth.ts` | DELETE |
+| `youtube-tokens.json` | DELETE if exists |
+| `server.ts` | Remove all 4 YouTube OAuth routes + imports |
+| `social-intelligence.js` | Stub out runYouTube(), remove all OAuth code |
+| `htmlGenerator.ts` | Remove YouTube connect UI, inject socialERHtml |
+| `pipeline.js` | Remove OAuth gating, add SocialER.run() |
+| `social-er.js` | CREATE — Apify scraper for Twitter, Instagram, LinkedIn |
+
+**Do not touch:** AEO section, press/news section, PPTX generator, org selector UI, canonOutlet function, any Serper news logic.

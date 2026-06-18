@@ -1062,29 +1062,33 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
     footer(sl);
   }
 
-  // Slide 10: Scorecard — paginate into groups of 5 for large org counts
+  // Slide 10: Scorecard — orgs ranked by score, paginate into groups of 5
   {
+    const ordinalP=n=>{const s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);};
+    const ranked=ORGS.map((org,idx)=>({org,idx,score:data[org].score})).sort((a,b)=>b.score-a.score);
+    let _ls=null,_lr=0;
+    ranked.forEach((o,idx)=>{ if(o.score===_ls){o.rank=_lr;} else {o.rank=idx+1;_lr=idx+1;_ls=o.score;} });
     const SCORE_GROUPS = [];
-    for (let gi=0; gi<ORGS.length; gi+=5) SCORE_GROUPS.push(ORGS.slice(gi, gi+5));
+    for (let gi=0; gi<ranked.length; gi+=5) SCORE_GROUPS.push(ranked.slice(gi, gi+5));
     SCORE_GROUPS.forEach((orgGroup, gIdx) => {
     const sl=pres.addSlide(); darkBg(sl);
     eyebrow(sl, SCORE_GROUPS.length>1 ? `Section 09 — Part ${gIdx+1} of ${SCORE_GROUPS.length}` : 'Section 09');
     stitle(sl,'Competitive Scorecard');
     const cw=Math.min(3.7,12.3/orgGroup.length-0.15);
-    orgGroup.forEach((org,i)=>{
-      const d=data[org]; const x=0.5+i*(cw+0.18);
-      sl.addShape(pres.shapes.ROUNDED_RECTANGLE,{x,y:1.28,w:cw,h:5.0,fill:{color:CARD},line:{color:orgPptx(i),width:1.5},rectRadius:0.1});
-      sl.addText(org,{x,y:1.38,w:cw,h:0.28,fontSize:11,bold:true,color:orgPptx(i),fontFace:'Calibri',align:'center',charSpacing:1});
-      const gc=d.grade==='A'?GOOD:d.grade==='B'?'3d8ef0':d.grade==='C+'?WARN:d.grade==='D'?'f0883e':'e05c5c';
-      sl.addText(d.grade,{x,y:1.68,w:cw,h:1.05,fontSize:60,bold:true,color:gc,fontFace:'Cambria',align:'center'});
+    orgGroup.forEach((entry,i)=>{
+      const org=entry.org; const d=data[org]; const x=0.5+i*(cw+0.18);
+      sl.addShape(pres.shapes.ROUNDED_RECTANGLE,{x,y:1.28,w:cw,h:5.0,fill:{color:CARD},line:{color:orgPptx(entry.idx),width:1.5},rectRadius:0.1});
+      sl.addText(org,{x,y:1.38,w:cw,h:0.28,fontSize:11,bold:true,color:orgPptx(entry.idx),fontFace:'Calibri',align:'center',charSpacing:1});
+      const rc=entry.rank===1?GOOD:entry.rank<=3?WARN:MUTED;
+      sl.addText(ordinalP(entry.rank),{x,y:1.68,w:cw,h:1.05,fontSize:48,bold:true,color:rc,fontFace:'Cambria',align:'center'});
       sl.addText(`${d.score} / 100`,{x,y:2.72,w:cw,h:0.3,fontSize:13,color:MUTED,fontFace:'Calibri',align:'center'});
       const bars=[{l:'Share of Voice',v:d.sov},{l:'Narrative',v:d.authPct},{l:'Citation',v:d.dataPct},{l:'AEO',v:d.aeo}];
       bars.forEach((b,bi)=>{
         const by=3.14+bi*0.62;
         sl.addText(b.l,{x:x+0.15,y:by,w:cw*0.52,h:0.22,fontSize:10,color:MUTED,fontFace:'Calibri'});
         sl.addShape(pres.shapes.RECTANGLE,{x:x+0.15,y:by+0.24,w:cw-0.3,h:0.1,fill:{color:CARD2},line:{color:BORD,width:0}});
-        if(b.v>0) sl.addShape(pres.shapes.RECTANGLE,{x:x+0.15,y:by+0.24,w:(cw-0.3)*b.v/100,h:0.1,fill:{color:orgPptx(i)},line:{color:orgPptx(i),width:0}});
-        sl.addText(b.v>0?String(b.v):(b.l==='AEO'?'N/A':String(b.v)),{x:x+cw-0.55,y:by,w:0.4,h:0.22,fontSize:10,bold:true,color:b.v>0?orgPptx(i):MUTED,fontFace:'Calibri',align:'right'});
+        if(b.v>0) sl.addShape(pres.shapes.RECTANGLE,{x:x+0.15,y:by+0.24,w:(cw-0.3)*b.v/100,h:0.1,fill:{color:orgPptx(entry.idx)},line:{color:orgPptx(entry.idx),width:0}});
+        sl.addText(b.v>0?String(b.v):(b.l==='AEO'?'N/A':String(b.v)),{x:x+cw-0.55,y:by,w:0.4,h:0.22,fontSize:10,bold:true,color:b.v>0?orgPptx(entry.idx):MUTED,fontFace:'Calibri',align:'right'});
       });
     });
     sl.addText('Score = (SoV×0.25) + (Narrative×0.25) + (Citation×0.20) + (AEO×0.30)',{x:0.5,y:6.98,w:12.3,h:0.24,fontSize:9,color:MUTED,fontFace:'Calibri'});
@@ -1127,7 +1131,6 @@ function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,so
   const {ORGS,DATE_FROM,DATE_TO,CLIENT_NAME} = cfg;
   const now=new Date().toUTCString();
   const tot=ORGS.reduce((s,o)=>s+(data[o]?.total||0),0);
-  const gradeCol=g=>g==='A'?'#4caf74':g==='B'?'#3d8ef0':g==='C+'?'#d4a017':g==='D'?'#f0883e':'#e05c5c';
 
   function weekBars(){
     const wk=Object.keys(data[ORGS[0]].weeklyData);
@@ -1344,9 +1347,14 @@ ${hasYT?`<div style="font-size:13px;font-weight:600;color:var(--text);margin:20p
   }
 
 
-  const scorecards=ORGS.map((org,i)=>{
+  const ordinal=n=>{const s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);};
+  const rankCol=r=>r===1?'var(--good)':r<=3?'var(--amber)':'var(--muted2)';
+  const rankedOrgs=ORGS.map((org,i)=>({org,i,score:data[org].score})).sort((a,b)=>b.score-a.score);
+  let _lastScore=null,_lastRank=0;
+  rankedOrgs.forEach((o,idx)=>{ if(o.score===_lastScore){o.rank=_lastRank;} else {o.rank=idx+1;_lastRank=idx+1;_lastScore=o.score;} });
+  const scorecards=rankedOrgs.map(({org,i,rank})=>{
     const d=data[org];
-    return `<div class="sca" style="border-top:3px solid ${orgHex(i)}"><div class="scn" style="color:${orgHex(i)}">${esc(org)}</div><div class="scg" style="color:${gradeCol(d.grade)}">${d.grade}</div><div class="scs">${d.score} / 100</div>
+    return `<div class="sca" style="border-top:3px solid ${orgHex(i)}"><div class="scn" style="color:${orgHex(i)}">${esc(org)}</div><div class="scg" style="color:${rankCol(rank)}">${ordinal(rank)}</div><div class="scs">${d.score} / 100</div>
 <div style="display:flex;flex-direction:column;gap:8px;text-align:left">
 ${scRow('Share of Voice',d.sov,orgHex(i))}${scRow('Citation',d.dataPct,orgHex(i))}${scRow('AEO',d.aeo,d.aeo>0?orgHex(i):'#5e7494')}${scRow('Social',d.social||0,d.social>0?orgHex(i):'#5e7494',(d.social||0)*10)}
 </div></div>`;
@@ -1469,7 +1477,7 @@ body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line
 .scc{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px}
 .sca{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:22px;text-align:center}
 .scn{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
-.scg{font-family:'DM Serif Display',serif;font-size:58px;line-height:1;margin:8px 0 4px;font-weight:400}
+.scg{font-family:'DM Serif Display',serif;font-size:44px;line-height:1;margin:8px 0 4px;font-weight:400}
 .scs{font-family:monospace;font-size:13px;color:var(--muted2);margin-bottom:14px}
 .scf{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:12px 16px;font-family:monospace;font-size:11px;color:var(--muted2);margin-top:8px}
 .scf strong{color:var(--amber)}
@@ -1578,7 +1586,7 @@ ${SI.buildAEOHtml(aeoResults, ORGS)}
 ${SI.buildSocialHtml(siSocial, socialScores, ORGS)}
 ${trendEvent?.detected && trendSocialData?.length ? SI.buildTrendSocialHtml(trendEvent, trendSocialData, ORGS) : ''}
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Weighted composite: media · LLM visibility · social. Formula shown in full.</div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social. Formula shown in full.</div><div class="sdiv"></div></div>
 <div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social/10&times;20)<br>
 <span style="color:var(--muted)">${ORGS.map(o=>`${esc(o)}: ${data[o].sov}&times;0.25+${data[o].dataPct}&times;0.25+${data[o].aeo}&times;0.30+${data[o].social}&times;2=${data[o].score}`).join(' &middot; ')}</span></div>
 <div class="scc">${scorecards}</div></section>
