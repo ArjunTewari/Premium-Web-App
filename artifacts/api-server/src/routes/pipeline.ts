@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import { db, reportLogsTable } from "@workspace/db";
 import { calculateReportCosts } from "../lib/auth.js";
-import { requireAuth } from "../middleware/require-auth.js";
+import { requireAuth, requireAdmin } from "../middleware/require-auth.js";
 
 const require = createRequire(import.meta.url);
 
@@ -117,7 +117,7 @@ router.get("/download/:file", requireAuth, (req: Request, res: Response) => {
   res.download(fpath, fname);
 });
 
-router.get("/auth/youtube", (req: Request, res: Response) => {
+router.get("/auth/youtube", requireAdmin, (req: Request, res: Response) => {
   const clientId = process.env.YOUTUBE_CLIENT_ID;
   const redirectUri = process.env.YOUTUBE_AUTHORIZED_URI;
   if (!clientId || !redirectUri) {
@@ -134,7 +134,7 @@ router.get("/auth/youtube", (req: Request, res: Response) => {
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 });
 
-router.get("/auth/youtube/callback", async (req: Request, res: Response) => {
+router.get("/auth/youtube/callback", requireAdmin, async (req: Request, res: Response) => {
   const { code, error } = req.query as { code?: string; error?: string };
   if (error) return res.status(400).send(`OAuth error: ${error}`);
   if (!code) return res.status(400).send("Missing authorization code.");
@@ -168,7 +168,7 @@ router.get("/auth/youtube/callback", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/auth/youtube/status", (_req: Request, res: Response) => {
+router.get("/auth/youtube/status", requireAdmin, (_req: Request, res: Response) => {
   const connected = fs.existsSync(YOUTUBE_TOKENS_FILE);
   res.json({ connected, setupUrl: "/api/auth/youtube" });
 });
