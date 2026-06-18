@@ -6,7 +6,7 @@
 
 const https = require('https');
 
-const SERPER_KEY = 'ea3ed82368f51f05e119a03baa36ce4d22503ae4';
+const SERPER_KEY = process.env.SERPER_KEY || '';
 
 function serperNews(query) {
   return new Promise((resolve, reject) => {

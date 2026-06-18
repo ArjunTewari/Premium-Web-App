@@ -10,12 +10,6 @@
     "zod": "catalog:"
   },
   "scripts": {
-  "build": "tsc -p tsconfig.json"
-  },
-  "exports": {
-  ".": {
-    "workspace": "./src/index.ts",
-    "default": "./dist/index.js"
-   }
+    "build": "tsc -p tsconfig.json"
   }
 }
