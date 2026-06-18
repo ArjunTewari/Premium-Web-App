@@ -151,8 +151,19 @@ html,body{min-height:100vh;background:var(--ink);color:var(--tx);font-family:'In
 <script>
 // ── Org selector ────────────────────────────────────────────────────────────
 const DEFAULT_ORGS = [
-  'CEEW','CSTEP','TERI','CSE','WRI India','Greenpeace India',
-  'Climate Trends','iForest','Urban Emissions','CREA','ATREE','Respirer Living Sciences','CLEAN'
+  'WRI India',
+  'Air Pollution Action Group',
+  'Chintan Environmental Research and Action Group',
+  'IIT Kanpur',
+  'CSTEP',
+  'IIT Delhi',
+  'Health Effects Institute',
+  'ICCT',
+  'EPIC India',
+  'Council on Energy, Environment and Water',
+  'Centre for Science and Environment',
+  'Climate Trends',
+  'Sustainable Futures Collaborative',
 ];
 const customOrgs = [];
 
@@ -161,7 +172,7 @@ function renderOrgCheckboxes() {
   const allOrgs = [...DEFAULT_ORGS, ...customOrgs];
   const checked = getSelectedOrgs();
   box.innerHTML = allOrgs.map(org => {
-    const isChecked = checked.includes(org) || (checked.length === 0 && (org === 'CEEW' || org === 'CSTEP'));
+    const isChecked = checked.includes(org) || (checked.length === 0 && (org === 'Council on Energy, Environment and Water' || org === 'CSTEP'));
     return `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tx);cursor:pointer;padding:2px 0">
       <input type="checkbox" value="${org}" ${isChecked?'checked':''} onchange="updateOrgCount()" style="accent-color:var(--amb);width:13px;height:13px;cursor:pointer">
       ${org}</label>`;

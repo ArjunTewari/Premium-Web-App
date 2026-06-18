@@ -11,19 +11,19 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // Keys must match exactly what the UI/pipeline sends as org names
 const ORG_HANDLES = {
-  'CEEW':                      { twitter: 'CEEWIndia',          instagram: 'ceewindia',          linkedin: 'council-on-energy-environment-and-water' },
-  'CSTEP':                     { twitter: 'CSTEP_India',        instagram: 'cstep_india',        linkedin: 'cstep-india' },
-  'TERI':                      { twitter: 'TERINews',           instagram: 'teri_official',      linkedin: 'the-energy-and-resources-institute' },
-  'CSE':                       { twitter: 'CSEIndia',           instagram: 'cseindia',           linkedin: 'centre-for-science-and-environment' },
-  'WRI India':                 { twitter: 'WRIIndia',           instagram: 'wri_india',          linkedin: 'wri-india' },
-  'Greenpeace India':          { twitter: 'GreenpeaceIndia',    instagram: 'greenpeaceindia',    linkedin: 'greenpeace-india' },
-  'Climate Trends':            { twitter: 'ClimateTrendsIN',    instagram: 'climatetrendsin',    linkedin: 'climate-trends' },
-  'iForest':                   { twitter: 'iForestIndia',       instagram: 'iforest_india',      linkedin: 'iforest' },
-  'Urban Emissions':           { twitter: 'UrbanEmissions',     instagram: 'urbanemissions',     linkedin: 'urban-emissions' },
-  'CREA':                      { twitter: 'CREA_Asia',          instagram: 'crea_asia',          linkedin: 'centre-for-research-on-energy-and-clean-air' },
-  'ATREE':                     { twitter: 'ATREEindia',         instagram: 'atreeindia',         linkedin: 'atree-india' },
-  'Respirer Living Sciences':  { twitter: 'RespireLiving',      instagram: 'respireliving',      linkedin: 'respirer-living-sciences' },
-  'CLEAN':                     { twitter: 'cleannetworkin',     instagram: 'cleannetworkin',     linkedin: 'clean-india-network' },
+  'WRI India':                                        { twitter: 'WRIIndia',          instagram: 'wri_india',           linkedin: 'wri-india' },
+  'Air Pollution Action Group':                       { twitter: 'APAGIndia',         instagram: 'apagindia',           linkedin: 'air-pollution-action-group' },
+  'Chintan Environmental Research and Action Group':  { twitter: 'ChintanIndia',      instagram: 'chintan_india',       linkedin: 'chintan-environmental-research-and-action-group' },
+  'IIT Kanpur':                                       { twitter: 'IITKanpur',         instagram: 'iitkanpur',           linkedin: 'iit-kanpur' },
+  'CSTEP':                                            { twitter: 'CSTEP_India',       instagram: 'cstep_india',         linkedin: 'cstep-india' },
+  'IIT Delhi':                                        { twitter: 'IITDelhi',          instagram: 'iitdelhi',            linkedin: 'iit-delhi' },
+  'Health Effects Institute':                         { twitter: 'HEIResearch',       instagram: 'heiresearch',         linkedin: 'health-effects-institute' },
+  'ICCT':                                             { twitter: 'TheICCT',           instagram: 'theicct',             linkedin: 'icct' },
+  'EPIC India':                                       { twitter: 'EPICIndia_',        instagram: 'epicindia_uchicago',  linkedin: 'epic-india' },
+  'Council on Energy, Environment and Water':         { twitter: 'CEEWIndia',         instagram: 'ceewindia',           linkedin: 'council-on-energy-environment-and-water' },
+  'Centre for Science and Environment':               { twitter: 'CSEIndia',          instagram: 'cseindia',            linkedin: 'centre-for-science-and-environment' },
+  'Climate Trends':                                   { twitter: 'ClimateTrendsIN',   instagram: 'climatetrendsin',     linkedin: 'climate-trends' },
+  'Sustainable Futures Collaborative':                { twitter: 'SFC_India',         instagram: 'sfc_india',           linkedin: 'sustainable-futures-collaborative' },
 };
 
 async function runApifyActor(actorId, input) {
