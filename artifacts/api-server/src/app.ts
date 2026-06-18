@@ -34,6 +34,14 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
 
+// Redirect bare /auth/youtube/callback → /api/auth/youtube/callback
+// so the Google Cloud Console registered redirect URI still works
+// even though the handler is mounted under /api.
+app.get("/auth/youtube/callback", (req, res) => {
+  const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+  res.redirect(307, `/api/auth/youtube/callback${qs}`);
+});
+
 seedAdminIfNeeded();
 
 export default app;
