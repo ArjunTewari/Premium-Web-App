@@ -13,8 +13,6 @@ const router: IRouter = Router();
 const OUT_DIR = path.join(process.cwd(), "outputs");
 if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
 
-const YOUTUBE_TOKENS_FILE = path.join(process.cwd(), "youtube_tokens.json");
-
 router.post("/run", requireAuth, async (req: Request, res: Response) => {
   const body = req.body || {};
 
@@ -33,10 +31,6 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     PERPLEXITY_KEY: body.perplexityKey || process.env.PERPLEXITY_KEY || "",
     GEMINI_KEY: body.geminiKey || process.env.GEMINI_KEY || "",
     TWITTER_KEY: process.env.TWITTER_KEY || "",
-    YOUTUBE_KEY: process.env.YOUTUBE_KEY || "",
-    YOUTUBE_CLIENT_ID: process.env.YOUTUBE_CLIENT_ID || "",
-    YOUTUBE_CLIENT_SECRET: process.env.YOUTUBE_CLIENT_SECRET || "",
-    YOUTUBE_AUTHORIZED_URI: process.env.YOUTUBE_AUTHORIZED_URI || "",
     outDir: OUT_DIR,
   };
 
@@ -115,62 +109,6 @@ router.get("/download/:file", requireAuth, (req: Request, res: Response) => {
   const fpath = path.join(OUT_DIR, fname);
   if (!fs.existsSync(fpath)) return res.status(404).send("File not found");
   res.download(fpath, fname);
-});
-
-router.get("/auth/youtube", requireAdmin, (req: Request, res: Response) => {
-  const clientId = process.env.YOUTUBE_CLIENT_ID;
-  const redirectUri = process.env.YOUTUBE_AUTHORIZED_URI;
-  if (!clientId || !redirectUri) {
-    return res.status(500).send("YOUTUBE_CLIENT_ID or YOUTUBE_AUTHORIZED_URI not set.");
-  }
-  const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    response_type: "code",
-    scope: "https://www.googleapis.com/auth/youtube.readonly",
-    access_type: "offline",
-    prompt: "consent",
-  });
-  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
-});
-
-router.get("/auth/youtube/callback", async (req: Request, res: Response) => {
-  const { code, error } = req.query as { code?: string; error?: string };
-  if (error) return res.status(400).send(`OAuth error: ${error}`);
-  if (!code) return res.status(400).send("Missing authorization code.");
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const axios = require("axios") as any;
-  try {
-    const tok = await axios.post("https://oauth2.googleapis.com/token", null, {
-      params: {
-        code,
-        client_id: process.env.YOUTUBE_CLIENT_ID,
-        client_secret: process.env.YOUTUBE_CLIENT_SECRET,
-        redirect_uri: process.env.YOUTUBE_AUTHORIZED_URI,
-        grant_type: "authorization_code",
-      },
-    });
-    const tokens = {
-      access_token: tok.data.access_token,
-      refresh_token: tok.data.refresh_token,
-      expiry_date: Date.now() + (tok.data.expires_in || 3600) * 1000,
-    };
-    fs.writeFileSync(YOUTUBE_TOKENS_FILE, JSON.stringify(tokens, null, 2));
-    res.send(`
-      <h2 style="font-family:sans-serif;color:#1a7a4a">✓ YouTube authorised</h2>
-      <p style="font-family:sans-serif">Tokens saved. YouTube data will be included in future reports.</p>
-      <p style="font-family:sans-serif"><a href="/">← Back to Emerald AI</a></p>
-    `);
-  } catch (e: unknown) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    res.status(500).send(`Token exchange failed: ${(e as any).response?.data?.error_description || (e as Error).message}`);
-  }
-});
-
-router.get("/auth/youtube/status", requireAdmin, (_req: Request, res: Response) => {
-  const connected = fs.existsSync(YOUTUBE_TOKENS_FILE);
-  res.json({ connected, setupUrl: "/api/auth/youtube" });
 });
 
 export default router;

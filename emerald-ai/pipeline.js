@@ -611,7 +611,7 @@ ${txt}`;
     for (const org of ORGS) cb(`  ${org} AEO score: ${aeoResults[org].score}`, aeoResults[org].score>0?'ok':'warn');
   } catch(e) { cb(`  AEO error: ${e.message}`, 'err'); }
 
-  // ── STEP 4: Social Media (YouTube · X/Twitter · Instagram · LinkedIn) ──
+  // ── STEP 4: Social Media (X/Twitter · Instagram · LinkedIn via Serper) ──
   cb(`\nSTEP 4/6 — Social Media Intelligence...`, 'head');
   let siSocial = { youtube: null, twitter: null, instagram: null, linkedin: null };
   try {
@@ -621,6 +621,17 @@ ${txt}`;
   for (const org of ORGS) {
     cb(`  Social score: ${org} = ${socialScores[org].total} pts (${socialScores[org].normalised}/10 normalised)`, 'ok');
   }
+
+  // ── STEP 4b: Social ER (Apify — actual engagement rates) ──
+  cb(`\nSTEP 4b/6 — Social Engagement Rate (Apify)...`, 'head');
+  const SocialER = require('./social-er');
+  let socialERResults = [];
+  let socialERHtml = '';
+  try {
+    socialERResults = await SocialER.run(cfg, ORGS, cb);
+    socialERHtml = SocialER.buildSocialERHtml(socialERResults);
+    cb(`  Social ER complete: ${socialERResults.length} orgs scored`, socialERResults.length > 0 ? 'ok' : 'warn');
+  } catch(e) { cb(`  Social ER error: ${e.message}`, 'err'); }
 
   // ── STEP 5: Aggregate + Score ─────────────────────────────
   cb(`\nSTEP 5/6 — Aggregating and scoring...`, 'head');
@@ -698,10 +709,13 @@ ${txt}`;
 
   try{
     cb('  Action matrix...');
-    const r=await callClaude(
-      `Generate 4 actions for EACH of these orgs: ${ORGS.join(', ')} — based on Indian AQ media + AEO + social media intelligence.\n${orgSummary}\nWhite-space gap topics (AQ media conversations tracked orgs are absent from): ${emerging.map(e=>e.topic).join(',')||'none'}\nReturn ONLY JSON array of ${ORGS.length*4} objects: [{"org":"orgname","priority":"Fix Now|Leverage|Optimise|Invest","area":"Media|Topics|Narrative|AEO|Social","action":"...","rationale":"1-2 sentences with specific data"}]`,
-      cfg.CLAUDE_KEY, Math.min(4000, 1000 + ORGS.length * 250)
-    );
+    const r=await Promise.race([
+      callClaude(
+        `Generate 4 actions for EACH of these orgs: ${ORGS.join(', ')} — based on Indian AQ media + AEO + social media intelligence.\n${orgSummary}\nWhite-space gap topics (AQ media conversations tracked orgs are absent from): ${emerging.map(e=>e.topic).join(',')||'none'}\nReturn ONLY JSON array of ${ORGS.length*4} objects: [{"org":"orgname","priority":"Fix Now|Leverage|Optimise|Invest","area":"Media|Topics|Narrative|AEO|Social","action":"...","rationale":"1-2 sentences with specific data"}]`,
+        cfg.CLAUDE_KEY, Math.min(4000, 1000 + ORGS.length * 250)
+      ),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Action matrix timed out after 30s')),30000))
+    ]);
     actions=parseJ(r)||[];
     cb(`  ${actions.length} actions`, actions.length>0?'ok':'err');
   }catch(e){ cb(`  actions err: ${e.message}`, 'err'); }
@@ -721,7 +735,7 @@ ${txt}`;
   await buildPPTX(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxFile,cfg);
   cb(`  PPTX: ${pptxName}`, 'ok');
 
-  const html=buildHTML(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxName,cfg);
+  const html=buildHTML(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxName,cfg,socialERHtml);
   fs.writeFileSync(htmlFile, html, 'utf8');
   cb(`  HTML: ${base}.html (${Math.round(html.length/1024)}KB)`, 'ok');
 
@@ -1127,7 +1141,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
 // ══════════════════════════════════════════════════════════════════════════
 //  HTML BUILDER  (adds AEO + Social sections)
 // ══════════════════════════════════════════════════════════════════════════
-function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxFilename,cfg){
+function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxFilename,cfg,socialERHtml=''){
   const {ORGS,DATE_FROM,DATE_TO,CLIENT_NAME} = cfg;
   const now=new Date().toUTCString();
   const tot=ORGS.reduce((s,o)=>s+(data[o]?.total||0),0);
@@ -1306,7 +1320,7 @@ ${!hasAEO?`<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212
     return `
 <section class="sec" id="social"><div class="sh"><div class="se">Social Media Intelligence</div><h2 class="st">Twitter/X &amp; YouTube</h2>
 <div class="sd">Social media presence and engagement around each organisation&rsquo;s AQ coverage. ${noData?'No social media API keys provided.':'Twitter search is limited to the last 7 days (free tier). Instagram and LinkedIn are not available via public API.'}</div><div class="sdiv"></div></div>
-${noData?`<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:13px;color:var(--muted2)"><strong style="color:var(--warn)">⚠ Social media data not available</strong> — Add TWITTER_BEARER_TOKEN and/or YOUTUBE_API_KEY and re-run.</div>`:''}
+${noData?`<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:13px;color:var(--muted2)"><strong style="color:var(--warn)">⚠ Social media data not available</strong> — Add SERPER_KEY and re-run to enable X, Instagram, and LinkedIn intelligence.</div>`:''}
 ${hasTw?`<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">🐦 Twitter / X <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:monospace">(7-day window, free tier)</span></div><div style="${grid}">${twitterCards}</div>`:''}
 ${hasYT?`<div style="font-size:13px;font-weight:600;color:var(--text);margin:20px 0 12px">▶ YouTube <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:monospace">(relevance search)</span></div><div style="${grid}">${youtubeCards}</div>`:''}
 </section>`;
@@ -1585,6 +1599,7 @@ ${emergingCards}</section>
 ${SI.buildAEOHtml(aeoResults, ORGS)}
 ${SI.buildSocialHtml(siSocial, socialScores, ORGS)}
 ${trendEvent?.detected && trendSocialData?.length ? SI.buildTrendSocialHtml(trendEvent, trendSocialData, ORGS) : ''}
+${socialERHtml}
 
 <section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social. Formula shown in full.</div><div class="sdiv"></div></div>
 <div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social/10&times;20)<br>

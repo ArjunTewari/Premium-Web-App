@@ -45,10 +45,6 @@ app.post('/run', async (req, res) => {
     GEMINI_KEY:    body.geminiKey    || process.env.GEMINI_KEY    || '',
     // Social — always from server secrets
     TWITTER_KEY:           process.env.TWITTER_KEY           || '',
-    YOUTUBE_KEY:           process.env.YOUTUBE_KEY           || '',
-    YOUTUBE_CLIENT_ID:     process.env.YOUTUBE_CLIENT_ID     || '',
-    YOUTUBE_CLIENT_SECRET: process.env.YOUTUBE_CLIENT_SECRET || '',
-    YOUTUBE_AUTHORIZED_URI:process.env.YOUTUBE_AUTHORIZED_URI|| '',
     outDir: OUT_DIR
   };
 
@@ -86,69 +82,6 @@ app.post('/run', async (req, res) => {
   }
 
   res.end();
-});
-
-// ── YouTube OAuth setup (one-time) ────────────────────────────────────────
-// Step 1: visit /auth/youtube  → redirects to Google consent page
-// Step 2: Google calls back to YOUTUBE_AUTHORIZED_URI with ?code=...
-// Step 3: tokens saved to youtube_tokens.json; YouTube is live from then on
-
-const YOUTUBE_TOKENS_FILE = path.join(__dirname, 'youtube_tokens.json');
-
-app.get('/auth/youtube', (req, res) => {
-  const clientId    = process.env.YOUTUBE_CLIENT_ID;
-  const redirectUri = process.env.YOUTUBE_AUTHORIZED_URI;
-  if (!clientId || !redirectUri) {
-    return res.status(500).send('YOUTUBE_CLIENT_ID or YOUTUBE_AUTHORIZED_URI not set in secrets.');
-  }
-  const params = new URLSearchParams({
-    client_id:    clientId,
-    redirect_uri: redirectUri,
-    response_type:'code',
-    scope:        'https://www.googleapis.com/auth/youtube.readonly',
-    access_type:  'offline',
-    prompt:       'consent'
-  });
-  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
-});
-
-// Callback — path is derived at runtime from YOUTUBE_AUTHORIZED_URI
-app.get('/auth/youtube/callback', async (req, res) => {
-  const { code, error } = req.query;
-  if (error) return res.status(400).send(`OAuth error: ${error}`);
-  if (!code)  return res.status(400).send('Missing authorization code.');
-
-  const axios = require('axios');
-  try {
-    const tok = await axios.post('https://oauth2.googleapis.com/token', null, {
-      params: {
-        code,
-        client_id:     process.env.YOUTUBE_CLIENT_ID,
-        client_secret: process.env.YOUTUBE_CLIENT_SECRET,
-        redirect_uri:  process.env.YOUTUBE_AUTHORIZED_URI,
-        grant_type:    'authorization_code'
-      }
-    });
-    const tokens = {
-      access_token:  tok.data.access_token,
-      refresh_token: tok.data.refresh_token,
-      expiry_date:   Date.now() + (tok.data.expires_in || 3600) * 1000
-    };
-    fs.writeFileSync(YOUTUBE_TOKENS_FILE, JSON.stringify(tokens, null, 2));
-    res.send(`
-      <h2 style="font-family:sans-serif;color:#1a7a4a">✓ YouTube authorised</h2>
-      <p style="font-family:sans-serif">Tokens saved. YouTube data will be included in future reports.</p>
-      <p style="font-family:sans-serif"><a href="/">← Back to Emerald AI</a></p>
-    `);
-  } catch (e) {
-    res.status(500).send(`Token exchange failed: ${e.response?.data?.error_description || e.message}`);
-  }
-});
-
-// Status endpoint — shows whether YouTube is connected
-app.get('/auth/youtube/status', (req, res) => {
-  const connected = fs.existsSync(YOUTUBE_TOKENS_FILE);
-  res.json({ connected, setupUrl: '/auth/youtube' });
 });
 
 // ── GET /download/:file — serve generated report files ────────────────────

@@ -255,171 +255,11 @@ async function runAEO(cfg, orgs, cb) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-//  STEP 2: YOUTUBE INTELLIGENCE
+//  STEP 2: YOUTUBE — OAuth removed; stub returns empty data
 // ══════════════════════════════════════════════════════════════════════════
-// ── YouTube OAuth helpers ─────────────────────────────────────────────────
-const YT_TOKENS_FILE = require('path').join(__dirname, 'youtube_tokens.json');
-
-function loadYtTokens() {
-  try { return JSON.parse(require('fs').readFileSync(YT_TOKENS_FILE, 'utf8')); }
-  catch { return null; }
-}
-
-async function getYtAccessToken(cfg) {
-  const tokens = loadYtTokens();
-  if (!tokens?.refresh_token) return null;
-
-  // Refresh if expired (or no expiry recorded)
-  const expiry = tokens.expiry_date || 0;
-  if (Date.now() < expiry - 60000) return tokens.access_token;
-
-  try {
-    const res = await axios.post('https://oauth2.googleapis.com/token', null, {
-      params: {
-        client_id:     cfg.YOUTUBE_CLIENT_ID,
-        client_secret: cfg.YOUTUBE_CLIENT_SECRET,
-        refresh_token: tokens.refresh_token,
-        grant_type:    'refresh_token'
-      },
-      timeout: 10000
-    });
-    const updated = {
-      ...tokens,
-      access_token: res.data.access_token,
-      expiry_date:  Date.now() + (res.data.expires_in || 3600) * 1000
-    };
-    require('fs').writeFileSync(YT_TOKENS_FILE, JSON.stringify(updated, null, 2));
-    return updated.access_token;
-  } catch (e) {
-    return null;
-  }
-}
-
 async function runYouTube(cfg, orgs, cb) {
-  if (!cfg.YOUTUBE_CLIENT_ID) {
-    cb('  No YOUTUBE_CLIENT_ID — skipping YouTube', 'warn');
-    return { videos: [], orgMentions: {}, trendingTopics: [], insightByOrg: {}, _connected: false };
-  }
-
-  const accessToken = await getYtAccessToken(cfg);
-  if (!accessToken) {
-    cb('  YouTube not authorised — visit /auth/youtube to complete one-time OAuth setup', 'warn');
-    return { videos: [], orgMentions: {}, trendingTopics: [], insightByOrg: {}, _connected: false };
-  }
-
-  const authHeader = { Authorization: `Bearer ${accessToken}` };
-
-  cb('  Fetching top AQ videos from YouTube...');
-  const publishedAfter = new Date(cfg.DATE_FROM).toISOString();
-  const publishedBefore = (() => { const d = new Date(cfg.DATE_TO); d.setHours(23, 59, 59); return d.toISOString(); })();
-
-  const seen = new Set();
-  const candidates = [];
-
-  const queries = [
-    'India air quality AQI pollution',
-    'Delhi Mumbai air pollution smog',
-    'India PM2.5 air pollution health',
-    'India clean air NCAP GRAP policy',
-    'India air quality research data 2026'
-  ];
-
-  for (const q of queries) {
-    try {
-      const res = await axios.get('https://www.googleapis.com/youtube/v3/search', {
-        headers: authHeader,
-        params: {
-          part: 'snippet', q, type: 'video',
-          maxResults: 50, order: 'viewCount',
-          publishedAfter, publishedBefore,
-          relevanceLanguage: 'en', regionCode: 'IN'
-        },
-        timeout: 15000
-      });
-      for (const item of (res.data.items || [])) {
-        const vid = item.id?.videoId;
-        if (vid && !seen.has(vid)) { seen.add(vid); candidates.push(vid); }
-      }
-      await sleep(200);
-    } catch (e) {
-      cb(`  YouTube search error: ${e.response?.data?.error?.message || e.message}`, 'warn');
-    }
-  }
-
-  // Fetch full details in batches of 50
-  let details = [];
-  for (let i = 0; i < candidates.length; i += 50) {
-    try {
-      const res = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
-        headers: authHeader,
-        params: { part: 'snippet,statistics', id: candidates.slice(i, i + 50).join(',') },
-        timeout: 15000
-      });
-      details = details.concat(res.data.items || []);
-      await sleep(150);
-    } catch (e) {
-      cb(`  YouTube details error: ${e.message}`, 'warn');
-    }
-  }
-
-  // Filter: AQ in title, exclude off-topic
-  const aqVideos = details
-    .filter(v => isAQTitle(v.snippet?.title || ''))
-    .sort((a, b) => parseInt(b.statistics?.viewCount || 0) - parseInt(a.statistics?.viewCount || 0))
-    .slice(0, 20); // top 20
-
-  cb(`  ${aqVideos.length} videos pass AQ title filter (of ${details.length} fetched)`, 'ok');
-
-  // Build structured items for mention detection
-  const items = aqVideos.map(v => ({
-    title: v.snippet?.title || '',
-    hook: v.snippet?.title || '',
-    description: (v.snippet?.description || '').slice(0, 400),
-    comments: [], // comment fetching would be Step 2b — separate API call per video
-    views: parseInt(v.statistics?.viewCount || 0),
-    publishedAt: (v.snippet?.publishedAt || '').slice(0, 10),
-    channel: v.snippet?.channelTitle || '',
-    videoId: v.id
-  }));
-
-  // Detect org mentions
-  const orgMentions = {};
-  for (const org of orgs) {
-    orgMentions[org] = detectMentionLocations(items, org);
-  }
-
-  // Use Claude to identify trending topics and generate insight
-  const titlesText = items.slice(0, 20).map((v, i) => `${i + 1}. "${v.title}" — ${v.channel} (${v.views.toLocaleString()} views, ${v.publishedAt})`).join('\n');
-  let trendingTopics = [], insightByOrg = {};
-
-  try {
-    cb('  Running Claude trend analysis on YouTube videos...');
-    const prompt = `Analyse these top Indian AQ YouTube videos for the period. Identify:
-1. The 5-7 main trending topics (as short pill labels, max 4 words each)
-2. For each of these orgs [${orgs.join(', ')}], 1-2 sentences on their presence pattern — where they appear, what topics they dominate, what gaps exist
-3. An overall summary sentence about what the YouTube AQ conversation was focused on this period
-
-Return ONLY JSON:
-{
-  "trending_topics": ["topic 1", "topic 2", ...],
-  "org_insights": {"${orgs[0]}": "...", "${orgs[1] || orgs[0]}": "..."},
-  "platform_summary": "..."
-}
-
-VIDEOS:
-${titlesText}`;
-
-    const raw = await callClaude(prompt, cfg.CLAUDE_KEY, 1200);
-    const parsed = parseJ(raw);
-    if (parsed) {
-      trendingTopics = parsed.trending_topics || [];
-      insightByOrg = parsed.org_insights || {};
-    }
-  } catch (e) {
-    cb(`  YouTube trend analysis error: ${e.message}`, 'warn');
-  }
-
-  return { videos: items, orgMentions, trendingTopics, insightByOrg, _connected: true };
+  cb?.('youtube', 'YouTube via OAuth removed. Skipping.');
+  return { videos: [], orgMentions: {}, trendingTopics: [], insightByOrg: {}, _connected: false };
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -758,17 +598,7 @@ function buildAEOHtml(aeoResults, orgs) {
 
 /** Social Intelligence section HTML */
 function buildSocialHtml(social, socialScores, orgs) {
-  const ytConnected = social.youtube?._connected !== false && (social.youtube?.videos?.length > 0 || social.youtube?.trendingTopics?.length > 0);
-
   const allPlatforms = [
-    {
-      id: 'yt', label: 'YouTube', data: social.youtube,
-      icon: '▶', iconBg: '#ff4444',
-      subtitle: 'YouTube Data API v3 · viewCount sort · regionCode=IN · AQ term required in title',
-      srcBadge: 'YouTube Data API v3',
-      footnote: `${social.youtube?.videos?.length || 0} videos analysed · 5 broad AQ search queries`,
-      skip: !ytConnected
-    },
     {
       id: 'tw', label: 'X / Twitter', data: social.twitter,
       icon: '𝕏', iconBg: '#111',
@@ -796,11 +626,6 @@ function buildSocialHtml(social, socialScores, orgs) {
   ];
 
   const platforms = allPlatforms.filter(p => !p.skip);
-
-  const ytNotice = !ytConnected
-    ? `<div style="background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.2);border-radius:6px;padding:10px 14px;font-size:12px;color:#8fa3b8;margin-bottom:16px">
-        <strong style="color:#d4a017">YouTube not connected.</strong> Visit <code style="background:#1e2638;padding:1px 5px;border-radius:3px">/auth/youtube</code> to complete one-time OAuth setup. YouTube data is excluded from this report.
-      </div>` : '';
 
   const tabButtons = platforms.map((p, i) =>
     `<div class="si-tab${i === 0 ? ' si-tab-active' : ''}" onclick="siTab('${p.id}',this)" style="display:flex;align-items:center;gap:7px;padding:10px 18px;font-size:12px;font-weight:600;color:${i === 0 ? '#d8e4f0' : '#8fa3b8'};cursor:pointer;border-bottom:${i === 0 ? '2px solid #c9922a' : '2px solid transparent'};margin-bottom:-1px;transition:all .15s;user-select:none">
@@ -875,14 +700,13 @@ function buildSocialHtml(social, socialScores, orgs) {
   <div style="margin-bottom:24px">
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#5e7494;margin-bottom:6px">Social Intelligence</div>
     <h2 style="font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;color:#d8e4f0;line-height:1.2">Trending AQ Content Across Platforms</h2>
-    <div style="margin-top:8px;font-size:13px;color:#8fa3b8;max-width:680px;line-height:1.65">Top AQ-related content on YouTube, X, Instagram, and LinkedIn — no org filter at search stage. Each time a tracked organisation is mentioned = 1 point. Points combine into the Social Presence Score.</div>
+    <div style="margin-top:8px;font-size:13px;color:#8fa3b8;max-width:680px;line-height:1.65">Top AQ-related content on X, Instagram, and LinkedIn — no org filter at search stage. Each time a tracked organisation is mentioned = 1 point. Points combine into the Social Presence Score.</div>
     <div style="width:40px;height:2px;background:#c9922a;margin:14px 0 0"></div>
   </div>
   <div style="background:rgba(201,146,42,.06);border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:14px 18px;font-size:12px;color:#8fa3b8;margin-bottom:20px;line-height:1.7">
     <strong style="color:#c9922a">Scoring:</strong> 1 point per mention regardless of location. Location (Title/Hook · Description · Comments) is tracked separately — an org cited in a title drives far more discovery than one buried in comments.
   </div>
 
-  ${ytNotice}
   <div style="display:flex;border-bottom:1px solid #252d40;margin-bottom:0">${tabButtons}</div>
   ${tabPanes}
 
@@ -895,7 +719,7 @@ function buildSocialHtml(social, socialScores, orgs) {
       <div style="display:flex;gap:28px;padding:16px;background:#1e2638;border-radius:6px;margin-top:14px;align-items:center;flex-wrap:wrap">
         <div style="flex:1;min-width:180px">
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:4px">Combined Social Presence Score</div>
-          <div style="font-size:11px;color:#8fa3b8">4 platforms · each org mention = 1 pt · normalised 0–100 in Competitive Scorecard</div>
+          <div style="font-size:11px;color:#8fa3b8">3 platforms · each org mention = 1 pt · normalised 0–100 in Competitive Scorecard</div>
         </div>
         <div style="display:flex;gap:24px;flex-shrink:0;align-items:center">${separators}</div>
       </div>

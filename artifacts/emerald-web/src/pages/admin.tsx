@@ -63,8 +63,6 @@ export default function Admin() {
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [expanded, setExpanded] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [ytConnected, setYtConnected] = useState<boolean | null>(null);
-
   useEffect(() => {
     if (user && user.role !== "admin") navigate("/");
   }, [user, navigate]);
@@ -73,12 +71,10 @@ export default function Admin() {
     Promise.all([
       fetch("/api/admin/reports?limit=200", { credentials: "include" }).then((r) => r.json()),
       fetch("/api/admin/costs", { credentials: "include" }).then((r) => r.json()),
-      fetch("/api/auth/youtube/status", { credentials: "include" }).then((r) => r.json()),
     ])
-      .then(([rData, cData, ytData]) => {
+      .then(([rData, cData]) => {
         setReports(rData.reports || []);
         setMonths(cData.months || []);
-        setYtConnected(ytData.connected ?? false);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -159,75 +155,6 @@ export default function Admin() {
                 sub="all time"
                 accent="#38bdf8"
               />
-            </div>
-
-            {/* YouTube OAuth Status */}
-            <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: "1.5rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: 8,
-                  background: "#1a0000",
-                  border: "1px solid #ff444433",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 20,
-                }}>▶</div>
-                <div>
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: "#f8fafc" }}>YouTube Data API v3</p>
-                  <p style={{ margin: "2px 0 0 0", fontSize: 12, color: "#64748b" }}>
-                    Used for social intelligence — video search, view counts, trending topics per org
-                  </p>
-                </div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  background: ytConnected ? "#0a2a1a" : "#1a0e0e",
-                  border: `1px solid ${ytConnected ? "#4caf7455" : "#f8717155"}`,
-                  borderRadius: 20,
-                  padding: "5px 12px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: ytConnected ? "#4caf74" : "#f87171",
-                }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: ytConnected ? "#4caf74" : "#f87171", display: "inline-block" }} />
-                  {ytConnected === null ? "Checking…" : ytConnected ? "Connected" : "Not connected"}
-                </div>
-                {!ytConnected && (
-                  <a
-                    href="/api/auth/youtube"
-                    style={{
-                      background: "#ff4444",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 6,
-                      padding: "7px 14px",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      textDecoration: "none",
-                    }}
-                  >
-                    Connect YouTube →
-                  </a>
-                )}
-                {ytConnected && (
-                  <a
-                    href="/api/auth/youtube"
-                    style={{
-                      background: "transparent",
-                      color: "#64748b",
-                      border: "1px solid #1e293b",
-                      borderRadius: 6,
-                      padding: "7px 14px",
-                      fontSize: 13,
-                      cursor: "pointer",
-                      textDecoration: "none",
-                    }}
-                  >
-                    Re-authorise
-                  </a>
-                )}
-              </div>
             </div>
 
             {/* Monthly Cost Breakdown */}
