@@ -1,10 +1,11 @@
 import bcrypt from "bcryptjs";
+import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 
 export async function seedAdminIfNeeded() {
   if (process.env.NODE_ENV === "production" && !process.env.SEED_ADMIN) return;
   try {
-    const existing = await db.select().from(usersTable).limit(1);
+    const existing = await db.select().from(usersTable).where(eq(usersTable.username, "admin")).limit(1);
     if (existing.length > 0) return;
     const password = process.env.ADMIN_INITIAL_PASSWORD;
     if (!password) {
