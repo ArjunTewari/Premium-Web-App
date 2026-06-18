@@ -39,7 +39,7 @@ externalPort = 3000
 
 [userenv.shared]
 SEED_ADMIN = "true"
-YOUTUBE_AUTHORIZED_URI = "https://premium-web-app-arjuntewari0505.replit.app/auth/youtube/callback"
+YOUTUBE_AUTHORIZED_URI = "https://premium-web-app-arjuntewari0505.replit.app/api/auth/youtube/callback"
 
 [nix]
 channel = "stable-25_05"

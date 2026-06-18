@@ -134,7 +134,7 @@ router.get("/auth/youtube", requireAdmin, (req: Request, res: Response) => {
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
 });
 
-router.get("/auth/youtube/callback", requireAdmin, async (req: Request, res: Response) => {
+router.get("/auth/youtube/callback", async (req: Request, res: Response) => {
   const { code, error } = req.query as { code?: string; error?: string };
   if (error) return res.status(400).send(`OAuth error: ${error}`);
   if (!code) return res.status(400).send("Missing authorization code.");
