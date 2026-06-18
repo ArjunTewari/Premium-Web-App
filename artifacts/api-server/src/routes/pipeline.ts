@@ -26,6 +26,7 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     DATE_TO: body.dateTo || "2026-06-08",
     CLIENT_NAME: body.clientName || "Chetan Bhattacharji",
     SCOPE_KEYWORDS: Array.isArray(body.scopeKeywords) ? body.scopeKeywords : [],
+    AEO_QUERIES: Array.isArray(body.aeoQueries) && body.aeoQueries.length > 0 ? body.aeoQueries.filter(Boolean) : [],
     SERPER_KEY: body.serperKey || process.env.SERPER_KEY || "",
     CLAUDE_KEY: body.claudeKey || process.env.CLAUDE_KEY || "",
     OPENAI_KEY: body.openaiKey || process.env.OPENAI_KEY || "",

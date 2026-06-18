@@ -125,10 +125,11 @@ async function serperSearch(query, key, type = 'news') {
 //  STEP 1: AEO PROBING
 // ══════════════════════════════════════════════════════════════════════════
 async function runAEO(cfg, orgs, cb) {
+  const queriesUsed = (cfg.AEO_QUERIES && cfg.AEO_QUERIES.length > 0) ? cfg.AEO_QUERIES : AEO_QUESTIONS;
   const results = {};
   for (const org of orgs) {
     results[org] = { score: 0, mentions: 0, llmBreakdown: {}, topResponse: '', questionResults: {} };
-    AEO_QUESTIONS.forEach((_, i) => {
+    queriesUsed.forEach((_, i) => {
       results[org].questionResults[`Q${i + 1}`] = [];
     });
   }
@@ -143,9 +144,9 @@ async function runAEO(cfg, orgs, cb) {
   await Promise.allSettled([
     // OpenAI GPT-4o mini
     cfg.OPENAI_KEY && (async () => {
-      cb('  Probing OpenAI GPT-4o mini...');
+      cb(`  Probing OpenAI GPT-4o mini — ${queriesUsed.length} questions...`);
       const responses = await Promise.allSettled(
-        AEO_QUESTIONS.map(q =>
+        queriesUsed.map(q =>
           axios.post('https://api.openai.com/v1/chat/completions',
             { model: 'gpt-4o-mini', max_tokens: 400, messages: [{ role: 'user', content: q }] },
             { headers: { 'Authorization': `Bearer ${cfg.OPENAI_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000 }
@@ -166,18 +167,18 @@ async function runAEO(cfg, orgs, cb) {
           results[org].questionResults[`Q${qi + 1}`].push({ llm: 'GPT-4o', cited: mentioned });
         });
         results[org].llmBreakdown['GPT-4o mini'] = {
-          mentions: count, total: AEO_QUESTIONS.length,
-          score: Math.round(count / AEO_QUESTIONS.length * 100)
+          mentions: count, total: queriesUsed.length,
+          score: Math.min(count * 10, 100)
         };
-        cb(`  GPT-4o → ${org}: ${count}/${AEO_QUESTIONS.length}`, count > 0 ? 'ok' : 'warn');
+        cb(`  GPT-4o → ${org}: ${count}/${queriesUsed.length}`, count > 0 ? 'ok' : 'warn');
       }
     })(),
 
-    // Perplexity Sonar (all 15 questions)
+    // Perplexity Sonar (all questions)
     cfg.PERPLEXITY_KEY && (async () => {
-      cb('  Probing Perplexity Sonar...');
+      cb(`  Probing Perplexity Sonar — ${queriesUsed.length} questions...`);
       const responses = await Promise.allSettled(
-        AEO_QUESTIONS.map(q =>
+        queriesUsed.map(q =>
           axios.post('https://api.perplexity.ai/chat/completions',
             { model: 'sonar', max_tokens: 400, messages: [{ role: 'user', content: q }] },
             { headers: { 'Authorization': `Bearer ${cfg.PERPLEXITY_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000 }
@@ -198,18 +199,18 @@ async function runAEO(cfg, orgs, cb) {
           results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Perplexity', cited: mentioned });
         });
         results[org].llmBreakdown['Perplexity'] = {
-          mentions: count, total: AEO_QUESTIONS.length,
-          score: Math.round(count / AEO_QUESTIONS.length * 100)
+          mentions: count, total: queriesUsed.length,
+          score: Math.min(count * 10, 100)
         };
-        cb(`  Perplexity → ${org}: ${count}/${AEO_QUESTIONS.length}`, count > 0 ? 'ok' : 'warn');
+        cb(`  Perplexity → ${org}: ${count}/${queriesUsed.length}`, count > 0 ? 'ok' : 'warn');
       }
     })(),
 
-    // Gemini 1.5 Flash (all 15 questions)
+    // Gemini 1.5 Flash (all questions)
     cfg.GEMINI_KEY && (async () => {
-      cb('  Probing Gemini 1.5 Flash...');
+      cb(`  Probing Gemini 1.5 Flash — ${queriesUsed.length} questions...`);
       const responses = await Promise.allSettled(
-        AEO_QUESTIONS.map(q =>
+        queriesUsed.map(q =>
           axios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cfg.GEMINI_KEY}`,
             { contents: [{ parts: [{ text: q }] }], generationConfig: { maxOutputTokens: 400 } },
@@ -233,25 +234,23 @@ async function runAEO(cfg, orgs, cb) {
           results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Gemini', cited: mentioned });
         });
         results[org].llmBreakdown['Gemini 1.5 Flash'] = {
-          mentions: count, total: AEO_QUESTIONS.length,
-          score: Math.round(count / AEO_QUESTIONS.length * 100)
+          mentions: count, total: queriesUsed.length,
+          score: Math.min(count * 10, 100)
         };
-        cb(`  Gemini → ${org}: ${count}/${AEO_QUESTIONS.length}`, count > 0 ? 'ok' : 'warn');
+        cb(`  Gemini → ${org}: ${count}/${queriesUsed.length}`, count > 0 ? 'ok' : 'warn');
       }
     })()
   ].filter(Boolean));
 
-  // Compute composite AEO score
+  // Compute composite AEO score: 10 points per mention across all LLMs, capped at 100
   for (const org of orgs) {
-    const scores = Object.values(results[org].llmBreakdown).map(v => v.score);
-    results[org].score = scores.length > 0
-      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-      : 0;
     results[org].mentions = Object.values(results[org].llmBreakdown)
       .reduce((a, b) => a + b.mentions, 0);
-    cb(`  AEO score: ${org} = ${results[org].score}/100`, 'ok');
+    results[org].score = Math.min(results[org].mentions * 10, 100);
+    cb(`  AEO score: ${org} = ${results[org].score}/100 (${results[org].mentions} mentions × 10pts)`, 'ok');
   }
 
+  results._queriesUsed = queriesUsed;
   return results;
 }
 
@@ -299,13 +298,13 @@ async function getYtAccessToken(cfg) {
 async function runYouTube(cfg, orgs, cb) {
   if (!cfg.YOUTUBE_CLIENT_ID) {
     cb('  No YOUTUBE_CLIENT_ID — skipping YouTube', 'warn');
-    return { videos: [], orgMentions: {}, trendingTopics: [], insightHtml: '' };
+    return { videos: [], orgMentions: {}, trendingTopics: [], insightByOrg: {}, _connected: false };
   }
 
   const accessToken = await getYtAccessToken(cfg);
   if (!accessToken) {
     cb('  YouTube not authorised — visit /auth/youtube to complete one-time OAuth setup', 'warn');
-    return { videos: [], orgMentions: {}, trendingTopics: [], insightHtml: '' };
+    return { videos: [], orgMentions: {}, trendingTopics: [], insightByOrg: {}, _connected: false };
   }
 
   const authHeader = { Authorization: `Bearer ${accessToken}` };
@@ -420,7 +419,7 @@ ${titlesText}`;
     cb(`  YouTube trend analysis error: ${e.message}`, 'warn');
   }
 
-  return { videos: items, orgMentions, trendingTopics, insightByOrg };
+  return { videos: items, orgMentions, trendingTopics, insightByOrg, _connected: true };
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -594,52 +593,58 @@ function locationBarsHtml(locs, color) {
 }
 
 /** Build a 2-row table (one row per org) for a platform */
-function platformTableHtml(orgs, orgMentions, trendingTopics, insightByOrg, orgColors, footnote) {
-  const thStyle = 'background:#1e2638;padding:10px 14px;text-align:left;font-family:\'JetBrains Mono\',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap';
-  const tdStyle = 'padding:14px;border-bottom:1px solid #252d40;vertical-align:top';
+function platformNarrativeHtml(orgs, orgMentions, trendingTopics, insightByOrg, footnote) {
+  const totalMentions = orgs.reduce((sum, org) => sum + (orgMentions[org]?.total || 0), 0);
 
-  const thead = `<thead><tr>
-    <th style="${thStyle};width:90px">Organisation</th>
-    <th style="${thStyle};width:80px;text-align:center">Mention<br>Count</th>
-    <th style="${thStyle};width:210px">Location of Mentions<br><span style="font-weight:400;opacity:.6">Title/Hook · Description · Comments</span></th>
-    <th style="${thStyle};width:80px;text-align:center">Total<br>Points</th>
-    <th style="${thStyle}">Trending Topics &amp; Context</th>
-  </tr></thead>`;
+  const topicChips = trendingTopics.length > 0
+    ? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px">
+        ${trendingTopics.map(t => `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fa3b8;background:#1e2638;border:1px solid #2e3a52;border-radius:3px;padding:3px 10px">${escHtml(t)}</span>`).join('')}
+      </div>`
+    : '';
 
-  const insightCell = `<td style="${tdStyle}" rowspan="${orgs.length}">
-    <div style="background:#1e2638;border-radius:6px;padding:12px 14px">
-      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
-        ${trendingTopics.map(t => `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">${escHtml(t)}</span>`).join('')}
-      </div>
-      ${orgs.map(org => {
-        const col = orgColor(org, orgs);
-        return `<div style="margin-bottom:8px;font-size:11px;color:#8fa3b8;line-height:1.6"><strong style="color:${col}">${escHtml(org)}:</strong> ${escHtml(insightByOrg[org] || 'Analysis pending — run pipeline to generate.')} </div>`;
-      }).join('')}
-    </div>
-  </td>`;
+  let orgBlocks;
+  if (totalMentions === 0) {
+    const topicList = trendingTopics.slice(0, 5).join(' · ');
+    const orgInsights = orgs.map(org => {
+      const insight = insightByOrg[org];
+      const col = orgColor(org, orgs);
+      return insight
+        ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #252d40"><strong style="color:${col}">${escHtml(org)}:</strong> ${escHtml(insight)}</div>`
+        : '';
+    }).filter(Boolean).join('');
+    orgBlocks = `<div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:16px;font-size:13px;color:#8fa3b8;line-height:1.7">
+      <div style="color:#5e7494;font-size:12px;margin-bottom:4px">No tracked organisations appeared in the content analysed on this platform.</div>
+      ${topicList ? `<div style="font-size:12px;color:#8fa3b8;margin-bottom:2px">Conversation centred on: <span style="color:#d8e4f0">${escHtml(topicList)}</span></div>` : ''}
+      ${orgInsights}
+    </div>`;
+  } else {
+    orgBlocks = orgs.map(org => {
+      const locs = orgMentions[org] || { title: 0, description: 0, comments: 0, total: 0 };
+      const col = orgColor(org, orgs);
+      const insight = insightByOrg[org] || '';
+      if (locs.total === 0) {
+        return `<div style="background:#111520;border:1px solid #252d40;border-left:2px solid #252d40;border-radius:0 6px 6px 0;padding:10px 14px;margin-bottom:8px;font-size:12px;color:#5e7494;line-height:1.6">
+          <strong style="color:#5e7494">${escHtml(org)}</strong> — not mentioned in the content analysed on this platform.${insight ? ` ${escHtml(insight)}` : ''}
+        </div>`;
+      }
+      const locBadges = [
+        locs.title > 0 ? `<span style="font-size:9px;color:#8fa3b8;background:#252d40;border-radius:2px;padding:1px 6px;font-family:monospace">${locs.title} title</span>` : '',
+        locs.description > 0 ? `<span style="font-size:9px;color:#8fa3b8;background:#252d40;border-radius:2px;padding:1px 6px;font-family:monospace">${locs.description} desc</span>` : '',
+        locs.comments > 0 ? `<span style="font-size:9px;color:#8fa3b8;background:#252d40;border-radius:2px;padding:1px 6px;font-family:monospace">${locs.comments} comments</span>` : ''
+      ].filter(Boolean).join(' ');
+      return `<div style="background:#181e2e;border:1px solid #252d40;border-left:3px solid ${col};border-radius:0 8px 8px 0;padding:14px 16px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:2px 9px;border-radius:3px;background:${col}1a;color:${col};border:1px solid ${col}55">${escHtml(org)}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:${col}">${locs.total} mention${locs.total !== 1 ? 's' : ''}</span>
+          ${locBadges}
+        </div>
+        ${insight ? `<div style="font-size:13px;color:#8fa3b8;line-height:1.7">${escHtml(insight)}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
 
-  const bodyRows = orgs.map((org, i) => {
-    const col = orgColor(org, orgs);
-    const locs = orgMentions[org] || { title: 0, description: 0, comments: 0, total: 0 };
-    return `<tr>
-      <td style="${tdStyle}">
-        <span style="display:inline-flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:3px 10px;border-radius:3px;background:${col}1a;color:${col};border:1px solid ${col}55">${escHtml(org)}</span>
-      </td>
-      <td style="${tdStyle};text-align:center">
-        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:${col}">${locs.total}</span>
-      </td>
-      <td style="${tdStyle}">${locationBarsHtml(locs, col)}</td>
-      <td style="${tdStyle};text-align:center">
-        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:${col}">${locs.total}</span>
-      </td>
-      ${i === 0 ? insightCell : ''}
-    </tr>`;
-  }).join('');
-
-  return `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
-    ${thead}<tbody>${bodyRows}</tbody>
-  </table>
-  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494;margin-top:8px">${escHtml(footnote)}</div>`;
+  return `${topicChips}${orgBlocks}
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494;margin-top:12px">${escHtml(footnote)}</div>`;
 }
 
 /** AEO section HTML */
@@ -705,7 +710,13 @@ function buildAEOHtml(aeoResults, orgs) {
     </div>`;
   }).join('');
 
-  const qRows = AEO_QUESTIONS.map((q, qi) => {
+  const queriesUsed = aeoResults._queriesUsed || AEO_QUESTIONS;
+  const displayQueries = queriesUsed.slice(0, 5);
+  const totalResponses = Object.values(Object.values(aeoResults).find(v => v && v.llmBreakdown) || {}).length > 0
+    ? Object.values((Object.values(aeoResults).find(v => v && v.llmBreakdown) || {}).llmBreakdown || {}).reduce((s, v) => s + (v.total || 0), 0)
+    : queriesUsed.length * 3;
+
+  const qRows = displayQueries.map((q, qi) => {
     const badges = orgs.map(org => {
       const qKey = `Q${qi + 1}`;
       const qResults = aeoResults[org]?.questionResults?.[qKey] || [];
@@ -729,53 +740,67 @@ function buildAEOHtml(aeoResults, orgs) {
   <div style="margin-bottom:24px">
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#5e7494;margin-bottom:6px">AEO — LLM Visibility</div>
     <h2 style="font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;color:#d8e4f0;line-height:1.2">AI Engine Optimisation</h2>
-    <div style="margin-top:8px;font-size:13px;color:#8fa3b8;max-width:680px;line-height:1.65">When someone asks an AI model about Indian air quality, which organisations does it cite? Five standard discovery questions were sent to three LLMs. Mention rate = AEO score. Contributes 30% of the Competitive Scorecard.</div>
+    <div style="margin-top:8px;font-size:13px;color:#8fa3b8;max-width:680px;line-height:1.65">When someone asks an AI model about Indian air quality, which organisations does it cite? ${queriesUsed.length} discovery questions were sent to three LLMs. Each mention = 10 points. Score out of 100. Contributes 30% of the Competitive Scorecard.</div>
     <div style="width:40px;height:2px;background:#c9922a;margin:14px 0 0"></div>
   </div>
   <div style="background:rgba(201,146,42,.06);border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:14px 18px;font-size:12px;color:#8fa3b8;margin-bottom:20px;line-height:1.7">
-    <strong style="color:#c9922a">How AEO is measured:</strong> Each LLM received 5 standard AQ discovery questions. Each response naming the org = 1 mention. Score = (total mentions ÷ total possible responses) × 100.
+    <strong style="color:#c9922a">How AEO is scored:</strong> ${queriesUsed.length} discovery questions sent to GPT-4o mini, Perplexity Sonar, and Gemini 1.5 Flash. Each response that names the organisation = <strong style="color:#c9922a">10 points</strong>. Maximum score = 100 (requires 10 or more mentions across all responses). Total possible responses per org = ${queriesUsed.length * 3}.
   </div>
   <div style="display:grid;grid-template-columns:repeat(${Math.min(orgs.length, 2)},1fr);gap:16px;margin-bottom:16px">${orgPanels}</div>
   <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:16px 18px;margin-bottom:12px">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c9922a;margin-bottom:10px">5 Standard AEO Discovery Questions</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c9922a;margin-bottom:2px">Sample AEO Queries (first 5 of ${queriesUsed.length})</div>
+    <div style="font-size:10px;color:#5e7494;margin-bottom:10px">These questions were sent to each LLM verbatim — no org names included.</div>
     ${qRows}
   </div>
-  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">GPT-4o mini · Perplexity Sonar · Gemini 1.5 Flash · ${AEO_QUESTIONS.length} questions × 3 LLMs = ${AEO_QUESTIONS.length * 3} responses per org</div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">GPT-4o mini · Perplexity Sonar · Gemini 1.5 Flash · ${queriesUsed.length} questions × 3 LLMs = ${queriesUsed.length * 3} responses per org · 10 pts per mention · max 100</div>
 </section>`;
 }
 
 /** Social Intelligence section HTML */
 function buildSocialHtml(social, socialScores, orgs) {
-  const platforms = [
+  const ytConnected = social.youtube?._connected !== false && (social.youtube?.videos?.length > 0 || social.youtube?.trendingTopics?.length > 0);
+
+  const allPlatforms = [
     {
       id: 'yt', label: 'YouTube', data: social.youtube,
       icon: '▶', iconBg: '#ff4444',
       subtitle: 'YouTube Data API v3 · viewCount sort · regionCode=IN · AQ term required in title',
       srcBadge: 'YouTube Data API v3',
-      footnote: `${social.youtube?.videos?.length || 0} videos analysed · 5 broad AQ search queries`
+      footnote: `${social.youtube?.videos?.length || 0} videos analysed · 5 broad AQ search queries`,
+      skip: !ytConnected
     },
     {
       id: 'tw', label: 'X / Twitter', data: social.twitter,
       icon: '𝕏', iconBg: '#111',
-      subtitle: 'Serper Search · site:x.com site:twitter.com · AQ + India queries · Google-indexed high-engagement public posts',
+      subtitle: 'Serper Search · site:x.com · AQ + India queries · Google-indexed high-engagement posts',
       srcBadge: 'Serper Search API',
-      footnote: `${social.twitter?.posts?.length || 0} posts analysed · Serper site:twitter.com search`
+      footnote: `${social.twitter?.posts?.length || 0} posts analysed · Serper site:twitter.com search`,
+      skip: false
     },
     {
       id: 'ig', label: 'Instagram', data: social.instagram,
       icon: '◉', iconBg: 'linear-gradient(135deg,#f09433,#dc2743,#bc1888)',
       subtitle: 'Serper Search · site:instagram.com · AQ queries · Google-indexed public posts',
       srcBadge: 'Serper Search API',
-      footnote: `${social.instagram?.posts?.length || 0} posts analysed · public posts only`
+      footnote: `${social.instagram?.posts?.length || 0} posts analysed · public posts only`,
+      skip: false
     },
     {
       id: 'li', label: 'LinkedIn', data: social.linkedin,
       icon: 'in', iconBg: '#0a66c2',
       subtitle: 'Serper Search · site:linkedin.com/posts · AQ queries · researcher & professional accounts',
       srcBadge: 'Serper Search API',
-      footnote: `${social.linkedin?.posts?.length || 0} posts analysed · Serper site:linkedin.com/posts search`
+      footnote: `${social.linkedin?.posts?.length || 0} posts analysed · Serper site:linkedin.com/posts search`,
+      skip: false
     }
   ];
+
+  const platforms = allPlatforms.filter(p => !p.skip);
+
+  const ytNotice = !ytConnected
+    ? `<div style="background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.2);border-radius:6px;padding:10px 14px;font-size:12px;color:#8fa3b8;margin-bottom:16px">
+        <strong style="color:#d4a017">YouTube not connected.</strong> Visit <code style="background:#1e2638;padding:1px 5px;border-radius:3px">/auth/youtube</code> to complete one-time OAuth setup. YouTube data is excluded from this report.
+      </div>` : '';
 
   const tabButtons = platforms.map((p, i) =>
     `<div class="si-tab${i === 0 ? ' si-tab-active' : ''}" onclick="siTab('${p.id}',this)" style="display:flex;align-items:center;gap:7px;padding:10px 18px;font-size:12px;font-weight:600;color:${i === 0 ? '#d8e4f0' : '#8fa3b8'};cursor:pointer;border-bottom:${i === 0 ? '2px solid #c9922a' : '2px solid transparent'};margin-bottom:-1px;transition:all .15s;user-select:none">
@@ -799,11 +824,11 @@ function buildSocialHtml(social, socialScores, orgs) {
         </div>
         <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;background:rgba(201,146,42,.12);border:1px solid rgba(201,146,42,.25);border-radius:3px;padding:2px 8px;flex-shrink:0">${escHtml(p.srcBadge)}</span>
       </div>
-      ${platformTableHtml(orgs, orgMentions, topics, insights, ORG_COLORS, p.footnote)}
+      ${platformNarrativeHtml(orgs, orgMentions, topics, insights, p.footnote)}
     </div>`;
   }).join('');
 
-  // Tally rows
+  // Tally rows (only connected platforms)
   const tallyRows = platforms.map(p => {
     const icon = p.icon;
     const bg   = p.iconBg;
@@ -857,6 +882,7 @@ function buildSocialHtml(social, socialScores, orgs) {
     <strong style="color:#c9922a">Scoring:</strong> 1 point per mention regardless of location. Location (Title/Hook · Description · Comments) is tracked separately — an org cited in a title drives far more discovery than one buried in comments.
   </div>
 
+  ${ytNotice}
   <div style="display:flex;border-bottom:1px solid #252d40;margin-bottom:0">${tabButtons}</div>
   ${tabPanes}
 

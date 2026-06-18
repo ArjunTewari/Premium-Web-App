@@ -14,6 +14,24 @@ const DEFAULT_SCOPE = [
   "Carbon Monoxide", "Nitrogen Dioxide", "Methane",
 ];
 
+const DEFAULT_AEO_QUERIES = [
+  "Which organisations are leading research on air quality and pollution in India?",
+  "Who are the top experts or organisations working on PM2.5 reduction in South Asia?",
+  "What NGOs or think tanks are most active in India's clean air campaign?",
+  "Which Indian institutions publish the most reliable air quality data?",
+  "Who is doing the most important work on air pollution policy in India?",
+  "What organisations are partnering with the Indian government on NCAP implementation?",
+  "Which research groups are tracking air quality index trends in Indian cities?",
+  "Who produces peer-reviewed research on indoor and outdoor air pollution in India?",
+  "What civil society groups are advocating for stricter emission standards in India?",
+  "Which organisations are monitoring industrial air pollution in India?",
+  "Who are the key voices on air quality health impacts in the Indian context?",
+  "What institutions are involved in real-time AQI monitoring networks across India?",
+  "Which think tanks influence air quality regulation and policy in India?",
+  "Who is leading awareness campaigns about smog and vehicular pollution in India?",
+  "What organisations collaborate internationally on South Asian air quality issues?",
+];
+
 interface ReportFile {
   name: string;
   size: number;
@@ -42,6 +60,12 @@ export default function Home() {
   const [scopeOpen, setScopeOpen] = useState(false);
   const [scopeKeywords, setScopeKeywords] = useState<string[]>([...DEFAULT_SCOPE]);
   const [scopeInput, setScopeInput] = useState("");
+
+  const [aeoOpen, setAeoOpen] = useState(false);
+  const [aeoQueries, setAeoQueries] = useState<string[]>([...DEFAULT_AEO_QUERIES]);
+  const [aeoInput, setAeoInput] = useState("");
+  const [aeoEditIdx, setAeoEditIdx] = useState<number | null>(null);
+  const [aeoEditVal, setAeoEditVal] = useState("");
 
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -105,6 +129,33 @@ export default function Home() {
     setScopeKeywords((prev) => prev.filter((k) => k !== kw));
   }
 
+  function addAeoQuery() {
+    const val = aeoInput.trim();
+    if (val && !aeoQueries.includes(val)) {
+      setAeoQueries((prev) => [...prev, val]);
+    }
+    setAeoInput("");
+  }
+
+  function removeAeoQuery(idx: number) {
+    setAeoQueries((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function startEditAeo(idx: number) {
+    setAeoEditIdx(idx);
+    setAeoEditVal(aeoQueries[idx]);
+  }
+
+  function saveEditAeo() {
+    if (aeoEditIdx === null) return;
+    const val = aeoEditVal.trim();
+    if (val) {
+      setAeoQueries((prev) => prev.map((q, i) => (i === aeoEditIdx ? val : q)));
+    }
+    setAeoEditIdx(null);
+    setAeoEditVal("");
+  }
+
   async function startRun() {
     if (!selectedOrgs.length) {
       alert("Select at least one organisation.");
@@ -122,6 +173,7 @@ export default function Home() {
       dateTo,
       clientName,
       scopeKeywords,
+      aeoQueries,
     };
 
     const TOTAL_STEPS = 60;
@@ -361,6 +413,66 @@ export default function Home() {
                 />
                 <button onClick={addScope} style={{ background: "#252d40", color: "#8fa3b8", border: "none", borderRadius: 5, padding: "6px 12px", fontSize: 11, cursor: "pointer" }}>+ Add</button>
                 <button onClick={() => setScopeKeywords([...DEFAULT_SCOPE])} style={{ background: "#252d40", color: "#5e7494", border: "none", borderRadius: 5, padding: "6px 12px", fontSize: 11, cursor: "pointer" }}>Reset</button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* AEO Queries */}
+        <div style={{ background: "#111520", border: "1px solid #252d40", borderRadius: 8, padding: 20, marginBottom: 16 }}>
+          <div
+            onClick={() => setAeoOpen(!aeoOpen)}
+            style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", color: "#c9922a", marginBottom: aeoOpen ? 14 : 0, display: "flex", alignItems: "center", gap: 7, cursor: "pointer" }}
+          >
+            AEO Discovery Queries{" "}
+            <span style={{ background: "#181e2e", color: "#8fa3b8", border: "1px solid #252d40", borderRadius: 3, padding: "1px 7px", fontSize: 9, fontWeight: 600 }}>{aeoQueries.length} queries</span>
+            <span style={{ marginLeft: "auto", fontSize: 10 }}>{aeoOpen ? "▲ hide" : "▼ show"}</span>
+          </div>
+          {aeoOpen && (
+            <div>
+              <div style={{ fontSize: 10, color: "#5e7494", marginBottom: 12, lineHeight: 1.7 }}>
+                These questions are sent verbatim to GPT-4o mini, Perplexity Sonar, and Gemini 1.5 Flash.
+                Each response that names a tracked org = <strong style={{ color: "#c9922a" }}>10 points</strong> (max 100).
+                Click any query to edit it inline.
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 12, maxHeight: 360, overflowY: "auto" }}>
+                {aeoQueries.map((q, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, background: "#181e2e", border: "1px solid #252d40", borderRadius: 5, padding: "6px 10px" }}>
+                    <span style={{ fontFamily: "monospace", fontSize: 10, color: "#c9922a", paddingTop: 3, minWidth: 22, flexShrink: 0 }}>Q{i + 1}</span>
+                    {aeoEditIdx === i ? (
+                      <div style={{ flex: 1, display: "flex", gap: 5, alignItems: "flex-start" }}>
+                        <textarea
+                          autoFocus
+                          value={aeoEditVal}
+                          onChange={(e) => setAeoEditVal(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEditAeo(); } if (e.key === "Escape") { setAeoEditIdx(null); } }}
+                          style={{ flex: 1, background: "#111520", border: "1px solid #c9922a", borderRadius: 4, padding: "4px 7px", color: "#d8e4f0", fontSize: 11, fontFamily: "monospace", outline: "none", resize: "vertical", minHeight: 40 }}
+                        />
+                        <button onClick={saveEditAeo} style={{ background: "#c9922a", color: "#0a0e17", border: "none", borderRadius: 4, padding: "4px 9px", fontSize: 10, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>✓</button>
+                        <button onClick={() => setAeoEditIdx(null)} style={{ background: "#252d40", color: "#8fa3b8", border: "none", borderRadius: 4, padding: "4px 9px", fontSize: 10, cursor: "pointer", flexShrink: 0 }}>✕</button>
+                      </div>
+                    ) : (
+                      <>
+                        <span
+                          onClick={() => startEditAeo(i)}
+                          style={{ flex: 1, fontSize: 11, color: "#8fa3b8", lineHeight: 1.55, cursor: "text", paddingTop: 2 }}
+                        >{q}</span>
+                        <button onClick={() => removeAeoQuery(i)} style={{ background: "transparent", border: "none", color: "#5e7494", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "0 2px", flexShrink: 0, opacity: 0.7 }}>×</button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input
+                  value={aeoInput}
+                  onChange={(e) => setAeoInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addAeoQuery(); } }}
+                  placeholder="Add custom query..."
+                  style={{ flex: 1, background: "#181e2e", border: "1px solid #252d40", borderRadius: 5, padding: "6px 9px", color: "#d8e4f0", fontSize: 11, fontFamily: "monospace", outline: "none" }}
+                />
+                <button onClick={addAeoQuery} style={{ background: "#252d40", color: "#8fa3b8", border: "none", borderRadius: 5, padding: "6px 12px", fontSize: 11, cursor: "pointer" }}>+ Add</button>
+                <button onClick={() => setAeoQueries([...DEFAULT_AEO_QUERIES])} style={{ background: "#252d40", color: "#5e7494", border: "none", borderRadius: 5, padding: "6px 12px", fontSize: 11, cursor: "pointer" }}>Reset</button>
               </div>
             </div>
           )}

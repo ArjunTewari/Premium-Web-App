@@ -1,0 +1,107 @@
+/**
+ * Run this on Replit: node debug_serper_sources.js
+ * It fires ONE Serper news query and dumps every unique `source` string raw.
+ * Paste the output back to Claude to fix canonOutlet precisely.
+ */
+
+const https = require('https');
+
+const SERPER_KEY = 'ea3ed82368f51f05e119a03baa36ce4d22503ae4';
+
+function serperNews(query) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({ q: query, gl: 'in', hl: 'en', num: 100 });
+    const req = https.request({
+      hostname: 'google.serper.dev',
+      path: '/news',
+      method: 'POST',
+      headers: {
+        'X-API-KEY': SERPER_KEY,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => resolve(JSON.parse(data)));
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+async function main() {
+  // Cast a wide net to get all Indian outlets
+  const queries = [
+    'air quality India',
+    'air pollution India NDTV',
+    'air pollution Aaj Tak ABP',
+    'CEEW air quality',
+    'CSTEP air pollution India',
+  ];
+
+  const sourceCounts = {};
+
+  for (const q of queries) {
+    console.log(`Querying: ${q}`);
+    try {
+      const data = await serperNews(q);
+      const news = data.news || [];
+      for (const item of news) {
+        // Serper news items have: title, link, snippet, date, source, imageUrl
+        const src = item.source;
+        if (src) {
+          sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+        } else {
+          // Sometimes source is nested or missing — log the full item shape once
+          console.log('ITEM SHAPE (no source field):', JSON.stringify(item, null, 2));
+        }
+      }
+    } catch(e) {
+      console.error('Error:', e.message);
+    }
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  console.log('\n\n══ RAW SOURCE STRINGS FROM SERPER ══');
+  console.log('(these are the exact strings hitting canonOutlet)\n');
+  Object.entries(sourceCounts)
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([src, count]) => {
+      console.log(`"${src}"  (${count}x)`);
+    });
+
+  console.log('\n══ CANONOUTLET TEST ══\n');
+  function canonOutlet(src) {
+    if(!src) return null; const s=src.toLowerCase();
+    if(s.includes('times of india')||s.includes('timesofindia')||s.includes('indiatimes'))return 'Times of India';
+    if(s.includes('hindustan times')||s.includes('hindustantimes'))return 'Hindustan Times';
+    if(s.includes('the hindu')||s.includes('thehindu'))return 'The Hindu';
+    if(s.includes('india today')||s.includes('indiatoday'))return 'India Today';
+    if(s.includes('ndtv'))return 'NDTV';
+    if(s.includes('news18'))return 'News18';
+    if(s.includes('the print')||s.includes('theprint'))return 'The Print';
+    if(s.includes('scroll'))return 'Scroll';
+    if(s.includes('indian express')||s.includes('indianexpress'))return 'Indian Express';
+    if(s.includes('business standard')||s.includes('bsind'))return 'Business Standard';
+    if(s.includes('deccan herald')||s.includes('deccanherald'))return 'Deccan Herald';
+    if(s.includes('aaj tak')||s.includes('aajtak'))return 'Aaj Tak';
+    if(s.includes('india tv')||s.includes('indiatv'))return 'India TV';
+    if(s.includes('abp news')||s.includes('abplive'))return 'ABP News';
+    return null;
+  }
+
+  let nullCount = 0;
+  Object.keys(sourceCounts).forEach(src => {
+    const result = canonOutlet(src);
+    if (!result) {
+      nullCount++;
+      console.log(`❌ NULL  ← "${src}"`);
+    }
+  });
+  if (nullCount === 0) console.log('✅ All sources matched!');
+  else console.log(`\n${nullCount} sources returning null — add these to canonOutlet`);
+}
+
+main().catch(console.error);

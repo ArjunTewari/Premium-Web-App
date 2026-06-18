@@ -1,0 +1,879 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AQ Intelligence &mdash; CEEW vs CSTEP</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>:root{--ink:#0a0e17;--surface:#111520;--surface2:#181e2e;--surface3:#1e2638;--border:#252d40;--border2:#2e3a52;--text:#d8e4f0;--muted:#5e7494;--muted2:#8fa3b8;--amber:#c9922a;--amber-dim:rgba(201,146,42,.12);--amber-glow:rgba(201,146,42,.06);--good:#4caf74;--warn:#d4a017;--bad:#e05c5c}
+*{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line-height:1.65;font-size:14px}
+.shell{display:flex;min-height:100vh}
+.sidenav{width:220px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:28px 0;display:flex;flex-direction:column}
+.sidenav-logo{padding:0 20px 24px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.sidenav-logo-name{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+.sidenav-logo-sub{font-size:10px;color:var(--muted);margin-top:2px;font-family:monospace}
+.nav-lbl{font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:12px 20px 6px}
+.nav-a{display:block;padding:7px 20px;font-size:12px;color:var(--muted2);text-decoration:none;border-left:2px solid transparent}
+.nav-a:hover{color:var(--text);background:var(--surface2)}.nav-a.active{color:var(--amber);border-left-color:var(--amber);background:var(--amber-glow)}
+.sidenav-footer{margin-top:auto;padding:16px 20px 0;border-top:1px solid var(--border);font-family:monospace;font-size:10px;color:var(--muted);line-height:1.8}
+.main{flex:1;min-width:0;padding:0 48px 80px;max-width:960px}
+.rh{padding:52px 0 44px;border-bottom:1px solid var(--border);margin-bottom:48px}
+.ey{font-family:monospace;font-size:11px;color:var(--amber);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
+.rt{font-family:'DM Serif Display',serif;font-size:42px;line-height:1.15;margin-bottom:10px;font-weight:400}
+.rti{color:var(--amber);font-style:italic}
+.rm{font-size:13px;color:var(--muted2);margin-bottom:28px;font-family:monospace}
+.chips{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:4px;font-size:12px;font-weight:600}
+.dn{background:var(--amber-glow);border:1px solid rgba(201,146,42,.2);border-radius:6px;padding:11px 16px;font-size:12px;color:var(--muted2);font-family:monospace}
+.dn strong{color:var(--amber)}
+.sec{margin-bottom:56px;scroll-margin-top:24px}
+.sh{margin-bottom:24px}
+.se{font-family:monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.st{font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;color:var(--text);line-height:1.2}
+.sd{margin-top:8px;font-size:13px;color:var(--muted2);max-width:680px}
+.sdiv{width:40px;height:2px;background:var(--amber);margin:14px 0 0}
+.mg{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mc{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px}
+.ml{font-family:monospace;font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin-bottom:6px}
+.mt{font-size:12px;color:var(--muted2);line-height:1.6}
+.sb-scope{background:var(--amber-glow);border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:14px 18px;font-size:12px;color:var(--muted2);margin-bottom:20px;line-height:1.7}
+.sb-scope strong{color:var(--amber)}
+.cp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.op{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:20px}
+.opn{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+.mch{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+.ch-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+.wbars{display:flex;gap:5px;align-items:flex-end;height:96px;margin-bottom:8px}
+.tg{display:grid;grid-template-columns:175px 1fr 1fr;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;font-size:12px}
+.tgh{background:var(--surface3);padding:10px 14px;font-family:monospace;font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+.tc{padding:12px 14px;border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+.tc:nth-child(3n){border-right:none}
+.tn{font-weight:600;color:var(--text);margin-bottom:3px}.cell-hl{font-size:11px;color:var(--muted);line-height:1.4;margin-top:5px}
+.owns{background:rgba(76,175,116,.06)}.con{background:rgba(61,142,240,.04)}
+.ob{display:inline-block;font-family:monospace;font-size:10px;font-weight:600;padding:1px 7px;border-radius:3px;margin-bottom:4px}
+.badge-owns{background:rgba(76,175,116,.15);color:var(--good);border:1px solid rgba(76,175,116,.3)}
+.badge-con{background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.25)}
+.badge-absent{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.nt,.at,.apt{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}
+.nt th,.at th,.apt th{background:var(--surface3);padding:10px 14px;text-align:left;font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+.nt td,.at td,.apt td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+.nt tr:hover td{background:var(--surface2)}
+.pos-auth{display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600}
+.pos-per{display:inline-block;background:var(--surface3);color:var(--muted2);border:1px solid var(--border2);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600}
+.pos-abs{display:inline-block;background:rgba(224,92,92,.1);color:var(--bad);border:1px solid rgba(224,92,92,.25);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600}
+.ctag{display:inline-flex;font-family:monospace;font-size:10px;color:var(--amber);background:var(--amber-dim);border:1px solid rgba(201,146,42,.25);border-radius:3px;padding:1px 6px;cursor:pointer;text-decoration:none;vertical-align:middle;margin-left:4px}
+.evd{display:none;background:var(--ink);border:1px solid var(--border2);border-radius:5px;padding:12px 14px;margin-top:9px}
+.evd.open{display:block}
+.ei{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start}
+.ei:last-child{border:none;padding-bottom:0}
+.en{font-family:monospace;font-size:10px;color:var(--muted);flex-shrink:0;min-width:40px;padding-top:2px}
+.eq{font-family:monospace;font-size:11px;color:var(--text);line-height:1.6;background:var(--surface3);border-left:2px solid var(--amber);padding:5px 9px;border-radius:0 3px 3px 0;margin-bottom:4px}
+.es{font-family:monospace;font-size:10px;color:var(--muted)}.es a{color:var(--amber);text-decoration:none}
+.lc{font-family:monospace;font-size:10px;color:var(--warn);background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.25);border-radius:3px;padding:2px 6px}
+.cqp{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:18px}
+.cqe{padding:8px 10px;border-radius:4px;margin-bottom:6px;font-size:11px;line-height:1.6}
+.cqd{background:rgba(76,175,116,.07);border-left:2px solid var(--good)}
+.cqv{background:var(--surface3);border-left:2px solid var(--muted)}
+.cqet{font-family:monospace;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px}
+.cqd .cqet{color:var(--good)}.cqv .cqet{color:var(--muted)}.cqetx{color:var(--text);font-family:monospace;font-size:11px}
+.em-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:12px}
+.em-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:12px}
+.em-topic{font-size:14px;font-weight:600;color:var(--text)}
+.em-mom{font-family:monospace;font-size:11px;color:var(--good);background:rgba(76,175,116,.1);border:1px solid rgba(76,175,116,.25);border-radius:3px;padding:2px 8px;flex-shrink:0}
+.em-body{font-size:13px;color:var(--muted2);line-height:1.65;margin-bottom:10px}
+.em-inf{background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.2);border-radius:4px;padding:8px 12px;font-size:11px;color:var(--warn);font-family:monospace}
+.em-inf::before{content:"⚠ INFERENCE — ";font-weight:600}
+.em-src{font-size:11px;color:var(--muted);padding:3px 0;font-family:monospace;display:flex;gap:8px}
+.em-src::before{content:"→";color:var(--amber)}
+.scc{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px}
+.sca{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:22px;text-align:center}
+.scn{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.scg{font-family:'DM Serif Display',serif;font-size:58px;line-height:1;margin:8px 0 4px;font-weight:400}
+.scs{font-family:monospace;font-size:13px;color:var(--muted2);margin-bottom:14px}
+.scf{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:12px 16px;font-family:monospace;font-size:11px;color:var(--muted2);margin-top:8px}
+.scf strong{color:var(--amber)}
+.fc{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:20px 22px;display:flex;gap:18px;align-items:flex-start;margin-bottom:14px}
+.fn{font-family:'DM Serif Display',serif;font-size:36px;color:var(--amber);line-height:1;flex-shrink:0;opacity:.45;margin-top:2px}
+.fb{flex:1}.fh{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;line-height:1.4}
+.fd{font-size:13px;color:var(--muted2);line-height:1.65}
+.pri-fix{display:inline-block;background:rgba(212,160,23,.12);color:var(--warn);border:1px solid rgba(212,160,23,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.pri-lev{display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.pri-opt{display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.25);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.pri-inv{display:inline-block;background:rgba(224,92,92,.1);color:var(--bad);border:1px solid rgba(224,92,92,.25);border-radius:3px;padding:2px 7px;font-family:monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.rat{font-size:11px;color:var(--muted);font-family:monospace;line-height:1.55}
+.apt td{font-family:monospace;color:var(--muted2);font-size:11px}.apt td a{color:var(--amber);text-decoration:none}
+.rf{border-top:1px solid var(--border);padding:28px 0 0;font-family:monospace;font-size:10px;color:var(--muted);line-height:2}
+.edit-bar{position:fixed;top:14px;right:18px;z-index:2000;display:flex;gap:8px;align-items:center}
+.edit-btn{background:#1e2638;border:1px solid var(--border2);border-radius:5px;padding:6px 13px;font-family:monospace;font-size:11px;color:var(--muted2);cursor:pointer;transition:all .15s;line-height:1.4}
+.edit-btn:hover,.edit-btn.on{background:rgba(201,146,42,.15);border-color:rgba(201,146,42,.4);color:var(--amber)}
+.edit-dl{color:var(--good)!important;border-color:rgba(76,175,116,.3)!important;background:rgba(76,175,116,.07)!important;display:none}
+body.edit-mode .edit-dl{display:inline-block}
+body.edit-mode [contenteditable="true"]:hover{outline:1.5px dashed rgba(201,146,42,.55);border-radius:2px;cursor:text}
+body.edit-mode [contenteditable="true"]:focus{outline:1.5px solid rgba(201,146,42,.7);border-radius:2px}
+.sec-x{display:none;position:absolute;top:10px;right:14px;width:22px;height:22px;border-radius:4px;background:rgba(224,92,92,.12);border:1px solid rgba(224,92,92,.3);color:var(--bad);font-size:15px;cursor:pointer;align-items:center;justify-content:center;line-height:1;font-weight:700}
+.sec-x:hover{background:rgba(224,92,92,.28)}
+body.edit-mode .sec-x{display:flex}
+.sec.sec-hidden{display:none}
+@media(max-width:900px){.sidenav{display:none}.main{padding:24px 20px 60px}.cp,.scc,.mg{grid-template-columns:1fr}.tg{grid-template-columns:1fr!important}.rt{font-size:28px}}</style></head><body>
+<div class="edit-bar" id="edit-bar"><button class="edit-btn" id="edit-btn" onclick="toggleEdit()">&#9998; Edit Mode</button><button class="edit-btn edit-dl" id="dl-btn" onclick="dlEdit()">&#8595; Download Edited</button></div>
+<div class="shell">
+<nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
+<div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a><a href="#method" class="nav-a">Methodology</a>
+<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#cit" class="nav-a">Citation Quality</a><a href="#em" class="nav-a">White-Space Gaps</a>
+<div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a><a href="#social" class="nav-a">Social Media</a>
+<div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a><a href="#appendix" class="nav-a">Appendix</a>
+<div class="sidenav-footer">Generated: 2026-06-18<br><div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2);padding:3px 20px"><div style="width:8px;height:8px;border-radius:2px;background:#3d8ef0"></div>CEEW: 1 arts</div><div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2);padding:3px 20px"><div style="width:8px;height:8px;border-radius:2px;background:#e05c3a"></div>CSTEP: 7 arts</div>CONFIDENTIAL</div></nav>
+<main class="main">
+<header class="rh" id="header"><div class="ey">Air Quality Media Intelligence &middot; India &middot; 2026-03-08 to 2026-06-08</div>
+<h1 class="rt">Air Quality<br><span class="rti">TRIPLE Media Analytics</span></h1>
+<div class="rm">Period: 2026-03-08 &rarr; 2026-06-08 &middot; 8 AQ articles &middot; Thu, 18 Jun 2026 01:08:35 GMT</div>
+<div class="chips"><span class="chip" style="background:#3d8ef01a;color:#3d8ef0;border:1px solid #3d8ef04d"><span style="width:7px;height:7px;border-radius:50%;display:inline-block;background:#3d8ef0"></span>CEEW</span><span class="chip" style="background:#e05c3a1a;color:#e05c3a;border:1px solid #e05c3a4d"><span style="width:7px;height:7px;border-radius:50%;display:inline-block;background:#e05c3a"></span>CSTEP</span></div>
+<div class="dn"><strong>Publicly available data</strong> Insight linked to evidence &middot; Thu, 18 Jun 2026 01:08:35 GMT</div>
+<div style="margin-top:16px;display:flex;align-items:center;gap:12px;background:rgba(61,142,240,.08);border:1px solid rgba(61,142,240,.25);border-radius:6px;padding:12px 16px;font-size:13px"><div style="flex:1;color:var(--text)"><strong style="font-weight:600">PowerPoint version available.</strong> Open the <code style="background:var(--surface3);padding:1px 5px;border-radius:3px;font-size:11px">.pptx</code> file in the same folder.</div><div style="font-family:monospace;font-size:11px;color:var(--muted2);flex-shrink:0">📁 aq-report-CEEW-vs-CSTEP-2026-06-18.pptx</div></div>
+</header>
+
+<section class="sec" id="exec"><div class="sh"><div class="se">Section 01</div><h2 class="st">Executive Summary</h2><div class="sd">Headline comparative findings across 2 organisations — media, LLM visibility, and social.</div><div class="sdiv"></div></div>
+<div style="background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.2);border-radius:8px;overflow:hidden;margin-bottom:4px">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;cursor:pointer;user-select:none" onclick="toggleExecDraft()">
+<span style="font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)">Draft Executive Summary <span style="font-weight:400;color:var(--muted2)">(AI-generated &mdash; review before sharing)</span></span>
+<span id="exec-draft-icon" style="font-family:monospace;font-size:12px;color:var(--amber)">&#9660; Show draft</span>
+</div>
+<div id="exec-draft" style="display:none;padding:0 18px 18px"><div class="fc"><div class="fn">1</div><div class="fb"><div class="fh">CSTEP Dominates Coverage Volume by 7x Margin</div><div class="fd">CSTEP published 7 articles versus CEEW's 1 article during the March-June 2026 period. This represents substantially higher media output on Indian air quality topics from CSTEP across the same timeframe and outlets. <span style="font-family:monospace;font-size:10px;color:var(--muted)">&rarr; §03 Share of Voice</span></div></div></div><div class="fc"><div class="fn">2</div><div class="fb"><div class="fh">CSTEP Leads Data-Specific Content Production Significantly</div><div class="fd">CSTEP generated 57% data-specific coverage compared to CEEW's 0% across their respective article counts. Only CSTEP demonstrated measurable focus on quantitative air quality data within published materials. <span style="font-family:monospace;font-size:10px;color:var(--muted)">&rarr; §05 Topic Ownership</span></div></div></div><div class="fc"><div class="fn">3</div><div class="fb"><div class="fh">Both Organizations Show Minimal Digital Amplification Capacity</div><div class="fd">CEEW and CSTEP each scored 0/10 on social media metrics across YouTube, Twitter, Instagram, and LinkedIn. Neither organization achieved discernible social media visibility for air quality coverage during this period. <span style="font-family:monospace;font-size:10px;color:var(--muted)">&rarr; §Social Media</span></div></div></div></div>
+</div></section>
+
+<section class="sec" id="method"><div class="sh"><div class="se">Section 02</div><h2 class="st">Methodology</h2><div class="sd">How data was collected, filtered, and analysed. Serper News API for media coverage · Claude Haiku 4.5 for article classification · LLM probing (GPT-4o, Perplexity, Gemini) for AEO visibility · Social media: YouTube OAuth2, X/Twitter, Instagram, LinkedIn via Serper.</div><div class="sdiv"></div></div></section>
+
+<section class="sec" id="sov"><div class="sh"><div class="se">Section 03</div><h2 class="st">Share of Voice</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
+<div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; 8 articles</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:12px;height:12px;border-radius:2px;background:#3d8ef0"></div>CEEW</div><div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:12px;height:12px;border-radius:2px;background:#e05c3a"></div>CSTEP</div></div></div>
+<div style="height:28px;background:#1e2638;border-radius:4px;overflow:hidden;display:flex;margin-bottom:12px"><div style="background:#3d8ef0;width:13%;display:flex;align-items:center;padding-left:9px;font-family:monospace;font-size:11px;font-weight:500;color:#fff;min-width:0;overflow:hidden">1</div><div style="background:#e05c3a;width:88%;display:flex;align-items:center;padding-left:9px;font-family:monospace;font-size:11px;font-weight:500;color:#fff;min-width:0;overflow:hidden">7</div></div>
+<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px"><div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#3d8ef0;margin-right:5px"></span>CEEW: 1</div><div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#e05c3a;margin-right:5px"></span>CSTEP: 7</div></div>
+</div>
+<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-family:monospace;font-size:11px;color:var(--muted2)"><strong style="color:var(--amber)">Reading this table:</strong> Total = all AQ-scoped articles across orgs at that outlet. Top orgs shows the three highest-coverage orgs as badges.</div>
+<table class="nt"><thead><tr><th>Outlet</th><th>Total</th><th>Top orgs by coverage</th><th>Evidence</th></tr></thead><tbody><tr><td style="font-weight:600">Times of India</td><td style="font-family:monospace;font-size:13px;font-weight:700;color:var(--muted2)">3</td><td style="line-height:2.2"><span style="display:inline-flex;align-items:center;gap:4px;font-family:monospace;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;background:#e05c3a1a;color:#e05c3a;border:1px solid #e05c3a4d;white-space:nowrap">CSTEP (2)</span> <span style="display:inline-flex;align-items:center;gap:4px;font-family:monospace;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;background:#3d8ef01a;color:#3d8ef0;border:1px solid #3d8ef04d;white-space:nowrap">CEEW (1)</span></td><td><a class="ctag" onclick="td('otTimesofIndia')">&#8599; articles</a><div class="evd" id="otTimesofIndia"><div class="ei"><div class="en" style="color:#e05c3a;font-weight:600">CSTEP</div><div class="eb"><div class="eq">India News: Bengaluru's pollution isn't dramatic; it's daily: no smog alerts, no panic buying of masks — just traffic, dust and ai</div><div class="es">Times of India &middot; Apr 3, 2026<br><a href="https://timesofindia.indiatimes.com/india/honestly-how-clean-is-bengaluru-air-in-jan-2026/articleshow/129988578.cms" target="_blank">https://timesofindia.indiatimes.com/india/honestly-how-clean-is-b</a></div></div></div><div class="ei"><div class="en" style="color:#3d8ef0;font-weight:600">CEEW</div><div class="eb"><div class="eq">India News: Delhi, the heart of India, is fast turning into a city that cannot breathe. As pollution levels climb — AQI touching 2</div><div class="es">Times of India &middot; 1 month ago<br><a href="https://timesofindia.indiatimes.com/india/dil-of-india-turns-choking-lungs-can-delhi-fix-its-pollution-crisis/articleshow/130533448.cms" target="_blank">https://timesofindia.indiatimes.com/india/dil-of-india-turns-chok</a></div></div></div></div></td></tr><tr><td style="font-weight:600">The Hindu</td><td style="font-family:monospace;font-size:13px;font-weight:700;color:var(--muted2)">1</td><td style="line-height:2.2"><span style="display:inline-flex;align-items:center;gap:4px;font-family:monospace;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;background:#e05c3a1a;color:#e05c3a;border:1px solid #e05c3a4d;white-space:nowrap">CSTEP (1)</span></td><td><a class="ctag" onclick="td('otTheHindu')">&#8599; articles</a><div class="evd" id="otTheHindu"><div class="ei"><div class="en" style="color:#e05c3a;font-weight:600">CSTEP</div><div class="eb"><div class="eq">While low-cost air quality sensors offer an affordable and promising way to expand pollution monitoring in countries of the Global</div><div class="es">The Hindu &middot; 1 month ago<br><a href="https://www.thehindu.com/news/cities/bangalore/regular-checks-key-to-improving-low-cost-air-quality-sensor-efficiency-study/article70898579.ece" target="_blank">https://www.thehindu.com/news/cities/bangalore/regular-checks-key</a></div></div></div></div></td></tr><tr><td style="font-weight:600">Indian Express</td><td style="font-family:monospace;font-size:13px;font-weight:700;color:var(--muted2)">1</td><td style="line-height:2.2"><span style="display:inline-flex;align-items:center;gap:4px;font-family:monospace;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;background:#e05c3a1a;color:#e05c3a;border:1px solid #e05c3a4d;white-space:nowrap">CSTEP (1)</span></td><td><a class="ctag" onclick="td('otIndianExpress')">&#8599; articles</a><div class="evd" id="otIndianExpress"><div class="ei"><div class="en" style="color:#e05c3a;font-weight:600">CSTEP</div><div class="eb"><div class="eq">Particulate matter measurements were more reliable than those for gases such as nitrogen dioxide and ozone, and carbon monoxide re</div><div class="es">Indian Express &middot; 1 month ago<br><a href="https://www.newindianexpress.com/cities/bengaluru/2026/Apr/24/air-quality-sensors-may-not-be-accurate" target="_blank">https://www.newindianexpress.com/cities/bengaluru/2026/Apr/24/air</a></div></div></div></div></td></tr><tr><td style="font-weight:600">Deccan Herald</td><td style="font-family:monospace;font-size:13px;font-weight:700;color:var(--muted2)">1</td><td style="line-height:2.2"><span style="display:inline-flex;align-items:center;gap:4px;font-family:monospace;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;background:#e05c3a1a;color:#e05c3a;border:1px solid #e05c3a4d;white-space:nowrap">CSTEP (1)</span></td><td><a class="ctag" onclick="td('otDeccanHerald')">&#8599; articles</a><div class="evd" id="otDeccanHerald"><div class="ei"><div class="en" style="color:#e05c3a;font-weight:600">CSTEP</div><div class="eb"><div class="eq">Air pollution monitoring: Study finds low-cost air quality sensors in India give unreliable NO2 and ozone data without calibration</div><div class="es">Deccan Herald &middot; 1 month ago<br><a href="https://www.deccanherald.com/india/indias-low-cost-air-quality-sensors-are-not-yet-ready-for-deployment-3978685" target="_blank">https://www.deccanherald.com/india/indias-low-cost-air-quality-se</a></div></div></div></div></td></tr></tbody></table></section>
+
+<section class="sec" id="tv"><div class="sh"><div class="se">Section 03b</div><h2 class="st">TV Channel Coverage</h2>
+<div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (Aaj Tak, India TV, ABP News) channels.</div><div class="sdiv"></div></div>
+<div style="margin-bottom:16px">
+<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">English TV</div>
+<table class="nt"><thead><tr><th>Org</th><th>NDTV</th><th>News18</th><th>India Today</th></tr></thead><tbody>
+<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:#3d8ef0">CEEW</span></td><td style="font-family:monospace">0</td><td style="font-family:monospace">0</td><td style="font-family:monospace">0</td></tr><tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:#e05c3a">CSTEP</span></td><td style="font-family:monospace">0</td><td style="font-family:monospace">0</td><td style="font-family:monospace">0</td></tr>
+</tbody></table></div>
+<div>
+<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Hindi TV</div>
+<table class="nt"><thead><tr><th>Org</th><th>Aaj Tak</th><th>India TV</th><th>ABP News</th></tr></thead><tbody>
+<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:#3d8ef0">CEEW</span></td><td style="font-family:monospace">0</td><td style="font-family:monospace">0</td><td style="font-family:monospace">0</td></tr><tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:#e05c3a">CSTEP</span></td><td style="font-family:monospace">0</td><td style="font-family:monospace">0</td><td style="font-family:monospace">0</td></tr>
+</tbody></table></div></section>
+
+<section class="sec" id="momentum"><div class="sh"><div class="se">Section 04</div><h2 class="st">Coverage Momentum</h2>
+<div class="sd">Weekly article volume per org. Taller = more articles. Dates parsed from Serper metadata.</div><div class="sdiv"></div></div>
+<div class="mch"><div class="ch-hdr"><div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">Weekly AQ volume</div><div style="font-size:11px;color:var(--muted)">2026-03-08 to 2026-06-08 &middot; CEEW: 1 &middot; CSTEP: 7</div></div>
+<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:12px;height:12px;border-radius:2px;background:#3d8ef0"></div>CEEW</div><div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:12px;height:12px;border-radius:2px;background:#e05c3a"></div>CSTEP</div></div></div>
+<div class="wbars"><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="CEEW: 0"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:2px" title="CSTEP: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">03-08</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="CEEW: 0"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:2px" title="CSTEP: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">03-15</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="CEEW: 0"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:2px" title="CSTEP: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">03-22</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="CEEW: 0"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:25px" title="CSTEP: 2"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">03-29</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="CEEW: 0"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:2px" title="CSTEP: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">04-05</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="CEEW: 0"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:2px" title="CSTEP: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">04-12</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="CEEW: 0"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:2px" title="CSTEP: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">04-19</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="CEEW: 0"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:2px" title="CSTEP: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">04-26</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="CEEW: 0"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:2px" title="CSTEP: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">05-03</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="CEEW: 0"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:2px" title="CSTEP: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">05-10</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:13px" title="CEEW: 1"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:63px" title="CSTEP: 5"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">05-17</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="CEEW: 0"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:2px" title="CSTEP: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">05-24</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="CEEW: 0"></div><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#e05c3a;height:2px" title="CSTEP: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">05-31</div></div></div></div></section>
+
+<section class="sec" id="topics"><div class="sh"><div class="se">Section 05</div><h2 class="st">Topic Ownership Map</h2>
+<div class="sd">20 AQ sub-topics including NCAP &middot; Policy &middot; PM2.5 Exposure &middot; Stubble Burning &middot; Vehicular Pollution &middot; Health Impact &middot; Brick Kilns &middot; Thermal Power Plants &middot; and more.</div><div class="sdiv"></div></div>
+
+<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:20px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--muted2)">
+<span><span class="ob badge-owns">Owns</span> = 5+ articles</span>
+<span><span class="ob badge-con">Contests</span> = 2&ndash;4 articles</span>
+<span><span class="ob badge-absent">Absent</span> = 0&ndash;1 articles</span>
+</div>
+<div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">NCAP</div><div style="font-size:11px;color:var(--muted);margin-top:3px">National Clean Air Programme — targets and compliance</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absNCAP')">2 absent (0–1 arts)</a><div class="evd" id="absNCAP" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Policy</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Air quality regulations, standards, government actions</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absPolicy')">2 absent (0–1 arts)</a><div class="evd" id="absPolicy" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">PM2.5 Exposure</div><div style="font-size:11px;color:var(--muted);margin-top:3px">City &amp; ward-level exposure data, health burden</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"><span style="font-family:monospace;font-size:10px;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.25);border-radius:3px;padding:2px 7px">1 contests</span></div></div><div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:11px;font-weight:600;color:#e05c3a;width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">CSTEP</span><div style="flex:1;height:7px;background:var(--surface3);border-radius:4px;overflow:hidden"><div style="height:100%;background:#e05c3a;width:100%;border-radius:4px"></div></div><span style="font-family:monospace;font-size:11px;font-weight:700;width:20px;text-align:right;color:#e05c3a;flex-shrink:0">2</span><span class="ob badge-con" style="flex-shrink:0">Contests</span><span style="font-family:monospace;font-size:10px;color:var(--muted);flex-shrink:0;cursor:default" title="Bengaluru's annual average PM2.5 levels 30-35 μg/m³">&#9432;</span></div><div style="margin-top:8px"><a class="ctag" onclick="td('absPM25Exposure')">1 absent (0–1 art)</a><div class="evd" id="absPM25Exposure" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Stubble Burning</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Parali, enforcement, seasonal contribution</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absStubbleBurning')">2 absent (0–1 arts)</a><div class="evd" id="absStubbleBurning" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Clean Air Finance</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Funding flows, investment gaps, budgets</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absCleanAirFinance')">2 absent (0–1 arts)</a><div class="evd" id="absCleanAirFinance" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Vehicular Pollution</div><div style="font-size:11px;color:var(--muted);margin-top:3px">EV targets, transport emissions, FAME</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absVehicularPollution')">2 absent (0–1 arts)</a><div class="evd" id="absVehicularPollution" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Health Impact</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Mortality, hospital admissions, DALY data</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absHealthImpact')">2 absent (0–1 arts)</a><div class="evd" id="absHealthImpact" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Industrial Pollution</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Factory emissions, cement, steel plants</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absIndustrialPollution')">2 absent (0–1 arts)</a><div class="evd" id="absIndustrialPollution" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Heat-AQI</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Summer heat compounding PM2.5 impacts</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absHeatAQI')">2 absent (0–1 arts)</a><div class="evd" id="absHeatAQI" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Brick Kilns</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Brick kiln emissions, FCBTK, zig-zag technology</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absBrickKilns')">2 absent (0–1 arts)</a><div class="evd" id="absBrickKilns" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Petrol Emissions</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Petrol vehicle tailpipe pollution</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absPetrolEmissions')">2 absent (0–1 arts)</a><div class="evd" id="absPetrolEmissions" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Diesel Emissions</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Diesel generators, trucks, buses</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absDieselEmissions')">2 absent (0–1 arts)</a><div class="evd" id="absDieselEmissions" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Super Emitters</div><div style="font-size:11px;color:var(--muted);margin-top:3px">High-emission point sources, hotspots</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absSuperEmitters')">2 absent (0–1 arts)</a><div class="evd" id="absSuperEmitters" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Thermal Power Plants</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Coal power plant emissions, FGD</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absThermalPowerPlants')">2 absent (0–1 arts)</a><div class="evd" id="absThermalPowerPlants" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Household Pollution</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Cooking fuel, biomass, LPG substitution</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absHouseholdPollution')">2 absent (0–1 arts)</a><div class="evd" id="absHouseholdPollution" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Indoor Pollution</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Indoor air quality, IAQ monitoring</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absIndoorPollution')">2 absent (0–1 arts)</a><div class="evd" id="absIndoorPollution" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Biomass Air Pollution</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Wood, crop residue, biomass burning</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absBiomassAirPollution')">2 absent (0–1 arts)</a><div class="evd" id="absBiomassAirPollution" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Rice Residue Burning</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Paddy straw burning, Punjab, Haryana</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absRiceResidueBurning')">2 absent (0–1 arts)</a><div class="evd" id="absRiceResidueBurning" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Wheat Residue Burning</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Wheat stubble burning, post-harvest</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absWheatResidueBurning')">2 absent (0–1 arts)</a><div class="evd" id="absWheatResidueBurning" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div><div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">Road Dust</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Resuspended road dust, unpaved roads</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0"></div></div><div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div><div style="margin-top:8px"><a class="ctag" onclick="td('absRoadDust')">2 absent (0–1 arts)</a><div class="evd" id="absRoadDust" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="font-family:monospace;font-size:10px;color:var(--muted)">CEEW (0)</span>  <span style="font-family:monospace;font-size:10px;color:var(--muted)">CSTEP (0)</span></div></div></div></div></section>
+
+<section class="sec" id="cit"><div class="sh"><div class="se">Section 07</div><h2 class="st">Citation Quality</h2>
+<div class="sd"><strong style="color:var(--good)">Data Cited</strong> = a specific number, statistic, or named report from this org is explicitly cited. <strong style="color:var(--muted2)">Named Mention</strong> = org is named but no specific data cited. <strong style="color:var(--muted)">Total</strong> = all articles retrieved by searching for this org&rsquo;s name &mdash; some may not directly name the org in the text (the search established the relevance connection; Claude classified each article individually). Sorted by Data Cited %.</div><div class="sdiv"></div></div>
+<table class="nt"><thead><tr><th>Org</th><th>Total</th><th>Data Cited</th><th>Named Mention</th><th>Evidence (Data Cited articles)</th></tr></thead><tbody><tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:#e05c3a">CSTEP</span></td><td style="font-family:monospace">7</td><td><span style="font-family:monospace;font-weight:700;color:var(--good)">4</span> <span style="font-family:monospace;font-size:10px;color:var(--muted)">(57%)</span></td><td style="font-family:monospace;color:var(--muted2)">1</td><td><div style="margin-bottom:5px"><div style="font-family:monospace;font-size:10px;color:var(--amber);line-height:1.5">&ldquo;48 air quality sensors from six manufacturers were tested&rdquo;</div><div style="font-family:monospace;font-size:10px;color:var(--muted)">The New Indian Express &middot; 1 month ago</div><a href="https://www.newindianexpress.com/cities/bengaluru/2026/Apr/24/air-quality-sensors-may-not-be-accurate" target="_blank" style="font-family:monospace;font-size:10px;color:var(--amber);text-decoration:none">&#8599; article</a></div><div style="margin-bottom:5px"><div style="font-family:monospace;font-size:10px;color:var(--amber);line-height:1.5">&ldquo;Bengaluru's annual average PM2.5 levels 30-35 μg/m³&rdquo;</div><div style="font-family:monospace;font-size:10px;color:var(--muted)">The Times of India &middot; Apr 3, 2026</div><a href="https://timesofindia.indiatimes.com/india/honestly-how-clean-is-bengaluru-air-in-jan-2026/articleshow/129988578.cms" target="_blank" style="font-family:monospace;font-size:10px;color:var(--amber);text-decoration:none">&#8599; article</a></div><div style="margin-bottom:5px"><div style="font-family:monospace;font-size:10px;color:var(--amber);line-height:1.5">&ldquo;Performance Evaluation of Multi-pollutant Air Quality Sensors&rdquo;</div><div style="font-family:monospace;font-size:10px;color:var(--muted)">The Hindu &middot; 1 month ago</div><a href="https://www.thehindu.com/news/cities/bangalore/regular-checks-key-to-improving-low-cost-air-quality-sensor-efficiency-study/article70898579.ece" target="_blank" style="font-family:monospace;font-size:10px;color:var(--amber);text-decoration:none">&#8599; article</a></div></td></tr><tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:#3d8ef0">CEEW</span></td><td style="font-family:monospace">1</td><td><span style="font-family:monospace;font-weight:700;color:var(--good)">0</span> <span style="font-family:monospace;font-size:10px;color:var(--muted)">(0%)</span></td><td style="font-family:monospace;color:var(--muted2)">0</td><td><span style="color:var(--muted);font-family:monospace;font-size:11px">—</span></td></tr></tbody></table></section>
+
+<section class="sec" id="em"><div class="sh"><div class="se">Section 08</div><h2 class="st">AQ Media White-Space Gaps</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations are <strong style="color:var(--warn)">not part of</strong> &mdash; identified by fetching general AQ news (no org name filter), removing any article that mentions a tracked org, then asking Claude to cluster the remaining articles into themes. These are genuine white-space opportunities: the AQ media conversation is active on these topics, but your orgs are absent. <strong>Gap signal</strong> = the evidence of absence. <strong>Opportunity</strong> = a concrete action to enter the conversation. Article links = source articles from the org-absent pool used as evidence.</div><div class="sdiv"></div></div>
+<div class="em-card">
+<div class="em-hdr"><div class="em-topic">Indoor Air Quality Health Impacts</div></div>
+<div class="em-body">Growing media focus on indoor air pollution as a serious health threat, often surpassing outdoor air quality risks in office and residential spaces.</div>
+<div class="em-inf" style="color:var(--warn)">&#9888; Gap signal: 2 articles specifically on indoor air quality health risks (office AC sickness, indoor vs outdoor pollution comparison) with zero mentions of CEEW or CSTEP engagement in this sub-domain.</div>
+<div class="em-inf" style="color:var(--good);margin-top:6px">&#8594; Opportunity: CEEW or CSTEP could publish research on indoor air quality standards in Indian workplaces and homes, positioning themselves as experts in this emerging health narrative.</div>
+<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px"><div class="em-src"><a href="https://www.indiatoday.in/health/story/office-air-quality-warning-signs-poor-indoor-health-risks-2927775-2026-06-17" target="_blank" style="color:var(--amber);text-decoration:none">Your office AC making you sick? Doctors reveal the warning signs of poor indoor air quality</a></div><div class="em-src"><a href="https://theprint.in/ani-press-releases/aqi-vs-indoor-air-quality-why-indoor-pollution-could-be-more-dangerous-than-outdoor-pollution/2962429/" target="_blank" style="color:var(--amber);text-decoration:none">AQI vs Indoor Air Quality: Why Indoor Pollution Could Be More Dangerous Than Outdoor Pollution</a></div></div>
+</div><div class="em-card">
+<div class="em-hdr"><div class="em-topic">Air Pollution &amp; Cardiovascular Health Link</div></div>
+<div class="em-body">Emerging media narrative connecting air pollution exposure to measurable cardiovascular disease increases and mortality, supported by epidemiological studies.</div>
+<div class="em-inf" style="color:var(--warn)">&#9888; Gap signal: 3 articles on pollution-health outcomes (heatwave-ozone deaths, CVD rise with pollution, WHO guideline non-compliance) with no tracked organization commentary or research citations.</div>
+<div class="em-inf" style="color:var(--good);margin-top:6px">&#8594; Opportunity: CEEW or CSTEP could publish or partner on health epidemiology studies quantifying pollution's cardiovascular burden in India, filling a clear evidence gap in media discourse.</div>
+<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px"><div class="em-src"><a href="https://www.downtoearth.org.in/climate-change/heatwaves-may-have-driven-ozone-exposure-linked-to-26500-deaths-in-india-in-2024-finds-iit-study" target="_blank" style="color:var(--amber);text-decoration:none">Heatwaves may have driven ozone exposure linked to 26,500 deaths in India in 2024, finds IIT study</a></div><div class="em-src"><a href="https://timesofindia.indiatimes.com/city/delhi/pollution-is-deadlier-than-you-think-ask-your-heart/articleshow/126401162.cms" target="_blank" style="color:var(--amber);text-decoration:none">Delhi pollution is deadlier than you think: Ask your heart — study finds 2% rise in CVD cases with every</a></div><div class="em-src"><a href="https://healthpolicy-watch.news/air-pollution-worsens-globally-share-of-cities-meeting-who-air-quality-guideline-declines/" target="_blank" style="color:var(--amber);text-decoration:none">Air Quality Worsens Globally – Share of Cities Meeting WHO Guidelines Declines</a></div></div>
+</div><div class="em-card">
+<div class="em-hdr"><div class="em-topic">Citizen Mobilization &amp; Grassroots Action</div></div>
+<div class="em-body">Media coverage emphasizing citizen engagement, protest movements, and grassroots action as drivers of air quality policy change, including public demands for AQI transparency.</div>
+<div class="em-inf" style="color:var(--warn)">&#9888; Gap signal: 3 articles on citizen action, misinformation/denial politics, and AQI measurement transparency—with no CEEW or CSTEP positioned as voices in public mobilization or community engagement narratives.</div>
+<div class="em-inf" style="color:var(--good);margin-top:6px">&#8594; Opportunity: CEEW or CSTEP could launch or amplify a citizen science initiative or public awareness campaign, directly addressing the grassroots action narrative currently absent their voices.</div>
+<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px"><div class="em-src"><a href="https://www.teriin.org/article/clean-air-starts-home-citizen-action-and-future-indias-air-quality" target="_blank" style="color:var(--amber);text-decoration:none">Clean Air Starts at Home: Citizen Action and the Future of India's Air Quality</a></div><div class="em-src"><a href="https://earthjournalism.net/stories/denial-and-misinformation-how-politics-weakens-indias-air-pollution-response" target="_blank" style="color:var(--amber);text-decoration:none">Denial and Misinformation: How Politics Weakens India's Air Pollution Response</a></div><div class="em-src"><a href="https://special.ndtv.com/air-emergency-your-suggestions-to-tackle-air-pollution-129/news-detail/delhi-air-pollution-protests-delhi-aqi-today-why-doesnt-india-report-air-quality-aqi-measure-beyond-500-9669223/3" target="_blank" style="color:var(--amber);text-decoration:none">Why Doesn't India Report Air Quality (AQI) Measure Beyond 500?</a></div></div>
+</div></section>
+
+
+<section style="margin-bottom:56px;scroll-margin-top:24px" id="aeo">
+  <div style="margin-bottom:24px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#5e7494;margin-bottom:6px">AEO — LLM Visibility</div>
+    <h2 style="font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;color:#d8e4f0;line-height:1.2">AI Engine Optimisation</h2>
+    <div style="margin-top:8px;font-size:13px;color:#8fa3b8;max-width:680px;line-height:1.65">When someone asks an AI model about Indian air quality, which organisations does it cite? Five standard discovery questions were sent to three LLMs. Mention rate = AEO score. Contributes 30% of the Competitive Scorecard.</div>
+    <div style="width:40px;height:2px;background:#c9922a;margin:14px 0 0"></div>
+  </div>
+  <div style="background:rgba(201,146,42,.06);border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:14px 18px;font-size:12px;color:#8fa3b8;margin-bottom:20px;line-height:1.7">
+    <strong style="color:#c9922a">How AEO is measured:</strong> Each LLM received 5 standard AQ discovery questions. Each response naming the org = 1 mention. Score = (total mentions ÷ total possible responses) × 100.
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px">
+    <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:20px;border-top:2px solid #3d8ef0">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#3d8ef0;margin-bottom:14px">CEEW</div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+        <svg width="64" height="64" viewBox="0 0 64 64" style="flex-shrink:0"><circle cx="32" cy="32" r="26" fill="none" stroke="#1e2638" stroke-width="10"/><circle cx="32" cy="32" r="26" fill="none" stroke="#3d8ef0" stroke-width="10" stroke-dasharray="11.4 152.0" stroke-dashoffset="41" stroke-linecap="round"/><text x="32" y="38" text-anchor="middle" fill="#3d8ef0" font-size="18" font-family="Inter" font-weight="700">D</text></svg>
+        <div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:28px;line-height:1;font-weight:700;color:#3d8ef0">D <span style="font-size:14px;color:#8fa3b8">(7/100)</span></div>
+          <div style="font-size:12px;color:#8fa3b8;margin-top:4px;margin-bottom:6px">AEO Score — Limited</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">3 of 45 LLM responses cited CEEW</div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fa3b8;width:130px;flex-shrink:0">Gemini 1.5 Flash</span>
+        <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden">
+          <div style="height:100%;border-radius:3px;background:#3d8ef0;width:0%"></div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#3d8ef0;width:38px;text-align:right">0/15</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fa3b8;width:130px;flex-shrink:0">Perplexity</span>
+        <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden">
+          <div style="height:100%;border-radius:3px;background:#3d8ef0;width:13%"></div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#3d8ef0;width:38px;text-align:right">2/15</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fa3b8;width:130px;flex-shrink:0">GPT-4o mini</span>
+        <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden">
+          <div style="height:100%;border-radius:3px;background:#3d8ef0;width:7%"></div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#3d8ef0;width:38px;text-align:right">1/15</span>
+      </div></div>
+      
+      <div style="background:#0a0e17;border:1px solid #2e3a52;border-left:2px solid #c9922a;border-radius:0 5px 5px 0;padding:10px 12px;margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8fa3b8;line-height:1.65">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#c9922a;margin-bottom:5px">Example LLM response</div>
+        &ldquo;The **leading India-based think tanks and research bodies** working on clean air policy include **CEEW, CSE, TERI, WRI India, CSTEP, CPR, and PHFI**, with **IIT Kanpur** also playing a major technical research role on ai&rdquo;
+      </div>
+      <div style="background:rgba(224,92,92,.06);border:1px solid rgba(224,92,92,.2);border-radius:6px;padding:10px 14px;font-size:12px;color:#8fa3b8;margin-top:12px;line-height:1.6"><strong style="color:#e05c5c">Visibility gap.</strong> CEEW cited in only 7% of LLM responses. Grade: D — Limited.</div>
+    </div>
+    <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:20px;border-top:2px solid #e05c3a">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#e05c3a;margin-bottom:14px">CSTEP</div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+        <svg width="64" height="64" viewBox="0 0 64 64" style="flex-shrink:0"><circle cx="32" cy="32" r="26" fill="none" stroke="#1e2638" stroke-width="10"/><circle cx="32" cy="32" r="26" fill="none" stroke="#e05c3a" stroke-width="10" stroke-dasharray="6.5 156.9" stroke-dashoffset="41" stroke-linecap="round"/><text x="32" y="38" text-anchor="middle" fill="#e05c3a" font-size="18" font-family="Inter" font-weight="700">D</text></svg>
+        <div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:28px;line-height:1;font-weight:700;color:#e05c3a">D <span style="font-size:14px;color:#8fa3b8">(4/100)</span></div>
+          <div style="font-size:12px;color:#8fa3b8;margin-top:4px;margin-bottom:6px">AEO Score — Limited</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">2 of 45 LLM responses cited CSTEP</div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fa3b8;width:130px;flex-shrink:0">Gemini 1.5 Flash</span>
+        <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden">
+          <div style="height:100%;border-radius:3px;background:#e05c3a;width:0%"></div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#e05c3a;width:38px;text-align:right">0/15</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fa3b8;width:130px;flex-shrink:0">Perplexity</span>
+        <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden">
+          <div style="height:100%;border-radius:3px;background:#e05c3a;width:13%"></div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#e05c3a;width:38px;text-align:right">2/15</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fa3b8;width:130px;flex-shrink:0">GPT-4o mini</span>
+        <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden">
+          <div style="height:100%;border-radius:3px;background:#e05c3a;width:0%"></div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#e05c3a;width:38px;text-align:right">0/15</span>
+      </div></div>
+      
+      <div style="background:#0a0e17;border:1px solid #2e3a52;border-left:2px solid #c9922a;border-radius:0 5px 5px 0;padding:10px 12px;margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8fa3b8;line-height:1.65">
+        <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#c9922a;margin-bottom:5px">Example LLM response</div>
+        &ldquo;The **leading India-based think tanks and research bodies** working on clean air policy include **CEEW, CSE, TERI, WRI India, CSTEP, CPR, and PHFI**, with **IIT Kanpur** also playing a major technical research role on ai&rdquo;
+      </div>
+      <div style="background:rgba(224,92,92,.06);border:1px solid rgba(224,92,92,.2);border-radius:6px;padding:10px 14px;font-size:12px;color:#8fa3b8;margin-top:12px;line-height:1.6"><strong style="color:#e05c5c">Visibility gap.</strong> CSTEP cited in only 4% of LLM responses. Grade: D — Limited.</div>
+    </div></div>
+  <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:16px 18px;margin-bottom:12px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c9922a;margin-bottom:10px">5 Standard AEO Discovery Questions</div>
+    
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q1</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">Which Indian research organisations are the most authoritative sources on air quality data and policy in India? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q2</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">What organisations publish the most reliable air quality index and PM2.5 data for Indian cities? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q3</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">Who are the leading think tanks and research bodies working on clean air policy in India? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#d4a017;background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.25);border-radius:3px;padding:1px 6px">CEEW ✓ 1/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#d4a017;background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.25);border-radius:3px;padding:1px 6px">CSTEP ✓ 1/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q4</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">Which organisations should journalists cite when writing about India's National Clean Air Programme? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q5</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">What Indian NGOs or research institutes are most influential on air pollution solutions and technology? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q6</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">What research organisations in India are doing the most credible work on reducing vehicular air pollution? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q7</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">Which Indian institutes publish peer-reviewed studies on indoor air quality and household pollution? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q8</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">Who are the most cited Indian organisations in international climate and air quality policy discussions? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q9</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">What organisations should I follow for the latest data on India's air quality improvement progress? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q10</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">Which bodies produce the most reliable assessments of India's National Clean Air Programme targets? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q11</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">What Indian think tanks and research centres are leading the conversation on clean air finance and investment? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#d4a017;background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.25);border-radius:3px;padding:1px 6px">CEEW ✓ 2/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#d4a017;background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.25);border-radius:3px;padding:1px 6px">CSTEP ✓ 1/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q12</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">Which organisations have the most credible data on PM2.5 health impacts in major Indian cities? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q13</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">Who are the key institutional voices on stubble burning and crop residue burning policy in India? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q14</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">What research organisations in India are tracking the health burden of air pollution most rigorously? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q15</span>
+      <div style="color:#8fa3b8;flex:1;line-height:1.55">Which Indian organisations are most frequently cited in government air quality policy consultations? <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px"><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CEEW ✗ 0/3</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;background:#1e2638;border:1px solid #252d40;border-radius:3px;padding:1px 6px">CSTEP ✗ 0/3</span></span></div>
+    </div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">GPT-4o mini · Perplexity Sonar · Gemini 1.5 Flash · 15 questions × 3 LLMs = 45 responses per org</div>
+</section>
+
+<section style="margin-bottom:56px;scroll-margin-top:24px" id="social">
+  <div style="margin-bottom:24px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#5e7494;margin-bottom:6px">Social Intelligence</div>
+    <h2 style="font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;color:#d8e4f0;line-height:1.2">Trending AQ Content Across Platforms</h2>
+    <div style="margin-top:8px;font-size:13px;color:#8fa3b8;max-width:680px;line-height:1.65">Top AQ-related content on YouTube, X, Instagram, and LinkedIn — no org filter at search stage. Each time a tracked organisation is mentioned = 1 point. Points combine into the Social Presence Score.</div>
+    <div style="width:40px;height:2px;background:#c9922a;margin:14px 0 0"></div>
+  </div>
+  <div style="background:rgba(201,146,42,.06);border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:14px 18px;font-size:12px;color:#8fa3b8;margin-bottom:20px;line-height:1.7">
+    <strong style="color:#c9922a">Scoring:</strong> 1 point per mention regardless of location. Location (Title/Hook · Description · Comments) is tracked separately — an org cited in a title drives far more discovery than one buried in comments.
+  </div>
+
+  <div style="display:flex;border-bottom:1px solid #252d40;margin-bottom:0"><div class="si-tab si-tab-active" onclick="siTab('yt',this)" style="display:flex;align-items:center;gap:7px;padding:10px 18px;font-size:12px;font-weight:600;color:#d8e4f0;cursor:pointer;border-bottom:2px solid #c9922a;margin-bottom:-1px;transition:all .15s;user-select:none">
+      <span style="width:16px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;flex-shrink:0;background:#ff4444">▶</span>
+      YouTube
+    </div><div class="si-tab" onclick="siTab('tw',this)" style="display:flex;align-items:center;gap:7px;padding:10px 18px;font-size:12px;font-weight:600;color:#8fa3b8;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;user-select:none">
+      <span style="width:16px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;flex-shrink:0;background:#111">𝕏</span>
+      X / Twitter
+    </div><div class="si-tab" onclick="siTab('ig',this)" style="display:flex;align-items:center;gap:7px;padding:10px 18px;font-size:12px;font-weight:600;color:#8fa3b8;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;user-select:none">
+      <span style="width:16px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;flex-shrink:0;background:linear-gradient(135deg,#f09433,#dc2743,#bc1888)">◉</span>
+      Instagram
+    </div><div class="si-tab" onclick="siTab('li',this)" style="display:flex;align-items:center;gap:7px;padding:10px 18px;font-size:12px;font-weight:600;color:#8fa3b8;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;user-select:none">
+      <span style="width:16px;height:16px;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#fff;flex-shrink:0;background:#0a66c2">in</span>
+      LinkedIn
+    </div></div>
+  <div id="si-pane-yt" style="display:block;padding-top:20px">
+      <div style="display:flex;align-items:center;gap:12px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+        <div style="width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;flex-shrink:0;background:#ff4444">▶</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:#d8e4f0">YouTube — Top AQ Content · Run pipeline to populate</div>
+          <div style="font-size:11px;color:#8fa3b8;font-family:'JetBrains Mono',monospace;margin-top:2px">YouTube Data API v3 · viewCount sort · regionCode=IN · AQ term required in title</div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;background:rgba(201,146,42,.12);border:1px solid rgba(201,146,42,.25);border-radius:3px;padding:2px 8px;flex-shrink:0">YouTube Data API v3</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
+    <thead><tr>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:90px">Organisation</th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:80px;text-align:center">Mention<br>Count</th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:210px">Location of Mentions<br><span style="font-weight:400;opacity:.6">Title/Hook · Description · Comments</span></th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:80px;text-align:center">Total<br>Points</th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap">Trending Topics &amp; Context</th>
+  </tr></thead><tbody><tr>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+        <span style="display:inline-flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:3px 10px;border-radius:3px;background:#3d8ef01a;color:#3d8ef0;border:1px solid #3d8ef055">CEEW</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#3d8ef0">0</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Title/Hook</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%;opacity:1"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#3d8ef0">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Description</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%;opacity:0.7"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#3d8ef0">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Comments</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%;opacity:0.5"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#5e7494">0</span>
+    </div></td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#3d8ef0">0</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top" rowspan="2">
+    <div style="background:#1e2638;border-radius:6px;padding:12px 14px">
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+        
+      </div>
+      <div style="margin-bottom:8px;font-size:11px;color:#8fa3b8;line-height:1.6"><strong style="color:#3d8ef0">CEEW:</strong> Analysis pending — run pipeline to generate. </div><div style="margin-bottom:8px;font-size:11px;color:#8fa3b8;line-height:1.6"><strong style="color:#e05c3a">CSTEP:</strong> Analysis pending — run pipeline to generate. </div>
+    </div>
+  </td>
+    </tr><tr>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+        <span style="display:inline-flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:3px 10px;border-radius:3px;background:#e05c3a1a;color:#e05c3a;border:1px solid #e05c3a55">CSTEP</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#e05c3a">0</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Title/Hook</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#e05c3a;width:0%;opacity:1"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#e05c3a">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Description</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#e05c3a;width:0%;opacity:0.7"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#e05c3a">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Comments</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#e05c3a;width:0%;opacity:0.5"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#5e7494">0</span>
+    </div></td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#e05c3a">0</span>
+      </td>
+      
+    </tr></tbody>
+  </table>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494;margin-top:8px">0 videos analysed · 5 broad AQ search queries</div>
+    </div><div id="si-pane-tw" style="display:none;padding-top:20px">
+      <div style="display:flex;align-items:center;gap:12px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+        <div style="width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;flex-shrink:0;background:#111">𝕏</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:#d8e4f0">X / Twitter — Top AQ Content · Data loaded</div>
+          <div style="font-size:11px;color:#8fa3b8;font-family:'JetBrains Mono',monospace;margin-top:2px">Serper Search · site:x.com site:twitter.com · AQ + India queries · Google-indexed high-engagement public posts</div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;background:rgba(201,146,42,.12);border:1px solid rgba(201,146,42,.25);border-radius:3px;padding:2px 8px;flex-shrink:0">Serper Search API</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
+    <thead><tr>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:90px">Organisation</th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:80px;text-align:center">Mention<br>Count</th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:210px">Location of Mentions<br><span style="font-weight:400;opacity:.6">Title/Hook · Description · Comments</span></th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:80px;text-align:center">Total<br>Points</th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap">Trending Topics &amp; Context</th>
+  </tr></thead><tbody><tr>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+        <span style="display:inline-flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:3px 10px;border-radius:3px;background:#3d8ef01a;color:#3d8ef0;border:1px solid #3d8ef055">CEEW</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#3d8ef0">0</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Title/Hook</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%;opacity:1"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#3d8ef0">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Description</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%;opacity:0.7"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#3d8ef0">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Comments</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%;opacity:0.5"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#5e7494">0</span>
+    </div></td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#3d8ef0">0</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top" rowspan="2">
+    <div style="background:#1e2638;border-radius:6px;padding:12px 14px">
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">PM2.5 exceeds WHO standards</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">Delhi/NCR pollution hotspots</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">AQI measurement methodology</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">India vs Beijing comparison</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">Indoor air quality crisis</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">Government policy accountability</span>
+      </div>
+      <div style="margin-bottom:8px;font-size:11px;color:#8fa3b8;line-height:1.6"><strong style="color:#3d8ef0">CEEW:</strong> CEEW is absent from these top posts despite being India's leading air quality research institute. Gap: No visible thought leadership on Twitter regarding policy solutions or comparative analysis with international standards. </div><div style="margin-bottom:8px;font-size:11px;color:#8fa3b8;line-height:1.6"><strong style="color:#e05c3a">CSTEP:</strong> CSTEP has no detectable presence in the trending air quality discourse on this platform. Gap: Missing engagement on technical aspects of AQI calculations, health impact quantification, or sectoral pollution source analysis. </div>
+    </div>
+  </td>
+    </tr><tr>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+        <span style="display:inline-flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:3px 10px;border-radius:3px;background:#e05c3a1a;color:#e05c3a;border:1px solid #e05c3a55">CSTEP</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#e05c3a">0</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Title/Hook</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#e05c3a;width:0%;opacity:1"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#e05c3a">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Description</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#e05c3a;width:0%;opacity:0.7"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#e05c3a">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Comments</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#e05c3a;width:0%;opacity:0.5"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#5e7494">0</span>
+    </div></td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#e05c3a">0</span>
+      </td>
+      
+    </tr></tbody>
+  </table>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494;margin-top:8px">12 posts analysed · Serper site:twitter.com search</div>
+    </div><div id="si-pane-ig" style="display:none;padding-top:20px">
+      <div style="display:flex;align-items:center;gap:12px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+        <div style="width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;flex-shrink:0;background:linear-gradient(135deg,#f09433,#dc2743,#bc1888)">◉</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:#d8e4f0">Instagram — Top AQ Content · Data loaded</div>
+          <div style="font-size:11px;color:#8fa3b8;font-family:'JetBrains Mono',monospace;margin-top:2px">Serper Search · site:instagram.com · AQ queries · Google-indexed public posts</div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;background:rgba(201,146,42,.12);border:1px solid rgba(201,146,42,.25);border-radius:3px;padding:2px 8px;flex-shrink:0">Serper Search API</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
+    <thead><tr>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:90px">Organisation</th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:80px;text-align:center">Mention<br>Count</th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:210px">Location of Mentions<br><span style="font-weight:400;opacity:.6">Title/Hook · Description · Comments</span></th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:80px;text-align:center">Total<br>Points</th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap">Trending Topics &amp; Context</th>
+  </tr></thead><tbody><tr>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+        <span style="display:inline-flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:3px 10px;border-radius:3px;background:#3d8ef01a;color:#3d8ef0;border:1px solid #3d8ef055">CEEW</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#3d8ef0">0</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Title/Hook</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%;opacity:1"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#3d8ef0">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Description</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%;opacity:0.7"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#3d8ef0">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Comments</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%;opacity:0.5"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#5e7494">0</span>
+    </div></td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#3d8ef0">0</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top" rowspan="2">
+    <div style="background:#1e2638;border-radius:6px;padding:12px 14px">
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">Delhi AQI &amp; PM2.5</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">City-level air standards</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">India vs global rankings</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">AQI measurement methods</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">Winter smog patterns</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">Government air quality policy</span>
+      </div>
+      <div style="margin-bottom:8px;font-size:11px;color:#8fa3b8;line-height:1.6"><strong style="color:#3d8ef0">CEEW:</strong> CEEW appears minimally in these posts; no direct mentions detected. Gap: Underrepresented despite being a major air quality research institution in India's AQ discourse. </div><div style="margin-bottom:8px;font-size:11px;color:#8fa3b8;line-height:1.6"><strong style="color:#e05c3a">CSTEP:</strong> CSTEP presence not evident in the provided posts. Gap: Absent from trending Instagram narratives on Indian air quality, suggesting limited social media visibility or engagement. </div>
+    </div>
+  </td>
+    </tr><tr>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+        <span style="display:inline-flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:3px 10px;border-radius:3px;background:#e05c3a1a;color:#e05c3a;border:1px solid #e05c3a55">CSTEP</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#e05c3a">0</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Title/Hook</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#e05c3a;width:0%;opacity:1"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#e05c3a">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Description</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#e05c3a;width:0%;opacity:0.7"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#e05c3a">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Comments</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#e05c3a;width:0%;opacity:0.5"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#5e7494">0</span>
+    </div></td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#e05c3a">0</span>
+      </td>
+      
+    </tr></tbody>
+  </table>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494;margin-top:8px">17 posts analysed · public posts only</div>
+    </div><div id="si-pane-li" style="display:none;padding-top:20px">
+      <div style="display:flex;align-items:center;gap:12px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+        <div style="width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;flex-shrink:0;background:#0a66c2">in</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:#d8e4f0">LinkedIn — Top AQ Content · Data loaded</div>
+          <div style="font-size:11px;color:#8fa3b8;font-family:'JetBrains Mono',monospace;margin-top:2px">Serper Search · site:linkedin.com/posts · AQ queries · researcher &amp; professional accounts</div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;background:rgba(201,146,42,.12);border:1px solid rgba(201,146,42,.25);border-radius:3px;padding:2px 8px;flex-shrink:0">Serper Search API</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
+    <thead><tr>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:90px">Organisation</th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:80px;text-align:center">Mention<br>Count</th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:210px">Location of Mentions<br><span style="font-weight:400;opacity:.6">Title/Hook · Description · Comments</span></th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap;width:80px;text-align:center">Total<br>Points</th>
+    <th style="background:#1e2638;padding:10px 14px;text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;font-weight:500;border-bottom:1px solid #252d40;white-space:nowrap">Trending Topics &amp; Context</th>
+  </tr></thead><tbody><tr>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+        <span style="display:inline-flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:3px 10px;border-radius:3px;background:#3d8ef01a;color:#3d8ef0;border:1px solid #3d8ef055">CEEW</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#3d8ef0">0</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Title/Hook</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%;opacity:1"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#3d8ef0">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Description</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%;opacity:0.7"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#3d8ef0">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Comments</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%;opacity:0.5"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#5e7494">0</span>
+    </div></td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#3d8ef0">0</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top" rowspan="2">
+    <div style="background:#1e2638;border-radius:6px;padding:12px 14px">
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">PM2.5 Health Standards</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">AQI Index Methodology</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">Delhi Air Crisis</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">WHO vs India Thresholds</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">Urban Pollution Trends</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">Policy &amp; Enforcement Gaps</span><span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8fa3b8;background:#252d40;border:1px solid #252d40;border-radius:2px;padding:2px 7px">Economic Cost Analysis</span>
+      </div>
+      <div style="margin-bottom:8px;font-size:11px;color:#8fa3b8;line-height:1.6"><strong style="color:#3d8ef0">CEEW:</strong> CEEW appears absent from these posts despite being India's leading air quality research institution. Major gap in institutional visibility on LinkedIn discussions around AQI standards and policy reform. </div><div style="margin-bottom:8px;font-size:11px;color:#8fa3b8;line-height:1.6"><strong style="color:#e05c3a">CSTEP:</strong> CSTEP similarly lacks presence in trending AQ conversations. Opportunity gap for evidence-based policy communication on institutional reform needs and budget allocation for air quality management. </div>
+    </div>
+  </td>
+    </tr><tr>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+        <span style="display:inline-flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:3px 10px;border-radius:3px;background:#e05c3a1a;color:#e05c3a;border:1px solid #e05c3a55">CSTEP</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#e05c3a">0</span>
+      </td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top">
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Title/Hook</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#e05c3a;width:0%;opacity:1"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#e05c3a">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Description</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#e05c3a;width:0%;opacity:0.7"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#e05c3a">0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;width:72px;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Comments</span>
+      <div style="flex:1;height:5px;background:#1e2638;border-radius:2px;overflow:hidden">
+        <div style="height:100%;border-radius:2px;background:#e05c3a;width:0%;opacity:0.5"></div>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;width:18px;text-align:right;color:#5e7494">0</span>
+    </div></td>
+      <td style="padding:14px;border-bottom:1px solid #252d40;vertical-align:top;text-align:center">
+        <span style="font-family:'DM Serif Display',serif;font-size:28px;line-height:1;font-weight:400;color:#e05c3a">0</span>
+      </td>
+      
+    </tr></tbody>
+  </table>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494;margin-top:8px">16 posts analysed · Serper site:linkedin.com/posts search</div>
+    </div>
+
+  <!-- Tally -->
+  <div style="margin-top:28px">
+    <div style="font-size:13px;font-weight:600;color:#d8e4f0;margin-bottom:4px">Social Presence Score — All Platforms</div>
+    <div style="font-size:12px;color:#8fa3b8;margin-bottom:16px">Each mention = 1 pt · tallied across all posts and videos · feeds into the Competitive Scorecard</div>
+    <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:18px 20px">
+      <div style="display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid #252d40">
+      <span style="display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fa3b8;width:110px;flex-shrink:0">
+        <span style="width:14px;height:14px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff;background:#ff4444">▶</span>
+        YouTube
+      </span>
+      <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden;display:flex;gap:2px"><div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%"></div><div style="height:100%;border-radius:2px;background:#e05c3a;width:0%"></div></div>
+      <div style="display:flex;gap:10px;flex-shrink:0"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#3d8ef0">CEEW 0</span> &nbsp; <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#e05c3a">CSTEP 0</span></div>
+    </div><div style="display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid #252d40">
+      <span style="display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fa3b8;width:110px;flex-shrink:0">
+        <span style="width:14px;height:14px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff;background:#111">𝕏</span>
+        X / Twitter
+      </span>
+      <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden;display:flex;gap:2px"><div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%"></div><div style="height:100%;border-radius:2px;background:#e05c3a;width:0%"></div></div>
+      <div style="display:flex;gap:10px;flex-shrink:0"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#3d8ef0">CEEW 0</span> &nbsp; <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#e05c3a">CSTEP 0</span></div>
+    </div><div style="display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid #252d40">
+      <span style="display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fa3b8;width:110px;flex-shrink:0">
+        <span style="width:14px;height:14px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff;background:linear-gradient(135deg,#f09433,#dc2743,#bc1888)">◉</span>
+        Instagram
+      </span>
+      <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden;display:flex;gap:2px"><div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%"></div><div style="height:100%;border-radius:2px;background:#e05c3a;width:0%"></div></div>
+      <div style="display:flex;gap:10px;flex-shrink:0"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#3d8ef0">CEEW 0</span> &nbsp; <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#e05c3a">CSTEP 0</span></div>
+    </div><div style="display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid #252d40">
+      <span style="display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fa3b8;width:110px;flex-shrink:0">
+        <span style="width:14px;height:14px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#fff;background:#0a66c2">in</span>
+        LinkedIn
+      </span>
+      <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden;display:flex;gap:2px"><div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%"></div><div style="height:100%;border-radius:2px;background:#e05c3a;width:0%"></div></div>
+      <div style="display:flex;gap:10px;flex-shrink:0"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#3d8ef0">CEEW 0</span> &nbsp; <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:#e05c3a">CSTEP 0</span></div>
+    </div>
+      <div style="display:flex;gap:28px;padding:16px;background:#1e2638;border-radius:6px;margin-top:14px;align-items:center;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:4px">Combined Social Presence Score</div>
+          <div style="font-size:11px;color:#8fa3b8">4 platforms · each org mention = 1 pt · normalised 0–100 in Competitive Scorecard</div>
+        </div>
+        <div style="display:flex;gap:24px;flex-shrink:0;align-items:center"><div style="text-align:center">
+      <div style="font-family:'DM Serif Display',serif;font-size:44px;line-height:1;color:#3d8ef0">0</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#3d8ef0;margin-top:2px">CEEW</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494">0/10 normalised</div>
+    </div><div style="width:1px;background:#252d40"></div><div style="text-align:center">
+      <div style="font-family:'DM Serif Display',serif;font-size:44px;line-height:1;color:#e05c3a">0</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#e05c3a;margin-top:2px">CSTEP</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494">0/10 normalised</div>
+    </div></div>
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+function siTab(id,el){
+  document.querySelectorAll('[id^="si-pane-"]').forEach(function(p){p.style.display='none';});
+  document.querySelectorAll('.si-tab').forEach(function(t){t.style.color='#8fa3b8';t.style.borderBottom='2px solid transparent';});
+  var pane=document.getElementById('si-pane-'+id);if(pane)pane.style.display='block';
+  el.style.color='#d8e4f0';el.style.borderBottom='2px solid #c9922a';
+}
+</script>
+
+
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Weighted composite: media · LLM visibility · social. Formula shown in full.</div><div class="sdiv"></div></div>
+<div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social/10&times;20)<br>
+<span style="color:var(--muted)">CEEW: 3&times;0.25+0&times;0.25+7&times;0.30+0&times;2=3 &middot; CSTEP: 18&times;0.25+57&times;0.25+4&times;0.30+0&times;2=20</span></div>
+<div class="scc"><div class="sca" style="border-top:3px solid #3d8ef0"><div class="scn" style="color:#3d8ef0">CEEW</div><div class="scg" style="color:#e05c5c">F</div><div class="scs">3 / 100</div>
+<div style="display:flex;flex-direction:column;gap:8px;text-align:left">
+<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--muted2)">Share of Voice</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:#3d8ef0;width:3%"></div></div><span style="font-family:monospace;font-size:11px;font-weight:600;width:30px;text-align:right;color:#3d8ef0">3</span></div><div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--muted2)">Citation</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:#3d8ef0;width:0%"></div></div><span style="font-family:monospace;font-size:11px;font-weight:600;width:30px;text-align:right;color:#3d8ef0">0</span></div><div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--muted2)">AEO</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:#3d8ef0;width:7%"></div></div><span style="font-family:monospace;font-size:11px;font-weight:600;width:30px;text-align:right;color:#3d8ef0">7</span></div><div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--muted2)">Social</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:#5e7494;width:0%"></div></div><span style="font-family:monospace;font-size:11px;font-weight:600;width:30px;text-align:right;color:#5e7494">0</span></div>
+</div></div><div class="sca" style="border-top:3px solid #e05c3a"><div class="scn" style="color:#e05c3a">CSTEP</div><div class="scg" style="color:#e05c5c">F</div><div class="scs">20 / 100</div>
+<div style="display:flex;flex-direction:column;gap:8px;text-align:left">
+<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--muted2)">Share of Voice</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:#e05c3a;width:18%"></div></div><span style="font-family:monospace;font-size:11px;font-weight:600;width:30px;text-align:right;color:#e05c3a">18</span></div><div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--muted2)">Citation</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:#e05c3a;width:57%"></div></div><span style="font-family:monospace;font-size:11px;font-weight:600;width:30px;text-align:right;color:#e05c3a">57</span></div><div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--muted2)">AEO</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:#e05c3a;width:4%"></div></div><span style="font-family:monospace;font-size:11px;font-weight:600;width:30px;text-align:right;color:#e05c3a">4</span></div><div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--muted2)">Social</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:#5e7494;width:0%"></div></div><span style="font-family:monospace;font-size:11px;font-weight:600;width:30px;text-align:right;color:#5e7494">0</span></div>
+</div></div></div></section>
+
+<section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including AEO and social media actions.</div><div class="sdiv"></div></div>
+<table class="at"><thead><tr><th>Org</th><th>Priority</th><th>Area</th><th>Action</th><th>Data rationale</th></tr></thead><tbody><tr><td style="font-weight:600;color:#3d8ef0">CEEW</td><td><span class="pri-fix">Fix Now</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">Media</td><td>Establish bylined expert column in Times of India on air quality policy to build author authority and shift from 1 article baseline to consistent thought leadership</td><td class="rat">0% author authentication across single article represents critical credibility gap; Times of India is proven outlet for CEEW content.</td></tr><tr><td style="font-weight:600;color:#3d8ef0">CEEW</td><td><span class="pri-inv">Invest</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">Topics</td><td>Launch research + media series on 'Air Pollution &amp; Cardiovascular Health Link'—white-space topic absent from tracked media but aligns with CEEW's energy-health nexus</td><td class="rat">Fills identified gap in AQ media conversations while positioning CEEW uniquely against CSTEP's PM2.5 focus.</td></tr><tr><td style="font-weight:600;color:#3d8ef0">CEEW</td><td><span class="pri-lev">Leverage</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">Social</td><td>Activate LinkedIn with weekly policy briefs + data visualizations (target 2 posts/week) to reach government/corporate decision-makers at zero current baseline</td><td class="rat">0/10 social score with 0 LinkedIn activity; policy audience for air quality sits natively on this platform.</td></tr><tr><td style="font-weight:600;color:#3d8ef0">CEEW</td><td><span class="pri-opt">Optimise</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">AEO</td><td>Restructure Times of India articles with SEO-optimized subheadings, internal linking strategy, and meta descriptions targeting 'air quality policy India' keywords to improve AEO from 7/100</td><td class="rat">AEO score of 7/100 indicates severe discoverability problem; existing outlet relationship should be leverage point for technical optimization.</td></tr><tr><td style="font-weight:600;color:#e05c3a">CSTEP</td><td><span class="pri-fix">Fix Now</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">Narrative</td><td>Develop 2-3 authenticated case studies with researcher bylines showing real PM2.5 health outcomes data to convert 57% data-specific articles into evidence-driven narrative authority</td><td class="rat">57% data-specific articles without author authentication dilutes impact; named researchers on health-outcome stories shift credibility from generic data reporting.</td></tr><tr><td style="font-weight:600;color:#e05c3a">CSTEP</td><td><span class="pri-inv">Invest</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">Topics</td><td>Produce investigative series on 'Indoor Air Quality Health Impacts' in partnership with health journalists—white-space topic that extends CSTEP's PM2.5 expertise indoors</td><td class="rat">Builds on existing PM2.5 focus while filling media gap; indoor AQ has emerging health policy relevance in India absent from current coverage.</td></tr><tr><td style="font-weight:600;color:#e05c3a">CSTEP</td><td><span class="pri-lev">Leverage</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">Social</td><td>Launch Instagram + Twitter dual-channel 'PM2.5 Data Releases' (1-2x/week visualizations, citizen health alerts) to activate grassroots mobilization audience at zero baseline</td><td class="rat">0/10 social baseline; Twitter + Instagram target citizen action and health-conscious audiences needed for 'Citizen Mobilization' white-space topic.</td></tr><tr><td style="font-weight:600;color:#e05c3a">CSTEP</td><td><span class="pri-opt">Optimise</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">AEO</td><td>Optimize Times of India PM2.5 articles with structured data markup (health impact schemas) and long-form SEO content (2000+ words) to lift AEO from 4/100 baseline</td><td class="rat">AEO of 4/100 is critically low; PM2.5 + health terms are high-search-volume keywords where technical SEO optimization yields immediate discoverability gains.</td></tr></tbody></table></section>
+
+<section class="sec" id="appendix"><div class="sh"><div class="se">Appendix</div><h2 class="st">Source Appendix</h2><div class="sd">All indexed articles. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
+<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:9px">CEEW &mdash; 1 articles</div>
+<table class="apt"><thead><tr><th>#</th><th>Outlet</th><th>Date</th><th>Headline</th><th>Classification</th><th>URL</th></tr></thead><tbody><tr><td>1</td><td>The Times of India</td><td style="font-size:10px">1 month ago</td><td style="max-width:260px">'Dil' of India turns choking lungs: Can Delhi fix its pollution crisis? | India News</td><td style="font-size:10px;font-family:monospace">Not Mentioned</td><td><a href="https://timesofindia.indiatimes.com/india/dil-of-india-turns-choking-lungs-can-delhi-fix-its-pollution-crisis/articleshow/130533448.cms" target="_blank">link</a></td></tr></tbody></table><div style="margin-bottom:24px"></div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:9px">CSTEP &mdash; 7 articles</div>
+<table class="apt"><thead><tr><th>#</th><th>Outlet</th><th>Date</th><th>Headline</th><th>Classification</th><th>URL</th></tr></thead><tbody><tr><td>1</td><td>The New Indian Express</td><td style="font-size:10px">1 month ago</td><td style="max-width:260px">Air quality sensors may not be accurate</td><td style="font-size:10px;font-family:monospace">Data Cited</td><td><a href="https://www.newindianexpress.com/cities/bengaluru/2026/Apr/24/air-quality-sensors-may-not-be-accurate" target="_blank">link</a></td></tr><tr><td>2</td><td>The Times of India</td><td style="font-size:10px">Apr 3, 2026</td><td style="max-width:260px">Honestly, how clean is Bengaluru air in Jan 2026?</td><td style="font-size:10px;font-family:monospace">Data Cited</td><td><a href="https://timesofindia.indiatimes.com/india/honestly-how-clean-is-bengaluru-air-in-jan-2026/articleshow/129988578.cms" target="_blank">link</a></td></tr><tr><td>3</td><td>Bangalore Mirror</td><td style="font-size:10px">1 month ago</td><td style="max-width:260px">Toxic turn: Bengaluru is India’s second most polluted city</td><td style="font-size:10px;font-family:monospace">Not Mentioned</td><td><a href="https://bangaloremirror.indiatimes.com/bangalore/civic/toxic-turn-bengaluru-is-indias-second-most-polluted-city/articleshow/130590713.cms" target="_blank">link</a></td></tr><tr><td>4</td><td>The Hindu</td><td style="font-size:10px">1 month ago</td><td style="max-width:260px">Regular checks key to improving low-cost air quality sensor efficiency: Study</td><td style="font-size:10px;font-family:monospace">Data Cited</td><td><a href="https://www.thehindu.com/news/cities/bangalore/regular-checks-key-to-improving-low-cost-air-quality-sensor-efficiency-study/article70898579.ece" target="_blank">link</a></td></tr><tr><td>5</td><td>Deccan Herald</td><td style="font-size:10px">1 month ago</td><td style="max-width:260px">India's low-cost air quality sensors are not yet ready for deployment</td><td style="font-size:10px;font-family:monospace">Named Mention</td><td><a href="https://www.deccanherald.com/india/indias-low-cost-air-quality-sensors-are-not-yet-ready-for-deployment-3978685" target="_blank">link</a></td></tr><tr><td>6</td><td>ETHealthworld.com</td><td style="font-size:10px">1 month ago</td><td style="max-width:260px">Need to calibrate low-cost sensors for local conditions for reliable air quality data, says study</td><td style="font-size:10px;font-family:monospace">Not Mentioned</td><td><a href="https://health.economictimes.indiatimes.com/news/industry/need-to-calibrate-low-cost-sensors-for-local-conditions-for-reliable-air-quality-data-says-study/130481356" target="_blank">link</a></td></tr><tr><td>7</td><td>The Times of India</td><td style="font-size:10px">Apr 3, 2026</td><td style="max-width:260px">Honestly, how clean is Bengaluru air in Jan 2026?</td><td style="font-size:10px;font-family:monospace">Data Cited</td><td><a href="/goto?url=CAESqwEB7keqTavt6r-0sKYzubwsQCGDxU-IT6MI06j3tKYmMMNOytiwS7RtOwWmmn8ZruLvL-hlMlvysU39AgCgaY3mwQ3NI6vLPoHfCqO9-81FZZQekaiGEzToEfXGCX6YTEsyeQ0nIDSN_o_GfwtENZLzKK_ijmhue3VKhfON-96ip1I8V_QPggbKFqia09HxFbbr1daHAhPcoXPpvlOc2cW1Oad37eg9TLPXcqs=" target="_blank">link</a></td></tr></tbody></table><div style="margin-bottom:24px"></div></section>
+
+<footer class="rf">Generated by Emerald AI &middot; AQ Intelligence Platform v7 &middot; Thu, 18 Jun 2026 01:08:35 GMT<br>
+Data: Serper News API &middot; Claude Haiku 4.5 &middot; LLM AEO probing &middot; 8 articles &middot; 2026-03-08 to 2026-06-08 &middot; Orgs: CEEW, CSTEP<br>
+<strong style="color:var(--text)">CONFIDENTIAL</strong> &mdash; prepared for Chetan Bhattacharji</footer>
+</main></div>
+<script>
+function td(id){var e=document.getElementById(id);if(e)e.classList.toggle('open');}
+var secs=document.querySelectorAll('.sec[id],header[id]');
+var nis=document.querySelectorAll('.nav-a');
+secs.forEach(function(s){new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){nis.forEach(function(n){n.classList.remove('active');});var a=document.querySelector('.nav-a[href="#'+e.target.id+'"]');if(a)a.classList.add('active');}});},{threshold:0.25,rootMargin:'-10% 0px -60% 0px'}).observe(s);});
+function toggleExecDraft(){var d=document.getElementById('exec-draft');var ic=document.getElementById('exec-draft-icon');if(!d)return;var open=d.style.display!=='none';d.style.display=open?'none':'block';if(ic)ic.textContent=open?'\u25bc Show draft':'\u25b2 Hide draft';}
+function toggleEdit(){
+  var on=!document.body.classList.contains('edit-mode');
+  document.body.classList.toggle('edit-mode',on);
+  var btn=document.getElementById('edit-btn');
+  if(btn){btn.textContent=on?'\u2715 Exit Edit':'\u9998 Edit Mode';btn.classList.toggle('on',on);}
+  document.querySelectorAll('.sd,.fd,.rat,.em-body,.em-inf,.eq,.cqetx').forEach(function(el){el.contentEditable=on?'true':'false';});
+  if(on)addHideButtons();
+}
+function addHideButtons(){
+  document.querySelectorAll('.sec[id],.rh[id]').forEach(function(s){
+    if(s.querySelector('.sec-x'))return;
+    var btn=document.createElement('button');
+    btn.className='sec-x';btn.title='Hide section';btn.innerHTML='&times;';
+    btn.onclick=function(){s.classList.add('sec-hidden');};
+    s.style.position='relative';
+    s.appendChild(btn);
+  });
+}
+function dlEdit(){
+  var bar=document.getElementById('edit-bar');
+  var oldMode=document.body.classList.contains('edit-mode');
+  document.body.classList.remove('edit-mode');
+  document.querySelectorAll('.sd,.fd,.rat,.em-body,.em-inf,.eq,.cqetx').forEach(function(el){el.contentEditable='false';});
+  if(bar)bar.style.display='none';
+  var html='<!DOCTYPE html>'+document.documentElement.outerHTML;
+  if(bar)bar.style.display='';
+  if(oldMode)document.body.classList.add('edit-mode');
+  var b=new Blob([html],{type:'text/html'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download='aq-report-edited.html';a.click();URL.revokeObjectURL(a.href);
+}
+</script></body></html>
