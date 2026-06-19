@@ -153,107 +153,7 @@ async function callClaude(prompt, key, maxTokens=2500) {
   return res.data.content[0].text;
 }
 
-// ── AEO: Query LLMs and score org mentions ─────────────────────────────────
-async function probeAEO(cfg, orgs, cb) {
-  const results = {};
-  for (const org of orgs) {
-    results[org] = { score: 0, mentions: 0, llmBreakdown: {}, topResponse: '' };
-  }
-
-  // OpenAI — run all 5 questions in parallel for speed
-  if (cfg.OPENAI_KEY) {
-    cb(`  Probing OpenAI (GPT-4o mini) — ${AEO_QUESTIONS.length} questions in parallel...`);
-    let totalMentions = {}; orgs.forEach(o => totalMentions[o] = 0);
-    const responses = await Promise.allSettled(AEO_QUESTIONS.map(q =>
-      axios.post('https://api.openai.com/v1/chat/completions',
-        { model: 'gpt-4o-mini', max_tokens: 400, messages: [{ role:'user', content: q }] },
-        { headers: { 'Authorization': `Bearer ${cfg.OPENAI_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000 }
-      )
-    ));
-    for (const r of responses) {
-      if (r.status !== 'fulfilled') { cb(`  OpenAI question error: ${r.reason?.message}`, 'warn'); continue; }
-      const text = r.value.data.choices[0].message.content;
-      for (const org of orgs) {
-        if (text.toLowerCase().includes(org.toLowerCase())) {
-          totalMentions[org]++;
-          if (!results[org].topResponse) results[org].topResponse = text.slice(0,200);
-        }
-      }
-    }
-    for (const org of orgs) {
-      const score = Math.round(totalMentions[org] / AEO_QUESTIONS.length * 100);
-      results[org].llmBreakdown['OpenAI GPT-4o'] = { mentions: totalMentions[org], score };
-      cb(`  OpenAI — ${org}: ${totalMentions[org]}/${AEO_QUESTIONS.length} mentions`, totalMentions[org] > 0 ? 'ok' : 'warn');
-    }
-  }
-
-  // Perplexity — 3 questions in parallel (save credits)
-  if (cfg.PERPLEXITY_KEY) {
-    cb(`  Probing Perplexity (sonar) — 3 questions in parallel...`);
-    let totalMentions = {}; orgs.forEach(o => totalMentions[o] = 0);
-    const N_PERP = 3;
-    const responses = await Promise.allSettled(AEO_QUESTIONS.slice(0,N_PERP).map(q =>
-      axios.post('https://api.perplexity.ai/chat/completions',
-        { model: 'sonar', max_tokens: 400, messages: [{ role:'user', content: q }] },
-        { headers: { 'Authorization': `Bearer ${cfg.PERPLEXITY_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000 }
-      )
-    ));
-    for (const r of responses) {
-      if (r.status !== 'fulfilled') { cb(`  Perplexity question error: ${r.reason?.message}`, 'warn'); continue; }
-      const text = r.value.data.choices[0].message.content;
-      for (const org of orgs) {
-        if (text.toLowerCase().includes(org.toLowerCase())) {
-          totalMentions[org]++;
-          if (!results[org].topResponse) results[org].topResponse = text.slice(0,200);
-        }
-      }
-    }
-    for (const org of orgs) {
-      const score = Math.round(totalMentions[org] / N_PERP * 100);
-      results[org].llmBreakdown['Perplexity'] = { mentions: totalMentions[org], score };
-      cb(`  Perplexity — ${org}: ${totalMentions[org]}/${N_PERP} mentions`, totalMentions[org] > 0 ? 'ok' : 'warn');
-    }
-  }
-
-  // Google Gemini — 3 questions in parallel
-  if (cfg.GEMINI_KEY) {
-    cb(`  Probing Google Gemini (gemini-1.5-flash) — 3 questions in parallel...`);
-    let totalMentions = {}; orgs.forEach(o => totalMentions[o] = 0);
-    const N_GEM = 3;
-    const responses = await Promise.allSettled(AEO_QUESTIONS.slice(0,N_GEM).map(q =>
-      axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cfg.GEMINI_KEY}`,
-        { contents: [{ parts: [{ text: q }] }], generationConfig: { maxOutputTokens: 400 } },
-        { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
-      )
-    ));
-    for (const r of responses) {
-      if (r.status !== 'fulfilled') { cb(`  Gemini question error: ${r.reason?.message}`, 'warn'); continue; }
-      const text = r.value.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      for (const org of orgs) {
-        if (text.toLowerCase().includes(org.toLowerCase())) {
-          totalMentions[org]++;
-          if (!results[org].topResponse) results[org].topResponse = text.slice(0,200);
-        }
-      }
-    }
-    for (const org of orgs) {
-      const score = Math.round(totalMentions[org] / N_GEM * 100);
-      results[org].llmBreakdown['Gemini'] = { mentions: totalMentions[org], score };
-      cb(`  Gemini — ${org}: ${totalMentions[org]}/${N_GEM} mentions`, totalMentions[org] > 0 ? 'ok' : 'warn');
-    }
-  }
-
-  // Compute composite AEO score: average of all LLM scores
-  for (const org of orgs) {
-    const llmScores = Object.values(results[org].llmBreakdown).map(v => v.score);
-    results[org].score = llmScores.length > 0 ? Math.round(llmScores.reduce((a,b)=>a+b,0) / llmScores.length) : 0;
-    results[org].mentions = Object.values(results[org].llmBreakdown).reduce((a,b)=>a+b.mentions, 0);
-  }
-
-  return results; // { [org]: { score, mentions, llmBreakdown, topResponse } }
-}
-
+// ── AEO: handled via SI.runAEO (social-intelligence.js)
 // ── Social Media: Twitter/X ────────────────────────────────────────────────
 async function fetchTwitter(cfg, orgs, cb) {
   const results = {};
@@ -563,11 +463,11 @@ ${txt}`;
   // ── STEP 3: AEO Visibility (via Social Intelligence module) ──
   cb(`\nSTEP 3/6 — AEO / LLM Visibility...`, 'head');
   let aeoResults = {};
-  for (const org of ORGS) aeoResults[org] = { score:0, mentions:0, llmBreakdown:{}, topResponse:'', questionResults:{} };
+  for (const org of ORGS) aeoResults[org] = { mentions:0, llmBreakdown:{}, topResponse:'', questionResults:{} };
   try {
     aeoResults = await SI.runAEO(cfg, ORGS, cb);
     delete aeoResults._queriesUsed; // remove metadata key — Object.values() calls later expect only org entries
-    for (const org of ORGS) cb(`  ${org} AEO score: ${aeoResults[org].score}`, aeoResults[org].score>0?'ok':'warn');
+    for (const org of ORGS) cb(`  ${org} AEO mentions: ${aeoResults[org].mentions}`, aeoResults[org].mentions>0?'ok':'warn');
   } catch(e) { cb(`  AEO error: ${e.message}`, 'err'); }
 
   // ── STEP 4: Social Engagement Rate (Apify) ────────────────
@@ -629,7 +529,7 @@ ${txt}`;
   cb(`\nSTEP 5b/6 — AI analysis (executive summary, gap narratives, actions)...`, 'head');
   const orgSummary = ORGS.map(o=>{
     const er = socialERResults.find(r=>r.org===o);
-    return `${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo}/100, Social ER ${data[o].social}/10 (TW=${er?.twitterER||0}% IG=${er?.instagramER||0}% LI=${er?.linkedinER||0}%), top outlet: ${data[o].topOutlet}, topics 2+: ${Object.entries(data[o].topicCounts).filter(([,v])=>v>=2).map(([k])=>k).join(',')||'none'}`;
+    return `${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo} mentions, Social ER ${data[o].social}/10 (TW=${er?.twitterER||0}% IG=${er?.instagramER||0}% LI=${er?.linkedinER||0}%), top outlet: ${data[o].topOutlet}, topics 2+: ${Object.entries(data[o].topicCounts).filter(([,v])=>v>=2).map(([k])=>k).join(',')||'none'}`;
   }).join('\n');
   let emerging=[], execF=[], actions=[];
 
@@ -739,7 +639,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,socia
     }
     sl.addText(`Period: ${DATE_FROM}  →  ${DATE_TO}`,{x:0.6,y:3.2,w:6,h:0.28,fontSize:12,color:MUTED,fontFace:'Calibri'});
     // AEO indicator on cover
-    const hasAEO = Object.values(aeoResults).some(v=>v.score>0);
+    const hasAEO = Object.values(aeoResults).some(v=>v.mentions>0);
     if(hasAEO) sl.addText('✓ LLM Visibility',{x:8,y:3.2,w:2.5,h:0.26,fontSize:10,color:GOOD,fontFace:'Calibri'});
     const hasER = socialERResults && socialERResults.length > 0;
     if(hasER) sl.addText(`✓ Social ER: ${socialERResults.length} orgs (Apify)`,{x:8,y:3.52,w:5.3,h:0.26,fontSize:10,color:GOOD,fontFace:'Calibri'});
@@ -752,7 +652,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,socia
     const findings=execF.length>0?execF.slice(0,3):[
       {headline:`${ORGS[0]} leads AQ coverage`,detail:ORGS.map(o=>`${o}: ${data[o]?.total||0} articles`).join(', ')+'.',section_ref:'§03'},
       {headline:'Primary Source rates vary across orgs',detail:ORGS.map(o=>`${o}: ${data[o]?.authPct||0}% primary source`).join(', ')+'.',section_ref:'§06 Narrative Position'},
-      {headline:'AEO/LLM visibility remains a shared gap',detail:ORGS.map(o=>`${o}: AEO ${data[o]?.aeo||0}/100`).join(', ')+'.',section_ref:'§AEO'}
+      {headline:'AEO/LLM visibility remains a shared gap',detail:ORGS.map(o=>`${o}: AEO ${data[o]?.aeo||0} mentions`).join(', ')+'.',section_ref:'§AEO'}
     ];
     findings.forEach((f,i)=>{
       const y=1.28+i*1.58;
@@ -869,22 +769,23 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,socia
   // Slide 7: AEO / LLM Visibility
   {
     const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'AEO — LLM VISIBILITY'); stitle(sl,'AI Engine Optimisation');
-    sl.addText('How often is each organisation cited when AI models answer AQ questions? Based on 5 standard queries per LLM.',{x:0.5,y:1.12,w:12.3,h:0.32,fontSize:12,color:MUTED,fontFace:'Calibri'});
+    sl.addText('How often is each organisation cited when AI models answer AQ questions? Metric = raw LLM mentions.',{x:0.5,y:1.12,w:12.3,h:0.32,fontSize:12,color:MUTED,fontFace:'Calibri'});
 
-    const hasAEO = Object.values(aeoResults).some(v=>v.score>0);
+    const hasAEO = Object.values(aeoResults).some(v=>v.mentions>0);
     if(!hasAEO){
       card(sl,0.5,1.55,12.3,2.5);
       sl.addText('AEO data not collected this run.',{x:0.5,y:2.5,w:12.3,h:0.4,fontSize:16,color:MUTED,fontFace:'Calibri',align:'center'});
       sl.addText('Add OPENAI_KEY, PERPLEXITY_KEY, or GEMINI_KEY to enable LLM probing.',{x:0.5,y:3.0,w:12.3,h:0.4,fontSize:12,color:WARN,fontFace:'Calibri',align:'center'});
     } else {
-      // Bar chart: AEO score per org
+      // Bar chart: raw LLM mentions per org
+      const maxMentions = Math.max(...ORGS.map(o=>aeoResults[o].mentions||0),1);
       sl.addChart(pres.charts.BAR,
-        [{name:'AEO Score',labels:ORGS,values:ORGS.map(o=>aeoResults[o].score||0)}],
+        [{name:'LLM Mentions',labels:ORGS,values:ORGS.map(o=>aeoResults[o].mentions||0)}],
         {x:0.5,y:1.55,w:6,h:3.0,barDir:'col',
           chartColors:ORGS.map((_,i)=>orgPptx(i)),chartArea:{fill:{color:CARD2}},
           catAxisLabelColor:MUTED,valAxisLabelColor:MUTED,valGridLine:{color:BORD,size:0.5},catGridLine:{style:'none'},
           showValue:true,dataLabelColor:TXT,dataLabelFontSize:12,
-          showLegend:false,valAxisLineShow:false,catAxisLineShow:false,showTitle:false,valAxisMaxVal:100});
+          showLegend:false,valAxisLineShow:false,catAxisLineShow:false,showTitle:false,valAxisMaxVal:maxMentions});
 
       // LLM breakdown cards
       const llmNames = [...new Set(Object.values(aeoResults).flatMap(v=>Object.keys(v.llmBreakdown)))];
@@ -892,7 +793,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,socia
         const ay=1.55+oi*1.6; if(ay>6.5) return;
         card(sl,6.8,ay,5.8,1.45);
         sl.addText(org,{x:6.95,y:ay+0.1,w:5.5,h:0.28,fontSize:11,bold:true,color:orgPptx(oi),fontFace:'Calibri'});
-        sl.addText(`Overall AEO: ${aeoResults[org].score}/100 · ${aeoResults[org].mentions} total mentions`,{x:6.95,y:ay+0.42,w:5.5,h:0.24,fontSize:10,color:TXT,fontFace:'Calibri'});
+        sl.addText(`${aeoResults[org].mentions} total LLM mentions`,{x:6.95,y:ay+0.42,w:5.5,h:0.24,fontSize:10,color:TXT,fontFace:'Calibri'});
         const bk = aeoResults[org].llmBreakdown;
         const bkStr = Object.entries(bk).map(([k,v])=>`${k}: ${v.mentions}/${AEO_QUESTIONS.length}`).join('  ·  ');
         sl.addText(bkStr||'No LLM data',{x:6.95,y:ay+0.7,w:5.5,h:0.24,fontSize:9,color:MUTED,fontFace:'Calibri'});
@@ -901,7 +802,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,socia
         }
       });
     }
-    sl.addText('AEO questions: "Which organisations are the most authoritative on Indian air quality?" and 4 similar. Score = (mentions/questions) × 100.',{x:0.5,y:6.98,w:12.3,h:0.24,fontSize:8,color:MUTED,fontFace:'Calibri',italic:true});
+    sl.addText('AEO questions sent verbatim to GPT-4o mini, Perplexity Sonar, and Gemini 1.5 Flash. Metric = raw LLM mentions.',{x:0.5,y:6.98,w:12.3,h:0.24,fontSize:8,color:MUTED,fontFace:'Calibri',italic:true});
     footer(sl);
   }
 
@@ -993,7 +894,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,socia
         sl.addText(b.v>0?String(b.v):(b.l==='AEO'?'N/A':String(b.v)),{x:x+cw-0.55,y:by,w:0.4,h:0.22,fontSize:10,bold:true,color:b.v>0?orgPptx(entry.idx):MUTED,fontFace:'Calibri',align:'right'});
       });
     });
-    sl.addText('Score = (SoV×0.25) + (Narrative×0.25) + (Citation×0.20) + (AEO×0.30)',{x:0.5,y:6.98,w:12.3,h:0.24,fontSize:9,color:MUTED,fontFace:'Calibri'});
+    sl.addText('Score = (SoV×0.25) + (Narrative×0.25) + (Citation×0.20) + (AEO mentions×0.30)',{x:0.5,y:6.98,w:12.3,h:0.24,fontSize:9,color:MUTED,fontFace:'Calibri'});
     }); // end SCORE_GROUPS
   }
 
@@ -1125,7 +1026,7 @@ function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,pptxFilenam
 
   // AEO Section HTML
   function aeoSection(){
-    const hasAEO = Object.values(aeoResults).some(v=>v.score>0);
+    const hasAEO = Object.values(aeoResults).some(v=>v.mentions>0);
     const llmNames = [...new Set(Object.values(aeoResults).flatMap(v=>Object.keys(v.llmBreakdown)))];
     const aeoQs = AEO_QUESTIONS.map((q,i)=>`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><div style="font-family:monospace;font-size:10px;color:var(--amber);flex-shrink:0;padding-top:2px">${i+1}</div><div style="color:var(--muted2)">${esc(q)}</div></div>`).join('');
     // Ranking by total mentions for the AEO section header bar
