@@ -29,6 +29,14 @@ const OUTLETS = [
 const TV_CHANNELS_ENGLISH = ["NDTV", "News18", "India Today"];
 const TV_CHANNELS_HINDI = ["Aaj Tak", "India TV", "ABP News"];
 const ALL_TV_CHANNELS = [...TV_CHANNELS_ENGLISH, ...TV_CHANNELS_HINDI];
+const TV_CHANNEL_DOMAINS = {
+  "NDTV": "ndtv.com",
+  "News18": "news18.com",
+  "India Today": "indiatoday.in",
+  "Aaj Tak": "aajtak.in",
+  "India TV": "indiatvnews.com",
+  "ABP News": "abplive.com",
+};
 const TOPICS = [
   "NCAP",
   "Policy",
@@ -230,6 +238,24 @@ async function serperSearch(query, key) {
     },
   );
   return res.data.news || res.data.organic || [];
+}
+
+async function serperWebSearch(query, key) {
+  const res = await axios.post(
+    "https://google.serper.dev/search",
+    { q: query, num: 10 },
+    {
+      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+      timeout: 15000,
+    },
+  );
+  return (res.data.organic || []).map((r) => ({
+    title: r.title || "",
+    link: r.link || "",
+    snippet: r.snippet || "",
+    source: r.source || dom(r.link || ""),
+    date: r.date || "",
+  }));
 }
 
 async function serperScrape(url, key) {
@@ -535,6 +561,41 @@ async function run(cfg, cb) {
       await sleep(300);
     }
     cb(`  ${org}: ${arts[org].length} articles`, "ok");
+  }
+
+  // ── STEP 1c: TV channel targeted searches ──────────────────
+  cb(`\nSTEP 1c/6 — Fetching TV channel coverage (site: searches)...`, "head");
+  for (const org of ORGS) {
+    const tvSeen = new Set(arts[org].map((a) => a.url || a.title));
+    for (const [channel, domain] of Object.entries(TV_CHANNEL_DOMAINS)) {
+      const q = `site:${domain} "${org}" air quality OR air pollution India`;
+      cb(`  ${q}`);
+      try {
+        const results = await serperWebSearch(q, cfg.SERPER_KEY);
+        let added = 0;
+        for (const r of results) {
+          const k = r.link || r.title;
+          if (!tvSeen.has(k)) {
+            tvSeen.add(k);
+            if (!inRange(r.date || "")) continue;
+            if (isThirdParty(r.link || "", org)) {
+              arts[org].push({
+                title: r.title || "",
+                snippet: r.snippet || "",
+                source: channel,
+                url: r.link || "",
+                date: r.date || "",
+              });
+              added++;
+            }
+          }
+        }
+        cb(`  ${channel} · ${org}: +${added}`, added > 0 ? "ok" : "warn");
+      } catch (e) {
+        cb(`  TV search error (${channel}): ${e.message}`, "warn");
+      }
+      await sleep(300);
+    }
   }
 
   // ── STEP 1b: Scrape article text ───────────────────────────
