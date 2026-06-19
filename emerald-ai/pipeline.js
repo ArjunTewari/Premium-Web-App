@@ -1308,22 +1308,13 @@ function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,so
 
   // AEO Section HTML
   function aeoSection(){
-    function aeoGrade(score){
-      if(score>=65)return{g:'S',label:'Sector Leader'};
-      if(score>=45)return{g:'A',label:'Strong Visibility'};
-      if(score>=28)return{g:'B',label:'Good Visibility'};
-      if(score>=12)return{g:'C',label:'Developing'};
-      if(score>=3) return{g:'D',label:'Limited'};
-      return           {g:'E',label:'Not yet visible'};
-    }
-    function donutGrade(score,color){
-      const {g}=aeoGrade(score);
-      const da=(score/100*163.4).toFixed(1),db=(163.4-da).toFixed(1);
-      return `<svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="#1e2638" stroke-width="10"/><circle cx="32" cy="32" r="26" fill="none" stroke="${color}" stroke-width="10" stroke-dasharray="${da} ${db}" stroke-dashoffset="41" stroke-linecap="round"/><text x="32" y="38" text-anchor="middle" fill="${color}" font-size="18" font-family="Inter" font-weight="700">${g}</text></svg>`;
-    }
     const hasAEO = Object.values(aeoResults).some(v=>v.score>0);
     const llmNames = [...new Set(Object.values(aeoResults).flatMap(v=>Object.keys(v.llmBreakdown)))];
     const aeoQs = AEO_QUESTIONS.map((q,i)=>`<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><div style="font-family:monospace;font-size:10px;color:var(--amber);flex-shrink:0;padding-top:2px">${i+1}</div><div style="color:var(--muted2)">${esc(q)}</div></div>`).join('');
+    // Ranking by total mentions for the AEO section header bar
+    const aeoRanked=[...ORGS].map((o,i)=>({o,i,m:aeoResults[o].mentions||0})).sort((a,b)=>b.m-a.m);
+    const maxMentions=Math.max(1,...aeoRanked.map(x=>x.m));
+    const aeoRankBar=aeoRanked.map((x,ri)=>`<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)"><span style="font-family:monospace;font-size:10px;color:var(--muted);width:16px;flex-shrink:0">${ri+1}</span><span style="font-size:11px;font-weight:600;color:${orgHex(x.i)};width:90px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.o)}</span><div style="flex:1;height:7px;background:var(--surface3);border-radius:4px;overflow:hidden"><div style="height:100%;background:${orgHex(x.i)};width:${Math.round(x.m/maxMentions*100)}%;border-radius:4px"></div></div><span style="font-family:monospace;font-size:11px;font-weight:700;width:36px;text-align:right;color:${orgHex(x.i)};flex-shrink:0">${x.m} <span style="font-weight:400;color:var(--muted)">mentions</span></span></div>`).join('');
     const cards = ORGS.map((org,i)=>{
       const a=aeoResults[org];
       const col=orgHex(i);
@@ -1331,8 +1322,8 @@ function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,so
       return `<div class="cqp" style="border-top:2px solid ${col}">
         <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${col};margin-bottom:12px">${esc(org)}</div>
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-          ${donutGrade(a.score,col)}
-          <div><div style="font-size:12px;color:var(--muted2);margin-bottom:4px">AEO Score</div><div style="font-family:monospace;font-size:18px;font-weight:700;color:${col}">${aeoGrade(a.score).g} <span style="font-size:12px;color:var(--muted)">(${a.score}/100)</span></div><div style="font-size:11px;color:var(--muted);margin-top:2px">${a.mentions} total LLM mentions</div></div>
+          <div style="font-family:monospace;font-size:40px;font-weight:700;color:${col};line-height:1;flex-shrink:0">${a.mentions||0}</div>
+          <div><div style="font-size:12px;color:var(--muted2);margin-bottom:2px">LLM Mentions</div><div style="font-size:11px;color:var(--muted)">${llmNames.length>0?'across '+llmNames.length+' model'+(llmNames.length!==1?'s':''):'no models run'}</div></div>
         </div>
         ${bk||'<div style="font-size:11px;color:var(--muted)">No LLM data collected</div>'}
         ${a.topResponse?`<div class="cqe cqd" style="margin-top:10px"><div class="cqet">Example LLM response</div><div style="color:var(--text);font-family:monospace;font-size:11px;line-height:1.5">&ldquo;${esc(a.topResponse)}&rdquo;</div></div>`:''}
@@ -1342,7 +1333,8 @@ function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,so
     return `
 <section class="sec" id="aeo"><div class="sh"><div class="se">AEO — LLM Visibility</div><h2 class="st">AI Engine Optimisation</h2>
 <div class="sd">How often is each organisation cited when AI models (GPT-4o, Perplexity, Gemini) are asked about Indian air quality? ${hasAEO?'Probed with '+AEO_QUESTIONS.length+' standard questions per LLM.':'No LLM API keys provided — add keys to enable.'}</div><div class="sdiv"></div></div>
-${!hasAEO?`<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:13px;color:var(--muted2)"><strong style="color:var(--warn)">⚠ AEO data not available</strong> — Add OpenAI, Perplexity, or Gemini API keys and re-run to populate this section. AEO contributes 30% of the scorecard.</div>`:''}
+${!hasAEO?`<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:13px;color:var(--muted2)"><strong style="color:var(--warn)">⚠ AEO data not available</strong> — Add OpenAI, Perplexity, or Gemini API keys and re-run to populate this section.</div>`:''}
+${hasAEO?`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px"><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px">LLM Mention Ranking</div>${aeoRankBar}</div>`:''}
 <div style="${grid}">${cards}</div>
 <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px">
   <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px">Standard AEO questions (${AEO_QUESTIONS.length} per LLM)</div>
@@ -1429,9 +1421,14 @@ ${hasYT?`<div style="font-size:13px;font-weight:600;color:var(--text);margin:20p
   const rankedOrgs=ORGS.map((org,i)=>({org,i,score:data[org].score})).sort((a,b)=>b.score-a.score);
   let _lastScore=null,_lastRank=0;
   rankedOrgs.forEach((o,idx)=>{ if(o.score===_lastScore){o.rank=_lastRank;} else {o.rank=idx+1;_lastRank=idx+1;_lastScore=o.score;} });
+  // Avg citation % used for per-card delta comparison
+  const avgCitedPct = ORGS.length ? Math.round(ORGS.reduce((s,o)=>s+(data[o].dataPct||0),0)/ORGS.length) : 0;
   const scorecards=rankedOrgs.map(({org,i,rank})=>{
     const d=data[org];
-    return `<div class="sca" style="border-top:3px solid ${orgHex(i)}"><div class="scn" style="color:${orgHex(i)}">${esc(org)}</div><div class="scg" style="color:${rankCol(rank)}">${ordinal(rank)}</div><div class="scs">${d.score} / 100</div>
+    const citDelta=d.dataPct-avgCitedPct;
+    const citDeltaStr=(citDelta>=0?'+':'')+citDelta+'% vs avg';
+    const citDeltaCol=citDelta>0?'var(--good)':citDelta<0?'var(--bad)':'var(--muted)';
+    return `<div class="sca" style="border-top:3px solid ${orgHex(i)}"><div class="scn" style="color:${orgHex(i)}">${esc(org)}</div><div class="scg" style="color:${rankCol(rank)}">${ordinal(rank)}</div><div style="font-family:monospace;font-size:11px;font-weight:600;color:${citDeltaCol};margin-bottom:14px">${citDeltaStr} cited</div>
 <div style="display:flex;flex-direction:column;gap:8px;text-align:left">
 ${scRow('Share of Voice',d.sov,orgHex(i))}${scRow('Citation',d.dataPct,orgHex(i))}${scRow('AEO',d.aeo,d.aeo>0?orgHex(i):'#5e7494')}${scRow('Social',d.social||0,d.social>0?orgHex(i):'#5e7494',(d.social||0)*10)}
 </div></div>`;
@@ -1657,7 +1654,7 @@ ${topicCards()}</section>
 <div class="sd"><strong style="color:var(--good)">Data Cited</strong> = a specific number, statistic, or named report from this org is explicitly cited. <strong style="color:var(--muted2)">Named Mention</strong> = org is named but no specific data cited. <strong style="color:var(--muted)">Total</strong> = all articles retrieved by searching for this org&rsquo;s name &mdash; some may not directly name the org in the text (the search established the relevance connection; Claude classified each article individually). Sorted by Data Cited %.</div><div class="sdiv"></div></div>
 ${clsNotice}${citTable()}</section>
 
-<section class="sec" id="em"><div class="sh"><div class="se">Section 08</div><h2 class="st">AQ Media White-Space Gaps</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations are <strong style="color:var(--warn)">not part of</strong> &mdash; identified by fetching general AQ news (no org name filter), removing any article that mentions a tracked org, then asking Claude to cluster the remaining articles into themes. These are genuine white-space opportunities: the AQ media conversation is active on these topics, but your orgs are absent. <strong>Gap signal</strong> = the evidence of absence. <strong>Opportunity</strong> = a concrete action to enter the conversation. Article links = source articles from the org-absent pool used as evidence.</div><div class="sdiv"></div></div>
+<section class="sec" id="em"><div class="sh"><div class="se">Section 08</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations are <strong style="color:var(--warn)">not yet part of</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. These are emerging narrative opportunities: the conversation is active but your orgs are absent. <strong>Gap signal</strong> = evidence of the absence. <strong>Opportunity</strong> = a concrete action to enter the conversation.</div><div class="sdiv"></div></div>
 ${emergingCards}</section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS)}
