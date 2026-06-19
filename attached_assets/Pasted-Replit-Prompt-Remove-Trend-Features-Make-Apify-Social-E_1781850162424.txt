@@ -1,0 +1,295 @@
+Replit Prompt — Remove Trend Features + Make Apify Social ER the Social Section
+
+Paste everything below into Replit's Agent/Assistant chat.
+
+This is a single combined change. Do the work in the ORDER given (Part 1
+then Part 2) — Part 1 removes things, Part 2 then cleanly rewires the social
+section on what's left. Do not do these in parallel or out of order, since
+both touch the same buildHTML/buildPPTX parameter lists and HTML
+assembly section.
+
+
+Overview of what's changing
+
+Two unrelated cleanups, done together because they touch adjacent code:
+
+
+Remove trend features entirely — both "Trend Detection / Trend Social"
+(48h spike detection → extra social fetch → its own report section) and
+"Coverage Momentum" (a weekly article-volume bar chart). These are two
+SEPARATE features that happen to share the word "trend" — confirmed by
+tracing the code, they do not call each other or share data.
+Make Apify Social ER the only social section — emerald-ai/social-er.js
+already exists, already runs every pipeline call (Step 4b), and already
+computes real per-platform engagement rates via Apify. Its output
+(socialERResults, socialERHtml) is currently computed but UNUSED — it
+doesn't feed each org's score, and isn't inserted into the final report.
+Meanwhile the OLD Serper-based SI.runSocial() / SI.buildSocialHtml()
+(Google-indexed site:twitter.com etc. search results, not real
+engagement data) is what's CURRENTLY driving both the score and the
+rendered "Social Media" section. This swaps which one is authoritative.
+
+
+SI.runAEO / SI.buildAEOHtml (LLM visibility probing — GPT-4o, Perplexity,
+Gemini) is a COMPLETELY SEPARATE feature from both of the above and must be
+left fully intact throughout this entire change.
+
+
+PART 1 — Remove trend features entirely
+
+1a. Remove the Step 2.5 Trend Detection block
+
+Delete this block from pipeline.js (search "STEP 2.5/6"):
+
+js// ── STEP 2.5: Trend Detection ─────────────────────────────
+cb(`\nSTEP 2.5/6 — Trend Detection (48h spike analysis)...`, 'head');
+const trendEvent = await detectTrend(cls, arts, ORGS, cfg.CLAUDE_KEY, cb);
+let trendSocialData = null;
+if (trendEvent.detected) {
+  cb(`[TREND] Fetching social data for: ${trendEvent.orgsToFetch.join(', ')}`);
+  trendSocialData = await TS.fetchTrendSocial(trendEvent, cfg, cb);
+} else {
+  cb('[TREND] No trend spike. Trend social fetch skipped.');
+}
+
+1b. Remove the detectTrend function
+
+Delete the entire detectTrend(cls, arts, orgs, claudeKey, cb) function
+definition in pipeline.js. Confirm it's not called anywhere else before
+deleting.
+
+1c. Remove the trend-social.js import and delete the file
+
+
+Remove const TS = require('./trend-social'); from the top of pipeline.js.
+Delete the file emerald-ai/trend-social.js entirely. (Do NOT migrate it to
+Apify — it's being deleted outright, not fixed.)
+
+
+1d. Remove trendEvent/trendSocialData from signatures and call sites
+
+These are threaded as positional params through buildPPTX and buildHTML.
+Remove them from both definitions and every call site:
+
+
+buildPPTX(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxFile,cfg)
+buildHTML(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxName,cfg,socialERHtml)
+
+
+(Leave siSocial, socialScores, and socialERHtml in these signatures for
+now — Part 2 below handles those specifically, don't pre-emptively remove
+them here.)
+
+Inside buildPPTX: remove the block rendering the trend slide (search
+if (trendEvent?.detected && trendSocialData?.length) and the slide text
+referencing trendEvent.topic, .articleCount, .triggeredAt, .summary).
+
+Inside buildHTML: remove
+
+
+the nav link conditional:
+${trendEvent?.detected?'<a href="#trend-social" class="nav-a">Trend Social</a>':''}
+the section render line:
+${trendEvent?.detected && trendSocialData?.length ? SI.buildTrendSocialHtml(trendEvent, trendSocialData, ORGS) : ''}
+
+
+1e. Remove buildTrendSocialHtml from social-intelligence.js
+
+Delete the buildTrendSocialHtml function and remove it from
+module.exports. Do NOT touch runAEO or buildAEOHtml. Leave
+runSocial/computeSocialScore/buildSocialHtml in place for now — Part 2
+removes those specifically.
+
+1f. Remove the Coverage Momentum chart (unrelated feature, same cleanup pass)
+
+In aggregateOrg(), remove the weekly-bucketing block:
+
+jsconst wk={}; const st=new Date(dateFrom);
+for(let i=0;i<13;i++){const d=new Date(st);d.setDate(d.getDate()+i*7);wk[d.toISOString().slice(0,10)]=0;}
+const wkeys=Object.keys(wk);
+artList.forEach(a=>{
+  const d=parseDateStr(a.date);
+  if(d){const diff=Math.floor((d-st)/(7*86400000));if(diff>=0&&diff<13){wk[wkeys[diff]]++;return;}}
+  wk[wkeys[0]]++;
+});
+
+Remove weeklyData:wk from the return object. Keep st only if it's used
+elsewhere in the function for something unrelated — check before deleting it.
+
+Remove the weekly chart series construction in buildPPTX (search
+data[ORGS[0]].weeklyData) and whatever sl.addChart(...) consumes it,
+including its slide/label if the chart was that slide's only content.
+
+Remove the <section class="sec" id="momentum">...</section> block
+("Section 04 — Coverage Momentum") from the HTML builder, including the
+per-week bar logic reading data[org]?.weeklyData[w]. Remove its nav link
+<a href="#momentum" class="nav-a">Momentum</a> — keep the rest of the Media
+Analysis nav group (Share of Voice, TV Coverage, Topic Ownership, Citation
+Quality, White-Space Gaps) intact.
+
+After removing Momentum, check whether the visible "Section 0X" labels need
+renumbering so there's no gap (Section 04 disappearing) — renumber only the
+visible label TEXT, do not change any id="..." attributes, and confirm nav
+href="#..." values still match each section's actual id afterward.
+
+
+PART 2 — Make Apify Social ER the authoritative social section
+
+Do this AFTER Part 1 is complete and verified working (no trend-related
+crashes), on the now-cleaned-up file.
+
+2a. Normalise Apify ER into the 0–10 score computeScore expects
+
+computeScore(d, aeoScore, socialScore=0) expects socialScore as 0–10
+(multiplied ×2 internally, max 20-pt contribution). social-er.js's avgER
+is a raw percentage. Add normalisation right after Step 4b's
+SocialER.run() call:
+
+jsconst maxER = Math.max(...socialERResults.map(r => r.avgER), 0.01); // avoid /0
+const erScoreByOrg = {};
+for (const r of socialERResults) {
+  erScoreByOrg[r.org] = Math.round((r.avgER / maxER) * 10);
+}
+
+In Step 5's scoring loop, change:
+
+jsdata[org] = computeScore(base, aeoResults[org].score, socialScores[org]?.normalised||0);
+
+to:
+
+jsdata[org] = computeScore(base, aeoResults[org].score, erScoreByOrg[org] || 0);
+
+2b. Remove the old Serper-based social fetch and scoring
+
+Remove from Step 4 in pipeline.js:
+
+jssiSocial = await SI.runSocial(cfg, ORGS, cb);
+
+and its surrounding try/catch, and:
+
+jsconst socialScores = SI.computeSocialScore(siSocial, ORGS);
+for (const org of ORGS) {
+  cb(`  Social score: ${org} = ${socialScores[org].total} pts (${socialScores[org].normalised}/10 normalised)`, 'ok');
+}
+
+Since siSocial/socialScores are no longer computed, remove them from the
+buildPPTX/buildHTML parameter lists and call sites too (same positional
+params identified in Part 1d — clean these up now in the same pass).
+
+2c. Rebuild buildSocialERHtml() with the richer layout
+
+Replace the current single-table buildSocialERHtml() in social-er.js with
+a layout matching the attached reference design (social-er-demo.html from
+earlier — dark theme, summary stat cards, ranked org rows with ER bars and
+platform pills, 3 per-platform mini-leaderboard cards). Specifically render:
+
+
+Section header — "Social Engagement Rate — Competitive Ranking", date
+range + ER formula subtitle. Reuse the existing .sh/.se/.st/.sd/.sdiv
+class names already used by other sections in pipeline.js's HTML output
+— do NOT introduce a separate inline <style> block.
+Methodology box — state the Apify actor IDs actually used
+(apidojo/tweet-scraper-v2, apify/instagram-scraper,
+harvestapi/linkedin-profile-posts-scraper — reference these as constants
+rather than hardcoding strings, so they stay accurate if social-er.js
+changes) and the ER formula.
+Summary stat cards (4): orgs tracked, total posts analysed (vs. max
+possible — compute from actual per-platform fetch caps in social-er.js,
+don't hardcode "5" unless that's confirmed to still be the cap), highest
+ER (value + org), median ER.
+Ranked org rows (sorted by avgER desc, using the existing rank
+field): rank/medal, org name, avg ER with proportional bar (relative to
+max ER in the run), per-platform ER (show "—" not "0%" when a platform had
+zero qualifying posts — these mean different things), post-count pills per
+platform, and the existing insight text from deriveInsight().
+Per-platform breakdown cards (Twitter / Instagram / LinkedIn): mini
+leaderboard within each platform using that platform's own ER ranking
+(r.twitterER, r.instagramER, r.linkedinER) — sort each independently,
+don't reuse overall avgER rank.
+Footnote — formula recap, Instagram/LinkedIn shares-not-available
+caveat, follower-count-at-scrape-time caveat.
+
+
+Match colors to the REST of the report's existing dark theme (#111520
+background, #8fa3b8 muted text, #252d40 borders — already used throughout
+pipeline.js's other build*Html() functions), not the reference file's
+slightly different palette, so this section doesn't look visually
+inconsistent with the rest of the report.
+
+2d. Swap the rendered section
+
+In buildHTML's assembly, replace:
+
+js${SI.buildSocialHtml(siSocial, socialScores, ORGS)}
+
+with:
+
+js${socialERHtml}
+
+Confirm socialERHtml (already computed at Step 4b) is in scope at the HTML
+assembly point. There should be exactly ONE social section in the final
+report — confirm no leftover second reference to socialERHtml exists
+elsewhere that would duplicate it.
+
+2e. Update the Methodology section text
+
+Find the methodology description (search "Serper site-search for AQ content
+mentions") and update it to remove that phrase, replacing with something
+reflecting: Serper News API for media coverage, Claude Haiku 4.5 for
+classification, LLM probing for AEO, Apify for social media engagement
+(Twitter/X, Instagram, LinkedIn), no YouTube.
+
+
+Do NOT touch (applies to both parts)
+
+
+SI.runAEO, SI.buildAEOHtml, "STEP 3/6 — AEO / LLM Visibility" — totally
+separate feature, must keep working exactly as before.
+TV Channel Coverage, Share of Voice, Topic Ownership, Citation Quality,
+White-Space Gaps sections — unrelated to either change.
+social-intelligence.js's runYouTube stub, AEO_QUESTIONS,
+detectMentionLocations — unrelated.
+ORG_HANDLES mapping in social-er.js — if an org in ORGS has no entry,
+it's silently skipped (existing behavior) — flag any mismatches you find
+during testing, don't invent new handles.
+APIFY_TOKEN env var handling — already gated with a graceful skip if
+unset, keep that pattern.
+The ER formula itself (calcER()) — only rendering/scoring wiring changes,
+not the math.
+serperSearch in pipeline.js (News API article fetch, Step 1 and Step 5a
+white-space gaps) — Serper stays for NEWS search. This change only removes
+Serper from the SOCIAL path (which, after Part 1, no longer exists at all
+via trend-social, and after Part 2, no longer exists via SI.runSocial
+either).
+
+
+
+After implementing — verification
+
+
+grep -rni "trend" emerald-ai/pipeline.js shows nothing related to spike
+detection, trend social, or momentum charts.
+grep -rni "trend" emerald-ai/social-intelligence.js shows no
+buildTrendSocialHtml.
+emerald-ai/trend-social.js no longer exists as a file.
+Run a full test pipeline call with APIFY_TOKEN set and 2-3 orgs that have
+entries in ORG_HANDLES (e.g. CEEW, CSE India, WRI India). Confirm:
+
+No console errors referencing undefined trendEvent/trendSocialData/
+weeklyData/siSocial/socialScores.
+The report has exactly ONE social section (new Apify-based design), no
+"Trend Social" section, no "Momentum" section, and matching nav links
+removed for both.
+Each org's final score/grade reflects erScoreByOrg, not the old Serper
+social score — show me one org's before/after score so this is visible,
+not just trusted.
+All untouched sections (TV Coverage, Share of Voice, Topic Ownership,
+Citation Quality, White-Space Gaps, AEO) still render correctly.
+PPTX generates without errors and has no trend or momentum slides.
+
+
+
+If APIFY_TOKEN is unset, confirm the pipeline still completes gracefully
+(no crash) and the social section renders an empty/no-data state cleanly.
+Show me the final nav bar HTML and the list of section IDs present in the
+generated report so I can confirm exactly what remains.

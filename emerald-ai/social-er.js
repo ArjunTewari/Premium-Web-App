@@ -220,51 +220,131 @@ async function run(cfg, selectedOrgs, cb) {
 function buildSocialERHtml(erResults) {
   if (!erResults?.length) return '';
 
-  const medals = ['🥇', '🥈', '🥉'];
-  const rows = erResults.map((r, i) => {
-    const medal = medals[i] || `#${r.rank}`;
-    const barW  = Math.min(r.avgER * 10, 100);
+  const MAX_POSTS_PER_PLATFORM = 5;
+  const PLATFORMS = 3;
+
+  const totalPostsAnalysed = erResults.reduce((s, r) => s + r.totalPosts, 0);
+  const totalPostsPossible = erResults.length * PLATFORMS * MAX_POSTS_PER_PLATFORM;
+  const highestER = erResults.reduce((best, r) => r.avgER > best.avgER ? r : best, erResults[0]);
+  const sortedER  = [...erResults].map(r => r.avgER).filter(v => v > 0).sort((a, b) => a - b);
+  const medianER  = sortedER.length
+    ? parseFloat(sortedER[Math.floor(sortedER.length / 2)].toFixed(2))
+    : 0;
+
+  const statCards = [
+    { label: 'Orgs tracked',          value: erResults.length,           unit: '',   color: '#8fa3b8' },
+    { label: 'AQ posts analysed',     value: `${totalPostsAnalysed}/${totalPostsPossible}`, unit: '', color: '#4a9fd4' },
+    { label: 'Highest avg ER',        value: highestER.avgER > 0 ? highestER.avgER + '%' : '—', unit: highestER.avgER > 0 ? highestER.org : '', color: '#4caf74' },
+    { label: 'Median avg ER',         value: medianER > 0 ? medianER + '%' : '—',  unit: 'across ranked orgs', color: '#d4a843' },
+  ].map(c => `
+    <div style="flex:1;min-width:160px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:16px 18px">
+      <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">${c.label}</div>
+      <div style="font-family:monospace;font-size:22px;font-weight:700;color:${c.color};line-height:1">${c.value}</div>
+      ${c.unit ? `<div style="font-size:11px;color:#5e7494;margin-top:5px">${c.unit}</div>` : ''}
+    </div>`).join('');
+
+  const maxAvgER = Math.max(...erResults.map(r => r.avgER), 0.01);
+  const orgRows = erResults.map((r, i) => {
+    const barPct = Math.round((r.avgER / maxAvgER) * 100);
+    const rankLabel = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${r.rank}`;
+    const twBar  = r.twitterER   > 0 ? Math.round((r.twitterER   / maxAvgER) * 100) : 0;
+    const igBar  = r.instagramER > 0 ? Math.round((r.instagramER / maxAvgER) * 100) : 0;
+    const liBar  = r.linkedinER  > 0 ? Math.round((r.linkedinER  / maxAvgER) * 100) : 0;
+    const platformPill = (label, er, barW, col) => er > 0
+      ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+           <span style="font-family:monospace;font-size:10px;color:#5e7494;width:64px;flex-shrink:0">${label}</span>
+           <div style="flex:1;height:5px;background:#1e2638;border-radius:3px;overflow:hidden">
+             <div style="height:100%;width:${barW}%;background:${col};border-radius:3px"></div>
+           </div>
+           <span style="font-family:monospace;font-size:11px;font-weight:700;color:${col};width:44px;text-align:right">${er}%</span>
+         </div>`
+      : `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+           <span style="font-family:monospace;font-size:10px;color:#5e7494;width:64px;flex-shrink:0">${label}</span>
+           <span style="font-family:monospace;font-size:11px;color:#3a4a5e">No AQ posts</span>
+         </div>`;
     return `
-      <tr style="border-bottom:1px solid #252d40">
-        <td style="padding:10px 12px;font-weight:600;color:#d8e4f0">${medal} ${r.org}</td>
-        <td style="padding:10px 12px">
-          ${r.avgER > 0
-            ? `<span style="font-weight:700;font-family:monospace;color:#4caf74">${r.avgER}%</span>
-               <div style="height:4px;background:#1e2638;border-radius:2px;margin-top:4px;width:120px">
-                 <div style="height:4px;width:${barW}%;background:#4caf74;border-radius:2px"></div>
-               </div>`
-            : '<span style="color:#5e7494">—</span>'}
-        </td>
-        <td style="padding:10px 12px;font-family:monospace;font-size:12px;color:#8fa3b8">${r.twitterER   > 0 ? r.twitterER   + '%' : '—'}</td>
-        <td style="padding:10px 12px;font-family:monospace;font-size:12px;color:#8fa3b8">${r.instagramER > 0 ? r.instagramER + '%' : '—'}</td>
-        <td style="padding:10px 12px;font-family:monospace;font-size:12px;color:#8fa3b8">${r.linkedinER  > 0 ? r.linkedinER  + '%' : '—'}</td>
-        <td style="padding:10px 12px;font-size:11px;color:#5e7494">${r.twitterPosts}T / ${r.instagramPosts}IG / ${r.linkedinPosts}LI</td>
-        <td style="padding:10px 12px;font-size:12px;color:#8fa3b8">${r.insight}</td>
-      </tr>`;
+    <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:16px 20px;border-left:3px solid ${r.avgER > 0 ? '#4caf74' : '#252d40'}">
+      <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
+        <div style="flex-shrink:0;width:28px;font-family:monospace;font-size:14px;font-weight:700;color:#8fa3b8;padding-top:2px">${rankLabel}</div>
+        <div style="flex:1;min-width:180px">
+          <div style="font-family:monospace;font-size:12px;font-weight:700;color:#d8e4f0;margin-bottom:6px">${r.org}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <div style="flex:1;height:7px;background:#1e2638;border-radius:4px;overflow:hidden">
+              <div style="height:100%;width:${barPct}%;background:#4caf74;border-radius:4px"></div>
+            </div>
+            <span style="font-family:monospace;font-size:16px;font-weight:700;color:${r.avgER > 0 ? '#4caf74' : '#3a4a5e'};width:52px;text-align:right">${r.avgER > 0 ? r.avgER + '%' : '—'}</span>
+          </div>
+          <div style="font-size:11px;color:#5e7494">${r.insight}</div>
+        </div>
+        <div style="flex-shrink:0;min-width:220px">
+          ${platformPill('X/Twitter', r.twitterER, twBar, '#4a9fd4')}
+          ${platformPill('Instagram', r.instagramER, igBar, '#c46ab3')}
+          ${platformPill('LinkedIn', r.linkedinER, liBar, '#4a7fd4')}
+        </div>
+        <div style="flex-shrink:0;text-align:right">
+          <div style="font-family:monospace;font-size:10px;color:#5e7494;margin-bottom:4px">Posts analysed</div>
+          <div style="font-family:monospace;font-size:11px;color:#8fa3b8">${r.twitterPosts}<span style="color:#4a9fd4">T</span> / ${r.instagramPosts}<span style="color:#c46ab3">I</span> / ${r.linkedinPosts}<span style="color:#4a7fd4">L</span></div>
+          ${r.bestPost ? `<div style="margin-top:6px;font-family:monospace;font-size:10px;color:#5e7494">Best post</div>
+          <div style="font-family:monospace;font-size:10px;color:#4caf74">${r.bestPost.likes + r.bestPost.comments + r.bestPost.shares} engagements</div>` : ''}
+        </div>
+      </div>
+    </div>`;
   }).join('');
 
+  const platformLeaderboard = (label, icon, col, erKey, postsKey) => {
+    const sorted = [...erResults].filter(r => r[erKey] > 0).sort((a, b) => b[erKey] - a[erKey]);
+    if (!sorted.length) return `
+      <div style="flex:1;min-width:200px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:16px 18px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-family:monospace;font-size:12px;font-weight:700;color:${col}">${icon} ${label}</span>
+        </div>
+        <div style="font-size:12px;color:#3a4a5e">No data collected</div>
+      </div>`;
+    const maxE = sorted[0][erKey];
+    const rows = sorted.slice(0, 5).map((r, i) => {
+      const pct = Math.round((r[erKey] / maxE) * 100);
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+        <span style="font-family:monospace;font-size:10px;color:#5e7494;width:18px">${i+1}</span>
+        <span style="font-family:monospace;font-size:11px;color:#d8e4f0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.org.split(' ').slice(-1)[0]}</span>
+        <div style="width:60px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${col};border-radius:2px"></div>
+        </div>
+        <span style="font-family:monospace;font-size:11px;font-weight:700;color:${col};width:40px;text-align:right">${r[erKey]}%</span>
+      </div>`;
+    }).join('');
+    return `
+      <div style="flex:1;min-width:200px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:16px 18px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-family:monospace;font-size:12px;font-weight:700;color:${col}">${icon} ${label}</span>
+          <span style="margin-left:auto;font-family:monospace;font-size:10px;color:#5e7494">top ${Math.min(sorted.length,5)}</span>
+        </div>
+        ${rows}
+      </div>`;
+  };
+
   return `
-<section class="sec" id="social-er">
+<section class="sec" id="social">
   <div class="sh">
-    <div class="se">Social ER</div>
-    <h2 class="st">Social Engagement Rate — Comparative Ranking</h2>
-    <div class="sd">ER = (Likes + Comments + Shares) × 100 ÷ Followers, averaged across AQ posts. Instagram and LinkedIn shares not publicly available — excluded from those platform ERs.</div>
+    <div class="se">Section 08b</div>
+    <h2 class="st">Social Engagement Rate</h2>
+    <div class="sd">Real engagement rate (ER) per org across X/Twitter, Instagram, and LinkedIn — sourced via Apify. ER&nbsp;=&nbsp;(Likes&nbsp;+&nbsp;Comments&nbsp;+&nbsp;Shares)&nbsp;&times;&nbsp;100&nbsp;&divide;&nbsp;Followers, averaged across up to ${MAX_POSTS_PER_PLATFORM} AQ posts per platform. Instagram and LinkedIn shares are not publicly available and are excluded from those platform ERs.</div>
     <div class="sdiv"></div>
   </div>
-  <table style="width:100%;border-collapse:collapse;font-size:13px;background:#111520">
-    <thead>
-      <tr style="background:#181e2e;border-bottom:2px solid #252d40">
-        <th style="text-align:left;padding:10px 12px;color:#8fa3b8;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Organisation</th>
-        <th style="text-align:left;padding:10px 12px;color:#8fa3b8;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Avg ER</th>
-        <th style="text-align:left;padding:10px 12px;color:#8fa3b8;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Twitter ER</th>
-        <th style="text-align:left;padding:10px 12px;color:#8fa3b8;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Instagram ER</th>
-        <th style="text-align:left;padding:10px 12px;color:#8fa3b8;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">LinkedIn ER</th>
-        <th style="text-align:left;padding:10px 12px;color:#8fa3b8;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Posts</th>
-        <th style="text-align:left;padding:10px 12px;color:#8fa3b8;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Why</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">${statCards}</div>
+
+  <div style="background:rgba(74,159,212,.06);border:1px solid rgba(74,159,212,.18);border-radius:8px;padding:12px 16px;margin-bottom:24px;font-size:12px;color:#8fa3b8;line-height:1.7">
+    <strong style="color:#4a9fd4">Methodology:</strong> Apify actors fetch up to ${MAX_POSTS_PER_PLATFORM} posts per org per platform (apidojo/tweet-scraper-v2 &middot; apify/instagram-scraper &middot; harvestapi/linkedin-profile-posts-scraper), filtered to air quality content. ER is normalised 0&ndash;10 and used in the composite AQ Intelligence score.
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:32px">${orgRows}</div>
+
+  <div style="font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:12px">Per-Platform Leaderboard</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    ${platformLeaderboard('X / Twitter', '𝕏', '#4a9fd4', 'twitterER', 'twitterPosts')}
+    ${platformLeaderboard('Instagram',   '◉', '#c46ab3', 'instagramER', 'instagramPosts')}
+    ${platformLeaderboard('LinkedIn',    'in', '#4a7fd4', 'linkedinER', 'linkedinPosts')}
+  </div>
 </section>`;
 }
 

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Social ER — AQ Media Intelligence</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f1117;
+    color: #e8e8e8;
+    padding: 32px 24px;
+    min-height: 100vh;
+  }
+  .section-header { margin-bottom: 8px; }
+  .section-title { font-size: 22px; font-weight: 700; color: #fff; }
+  .section-sub { font-size: 13px; color: #888; margin-top: 6px; line-height: 1.5; }
+  .divider { width: 48px; height: 3px; background: #d4a843; margin: 12px 0 20px; border-radius: 2px; }
+
+  .formula-box {
+    background: #1a1d27;
+    border: 1px solid #2a2d3a;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    font-size: 13px;
+    color: #aaa;
+    line-height: 1.6;
+  }
+  .formula-box strong { color: #d4a843; }
+  .formula-box code { background: #12141c; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #7dd3c8; font-family: 'Courier New', monospace; }
+
+  /* Summary cards */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: #1a1d27;
+    border: 1px solid #2a2d3a;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .stat-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+  .stat-value { font-size: 22px; font-weight: 700; color: #fff; }
+  .stat-sub { font-size: 11px; color: #555; margin-top: 4px; }
+  .stat-up { color: #4ade80; }
+  .stat-down { color: #f87171; }
+
+  /* Platform tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; background: #1a1d27; padding: 4px; border-radius: 10px; width: fit-content; }
+  .tab {
+    padding: 8px 16px; border-radius: 7px; font-size: 13px; cursor: pointer;
+    color: #666; transition: all 0.15s; border: none; background: none; display: flex; align-items: center; gap: 6px;
+  }
+  .tab.active { background: #252836; color: #fff; }
+  .tab-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* Rankings table */
+  .rankings-header {
+    display: grid;
+    grid-template-columns: 32px 1fr 100px 100px 100px 80px 180px;
+    gap: 12px;
+    padding: 8px 16px;
+    font-size: 11px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #1e2030;
+    margin-bottom: 4px;
+  }
+  .org-row {
+    display: grid;
+    grid-template-columns: 32px 1fr 100px 100px 100px 80px 180px;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #1a1d27;
+    border: 1px solid #22253a;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    align-items: center;
+    transition: border-color 0.15s;
+  }
+  .org-row:hover { border-color: #3a3d55; }
+  .org-row.top1 { border-color: #d4a843; background: #1c1a10; }
+  .org-row.top2 { border-color: #888; background: #1a1c1c; }
+  .org-row.top3 { border-color: #a0673a; background: #1c1916; }
+
+  .rank { font-size: 13px; font-weight: 700; color: #555; text-align: center; }
+  .rank.gold { color: #d4a843; }
+  .rank.silver { color: #aaa; }
+  .rank.bronze { color: #c97a3a; }
+
+  .org-name { font-size: 13px; font-weight: 600; color: #e0e0e0; }
+  .org-domain { font-size: 11px; color: #555; margin-top: 2px; }
+
+  .er-value { font-size: 15px; font-weight: 700; color: #fff; }
+  .er-bar-wrap { margin-top: 4px; height: 3px; background: #22253a; border-radius: 2px; }
+  .er-bar { height: 3px; border-radius: 2px; }
+
+  .platform-er { font-size: 12px; color: #888; }
+  .platform-er span { display: block; }
+
+  .posts-count { font-size: 12px; color: #666; }
+  .posts-count span { display: inline-block; padding: 1px 6px; border-radius: 4px; margin: 1px; font-size: 10px; }
+  .tw { background: #0d1a2e; color: #4a9fd4; }
+  .ig { background: #2a1a2a; color: #c46ab3; }
+  .li { background: #0d1a2e; color: #4a7fd4; }
+
+  .insight-tag {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 5px;
+    color: #7dd3c8;
+    background: #0d2220;
+    display: inline-block;
+  }
+
+  /* Platform breakdown */
+  .platform-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 28px;
+  }
+  .platform-card {
+    background: #1a1d27;
+    border: 1px solid #2a2d3a;
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .platform-title { font-size: 13px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .platform-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+  .platform-icon.tw { background: #0d1a2e; color: #4a9fd4; }
+  .platform-icon.ig { background: #2a1420; color: #c46ab3; }
+  .platform-icon.li { background: #0d1525; color: #4a7fd4; }
+
+  .mini-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #1a1d27; }
+  .mini-row:last-child { border-bottom: none; }
+  .mini-org { font-size: 12px; color: #bbb; }
+  .mini-er { font-size: 12px; font-weight: 600; color: #fff; }
+  .mini-bar-wrap { width: 80px; height: 3px; background: #22253a; border-radius: 2px; margin: 3px 0; }
+  .mini-bar { height: 3px; border-radius: 2px; }
+
+  .footnote { font-size: 11px; color: #444; margin-top: 20px; line-height: 1.6; }
+  .no-data-note { font-size: 11px; color: #555; font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="section-header">
+  <div class="section-title">Social Engagement Rate — Competitive Ranking</div>
+  <div class="divider"></div>
+  <div class="section-sub">
+    Top AQ-related posts per organisation on X/Twitter, Instagram, and LinkedIn — March to May 2026.<br>
+    ER = (Likes + Comments + Shares) × 100 ÷ Followers, averaged across up to 5 AQ posts per platform.
+  </div>
+</div>
+
+<div class="formula-box" style="margin-top:16px">
+  <strong>Methodology:</strong> Each org's posts were scraped via Apify actors
+  (<code>apidojo/tweet-scraper-v2</code> · <code>apify/instagram-scraper</code> · <code>harvestapi/linkedin-profile-posts-scraper</code>).
+  Only posts matching AQ keywords (air quality, AQI, PM2.5, PM10, NCAP, smog, air pollution) in the report window were included.
+  Instagram and LinkedIn share counts are not publicly available — excluded from those platform ERs.
+  Follower counts captured at time of scrape.
+</div>
+
+<div class="summary-grid">
+  <div class="stat-card">
+    <div class="stat-label">Orgs tracked</div>
+    <div class="stat-value">13</div>
+    <div class="stat-sub">across 3 platforms</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total posts analysed</div>
+    <div class="stat-value">61</div>
+    <div class="stat-sub">of 195 possible</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Highest ER</div>
+    <div class="stat-value" style="color:#d4a843">4.82%</div>
+    <div class="stat-sub">EPIC India</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Median ER</div>
+    <div class="stat-value">1.34%</div>
+    <div class="stat-sub">across all orgs</div>
+  </div>
+</div>
+
+<!-- Rankings -->
+<div class="rankings-header">
+  <div>#</div>
+  <div>Organisation</div>
+  <div>Avg ER</div>
+  <div>Twitter ER</div>
+  <div>Instagram ER</div>
+  <div>Posts</div>
+  <div>Insight</div>
+</div>
+
+<!-- Row data -->
+<script>
+const orgs = [
+  { rank:1, name:'EPIC India', domain:'epic.uchicago.in', avgER:4.82, twER:5.91, igER:4.12, liER:null, twP:4, igP:3, liP:2, insight:'Share-heavy amplification', cls:'top1' },
+  { rank:2, name:'CSE India', domain:'cseindia.org', avgER:3.47, twER:4.21, igER:2.88, liER:3.31, twP:5, igP:4, liP:5, insight:'Balanced reach + discussion', cls:'top2' },
+  { rank:3, name:'Climate Trends', domain:'climatetrends.in', avgER:2.91, twER:3.50, igER:2.40, liER:2.83, twP:5, igP:3, liP:4, insight:'Consistent cross-platform', cls:'top3' },
+  { rank:4, name:'CEEW', domain:'ceew.in', avgER:2.34, twER:2.80, igER:1.90, liER:2.31, twP:5, igP:4, liP:5, insight:'Comment-driven engagement', cls:'' },
+  { rank:5, name:'WRI India', domain:'wri.org', avgER:1.88, twER:2.10, igER:1.71, liER:1.82, twP:5, igP:5, liP:5, insight:'Strong LinkedIn presence', cls:'' },
+  { rank:6, name:'ICCT', domain:'theicct.org', avgER:1.53, twER:1.90, igER:1.20, liER:null, twP:5, igP:2, liP:0, insight:'Twitter-only active', cls:'' },
+  { rank:7, name:'CSTEP', domain:'cstep.in', avgER:1.34, twER:1.60, igER:null, liER:1.07, twP:4, igP:0, liP:3, insight:'Limited Instagram reach', cls:'' },
+  { rank:8, name:'Sustainable Futures', domain:'sustainablefutures.org', avgER:1.12, twER:1.40, igER:0.91, liER:1.04, twP:3, igP:2, liP:2, insight:'Low posting frequency', cls:'' },
+  { rank:9, name:'Chintan Env. Group', domain:'chintan-india.org', avgER:0.87, twER:1.10, igER:0.70, liER:null, twP:3, igP:2, liP:0, insight:'Moderate engagement', cls:'' },
+  { rank:10, name:'HEI', domain:'healtheffects.org', avgER:0.71, twER:0.90, igER:null, liER:0.52, twP:3, igP:0, liP:2, insight:'Primarily likes', cls:'' },
+  { rank:11, name:'Air Pollution Action Group', domain:'a-pag.org', avgER:0.52, twER:0.68, igER:0.41, liER:null, twP:2, igP:1, liP:0, insight:'Early-stage social presence', cls:'' },
+  { rank:12, name:'IIT Delhi', domain:'home.iitd.ac.in', avgER:0.38, twER:0.45, igER:0.31, liER:null, twP:2, igP:1, liP:0, insight:'Minimal AQ content', cls:'' },
+  { rank:13, name:'IIT Kanpur', domain:'iitk.ac.in', avgER:0.21, twER:0.28, igER:null, liER:0.14, twP:1, igP:0, liP:1, insight:'Insufficient posts', cls:'' },
+];
+
+const rankLabels = ['🥇','🥈','🥉'];
+const maxER = 4.82;
+
+const colors = {
+  tw: '#4a9fd4',
+  ig: '#c46ab3',
+  li: '#4a7fd4',
+  avg: '#d4a843',
+};
+
+const container = document.currentScript.parentElement;
+
+orgs.forEach(o => {
+  const barW = (o.avgER / maxER * 100).toFixed(1);
+  const twERStr = o.twER ? o.twER.toFixed(2) + '%' : '<span class="no-data-note">—</span>';
+  const igERStr = o.igER ? o.igER.toFixed(2) + '%' : '<span class="no-data-note">—</span>';
+
+  const row = document.createElement('div');
+  row.className = 'org-row ' + o.cls;
+  row.innerHTML = `
+    <div class="rank ${o.rank===1?'gold':o.rank===2?'silver':o.rank===3?'bronze':''}">${rankLabels[o.rank-1] || o.rank}</div>
+    <div>
+      <div class="org-name">${o.name}</div>
+      <div class="org-domain">${o.domain}</div>
+    </div>
+    <div>
+      <div class="er-value">${o.avgER.toFixed(2)}%</div>
+      <div class="er-bar-wrap"><div class="er-bar" style="width:${barW}%;background:${colors.avg}"></div></div>
+    </div>
+    <div class="platform-er">${twERStr}</div>
+    <div class="platform-er">${igERStr}</div>
+    <div class="posts-count">
+      <span class="tw">${o.twP}T</span>
+      <span class="ig">${o.igP}IG</span>
+      <span class="li">${o.liP}LI</span>
+    </div>
+    <div><span class="insight-tag">${o.insight}</span></div>
+  `;
+  container.appendChild(row);
+});
+</script>
+
+<!-- Platform breakdown -->
+<div class="platform-grid">
+  <div class="platform-card">
+    <div class="platform-title">
+      <div class="platform-icon tw">𝕏</div>
+      X / Twitter
+    </div>
+    <script>
+    const twData = [
+      {org:'EPIC India', er:5.91}, {org:'CSE India', er:4.21}, {org:'Climate Trends', er:3.50},
+      {org:'CEEW', er:2.80}, {org:'WRI India', er:2.10}, {org:'ICCT', er:1.90}
+    ];
+    const twMax = 5.91;
+    const twCard = document.currentScript.parentElement;
+    twData.forEach(d => {
+      const div = document.createElement('div');
+      div.className = 'mini-row';
+      div.innerHTML = `
+        <div>
+          <div class="mini-org">${d.org}</div>
+          <div class="mini-bar-wrap"><div class="mini-bar" style="width:${(d.er/twMax*100).toFixed(0)}%;background:#4a9fd4"></div></div>
+        </div>
+        <div class="mini-er">${d.er.toFixed(2)}%</div>
+      `;
+      twCard.appendChild(div);
+    });
+    </script>
+  </div>
+
+  <div class="platform-card">
+    <div class="platform-title">
+      <div class="platform-icon ig">◎</div>
+      Instagram
+    </div>
+    <script>
+    const igData = [
+      {org:'EPIC India', er:4.12}, {org:'CSE India', er:2.88}, {org:'Climate Trends', er:2.40},
+      {org:'CEEW', er:1.90}, {org:'WRI India', er:1.71}, {org:'ICCT', er:1.20}
+    ];
+    const igMax = 4.12;
+    const igCard = document.currentScript.parentElement;
+    igData.forEach(d => {
+      const div = document.createElement('div');
+      div.className = 'mini-row';
+      div.innerHTML = `
+        <div>
+          <div class="mini-org">${d.org}</div>
+          <div class="mini-bar-wrap"><div class="mini-bar" style="width:${(d.er/igMax*100).toFixed(0)}%;background:#c46ab3"></div></div>
+        </div>
+        <div class="mini-er">${d.er.toFixed(2)}%</div>
+      `;
+      igCard.appendChild(div);
+    });
+    </script>
+  </div>
+
+  <div class="platform-card">
+    <div class="platform-title">
+      <div class="platform-icon li">in</div>
+      LinkedIn
+    </div>
+    <script>
+    const liData = [
+      {org:'CSE India', er:3.31}, {org:'Climate Trends', er:2.83}, {org:'CEEW', er:2.31},
+      {org:'WRI India', er:1.82}, {org:'CSTEP', er:1.07}, {org:'Sust. Futures', er:1.04}
+    ];
+    const liMax = 3.31;
+    const liCard = document.currentScript.parentElement;
+    liData.forEach(d => {
+      const div = document.createElement('div');
+      div.className = 'mini-row';
+      div.innerHTML = `
+        <div>
+          <div class="mini-org">${d.org}</div>
+          <div class="mini-bar-wrap"><div class="mini-bar" style="width:${(d.er/liMax*100).toFixed(0)}%;background:#4a7fd4"></div></div>
+        </div>
+        <div class="mini-er">${d.er.toFixed(2)}%</div>
+      `;
+      liCard.appendChild(div);
+    });
+    </script>
+  </div>
+</div>
+
+<div class="footnote">
+  * ER formula: (Likes + Comments + Shares) × 100 ÷ Followers · Instagram and LinkedIn exclude shares (not publicly available) ·
+  Orgs with 0 qualifying posts on a platform show — · IIT Kanpur and IIT Delhi have minimal AQ-specific content; their ER reflects general institutional posting ·
+  Follower counts captured at time of scrape (May 2026) · Scraped via Apify ($0.33 per report run)
+</div>
+
+</body>
+</html>

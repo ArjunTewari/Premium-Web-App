@@ -9,7 +9,6 @@ const fs      = require('fs');
 const path    = require('path');
 const PptxGen = require('pptxgenjs');
 const SI      = require('./social-intelligence');
-const TS      = require('./trend-social');
 
 const OUTLETS = [
   'Times of India','Hindustan Times','The Hindu','Indian Express','Business Standard',
@@ -352,14 +351,6 @@ function aggregateOrg(artList, clsList, dateFrom) {
     );
     if(match) tc[match]++;
   });
-  const wk={}; const st=new Date(dateFrom);
-  for(let i=0;i<13;i++){const d=new Date(st);d.setDate(d.getDate()+i*7);wk[d.toISOString().slice(0,10)]=0;}
-  const wkeys=Object.keys(wk);
-  artList.forEach(a=>{
-    const d=parseDateStr(a.date);
-    if(d){const diff=Math.floor((d-st)/(7*86400000));if(diff>=0&&diff<13){wk[wkeys[diff]]++;return;}}
-    wk[wkeys[0]]++;
-  });
   const sov = Math.min(100, Math.round(artList.length*2.5));
   const authPct = clsList.length ? Math.round(ac/clsList.length*100) : 0;
   const dataPct = clsList.length ? Math.round(dc/clsList.length*100) : 0;
@@ -368,7 +359,7 @@ function aggregateOrg(artList, clsList, dateFrom) {
     authCount:ac, authPct, dataCount:dc, dataPct,
     outletCounts:oc, sortedOutlets:so,
     topOutlet:so[0]?.[0]||'N/A', topOutlets:so.slice(0,3).map(([o])=>o),
-    topicCounts:tc, weeklyData:wk,
+    topicCounts:tc,
     authExamples:clsList.filter(c=>c.citation_quality==='Data Cited').slice(0,2),
     vagueExamples:clsList.filter(c=>c.citation_quality==='Named Mention').slice(0,2),
     classifications:clsList, sov, authPct, dataPct
@@ -381,89 +372,6 @@ function computeScore(d, aeoScore, socialScore=0) {
   return { ...d, aeo: aeoScore, social: socialScore, score: tot, grade: tot>=80?'A':tot>=65?'B':tot>=50?'C+':tot>=35?'D':'F' };
 }
 
-// ── Trend Detection ────────────────────────────────────────────────────────
-async function detectTrend(cls, arts, orgs, claudeKey, cb) {
-  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
-  const topicCounts = {};
-  const topicArticles = {};
-
-  for (const org of orgs) {
-    const artList = arts[org] || [];
-    const clsList = cls[org] || [];
-    clsList.forEach((item, idx) => {
-      const art = artList[idx];
-      const dateStr = art?.date || item.date || '';
-      const d = parseDateStr(dateStr);
-      if (d && d < cutoff) return;
-      const topic = item.aq_subtopic || 'General AQ';
-      topicCounts[topic] = (topicCounts[topic] || 0) + 1;
-      if (!topicArticles[topic]) topicArticles[topic] = [];
-      topicArticles[topic].push({
-        title: art?.title || '',
-        snippet: art?.snippet || '',
-        source: art?.source || item.outlet || ''
-      });
-    });
-  }
-
-  const sorted = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]);
-  const [topTopic, topCount] = sorted[0] || ['', 0];
-
-  if (topCount < 4) {
-    cb(`[TREND] No spike detected. Skipping trend social fetch.`);
-    return { detected: false };
-  }
-
-  const trendArts = (topicArticles[topTopic] || []).slice(0, 20);
-  const articlesText = trendArts
-    .map(a => `- "${a.title}" (${a.source}): ${a.snippet.slice(0, 100)}`)
-    .join('\n');
-
-  const prompt = `You are analysing a batch of air quality news articles that spiked in the last 48 hours.
-
-Articles:
-${articlesText}
-
-Tracked organisations: ${orgs.join(', ')}
-
-Return JSON only, no markdown, no explanation:
-{
-  "trend_topic": "<2-5 word label for what is trending>",
-  "trend_summary": "<one sentence explaining why this is spiking now>",
-  "orgs_mentioned": ["<org name>", ...],
-  "orgs_implicated": ["<org name>", ...]
-}
-
-orgs_mentioned = orgs explicitly named in these articles.
-orgs_implicated = orgs whose known research areas directly overlap with this trend topic, even if not named.
-Only include org names from the tracked organisations list above.`;
-
-  try {
-    const raw = await callClaude(prompt, claudeKey, 800);
-    const parsed = parseJ(raw);
-    if (!parsed) {
-      cb(`[TREND] Analysis returned no valid JSON. Skipping trend fetch.`, 'warn');
-      return { detected: false };
-    }
-    const orgsMentioned  = (parsed.orgs_mentioned  || []).filter(o => orgs.includes(o));
-    const orgsImplicated = (parsed.orgs_implicated || []).filter(o => orgs.includes(o));
-    const orgsToFetch = [...new Set([...orgsMentioned, ...orgsImplicated])];
-    const trendEvent = {
-      detected: true,
-      topic: parsed.trend_topic || topTopic,
-      summary: parsed.trend_summary || '',
-      triggeredAt: new Date().toISOString(),
-      articleCount: topCount,
-      orgsMentioned,
-      orgsToFetch
-    };
-    cb(`[TREND] Spike detected: "${trendEvent.topic}" — ${topCount} articles in 48h. Orgs flagged: ${orgsToFetch.join(', ') || 'none'}`);
-    return trendEvent;
-  } catch (e) {
-    cb(`[TREND] Claude analysis error: ${e.message}`, 'warn');
-    return { detected: false };
-  }
-}
 
 // PR wire sites and org's own domain — never count as third-party coverage
 const PR_WIRE_DOMAINS = [
@@ -652,17 +560,6 @@ ${txt}`;
     cb(`  ${org} total classified: ${cls[org].length}`, cls[org].length>0?'ok':'err');
   }
 
-  // ── STEP 2.5: Trend Detection ─────────────────────────────
-  cb(`\nSTEP 2.5/6 — Trend Detection (48h spike analysis)...`, 'head');
-  const trendEvent = await detectTrend(cls, arts, ORGS, cfg.CLAUDE_KEY, cb);
-  let trendSocialData = null;
-  if (trendEvent.detected) {
-    cb(`[TREND] Fetching social data for: ${trendEvent.orgsToFetch.join(', ')}`);
-    trendSocialData = await TS.fetchTrendSocial(trendEvent, cfg, cb);
-  } else {
-    cb('[TREND] No trend spike. Trend social fetch skipped.');
-  }
-
   // ── STEP 3: AEO Visibility (via Social Intelligence module) ──
   cb(`\nSTEP 3/6 — AEO / LLM Visibility...`, 'head');
   let aeoResults = {};
@@ -673,19 +570,8 @@ ${txt}`;
     for (const org of ORGS) cb(`  ${org} AEO score: ${aeoResults[org].score}`, aeoResults[org].score>0?'ok':'warn');
   } catch(e) { cb(`  AEO error: ${e.message}`, 'err'); }
 
-  // ── STEP 4: Social Media (X/Twitter · Instagram · LinkedIn via Serper) ──
-  cb(`\nSTEP 4/6 — Social Media Intelligence...`, 'head');
-  let siSocial = { youtube: null, twitter: null, instagram: null, linkedin: null };
-  try {
-    siSocial = await SI.runSocial(cfg, ORGS, cb);
-  } catch(e) { cb(`  Social error: ${e.message}`, 'err'); }
-  const socialScores = SI.computeSocialScore(siSocial, ORGS);
-  for (const org of ORGS) {
-    cb(`  Social score: ${org} = ${socialScores[org].total} pts (${socialScores[org].normalised}/10 normalised)`, 'ok');
-  }
-
-  // ── STEP 4b: Social ER (Apify — actual engagement rates) ──
-  cb(`\nSTEP 4b/6 — Social Engagement Rate (Apify)...`, 'head');
+  // ── STEP 4: Social Engagement Rate (Apify) ────────────────
+  cb(`\nSTEP 4/6 — Social Engagement Rate (Apify)...`, 'head');
   const SocialER = require('./social-er');
   let socialERResults = [];
   let socialERHtml = '';
@@ -695,12 +581,17 @@ ${txt}`;
     cb(`  Social ER complete: ${socialERResults.length} orgs scored`, socialERResults.length > 0 ? 'ok' : 'warn');
   } catch(e) { cb(`  Social ER error: ${e.message}`, 'err'); }
 
+  // ── ER normalisation: 0–10 score per org ─────────────────
+  const maxER = Math.max(...socialERResults.map(r => r.avgER), 0.01);
+  const erScoreByOrg = {};
+  for (const r of socialERResults) erScoreByOrg[r.org] = Math.round((r.avgER / maxER) * 10);
+
   // ── STEP 5: Aggregate + Score ─────────────────────────────
   cb(`\nSTEP 5/6 — Aggregating and scoring...`, 'head');
   const data={};
   for(const org of ORGS){
     const base = aggregateOrg(arts[org], cls[org], DATE_FROM);
-    data[org] = computeScore(base, aeoResults[org].score, socialScores[org]?.normalised||0);
+    data[org] = computeScore(base, aeoResults[org].score, erScoreByOrg[org]||0);
     cb(`  ${org}: ${data[org].total} arts | ${data[org].authPct}% auth | ${data[org].dataPct}% data | AEO ${data[org].aeo} | Social ${data[org].social} | score ${data[org].score} (${data[org].grade})`, 'ok');
   }
 
@@ -736,7 +627,10 @@ ${txt}`;
 
   // ── STEP 5b: AI analysis ───────────────────────────────────
   cb(`\nSTEP 5b/6 — AI analysis (executive summary, gap narratives, actions)...`, 'head');
-  const orgSummary = ORGS.map(o=>`${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo}/100, Social ${data[o].social}/10 (YT=${siSocial.youtube?.orgMentions?.[o]?.total||0} TW=${siSocial.twitter?.orgMentions?.[o]?.total||0} IG=${siSocial.instagram?.orgMentions?.[o]?.total||0} LI=${siSocial.linkedin?.orgMentions?.[o]?.total||0}), top outlet: ${data[o].topOutlet}, topics 2+: ${Object.entries(data[o].topicCounts).filter(([,v])=>v>=2).map(([k])=>k).join(',')||'none'}`).join('\n');
+  const orgSummary = ORGS.map(o=>{
+    const er = socialERResults.find(r=>r.org===o);
+    return `${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo}/100, Social ER ${data[o].social}/10 (TW=${er?.twitterER||0}% IG=${er?.instagramER||0}% LI=${er?.linkedinER||0}%), top outlet: ${data[o].topOutlet}, topics 2+: ${Object.entries(data[o].topicCounts).filter(([,v])=>v>=2).map(([k])=>k).join(',')||'none'}`;
+  }).join('\n');
   let emerging=[], execF=[], actions=[];
 
   try{
@@ -794,10 +688,10 @@ ${txt}`;
   const pptxFile= path.join(cfg.outDir, `${base}.pptx`);
   const pptxName= `${base}.pptx`;
 
-  await buildPPTX(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxFile,cfg);
+  await buildPPTX(data,{},emerging,execF,actions,arts,aeoResults,socialERResults,pptxFile,cfg);
   cb(`  PPTX: ${pptxName}`, 'ok');
 
-  const html=buildHTML(data,{},emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxName,cfg,socialERHtml);
+  const html=buildHTML(data,{},emerging,execF,actions,arts,aeoResults,pptxName,cfg,socialERHtml);
   fs.writeFileSync(htmlFile, html, 'utf8');
   cb(`  HTML: ${base}.html (${Math.round(html.length/1024)}KB)`, 'ok');
 
@@ -808,7 +702,7 @@ ${txt}`;
 // ══════════════════════════════════════════════════════════════════════════
 //  PPTX BUILDER
 // ══════════════════════════════════════════════════════════════════════════
-async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,outFile,cfg) {
+async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,socialERResults,outFile,cfg) {
   const {ORGS,DATE_FROM,DATE_TO,CLIENT_NAME} = cfg;
   const pres=new PptxGen();
   pres.layout='LAYOUT_WIDE'; pres.author='Emerald AI';
@@ -847,12 +741,8 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
     // AEO indicator on cover
     const hasAEO = Object.values(aeoResults).some(v=>v.score>0);
     if(hasAEO) sl.addText('✓ LLM Visibility',{x:8,y:3.2,w:2.5,h:0.26,fontSize:10,color:GOOD,fontFace:'Calibri'});
-    const hasTwSI  = (siSocial.twitter?.posts?.length||0) > 0;
-    const hasYTSI  = (siSocial.youtube?.videos?.length||0) > 0;
-    const hasIGSI  = (siSocial.instagram?.posts?.length||0) > 0;
-    const hasLISI  = (siSocial.linkedin?.posts?.length||0) > 0;
-    const socials = [hasTwSI&&'X/Twitter', hasYTSI&&'YouTube', hasIGSI&&'Instagram', hasLISI&&'LinkedIn'].filter(Boolean).join(' · ');
-    if(socials) sl.addText(`✓ Social: ${socials}`,{x:8,y:3.52,w:5.3,h:0.26,fontSize:10,color:GOOD,fontFace:'Calibri'});
+    const hasER = socialERResults && socialERResults.length > 0;
+    if(hasER) sl.addText(`✓ Social ER: ${socialERResults.length} orgs (Apify)`,{x:8,y:3.52,w:5.3,h:0.26,fontSize:10,color:GOOD,fontFace:'Calibri'});
     sl.addText(`Prepared for ${CLIENT_NAME||'client'} · Generated ${new Date().toISOString().slice(0,10)} · CONFIDENTIAL`,{x:0.6,y:7.1,w:12,h:0.26,fontSize:9,color:MUTED,fontFace:'Calibri'});
   }
 
@@ -914,26 +804,9 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
     sl.addText(`Serper News API · ${new Date().toISOString().slice(0,10)} · AQ-scoped`,{x:0.5,y:6.98,w:8,h:0.24,fontSize:9,color:MUTED,fontFace:'Calibri'});
   }
 
-  // Slide 4: Coverage Momentum
+  // Slide 4: Topic Ownership
   {
-    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Section 04'); stitle(sl,'Coverage Momentum');
-    const weeks=Object.keys(data[ORGS[0]].weeklyData);
-    const series=ORGS.map((org,i)=>({name:org,labels:weeks.map(w=>w.slice(5)),values:weeks.map(w=>data[org].weeklyData[w]||0)}));
-    sl.addChart(pres.charts.LINE,series,{
-      x:0.5,y:1.22,w:12.3,h:5.0,
-      chartColors:ORGS.map((_,i)=>orgPptx(i)),
-      chartArea:{fill:{color:CARD2}},catAxisLabelColor:MUTED,valAxisLabelColor:MUTED,
-      valGridLine:{color:BORD,size:0.5},catGridLine:{style:'none'},
-      lineSize:3,lineSmooth:false,
-      showLegend:true,legendPos:'b',legendColor:TXT,legendFontSize:11,
-      valAxisLineShow:false,catAxisLineShow:false,showTitle:false
-    });
-    footer(sl);
-  }
-
-  // Slide 5: Topic Ownership
-  {
-    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Section 05'); stitle(sl,'Topic Ownership Map');
+    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Section 04'); stitle(sl,'Topic Ownership Map');
     // For large org counts: split into groups of 5 — one table block per group
     const ORG_GROUPS = [];
     for (let gi=0; gi<ORGS.length; gi+=5) ORG_GROUPS.push(ORGS.slice(gi, gi+5));
@@ -961,7 +834,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
 
   // Slide 6: Narrative & Citation
   {
-    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Sections 06 & 07'); stitle(sl,'Narrative Position & Citation Quality');
+    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Sections 05 & 06'); stitle(sl,'Narrative Position & Citation Quality');
     // For large org counts: reduce card height and font sizes to fit
     const cw=Math.min(3.7,12.3/ORGS.length-0.2);
     const cardH = ORGS.length<=4 ? 2.68 : ORGS.length<=7 ? 2.0 : 1.6;
@@ -1032,98 +905,51 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
     footer(sl);
   }
 
-  // Slide 8: Social Media (all 4 platforms from SI module)
+  // Slide 8: Social Engagement Rate (Apify)
   {
-    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Social Media Intelligence'); stitle(sl,'Platform Presence Scorecard');
-    sl.addText('Org mentions in top AQ content across YouTube · X/Twitter · Instagram · LinkedIn — Serper Search + YouTube Data API.',{x:0.5,y:1.12,w:12.3,h:0.32,fontSize:12,color:MUTED,fontFace:'Calibri'});
-
-    const platforms4=[
-      {label:'YouTube',key:'youtube',icon:'YT',col:'ff4444'},
-      {label:'X/Twitter',key:'twitter',icon:'X',col:'e2e8f0'},
-      {label:'Instagram',key:'instagram',icon:'IG',col:'e1306c'},
-      {label:'LinkedIn',key:'linkedin',icon:'LI',col:'0a66c2'}
-    ];
-    const hasSocial = platforms4.some(p=>(siSocial[p.key]?.orgMentions && Object.values(siSocial[p.key]?.orgMentions||{}).some(v=>v.total>0)));
-
-    if(!hasSocial){
+    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Social Media Intelligence'); stitle(sl,'Social Engagement Rate');
+    sl.addText('ER = (Likes + Comments + Shares) × 100 ÷ Followers, averaged across AQ posts per org. Apify: X/Twitter · Instagram · LinkedIn.',{x:0.5,y:1.12,w:12.3,h:0.32,fontSize:12,color:MUTED,fontFace:'Calibri'});
+    const hasSocialER = socialERResults && socialERResults.length > 0;
+    if (!hasSocialER) {
       card(sl,0.5,1.55,12.3,2.0);
-      sl.addText('Social media data not collected this run.',{x:0.5,y:2.3,w:12.3,h:0.4,fontSize:16,color:MUTED,fontFace:'Calibri',align:'center'});
-      sl.addText('Add social media API keys and/or Serper key to enable.',{x:0.5,y:2.76,w:12.3,h:0.4,fontSize:12,color:WARN,fontFace:'Calibri',align:'center'});
+      sl.addText('Social ER data not collected this run.',{x:0.5,y:2.3,w:12.3,h:0.4,fontSize:16,color:MUTED,fontFace:'Calibri',align:'center'});
+      sl.addText('Set APIFY_TOKEN to enable Apify social engagement rate collection.',{x:0.5,y:2.76,w:12.3,h:0.4,fontSize:12,color:WARN,fontFace:'Calibri',align:'center'});
     } else {
-      // Platform × Org grid — 4 platform rows, Org columns
-      const trows=[
-        [{text:'Platform',options:{bold:true,color:MUTED,fontSize:9,fill:{color:'181e2e'}}},
-         ...ORGS.map((o,i)=>({text:o,options:{bold:true,color:orgPptx(i),fontSize:10,fill:{color:'181e2e'},align:'center'}})),
-         {text:'Platform Total',options:{bold:true,color:AMBER,fontSize:9,fill:{color:'181e2e'},align:'center'}}],
-        ...platforms4.map(p=>{
-          const orgCells=ORGS.map((org,i)=>{
-            const pts=siSocial[p.key]?.orgMentions?.[org]?.total||0;
-            return {text:String(pts),options:{color:pts>0?orgPptx(i):MUTED,fontSize:12,fill:{color:'111520'},align:'center',bold:pts>0}};
-          });
-          const platTotal=ORGS.reduce((s,o)=>s+(siSocial[p.key]?.orgMentions?.[o]?.total||0),0);
-          return [{text:p.label,options:{bold:true,color:TXT,fontSize:11,fill:{color:'111520'}}},
-            ...orgCells,
-            {text:String(platTotal),options:{color:AMBER,fontSize:12,fill:{color:'111520'},align:'center',bold:true}}];
-        }),
-        [{text:'Social Score (0–10)',options:{bold:true,color:AMBER,fontSize:9,fill:{color:'181e2e'}}},
-         ...ORGS.map((o,i)=>({text:String(socialScores[o]?.normalised||0),options:{bold:true,color:orgPptx(i),fontSize:12,fill:{color:'181e2e'},align:'center'}})),
-         {text:'',options:{fill:{color:'181e2e'}}}]
+      const sorted = [...socialERResults].sort((a, b) => b.avgER - a.avgER);
+      const trows = [
+        [
+          {text:'#',            options:{bold:true,color:MUTED,fontSize:9,fill:{color:CARD2},align:'center'}},
+          {text:'Org',          options:{bold:true,color:MUTED,fontSize:9,fill:{color:CARD2}}},
+          {text:'Avg ER',       options:{bold:true,color:MUTED,fontSize:9,fill:{color:CARD2},align:'center'}},
+          {text:'Twitter ER',   options:{bold:true,color:MUTED,fontSize:9,fill:{color:CARD2},align:'center'}},
+          {text:'Instagram ER', options:{bold:true,color:MUTED,fontSize:9,fill:{color:CARD2},align:'center'}},
+          {text:'LinkedIn ER',  options:{bold:true,color:MUTED,fontSize:9,fill:{color:CARD2},align:'center'}},
+          {text:'Posts',        options:{bold:true,color:MUTED,fontSize:9,fill:{color:CARD2},align:'center'}},
+        ],
+        ...sorted.slice(0, 10).map((r, ri) => {
+          const orgIdx = ORGS.indexOf(r.org);
+          const oc = orgPptx(orgIdx >= 0 ? orgIdx : ri);
+          return [
+            {text:String(r.rank),                                      options:{color:ri<3?AMBER:MUTED,fontSize:10,fill:{color:CARD},align:'center',bold:ri<3}},
+            {text:r.org,                                               options:{bold:true,color:oc,fontSize:10,fill:{color:CARD}}},
+            {text:r.avgER > 0 ? r.avgER+'%' : '—',                    options:{bold:true,color:r.avgER>0?GOOD:MUTED,fontSize:11,fill:{color:CARD},align:'center'}},
+            {text:r.twitterER > 0 ? r.twitterER+'%' : '—',            options:{color:TXT,fontSize:10,fill:{color:CARD},align:'center'}},
+            {text:r.instagramER > 0 ? r.instagramER+'%' : '—',        options:{color:TXT,fontSize:10,fill:{color:CARD},align:'center'}},
+            {text:r.linkedinER > 0 ? r.linkedinER+'%' : '—',          options:{color:TXT,fontSize:10,fill:{color:CARD},align:'center'}},
+            {text:`${r.twitterPosts}T/${r.instagramPosts}I/${r.linkedinPosts}L`,options:{color:MUTED,fontSize:9,fill:{color:CARD},align:'center'}},
+          ];
+        })
       ];
-      const colW=[2.2,...ORGS.map(()=>Math.min(2.0,(10.1-0.1*(ORGS.length-1))/ORGS.length)),1.5];
-      sl.addTable(trows,{x:0.5,y:1.55,w:12.3,colW,rowH:0.44,border:{pt:0.5,color:BORD},fontFace:'Calibri'});
-
-      // Trending topics boxes from YouTube and Twitter
-      const ytTopics=(siSocial.youtube?.trendingTopics||[]).slice(0,5).join('  ·  ');
-      const twTopics=(siSocial.twitter?.trendingTopics||[]).slice(0,5).join('  ·  ');
-      if(ytTopics){sl.addText(`YT trending: ${ytTopics}`,{x:0.5,y:4.85,w:12.3,h:0.26,fontSize:10,color:MUTED,fontFace:'Calibri',italic:true});}
-      if(twTopics){sl.addText(`X trending:  ${twTopics}`,{x:0.5,y:5.15,w:12.3,h:0.26,fontSize:10,color:MUTED,fontFace:'Calibri',italic:true});}
+      const colW = [0.5, 3.2, 1.3, 1.3, 1.3, 1.3, 1.4];
+      sl.addTable(trows, {x:0.5,y:1.55,w:10.3,colW,rowH:0.40,border:{pt:0.5,color:BORD},fontFace:'Calibri'});
     }
-    sl.addText('YouTube: Data API v3 broad AQ search · X/Twitter/Instagram/LinkedIn: Serper site: search · mention detection across title, description, comments',{x:0.5,y:6.98,w:12.3,h:0.24,fontSize:8,color:MUTED,fontFace:'Calibri',italic:true});
-    footer(sl);
-  }
-
-  // Slide 8b: Trend Social Visibility (only when a spike was detected)
-  if (trendEvent?.detected && trendSocialData?.length) {
-    const sl=pres.addSlide(); darkBg(sl);
-    eyebrow(sl,'Trend Social Intelligence');
-    stitle(sl,'Trend Social Visibility');
-    sl.addText(`Spike: "${trendEvent.topic}" · ${trendEvent.articleCount} articles · ${trendEvent.triggeredAt.slice(0,10)} · ${trendEvent.summary}`,
-      {x:0.5,y:1.12,w:12.3,h:0.36,fontSize:10,color:MUTED,fontFace:'Calibri',italic:true});
-
-    const trows=[
-      [
-        {text:'Org',              options:{bold:true,color:MUTED,  fontSize:9,fill:{color:CARD2}}},
-        {text:'Relevance',        options:{bold:true,color:MUTED,  fontSize:9,fill:{color:CARD2},align:'center'}},
-        {text:'X/Twitter',        options:{bold:true,color:MUTED,  fontSize:9,fill:{color:CARD2},align:'center'}},
-        {text:'YouTube',          options:{bold:true,color:MUTED,  fontSize:9,fill:{color:CARD2},align:'center'}},
-        {text:'Instagram',        options:{bold:true,color:MUTED,  fontSize:9,fill:{color:CARD2},align:'center'}},
-        {text:'LinkedIn',         options:{bold:true,color:MUTED,  fontSize:9,fill:{color:CARD2},align:'center'}},
-        {text:'Score',            options:{bold:true,color:AMBER,  fontSize:9,fill:{color:CARD2},align:'center'}}
-      ],
-      ...trendSocialData.map((entry,i)=>{
-        const orgIdx=ORGS.indexOf(entry.org);
-        const oc=orgPptx(orgIdx>=0?orgIdx:i);
-        const relCol=entry.trendRelevance==='mentioned'?GOOD:WARN;
-        return [
-          {text:entry.org,                                           options:{bold:true,color:oc,    fontSize:10,fill:{color:CARD}}},
-          {text:entry.trendRelevance==='mentioned'?'Mentioned':'Implicated', options:{color:relCol,fontSize:9,fill:{color:CARD},align:'center'}},
-          {text:String(entry.platforms.x?.count||0),                options:{color:TXT,  fontSize:10,fill:{color:CARD},align:'center'}},
-          {text:String(entry.platforms.youtube?.count||0),          options:{color:TXT,  fontSize:10,fill:{color:CARD},align:'center'}},
-          {text:String(entry.platforms.instagram?.count||0),        options:{color:TXT,  fontSize:10,fill:{color:CARD},align:'center'}},
-          {text:String(entry.platforms.linkedin?.count||0),         options:{color:TXT,  fontSize:10,fill:{color:CARD},align:'center'}},
-          {text:String(entry.trendVisibilityScore),                 options:{bold:true,color:AMBER,fontSize:11,fill:{color:CARD},align:'center'}}
-        ];
-      })
-    ];
-    sl.addTable(trows,{x:0.5,y:1.55,w:12.3,colW:[2.5,1.5,1.5,2.0,1.5,1.5,1.8],rowH:0.42,border:{pt:0.5,color:BORD},fontFace:'Calibri'});
-    sl.addText('Score: X/Twitter +25 · YouTube +25 · Instagram +15 · LinkedIn +15 · Mentioned in news +20 · Cap 100',
-      {x:0.5,y:6.98,w:12.3,h:0.24,fontSize:8,color:MUTED,fontFace:'Calibri'});
+    sl.addText('Apify actors: apidojo/tweet-scraper-v2 · apify/instagram-scraper · harvestapi/linkedin-profile-posts-scraper · Instagram and LinkedIn shares excluded from ER',{x:0.5,y:6.98,w:12.3,h:0.24,fontSize:8,color:MUTED,fontFace:'Calibri',italic:true});
     footer(sl);
   }
 
   // Slide 9: White-Space Gaps
   {
-    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Section 08'); stitle(sl,'AQ Media White-Space Gaps');
+    const sl=pres.addSlide(); darkBg(sl); eyebrow(sl,'Section 07'); stitle(sl,'AQ Media White-Space Gaps');
     sl.addText('Topics the broader AQ media is covering that tracked orgs are absent from — narrative opportunities.',
       {x:0.5,y:1.12,w:12.3,h:0.32,fontSize:11,color:MUTED,fontFace:'Calibri',italic:true});
     const narrs=emerging.length>0?emerging.slice(0,2):[{topic:'Insufficient data',description:'Not enough general AQ articles fetched to identify gaps.',gap_signal:'',opportunity:''}];
@@ -1148,7 +974,7 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
     for (let gi=0; gi<ranked.length; gi+=5) SCORE_GROUPS.push(ranked.slice(gi, gi+5));
     SCORE_GROUPS.forEach((orgGroup, gIdx) => {
     const sl=pres.addSlide(); darkBg(sl);
-    eyebrow(sl, SCORE_GROUPS.length>1 ? `Section 09 — Part ${gIdx+1} of ${SCORE_GROUPS.length}` : 'Section 09');
+    eyebrow(sl, SCORE_GROUPS.length>1 ? `Section 08 — Part ${gIdx+1} of ${SCORE_GROUPS.length}` : 'Section 08');
     stitle(sl,'Competitive Scorecard');
     const cw=Math.min(3.7,12.3/orgGroup.length-0.15);
     orgGroup.forEach((entry,i)=>{
@@ -1203,19 +1029,10 @@ async function buildPPTX(data,comps,emerging,execF,actions,arts,aeoResults,siSoc
 // ══════════════════════════════════════════════════════════════════════════
 //  HTML BUILDER  (adds AEO + Social sections)
 // ══════════════════════════════════════════════════════════════════════════
-function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,siSocial,socialScores,trendEvent,trendSocialData,pptxFilename,cfg,socialERHtml=''){
+function buildHTML(data,comps,emerging,execF,actions,arts,aeoResults,pptxFilename,cfg,socialERHtml=''){
   const {ORGS,DATE_FROM,DATE_TO,CLIENT_NAME} = cfg;
   const now=new Date().toUTCString();
   const tot=ORGS.reduce((s,o)=>s+(data[o]?.total||0),0);
-
-  function weekBars(){
-    const wk=Object.keys(data[ORGS[0]].weeklyData);
-    const mx=Math.max(...wk.map(w=>ORGS.reduce((s,o)=>s+(data[o]?.weeklyData[w]||0),0)),1);
-    return wk.map(w=>{
-      const bars=ORGS.map((org,i)=>{const c=data[org]?.weeklyData[w]||0;const h=Math.max(Math.round(c/mx*76),2);return `<div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:${orgHex(i)};height:${h}px" title="${esc(org)}: ${c}"></div>`;}).join('');
-      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px">${bars}</div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">${esc(w.slice(5))}</div></div>`;
-    }).join('');
-  }
 
   function sovBar(){
     const bars=ORGS.map((org,i)=>{const pct=tot>0?Math.round((data[org]?.total||0)/tot*100):0;return `<div style="background:${orgHex(i)};width:${pct}%;display:flex;align-items:center;padding-left:9px;font-family:monospace;font-size:11px;font-weight:500;color:#fff;min-width:0;overflow:hidden">${data[org]?.total||0}</div>`;}).join('');
@@ -1588,8 +1405,8 @@ body.edit-mode .sec-x{display:flex}
 <div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a><a href="#method" class="nav-a">Methodology</a>
-<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#cit" class="nav-a">Citation Quality</a><a href="#em" class="nav-a">White-Space Gaps</a>
-<div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a><a href="#social" class="nav-a">Social Media</a>${trendEvent?.detected?'<a href="#trend-social" class="nav-a">Trend Social</a>':''}
+<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#cit" class="nav-a">Citation Quality</a><a href="#em" class="nav-a">White-Space Gaps</a>
+<div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a><a href="#social" class="nav-a">Social Media</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a><a href="#appendix" class="nav-a">Appendix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0,10)}<br>${navOrgs}CONFIDENTIAL</div></nav>
 <main class="main">
@@ -1610,7 +1427,7 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
 <div id="exec-draft" style="display:none;padding:0 18px 18px">${execCards}</div>
 </div></section>
 
-<section class="sec" id="method"><div class="sh"><div class="se">Section 02</div><h2 class="st">Methodology</h2><div class="sd">How data was collected, filtered, and analysed. Serper News API for media coverage · Claude Haiku 4.5 for article classification · LLM probing (GPT-4o, Perplexity, Gemini) for AEO visibility · Social media: YouTube OAuth2, X/Twitter, Instagram, LinkedIn via Serper.</div><div class="sdiv"></div></div></section>
+<section class="sec" id="method"><div class="sh"><div class="se">Section 02</div><h2 class="st">Methodology</h2><div class="sd">How data was collected, filtered, and analysed. Serper News API for media coverage · Claude Haiku 4.5 for article classification · LLM probing (GPT-4o, Perplexity, Gemini) for AEO visibility · Apify for social media engagement (Twitter/X, Instagram, LinkedIn), no YouTube.</div><div class="sdiv"></div></div></section>
 
 <section class="sec" id="sov"><div class="sh"><div class="se">Section 03</div><h2 class="st">Share of Voice</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
 <div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div>
@@ -1634,13 +1451,7 @@ ${ORGS.map((org,i)=>`<tr><td><span style="font-family:monospace;font-size:11px;f
 ${ORGS.map((org,i)=>`<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_HINDI.map(ch=>`<td style="font-family:monospace">${data[org]?.outletCounts[ch]||0}</td>`).join('')}</tr>`).join('')}
 </tbody></table></div></section>
 
-<section class="sec" id="momentum"><div class="sh"><div class="se">Section 04</div><h2 class="st">Coverage Momentum</h2>
-<div class="sd">Weekly article volume per org. Taller = more articles. Dates parsed from Serper metadata.</div><div class="sdiv"></div></div>
-<div class="mch"><div class="ch-hdr"><div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">Weekly AQ volume</div><div style="font-size:11px;color:var(--muted)">${esc(DATE_FROM)} to ${esc(DATE_TO)} &middot; ${ORGS.map(o=>`${esc(o)}: ${data[o].total}`).join(' &middot; ')}</div></div>
-<div style="display:flex;gap:12px;flex-wrap:wrap">${ORGS.map((o,i)=>`<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:12px;height:12px;border-radius:2px;background:${orgHex(i)}"></div>${esc(o)}</div>`).join('')}</div></div>
-<div class="wbars">${weekBars()}</div></div></section>
-
-<section class="sec" id="topics"><div class="sh"><div class="se">Section 05</div><h2 class="st">Topic Ownership Map</h2>
+<section class="sec" id="topics"><div class="sh"><div class="se">Section 04</div><h2 class="st">Topic Ownership Map</h2>
 <div class="sd">${TOPICS.length} AQ sub-topics including NCAP &middot; Policy &middot; PM2.5 Exposure &middot; Stubble Burning &middot; Vehicular Pollution &middot; Health Impact &middot; Brick Kilns &middot; Thermal Power Plants &middot; and more.</div><div class="sdiv"></div></div>
 ${clsNotice}
 <div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:20px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--muted2)">
@@ -1650,24 +1461,22 @@ ${clsNotice}
 </div>
 ${topicCards()}</section>
 
-<section class="sec" id="cit"><div class="sh"><div class="se">Section 07</div><h2 class="st">Citation Quality</h2>
+<section class="sec" id="cit"><div class="sh"><div class="se">Section 05</div><h2 class="st">Citation Quality</h2>
 <div class="sd"><strong style="color:var(--good)">Data Cited</strong> = a specific number, statistic, or named report from this org is explicitly cited. <strong style="color:var(--muted2)">Named Mention</strong> = org is named but no specific data cited. <strong style="color:var(--muted)">Total</strong> = all articles retrieved by searching for this org&rsquo;s name &mdash; some may not directly name the org in the text (the search established the relevance connection; Claude classified each article individually). Sorted by Data Cited %.</div><div class="sdiv"></div></div>
 ${clsNotice}${citTable()}</section>
 
-<section class="sec" id="em"><div class="sh"><div class="se">Section 08</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations are <strong style="color:var(--warn)">not yet part of</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. These are emerging narrative opportunities: the conversation is active but your orgs are absent. <strong>Gap signal</strong> = evidence of the absence. <strong>Opportunity</strong> = a concrete action to enter the conversation.</div><div class="sdiv"></div></div>
+<section class="sec" id="em"><div class="sh"><div class="se">Section 06</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations are <strong style="color:var(--warn)">not yet part of</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. These are emerging narrative opportunities: the conversation is active but your orgs are absent. <strong>Gap signal</strong> = evidence of the absence. <strong>Opportunity</strong> = a concrete action to enter the conversation.</div><div class="sdiv"></div></div>
 ${emergingCards}</section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS)}
-${SI.buildSocialHtml(siSocial, socialScores, ORGS)}
-${trendEvent?.detected && trendSocialData?.length ? SI.buildTrendSocialHtml(trendEvent, trendSocialData, ORGS) : ''}
 ${socialERHtml}
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social. Formula shown in full.</div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 07</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social. Formula shown in full.</div><div class="sdiv"></div></div>
 <div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social/10&times;20)<br>
 <span style="color:var(--muted)">${ORGS.map(o=>`${esc(o)}: ${data[o].sov}&times;0.25+${data[o].dataPct}&times;0.25+${data[o].aeo}&times;0.30+${data[o].social}&times;2=${data[o].score}`).join(' &middot; ')}</span></div>
 <div class="scc">${scorecards}</div></section>
 
-<section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including AEO and social media actions.</div><div class="sdiv"></div></div>
+<section class="sec" id="actions"><div class="sh"><div class="se">Section 08</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including AEO and social media actions.</div><div class="sdiv"></div></div>
 <table class="at"><thead><tr><th>Org</th><th>Priority</th><th>Area</th><th>Action</th><th>Data rationale</th></tr></thead><tbody>${actionRows}</tbody></table></section>
 
 <section class="sec" id="appendix"><div class="sh"><div class="se">Appendix</div><h2 class="st">Source Appendix</h2><div class="sd">All indexed articles. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
