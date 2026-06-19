@@ -1,0 +1,195 @@
+Context / Bug
+
+In emerald-ai/pipeline.js, Step 2 classifies each article's citation quality by
+sending Claude only the FIRST 700 characters of scraped text:
+
+jsconst txt = batch.map((a,j) =>
+  `[${j}] SOURCE: ${a.source} | DATE: ${a.date}\nTITLE: ${a.title}\nCONTENT: ${(a.fullText||a.snippet||'').slice(0,700)}`
+).join('\n===\n');
+
+a.fullText itself is already capped at 2000 characters by serperScrape()
+(see the slice(0,2000) at the end of that function — do not change that cap,
+it controls scrape cost and stays as-is).
+
+The bug: if an organisation's name appears AFTER character 700 of the scraped
+text (which the article is long enough to allow, since fullText can be up to
+2000 chars), Claude never sees it and incorrectly classifies the article as
+"Not Mentioned" — even though the org is genuinely discussed with real data
+later in the same article. This was confirmed with a real example: a Times of
+India article that names CEEW and cites a specific named CEEW study several
+paragraphs in was classified "Not Mentioned" because that paragraph fell past
+character 700 of the scraped text.
+
+Important context on WHY this matters more than it might seem: Step 1's
+fetch query is "${org}" ${kw} India — the org name is in QUOTES, meaning
+Google only returns this article because it found that exact phrase somewhere
+on the page. This means every article that reaches Step 2 was already
+confirmed by Google to contain the org name SOMEWHERE on the full page. So a
+"Not Mentioned" result from Claude is essentially never a genuine absence —
+it is almost always a SCRAPE/TRUNCATION ARTIFACT: either (a) the org mention
+fell outside the 700-char window Claude was shown, or (b) it fell outside the
+2000-char window serperScrape() captured in the first place, or (c) the
+scrape failed entirely and fell back to the Step 1b warning-text stub. The
+fix must distinguish these cases explicitly rather than guessing.
+
+The fix — three parts
+
+Do NOT increase the 700-character limit sent to Claude, or the 2000-character
+scrape cap in serperScrape(). Token/API/scrape cost must stay the same.
+
+Part 1 — Count org mentions in the scraped text (deterministic, in code)
+
+Add a helper countMentions(text, org) near canonOutlet() /
+mentionsOrg()-style helpers in emerald-ai/pipeline.js:
+
+jsfunction countMentions(text, org) {
+  if (!text || !org) return 0;
+  const t = text.toLowerCase();
+  const orgL = org.toLowerCase();
+  const words = orgL.split(/\s+/);
+  // Build a regex that matches the org name as a phrase (escape special chars)
+  const escaped = orgL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const matches = t.match(new RegExp(escaped, 'g'));
+  return matches ? matches.length : 0;
+}
+
+This counts how many times the org's name (as an exact phrase, case-insensitive)
+appears in the scraped fullText — NOT just in the 700-char window sent to
+Claude. This is the count that matters for understanding total visibility
+within the article, independent of what Claude actually gets shown.
+
+Part 2 — Center the classification window on the first mention
+
+Add extractRelevantWindow(text, org, windowSize = 700):
+
+
+If text is empty/falsy, return ''.
+Search text (case-insensitive) for the FIRST occurrence of the org name
+(same matching approach as countMentions / the existing
+mentionsOrg/detectMentionLocations logic elsewhere in the codebase —
+reuse that pattern for consistency).
+If a match is found at index idx, compute a window of length windowSize
+centered on idx:
+
+
+js  const half = Math.floor(windowSize / 2);
+  let start = Math.max(0, idx - half);
+  let end = Math.min(text.length, start + windowSize);
+  start = Math.max(0, end - windowSize);
+
+Return text.slice(start, end), prefixed with '...' if start > 0 and
+suffixed with '...' if end < text.length.
+
+
+If NO match is found anywhere in text (i.e. countMentions returned 0),
+return the first windowSize characters as before — BUT see Part 3, this
+case must now be flagged, not silently classified as a normal "Not Mentioned."
+
+
+Part 3 — Flag scrape-gap articles distinctly, do not let Claude silently call them "Not Mentioned"
+
+Before calling Claude, check countMentions(a.fullText, org) for each article
+in the batch:
+
+
+If countMentions === 0: this means Google confirmed the org name is on the
+page (that's why Step 1 fetched it), but it does NOT appear anywhere in the
+2000-char scraped text. This is a scrape-coverage gap, not evidence of
+absence. Mark this article's citation_quality directly in code as
+"Mention Not In Scraped Text" and SKIP sending it to Claude for
+citation_quality classification (saves a token-worth of confusion — Claude
+has nothing useful to judge here). Still let Claude classify aq_subtopic
+for it if you want topic data, but the citation_quality field should be
+set programmatically, not by Claude, for this case.
+If countMentions >= 1: proceed with the normal Claude classification flow,
+using the centered window from Part 2. Pass mentionCount into the prompt
+as context (see below) and have Claude return it back unchanged in its JSON
+output for the report.
+
+
+4. Updated Step 2 prompt construction
+
+Replace:
+
+jsconst txt = batch.map((a,j) =>
+  `[${j}] SOURCE: ${a.source} | DATE: ${a.date}\nTITLE: ${a.title}\nCONTENT: ${(a.fullText||a.snippet||'').slice(0,700)}`
+).join('\n===\n');
+
+with something like:
+
+jsconst txt = batch.map((a,j) => {
+  const fullText = a.fullText || a.snippet || '';
+  const mentionCount = countMentions(fullText, org);
+  const window = extractRelevantWindow(fullText, org, 700);
+  return `[${j}] SOURCE: ${a.source} | DATE: ${a.date} | ORG MENTIONS IN FULL SCRAPED TEXT: ${mentionCount}\nTITLE: ${a.title}\nCONTENT: ${window}`;
+}).join('\n===\n');
+
+Update the classification prompt instructions (the prompt = ... template a few
+lines below) to:
+
+
+Add a new output field: mention_count — pass through the ORG MENTIONS IN FULL SCRAPED TEXT number shown in the input for that article, don't ask
+Claude to recount it itself from the truncated window (it can't see the full
+text, only the windowed excerpt).
+Clarify in the instructions that citation_quality should be judged from the
+CONTENT excerpt shown, and that mention_count is a separate, informational
+field reflecting total mentions across the full article (which may be higher
+than what's visible in the excerpt).
+Add "Mention Not In Scraped Text" as a fourth possible value alongside
+"Data Cited" / "Named Mention" / "Not Mentioned" in the field description,
+for the cases handled programmatically in Part 3 (so the JSON schema and any
+downstream rendering code that reads citation_quality knows this is a
+valid value, not an error).
+
+
+5. Do NOT touch
+
+
+serperScrape()'s slice(0,2000) cap — leave as-is, this fix works within
+the existing scraped text, it doesn't fetch more of it.
+The 700 window size itself — keep it at 700, just change WHERE in the text
+that window is taken from.
+The snippet-fallback warning text in Step 1b
+([Full text unavailable. If ${org} is not explicitly cited with data, mark Secondary Mention.]) — that's a separate, already-known issue (scrape
+failure vs genuine absence) and is out of scope for this change. Leave it
+exactly as it is.
+max_tokens on the Claude call, or any other cost-related parameter.
+
+
+6. After implementing — verification
+
+Re-run classification on the SAME CEEW / Times of India article referenced in
+the bug report above (or any article where you can manually confirm the org
+name appears later in the article body) and confirm:
+
+
+The org's name now appears inside the CONTENT: text actually sent to Claude
+(log/print the constructed prompt text for at least one batch so this is
+visible, not just trust the JSON output)
+citation_quality for that article changes from "Not Mentioned" to a more
+accurate "Named Mention" or "Data Cited" (whichever the article content
+actually supports)
+mention_count in the output is non-zero and matches a manual count of how
+many times the org name appears in fullText for that article
+Total character count sent to Claude per article stays at ~700 (i.e. this is
+NOT secretly sending more text than before — confirm via length check)
+Find or simulate at least one article where the org name from Step 1's
+search genuinely does NOT appear in the 2000-char scraped fullText (this
+can happen if the org name was on the page in a part Google indexed but
+serperScrape() didn't capture within its 2000-char limit, e.g. a long
+article where the mention is very deep, or a page where scraped content
+differs from indexed content). Confirm that article gets citation_quality: "Mention Not In Scraped Text" set programmatically, is NOT sent to Claude
+for citation classification, and is visually distinguishable from genuine
+"Not Mentioned" results in whatever report/UI section reads this field
+(Citation Quality table, Source Appendix, etc. — check both).
+Run the existing test/sample pipeline call and show me the before/after
+citation_quality + mention_count for at least 2-3 articles where the org
+mention is NOT in the first 700 characters of fullText, so the fix is
+demonstrably working on real data, not just passing on a single hand-picked
+example.
+Confirm any frontend/report code that renders citation_quality (e.g. the
+Citation Quality section and Source Appendix table shown in the HTML report
+builder) handles the new "Mention Not In Scraped Text" value without
+crashing or rendering it as blank — it should show distinctly from "Not
+Mentioned" (e.g. a different color/label) so report readers don't conflate
+"confirmed absent" with "scrape couldn't reach it."

@@ -85,6 +85,29 @@ function parseDateStr(s) {
   return null;
 }
 
+// ── Classification helpers ─────────────────────────────────────────────────
+/** Count exact-phrase occurrences of org name (case-insensitive) in scraped text */
+function countMentions(text, org) {
+  if (!text || !org) return 0;
+  const escaped = org.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const matches = text.toLowerCase().match(new RegExp(escaped, 'g'));
+  return matches ? matches.length : 0;
+}
+
+/** Return a ~windowSize window of text centered on the first occurrence of org.
+ *  If org is not found, returns first windowSize chars (caller should check countMentions). */
+function extractRelevantWindow(text, org, windowSize = 700) {
+  if (!text) return '';
+  const escaped = org.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const idx = text.toLowerCase().search(new RegExp(escaped));
+  if (idx === -1) return text.slice(0, windowSize);
+  const half = Math.floor(windowSize / 2);
+  let start = Math.max(0, idx - half);
+  let end   = Math.min(text.length, start + windowSize);
+  start = Math.max(0, end - windowSize);
+  return (start > 0 ? '...' : '') + text.slice(start, end) + (end < text.length ? '...' : '');
+}
+
 function canonOutlet(src) {
   if(!src) return null; const s=src.toLowerCase();
   if(s.includes('times of india')||s.includes('timesofindia')||s.includes('indiatimes'))return 'Times of India';
@@ -554,38 +577,76 @@ async function run(cfg, cb) {
 
     for(let bi=0;bi<batches.length;bi++){
       const batch=batches[bi];
-      const txt=batch.map((a,j)=>
-        `[${j}] SOURCE: ${a.source} | DATE: ${a.date}\nTITLE: ${a.title}\nCONTENT: ${(a.fullText||a.snippet||'').slice(0,700)}`
-      ).join('\n===\n');
+
+      // Separate articles: those with 0 mentions in scraped text are pre-classified;
+      // only articles where the org actually appears go to Claude.
+      const scrapeGap=[], needsClaude=[];
+      batch.forEach((a,j)=>{
+        const ft=a.fullText||a.snippet||'';
+        const mc=countMentions(ft, org);
+        if(mc===0) scrapeGap.push({j,a,mc});
+        else        needsClaude.push({j,a,mc,ft});
+      });
+
+      // Pre-classify scrape-gap articles deterministically — Claude has nothing useful to see
+      const preItems=scrapeGap.map(({j,a})=>({
+        index:j, outlet:a.source||'', date:a.date||'',
+        citation_quality:'Mention Not In Scraped Text',
+        mention_count:0, aq_subtopic:'General AQ',
+        evidence_quote:'org name not found in scraped text', confidence:'Low'
+      }));
+
+      if(needsClaude.length===0){
+        cls[org]=cls[org].concat(preItems);
+        cb(`  ${org} batch ${bi+1}/${batches.length} — ${scrapeGap.length} scrape-gap, skipped Claude`, 'warn');
+        await sleep(100);
+        continue;
+      }
+
+      // Build prompt using centered 700-char windows for articles that do have mentions
+      const txt=needsClaude.map(({j,a,mc,ft})=>{
+        const window=extractRelevantWindow(ft, org, 700);
+        return `[${j}] SOURCE: ${a.source} | DATE: ${a.date} | ORG MENTIONS IN FULL SCRAPED TEXT: ${mc}\nTITLE: ${a.title}\nCONTENT: ${window}`;
+      }).join('\n===\n');
 
       const prompt=`You are a media intelligence analyst classifying Indian news articles about air quality for the organisation "${org}".
 
 For EACH numbered article, return one JSON object with:
-- citation_quality: "Data Cited" if a specific number, %, statistic, or named report FROM "${org}" appears in the article. "Named Mention" if org is named but no specific data cited. "Not Mentioned" if org does not appear.
+- index: the article number shown in [brackets]
+- citation_quality: "Data Cited" if a specific number, %, statistic, or named report FROM "${org}" appears in the CONTENT excerpt. "Named Mention" if org is named but no specific data cited. "Not Mentioned" if org does not appear in the excerpt. (Do NOT use "Mention Not In Scraped Text" — that is set before this step for articles not shown here.)
+- mention_count: copy the ORG MENTIONS IN FULL SCRAPED TEXT number exactly as given — do not recount from the excerpt
 - aq_subtopic: EXACTLY one of: NCAP, Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance, Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI, Brick Kilns, Petrol Emissions, Diesel Emissions, Super Emitters, Thermal Power Plants, Household Pollution, Indoor Pollution, Biomass Air Pollution, Rice Residue Burning, Wheat Residue Burning, Road Dust, General AQ
 - evidence_quote: exact phrase ≤12 words from content. "not mentioned" if absent.
 - outlet: publication from SOURCE field
 - date: date from DATE field
 - confidence: "High" or "Low"
 
+Note: CONTENT is a ~700-char window centered on the org's first mention in the scraped text — the org name should appear in it.
+
 Return ONLY a JSON array. No preamble, no markdown.
-[{"index":0,"outlet":"Times of India","date":"Mar 5, 2026","citation_quality":"Data Cited","aq_subtopic":"NCAP","evidence_quote":"CEEW found 23 of 131 cities met targets","confidence":"High"}]
+[{"index":0,"outlet":"Times of India","date":"Mar 5, 2026","citation_quality":"Data Cited","mention_count":3,"aq_subtopic":"NCAP","evidence_quote":"CEEW found 23 of 131 cities met targets","confidence":"High"}]
 
 ARTICLES:
 ${txt}`;
 
-      cb(`  ${org} batch ${bi+1}/${batches.length}...`);
+      cb(`  ${org} batch ${bi+1}/${batches.length}${scrapeGap.length>0?` (${scrapeGap.length} scrape-gap pre-classified)`:''}...`);
       try{
         const raw=await callClaude(prompt, cfg.CLAUDE_KEY, 2500);
         cb(`  preview: ${raw.slice(0,90).replace(/\n/g,' ')}`, 'warn');
         const parsed=parseJ(raw);
         if(parsed&&Array.isArray(parsed)&&parsed.length>0){
-          cls[org]=cls[org].concat(parsed);
-          cb(`  +${parsed.length} classified`, 'ok');
+          // Merge Claude results with pre-classified, preserve original article order
+          const all=[...preItems,...parsed].sort((a,b)=>(a.index||0)-(b.index||0));
+          cls[org]=cls[org].concat(all);
+          cb(`  +${all.length} classified (${parsed.length} Claude + ${preItems.length} scrape-gap)`, 'ok');
         } else {
           cb(`  parse failed: ${raw.slice(0,80)}`, 'err');
+          if(preItems.length>0) cls[org]=cls[org].concat(preItems);
         }
-      }catch(e){ cb(`  Claude error: ${e.message}`, 'err'); }
+      }catch(e){
+        cb(`  Claude error: ${e.message}`, 'err');
+        if(preItems.length>0) cls[org]=cls[org].concat(preItems);
+      }
       await sleep(500);
     }
     cb(`  ${org} total classified: ${cls[org].length}`, cls[org].length>0?'ok':'err');
@@ -1342,6 +1403,7 @@ ${hasYT?`<div style="font-size:13px;font-weight:600;color:var(--text);margin:20p
       const total=cls.length;
       const cited=cls.filter(c=>c.citation_quality==='Data Cited').length;
       const named=cls.filter(c=>c.citation_quality==='Named Mention').length;
+      const notInScrape=cls.filter(c=>c.citation_quality==='Mention Not In Scraped Text').length;
       const pct=total>0?Math.round(cited/total*100):0;
       // Match cited articles with their URLs via index alignment
       const evidenceItems = cls.reduce((acc,c,ci)=>{
@@ -1354,10 +1416,10 @@ ${hasYT?`<div style="font-size:13px;font-weight:600;color:var(--text);margin:20p
       const evCell = evidenceItems.length
         ? evidenceItems.map(e=>`<div style="margin-bottom:5px"><div style="font-family:monospace;font-size:10px;color:var(--amber);line-height:1.5">&ldquo;${esc(e.quote)}&rdquo;</div><div style="font-family:monospace;font-size:10px;color:var(--muted)">${esc(e.outlet)} &middot; ${esc(e.date)}</div>${e.url?`<a href="${esc(e.url)}" target="_blank" style="font-family:monospace;font-size:10px;color:var(--amber);text-decoration:none">&#8599; article</a>`:''}</div>`).join('')
         : `<span style="color:var(--muted);font-family:monospace;font-size:11px">—</span>`;
-      return {org,i,total,cited,named,pct,evCell};
+      return {org,i,total,cited,named,notInScrape,pct,evCell};
     }).sort((a,b)=>b.pct-a.pct);
-    return `<table class="nt"><thead><tr><th>Org</th><th>Total</th><th>Data Cited</th><th>Named Mention</th><th>Evidence (Data Cited articles)</th></tr></thead><tbody>${
-      rows.map(r=>`<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(r.i)}">${esc(r.org)}</span></td><td style="font-family:monospace">${r.total}</td><td><span style="font-family:monospace;font-weight:700;color:var(--good)">${r.cited}</span> <span style="font-family:monospace;font-size:10px;color:var(--muted)">(${r.pct}%)</span></td><td style="font-family:monospace;color:var(--muted2)">${r.named}</td><td>${r.evCell}</td></tr>`).join('')
+    return `<table class="nt"><thead><tr><th>Org</th><th>Total</th><th>Data Cited</th><th>Named Mention</th><th title="Org confirmed on page by Google but not found in 2000-char scraped text">Not In Scrape</th><th>Evidence (Data Cited articles)</th></tr></thead><tbody>${
+      rows.map(r=>`<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(r.i)}">${esc(r.org)}</span></td><td style="font-family:monospace">${r.total}</td><td><span style="font-family:monospace;font-weight:700;color:var(--good)">${r.cited}</span> <span style="font-family:monospace;font-size:10px;color:var(--muted)">(${r.pct}%)</span></td><td style="font-family:monospace;color:var(--muted2)">${r.named}</td><td style="font-family:monospace;color:#8b7cf8">${r.notInScrape||'—'}</td><td>${r.evCell}</td></tr>`).join('')
     }</tbody></table>`;
   }
 
@@ -1377,7 +1439,8 @@ ${scRow('Share of Voice',d.sov,orgHex(i))}${scRow('Citation',d.dataPct,orgHex(i)
 
   const appendixSections=ORGS.map(org=>{
     const d=data[org];
-    const rows=arts[org].slice(0,15).map((a,i)=>{const c=d.classifications[i]||{};return `<tr><td>${i+1}</td><td>${esc(a.source||'')}</td><td style="font-size:10px">${esc(a.date||'')}</td><td style="max-width:260px">${esc(a.title||'')}</td><td style="font-size:10px;font-family:monospace">${esc(c.citation_quality||'—')}</td><td>${a.url?`<a href="${esc(a.url)}" target="_blank">link</a>`:'—'}</td></tr>`;}).join('');
+    const cqColor=q=>q==='Data Cited'?'var(--good)':q==='Named Mention'?'var(--muted2)':q==='Mention Not In Scraped Text'?'#8b7cf8':'var(--muted)';
+    const rows=arts[org].slice(0,15).map((a,i)=>{const c=d.classifications[i]||{};const cq=c.citation_quality||'—';return `<tr><td>${i+1}</td><td>${esc(a.source||'')}</td><td style="font-size:10px">${esc(a.date||'')}</td><td style="max-width:260px">${esc(a.title||'')}</td><td style="font-size:10px;font-family:monospace;color:${cqColor(cq)}">${esc(cq)}</td><td>${a.url?`<a href="${esc(a.url)}" target="_blank">link</a>`:'—'}</td></tr>`;}).join('');
     return `<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:9px">${esc(org)} &mdash; ${d.total} articles</div>
 <table class="apt"><thead><tr><th>#</th><th>Outlet</th><th>Date</th><th>Headline</th><th>Classification</th><th>URL</th></tr></thead><tbody>${rows}</tbody></table><div style="margin-bottom:24px"></div>`;
   }).join('');
