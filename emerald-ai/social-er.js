@@ -9,20 +9,21 @@ const axios = require('axios');
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// Keys must match exactly what the UI/pipeline sends as org names
 const ORG_HANDLES = {
-  'WRI India':                                        { twitter: 'WRIIndia',           instagram: 'wri_india',           linkedin: 'wri-india' },
-  'Air Pollution Action Group':                       { twitter: 'APAGIndia',          instagram: 'apagindia',           linkedin: 'air-pollution-action-group' },
-  'Chintan Environmental Research and Action Group':  { twitter: 'ChintanIndia',       instagram: 'chintan_india',       linkedin: 'chintan-environmental-research-and-action-group' },
-  'IIT Kanpur':                                       { twitter: 'IITKanpur',          instagram: 'iitkanpur',           linkedin: 'iit-kanpur' },
-  'CSTEP':                                            { twitter: 'CSTEP_India',        instagram: 'cstep_india',         linkedin: 'cstep-india' },
-  'IIT Delhi':                                        { twitter: 'IITDelhi',           instagram: 'iitdelhi',            linkedin: 'iit-delhi' },
-  'Health Effects Institute':                         { twitter: 'HEIResearch',        instagram: 'heiresearch',         linkedin: 'health-effects-institute' },
-  'ICCT':                                             { twitter: 'TheICCT',            instagram: 'theicct',             linkedin: 'icct' },
-  'EPIC India':                                       { twitter: 'EPICIndia_',         instagram: 'epicindia_uchicago',  linkedin: 'epic-india' },
-  'Council on Energy, Environment and Water':         { twitter: 'CEEWIndia',          instagram: 'ceewindia',           linkedin: 'council-on-energy-environment-and-water' },
-  'Centre for Science and Environment':               { twitter: 'CSEIndia',           instagram: 'cseindia',            linkedin: 'centre-for-science-and-environment' },
-  'Climate Trends':                                   { twitter: 'ClimateTrendsIN',    instagram: 'climatetrendsin',     linkedin: 'climate-trends' },
-  'Sustainable Futures Collaborative':                { twitter: 'SFC_India',          instagram: 'sfc_india',           linkedin: 'sustainable-futures-collaborative' },
+  'WRI India':                                        { twitter: 'WRIIndia',          instagram: 'wri_india',           linkedin: 'wri-india' },
+  'Air Pollution Action Group':                       { twitter: 'APAGIndia',         instagram: 'apagindia',           linkedin: 'air-pollution-action-group' },
+  'Chintan Environmental Research and Action Group':  { twitter: 'ChintanIndia',      instagram: 'chintan_india',       linkedin: 'chintan-environmental-research-and-action-group' },
+  'IIT Kanpur':                                       { twitter: 'IITKanpur',         instagram: 'iitkanpur',           linkedin: 'iit-kanpur' },
+  'CSTEP':                                            { twitter: 'CSTEP_India',       instagram: 'cstep_india',         linkedin: 'cstep-india' },
+  'IIT Delhi':                                        { twitter: 'IITDelhi',          instagram: 'iitdelhi',            linkedin: 'iit-delhi' },
+  'Health Effects Institute':                         { twitter: 'HEIResearch',       instagram: 'heiresearch',         linkedin: 'health-effects-institute' },
+  'ICCT':                                             { twitter: 'TheICCT',           instagram: 'theicct',             linkedin: 'icct' },
+  'EPIC India':                                       { twitter: 'EPICIndia_',        instagram: 'epicindia_uchicago',  linkedin: 'epic-india' },
+  'Council on Energy, Environment and Water':         { twitter: 'CEEWIndia',         instagram: 'ceewindia',           linkedin: 'council-on-energy-environment-and-water' },
+  'Centre for Science and Environment':               { twitter: 'CSEIndia',          instagram: 'cseindia',            linkedin: 'centre-for-science-and-environment' },
+  'Climate Trends':                                   { twitter: 'ClimateTrendsIN',   instagram: 'climatetrendsin',     linkedin: 'climate-trends' },
+  'Sustainable Futures Collaborative':                { twitter: 'SFC_India',         instagram: 'sfc_india',           linkedin: 'sustainable-futures-collaborative' },
 };
 
 async function runApifyActor(actorId, input) {
