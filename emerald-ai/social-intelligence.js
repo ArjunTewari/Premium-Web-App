@@ -260,21 +260,29 @@ function buildAEOHtml(aeoResults, orgs) {
   }).join('');
 
   const queriesUsed = aeoResults._queriesUsed || AEO_QUESTIONS;
-  const displayQueries = queriesUsed.slice(0, 5);
-  const totalResponses = Object.values(Object.values(aeoResults).find(v => v && v.llmBreakdown) || {}).length > 0
-    ? Object.values((Object.values(aeoResults).find(v => v && v.llmBreakdown) || {}).llmBreakdown || {}).reduce((s, v) => s + (v.total || 0), 0)
-    : queriesUsed.length * 3;
 
-  const qRows = displayQueries.map((q, qi) => {
+  // Split queries: those where ≥1 org was mentioned vs complete blanks
+  const queriesWithHits = [];
+  const queriesWithZero = [];
+  queriesUsed.forEach((q, qi) => {
+    const qKey = `Q${qi + 1}`;
+    const anyMentioned = orgs.some(org =>
+      (aeoResults[org]?.questionResults?.[qKey] || []).some(r => r.cited)
+    );
+    if (anyMentioned) queriesWithHits.push({ q, qi });
+    else              queriesWithZero.push({ q, qi });
+  });
+
+  const makeQRow = ({ q, qi }) => {
+    const qKey = `Q${qi + 1}`;
     const badges = orgs.map(org => {
-      const qKey = `Q${qi + 1}`;
       const qResults = aeoResults[org]?.questionResults?.[qKey] || [];
       const citedCount = qResults.filter(r => r.cited).length;
       const total = qResults.length;
       const col = total === 0 ? '#5e7494' : citedCount === total ? '#4caf74' : citedCount > 0 ? '#d4a017' : '#5e7494';
       const bg  = total === 0 ? '#1e2638' : citedCount === total ? 'rgba(76,175,116,.1)' : citedCount > 0 ? 'rgba(212,160,23,.1)' : '#1e2638';
       const bdr = total === 0 ? '#252d40' : citedCount === total ? 'rgba(76,175,116,.25)' : citedCount > 0 ? 'rgba(212,160,23,.25)' : '#252d40';
-      const label = total === 0 ? `${org} —` : citedCount === total ? `${org} ✓ ${citedCount}/${total}` : citedCount > 0 ? `${org} ✓ ${citedCount}/${total}` : `${org} ✗ 0/${total}`;
+      const label = total === 0 ? `${org} —` : citedCount > 0 ? `${org} ✓ ${citedCount}/${total}` : `${org} ✗ 0/${total}`;
       return `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:${col};background:${bg};border:1px solid ${bdr};border-radius:3px;padding:1px 6px">${escHtml(label)}</span>`;
     }).join('');
     return `
@@ -282,7 +290,28 @@ function buildAEOHtml(aeoResults, orgs) {
       <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q${qi + 1}</span>
       <div style="color:#8fa3b8;flex:1;line-height:1.55">${escHtml(q)} <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px">${badges}</span></div>
     </div>`;
-  }).join('');
+  };
+
+  const hitRows  = queriesWithHits.map(makeQRow).join('');
+  const gapBlock = queriesWithZero.length ? `
+  <div style="background:rgba(224,92,92,.04);border:1px solid rgba(224,92,92,.15);border-radius:8px;padding:16px 18px;margin-top:16px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#e05c5c;margin-bottom:4px">
+      Content &amp; Visibility Gaps — ${queriesWithZero.length} Topics with Zero Mentions
+    </div>
+    <div style="font-size:12px;color:#8fa3b8;margin-bottom:12px;line-height:1.65;max-width:680px">
+      None of the tracked organisations appeared in LLM responses to these ${queriesWithZero.length} queries.
+      This is a strategic opportunity — organisations that publish credible, citable content on these specific topics
+      could own these AI citations. Right now, <strong style="color:#e05c5c">no one does</strong>.
+    </div>
+    ${queriesWithZero.map(({ q, qi }) => `
+    <div style="display:flex;gap:14px;padding:8px 0;border-bottom:1px solid rgba(224,92,92,.08);align-items:flex-start">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#e05c5c;flex-shrink:0;width:18px;padding-top:2px">Q${qi + 1}</span>
+      <div style="flex:1">
+        <div style="font-size:12px;color:#8fa3b8;line-height:1.55;margin-bottom:4px">${escHtml(q)}</div>
+        <div style="font-size:11px;color:#5e7494">→ Publish a report, brief, or data update addressing this specific question to capture AI visibility</div>
+      </div>
+    </div>`).join('')}
+  </div>` : '';
 
   return `
 <section style="margin-bottom:56px;scroll-margin-top:24px" id="aeo">
@@ -297,9 +326,12 @@ function buildAEOHtml(aeoResults, orgs) {
   </div>
   <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">${orgPanels}</div>
   <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:16px 18px;margin-bottom:12px">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c9922a;margin-bottom:2px">Sample AEO Queries (first 5 of ${queriesUsed.length})</div>
-    <div style="font-size:10px;color:#5e7494;margin-bottom:10px">These questions were sent to each LLM verbatim — no org names included.</div>
-    ${qRows}
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c9922a;margin-bottom:2px">
+      AEO Queries with Org Mentions (${queriesWithHits.length} of ${queriesUsed.length})
+    </div>
+    <div style="font-size:10px;color:#5e7494;margin-bottom:10px">Queries where at least one tracked organisation was cited by an LLM.</div>
+    ${hitRows || '<div style="font-size:12px;color:#5e7494;padding:8px 0">No org mentions found across any queries.</div>'}
+    ${gapBlock}
   </div>
   <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">GPT-4o mini · Perplexity Sonar · Gemini 1.5 Flash · ${queriesUsed.length} questions × 3 LLMs = ${queriesUsed.length * 3} responses per org</div>
 </section>`;

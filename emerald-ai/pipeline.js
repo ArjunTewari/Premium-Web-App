@@ -839,7 +839,7 @@ ${txt}`;
   );
   const orgSummary = ORGS.map((o) => {
     const er = socialERResults.find((r) => r.org === o);
-    return `${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo} mentions, Social ER ${data[o].social}/10 (IG=${er?.instagramER || 0}% LI=${er?.linkedinER || 0}% YT=${er?.youtubeER || 0}%), top outlet: ${data[o].topOutlet}, topics 2+: ${
+    return `${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo} mentions, Social ER ${data[o].social}/10 (TW=${er?.twitterER || 0}% LI=${er?.linkedinER || 0}% YT=${er?.youtubeER || 0}%), top outlet: ${data[o].topOutlet}, topics 2+: ${
       Object.entries(data[o].topicCounts)
         .filter(([, v]) => v >= 2)
         .map(([k]) => k)
@@ -1134,7 +1134,7 @@ async function buildPPTX(
       });
     const hasER = socialERResults && socialERResults.length > 0;
     if (hasER)
-      sl.addText(`✓ Social ER: ${socialERResults.length} orgs (Apify)`, {
+      sl.addText(`✓ Social Presence: ${socialERResults.length} orgs (Serper)`, {
         x: 8,
         y: 3.52,
         w: 5.3,
@@ -1837,7 +1837,7 @@ async function buildPPTX(
         align: "center",
       });
       sl.addText(
-        "Set APIFY_TOKEN to enable Apify social engagement rate collection.",
+        "Social AQ Presence powered by Serper web search.",
         {
           x: 0.5,
           y: 2.76,
