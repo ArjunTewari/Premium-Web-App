@@ -495,7 +495,7 @@ function isThirdParty(url, orgName) {
 // ══════════════════════════════════════════════════════════════════════════
 async function run(cfg, cb) {
   // cfg: { ORGS[], DATE_FROM, DATE_TO, CLIENT_NAME, SERPER_KEY, CLAUDE_KEY, CLAUDE_MODEL,
-  //         OPENAI_KEY?, PERPLEXITY_KEY?, GEMINI_KEY?, TWITTER_KEY?, outDir }
+  //         OPENAI_KEY?, PERPLEXITY_KEY?, GEMINI_KEY?, TWITTER_KEY?, YOUTUBE_KEY?, outDir }
   // cb(message, level) — streams log lines
 
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
@@ -780,6 +780,22 @@ ${txt}`;
     cb(`  Social ER error: ${e.message}`, "err");
   }
 
+  // ── YouTube ER ────────────────────────────────────────────
+  cb(`\nSTEP 4b/6 — YouTube ER (YouTube Data API v3)...`, "head");
+  const YoutubeER = require("./youtube-er");
+  let youtubeERResults = [];
+  let youtubeERHtml = "";
+  try {
+    youtubeERResults = await YoutubeER.run(cfg, ORGS, cb);
+    youtubeERHtml = YoutubeER.buildYoutubeERHtml(youtubeERResults, !!cfg.YOUTUBE_KEY);
+    cb(
+      `  YouTube ER complete: ${youtubeERResults.filter(r => r.videoCount > 0).length} orgs with videos`,
+      youtubeERResults.some(r => r.videoCount > 0) ? "ok" : "warn",
+    );
+  } catch (e) {
+    cb(`  YouTube ER error: ${e.message}`, "err");
+  }
+
   // ── ER normalisation: 0–10 score per org ─────────────────
   const maxER = Math.max(...socialERResults.map((r) => r.avgER), 0.01);
   const erScoreByOrg = {};
@@ -965,6 +981,7 @@ ${txt}`;
     pptxName,
     cfg,
     socialERHtml,
+    youtubeERHtml,
   );
   fs.writeFileSync(htmlFile, html, "utf8");
   cb(`  HTML: ${base}.html (${Math.round(html.length / 1024)}KB)`, "ok");
@@ -2438,6 +2455,7 @@ function buildHTML(
   pptxFilename,
   cfg,
   socialERHtml = "",
+  youtubeERHtml = "",
 ) {
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
   const now = new Date().toUTCString();
@@ -2919,8 +2937,8 @@ body.edit-mode .sec-x{display:flex}
 <div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a><a href="#method" class="nav-a">Methodology</a>
-<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#momentum" class="nav-a">Momentum</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a>
-<div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a><a href="#social" class="nav-a">Social Media</a>
+<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#momentum" class="nav-a">Momentum</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social &amp; Digital</div><a href="#social" class="nav-a">Social Presence</a><a href="#youtube-er" class="nav-a">YouTube ER</a>
+<div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>${navOrgs}CONFIDENTIAL</div></nav>
 <main class="main">
@@ -2983,6 +3001,7 @@ ${emergingCards}</section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS)}
 ${socialERHtml}
+${youtubeERHtml}
 
 <section class="sec" id="score"><div class="sh"><div class="se">Section 07</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social. Formula shown in full.</div><div class="sdiv"></div></div>
 <div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social/10&times;20)<br>
