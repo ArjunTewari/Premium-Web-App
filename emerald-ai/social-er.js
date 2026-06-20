@@ -34,8 +34,10 @@ async function runApifyActor(actorId, input) {
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
   if (!APIFY_TOKEN) throw new Error('APIFY_TOKEN not set');
 
+  // Apify URL path uses ~ separator, not /
+  const safeId = actorId.replace('/', '~');
   const startRes = await axios.post(
-    `https://api.apify.com/v2/acts/${encodeURIComponent(actorId)}/runs?token=${APIFY_TOKEN}`,
+    `https://api.apify.com/v2/acts/${safeId}/runs?token=${APIFY_TOKEN}`,
     input,
     { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
   );
@@ -59,7 +61,7 @@ async function runApifyActor(actorId, input) {
   return dataRes.data;
 }
 
-async function fetchInstagramPosts(handle, dateFrom) {
+async function fetchInstagramPosts(handle, dateFrom, cb) {
   try {
     const items = await runApifyActor('apify/instagram-scraper', {
       usernames: [handle],
@@ -81,12 +83,12 @@ async function fetchInstagramPosts(handle, dateFrom) {
         followerCount: p.ownerFollowersCount || p.followersCount || 0,
       }));
   } catch (e) {
-    console.error(`[SocialER] Instagram fetch failed for ${handle}:`, e.message);
+    cb?.(`  [SocialER] Instagram error (${handle}): ${e.message}`, 'warn');
     return [];
   }
 }
 
-async function fetchLinkedInPosts(companySlug, dateFrom, dateTo) {
+async function fetchLinkedInPosts(companySlug, dateFrom, dateTo, cb) {
   try {
     const items = await runApifyActor('harvestapi/linkedin-profile-posts-scraper', {
       profileUrls: [`https://www.linkedin.com/company/${companySlug}/`],
@@ -113,12 +115,12 @@ async function fetchLinkedInPosts(companySlug, dateFrom, dateTo) {
         followerCount: p.companyFollowersCount || p.followersCount || 0,
       }));
   } catch (e) {
-    console.error(`[SocialER] LinkedIn fetch failed for ${companySlug}:`, e.message);
+    cb?.(`  [SocialER] LinkedIn error (${companySlug}): ${e.message}`, 'warn');
     return [];
   }
 }
 
-async function fetchYouTubePosts(channelHandle, dateFrom, dateTo) {
+async function fetchYouTubePosts(channelHandle, dateFrom, dateTo, cb) {
   try {
     const items = await runApifyActor('streamers/youtube-scraper', {
       startUrls: [{ url: `https://www.youtube.com/@${channelHandle}/videos` }],
@@ -145,7 +147,7 @@ async function fetchYouTubePosts(channelHandle, dateFrom, dateTo) {
         followerCount: v.numberOfSubscribers || 0,
       }));
   } catch (e) {
-    console.error(`[SocialER] YouTube fetch failed for ${channelHandle}:`, e.message);
+    cb?.(`  [SocialER] YouTube error (${channelHandle}): ${e.message}`, 'warn');
     return [];
   }
 }
@@ -176,25 +178,25 @@ function deriveInsight(posts) {
 
 async function run(cfg, selectedOrgs, cb) {
   if (!process.env.APIFY_TOKEN) {
-    cb?.('social-er', 'APIFY_TOKEN not set — skipping Social ER');
+    cb?.('  [SocialER] APIFY_TOKEN not set — skipping Social ER', 'warn');
     return [];
   }
 
-  cb?.('social-er', `Starting Social ER for ${selectedOrgs.length} orgs across Instagram, LinkedIn, YouTube…`);
+  cb?.(`  Social ER: starting for ${selectedOrgs.length} orgs across Instagram, LinkedIn, YouTube…`);
   const orgResults = [];
 
   for (const orgName of selectedOrgs) {
     const handles = ORG_HANDLES[orgName];
     if (!handles) {
-      cb?.('social-er', `No handles found for ${orgName} — skipping`);
+      cb?.(`  [SocialER] No handles for "${orgName}" — skipping`, 'warn');
       continue;
     }
-    cb?.('social-er', `Fetching ${orgName}…`);
+    cb?.(`  [SocialER] Fetching ${orgName}…`);
 
     const [igPosts, liPosts, ytPosts] = await Promise.allSettled([
-      fetchInstagramPosts(handles.instagram, cfg.DATE_FROM),
-      fetchLinkedInPosts(handles.linkedin, cfg.DATE_FROM, cfg.DATE_TO),
-      fetchYouTubePosts(handles.youtube, cfg.DATE_FROM, cfg.DATE_TO),
+      fetchInstagramPosts(handles.instagram, cfg.DATE_FROM, cb),
+      fetchLinkedInPosts(handles.linkedin, cfg.DATE_FROM, cfg.DATE_TO, cb),
+      fetchYouTubePosts(handles.youtube, cfg.DATE_FROM, cfg.DATE_TO, cb),
     ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : []));
 
     const allPosts = [...igPosts, ...liPosts, ...ytPosts];
@@ -220,13 +222,13 @@ async function run(cfg, selectedOrgs, cb) {
       insight:        deriveInsight(allPosts),
     });
 
-    cb?.('social-er', `${orgName} done — avgER: ${avgER}%`);
+    cb?.(`  [SocialER] ${orgName} done — IG:${calcER(igPosts)}% LI:${calcER(liPosts)}% YT:${calcER(ytPosts)}% avg:${avgER}%`, avgER > 0 ? 'ok' : 'warn');
   }
 
   orgResults.sort((a, b) => b.avgER - a.avgER);
   orgResults.forEach((r, i) => { r.rank = i + 1; });
 
-  cb?.('social-er', 'Social ER complete');
+  cb?.(`  Social ER complete`, 'ok');
   return orgResults;
 }
 
