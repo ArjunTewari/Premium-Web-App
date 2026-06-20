@@ -90,14 +90,13 @@ async function fetchInstagramPosts(handle, dateFrom, cb) {
 
 async function fetchLinkedInPosts(companySlug, dateFrom, dateTo, cb) {
   try {
-    const items = await runApifyActor('harvestapi/linkedin-profile-posts-scraper', {
-      profileUrls: [`https://www.linkedin.com/company/${companySlug}/`],
-      maxPosts: 10,
+    const items = await runApifyActor('apimaestro/linkedin-company-posts', {
+      companyUrls: [`https://www.linkedin.com/company/${companySlug}/`],
     });
     const aqKeywords = /air quality|air pollution|aqi|pm2\.5|pm10|ncap|smog|particulate/i;
     const fromDate = new Date(dateFrom);
     const toDate   = new Date(dateTo);
-    return (items || [])
+    return (items || []).slice(0, 50)  // actor ignores maxPosts — cap here
       .filter(p => {
         const postDate = new Date(p.postedAt || p.date || 0);
         return postDate >= fromDate && postDate <= toDate &&
@@ -349,7 +348,7 @@ function buildSocialERHtml(erResults) {
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">${statCards}</div>
 
   <div style="background:rgba(74,159,212,.06);border:1px solid rgba(74,159,212,.18);border-radius:8px;padding:12px 16px;margin-bottom:24px;font-size:12px;color:#8fa3b8;line-height:1.7">
-    <strong style="color:#4a9fd4">Methodology:</strong> Apify actors fetch up to ${MAX_POSTS_PER_PLATFORM} posts per org per platform (apify/instagram-scraper &middot; harvestapi/linkedin-profile-posts-scraper &middot; streamers/youtube-scraper), filtered to air quality content. ER is normalised 0&ndash;10 and used in the composite AQ Intelligence score.
+    <strong style="color:#4a9fd4">Methodology:</strong> Apify actors fetch up to ${MAX_POSTS_PER_PLATFORM} posts per org per platform (apify/instagram-scraper &middot; apimaestro/linkedin-company-posts &middot; streamers/youtube-scraper), filtered to air quality content. ER is normalised 0&ndash;10 and used in the composite AQ Intelligence score.
   </div>
 
   <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:32px">${orgRows}</div>
