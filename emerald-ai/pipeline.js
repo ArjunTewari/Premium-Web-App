@@ -2597,51 +2597,6 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2);padding:3px 20px"><div style="width:8px;height:8px;border-radius:2px;background:${orgHex(ORGS.indexOf(o))}"></div>${esc(o)}: ${data[o].total} arts</div>`,
   ).join("");
 
-  function citTable() {
-    const rows = ORGS.map((org, i) => {
-      const cls = data[org]?.classifications || [];
-      const total = cls.length;
-      const cited = cls.filter(
-        (c) => c.citation_quality === "Data Cited",
-      ).length;
-      const named = cls.filter(
-        (c) => c.citation_quality === "Named Mention",
-      ).length;
-      const notInScrape = cls.filter(
-        (c) => c.citation_quality === "Mention Not In Scraped Text",
-      ).length;
-      const pct = total > 0 ? Math.round((cited / total) * 100) : 0;
-      // Match cited articles with their URLs via index alignment
-      const evidenceItems = cls.reduce((acc, c, ci) => {
-        if (c.citation_quality === "Data Cited" && acc.length < 3) {
-          const art = arts[org]?.[ci];
-          acc.push({
-            quote: c.evidence_quote || "",
-            outlet: c.outlet || "",
-            date: c.date || "",
-            url: art?.url || "",
-          });
-        }
-        return acc;
-      }, []);
-      const evCell = evidenceItems.length
-        ? evidenceItems
-            .map(
-              (e) =>
-                `<div style="margin-bottom:5px"><div style="font-family:monospace;font-size:10px;color:var(--amber);line-height:1.5">&ldquo;${esc(e.quote)}&rdquo;</div><div style="font-family:monospace;font-size:10px;color:var(--muted)">${esc(e.outlet)} &middot; ${esc(e.date)}</div>${e.url ? `<a href="${esc(e.url)}" target="_blank" style="font-family:monospace;font-size:10px;color:var(--amber);text-decoration:none">&#8599; article</a>` : ""}</div>`,
-            )
-            .join("")
-        : `<span style="color:var(--muted);font-family:monospace;font-size:11px">—</span>`;
-      return { org, i, total, cited, named, notInScrape, pct, evCell };
-    }).sort((a, b) => b.pct - a.pct);
-    return `<table class="nt"><thead><tr><th>Org</th><th>Total</th><th>Data Cited</th><th>Named Mention</th><th title="Org confirmed on page by Google but not found in 2000-char scraped text">Not In Scrape</th><th>Evidence (Data Cited articles)</th></tr></thead><tbody>${rows
-      .map(
-        (r) =>
-          `<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(r.i)}">${esc(r.org)}</span></td><td style="font-family:monospace">${r.total}</td><td><span style="font-family:monospace;font-weight:700;color:var(--good)">${r.cited}</span> <span style="font-family:monospace;font-size:10px;color:var(--muted)">(${r.pct}%)</span></td><td style="font-family:monospace;color:var(--muted2)">${r.named}</td><td style="font-family:monospace;color:#8b7cf8">${r.notInScrape || "—"}</td><td>${r.evCell}</td></tr>`,
-      )
-      .join("")}</tbody></table>`;
-  }
-
   const ordinal = (n) => {
     const s = ["th", "st", "nd", "rd"],
       v = n % 100;
@@ -2891,9 +2846,9 @@ body.edit-mode .sec-x{display:flex}
 <div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a><a href="#method" class="nav-a">Methodology</a>
-<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#cit" class="nav-a">Citation Quality</a><a href="#em" class="nav-a">White-Space Gaps</a>
+<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Source Appendix</a><a href="#em" class="nav-a">White-Space Gaps</a>
 <div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a><a href="#social" class="nav-a">Social Media</a>
-<div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a><a href="#appendix" class="nav-a">Appendix</a>
+<div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>${navOrgs}CONFIDENTIAL</div></nav>
 <main class="main">
 <header class="rh" id="header"><div class="ey">Air Quality Media Intelligence &middot; India &middot; ${esc(DATE_FROM)} to ${esc(DATE_TO)}</div>
@@ -2945,9 +2900,8 @@ ${clsNotice}
 </div>
 ${topicCards()}</section>
 
-<section class="sec" id="cit"><div class="sh"><div class="se">Section 05</div><h2 class="st">Citation Quality</h2>
-<div class="sd"><strong style="color:var(--good)">Data Cited</strong> = a specific number, statistic, or named report from this org is explicitly cited. <strong style="color:var(--muted2)">Named Mention</strong> = org is named but no specific data cited. <strong style="color:var(--muted)">Total</strong> = all articles retrieved by searching for this org&rsquo;s name &mdash; some may not directly name the org in the text (the search established the relevance connection; Claude classified each article individually). Sorted by Data Cited %.</div><div class="sdiv"></div></div>
-${clsNotice}${citTable()}</section>
+<section class="sec" id="appendix"><div class="sh"><div class="se">Section 05</div><h2 class="st">Source Appendix</h2><div class="sd">All indexed articles. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
+${appendixSections}</section>
 
 <section class="sec" id="em"><div class="sh"><div class="se">Section 06</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations are <strong style="color:var(--warn)">not yet part of</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. These are emerging narrative opportunities: the conversation is active but your orgs are absent. <strong>Gap signal</strong> = evidence of the absence. <strong>Opportunity</strong> = a concrete action to enter the conversation.</div><div class="sdiv"></div></div>
 ${emergingCards}</section>
@@ -2962,9 +2916,6 @@ ${socialERHtml}
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 08</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including AEO and social media actions.</div><div class="sdiv"></div></div>
 <table class="at"><thead><tr><th>Org</th><th>Priority</th><th>Area</th><th>Action</th><th>Data rationale</th></tr></thead><tbody>${actionRows}</tbody></table></section>
-
-<section class="sec" id="appendix"><div class="sh"><div class="se">Appendix</div><h2 class="st">Source Appendix</h2><div class="sd">All indexed articles. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
-${appendixSections}</section>
 
 <footer class="rf">Generated by Emerald AI &middot; AQ Intelligence Platform v7 &middot; ${now}<br>
 Data: Serper News API &middot; Claude Haiku 4.5 &middot; LLM AEO probing &middot; ${tot} articles &middot; ${esc(DATE_FROM)} to ${esc(DATE_TO)} &middot; Orgs: ${esc(ORGS.join(", "))}<br>
