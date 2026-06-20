@@ -216,7 +216,7 @@ function canonOutlet(src) {
   if (s.includes("the print") || s.includes("theprint")) return "The Print";
   if (s.includes("scroll")) return "Scroll";
   if (s.includes("indian express") || s.includes("indianexpress"))
-    return "Indian E xpress";
+    return "Indian Express";
   if (s.includes("business standard") || s.includes("bsind"))
     return "Business Standard";
   if (s.includes("deccan herald") || s.includes("deccanherald"))
@@ -228,10 +228,19 @@ function canonOutlet(src) {
 }
 
 // ── API calls ──────────────────────────────────────────────────────────────
-async function serperSearch(query, key) {
+function toSerperDate(s) {
+  if (!s) return "";
+  const [y, m, d] = s.split("-");
+  return `${m}/${d}/${y}`;
+}
+
+async function serperSearch(query, key, dateFrom, dateTo) {
+  const body = { q: query, num: 10 };
+  if (dateFrom && dateTo)
+    body.tbs = `cdr:1,cd_min:${toSerperDate(dateFrom)},cd_max:${toSerperDate(dateTo)}`;
   const res = await axios.post(
     "https://google.serper.dev/news",
-    { q: query, num: 10 },
+    body,
     {
       headers: { "X-API-KEY": key, "Content-Type": "application/json" },
       timeout: 15000,
@@ -240,10 +249,13 @@ async function serperSearch(query, key) {
   return res.data.news || res.data.organic || [];
 }
 
-async function serperWebSearch(query, key) {
+async function serperWebSearch(query, key, dateFrom, dateTo) {
+  const body = { q: query, num: 10 };
+  if (dateFrom && dateTo)
+    body.tbs = `cdr:1,cd_min:${toSerperDate(dateFrom)},cd_max:${toSerperDate(dateTo)}`;
   const res = await axios.post(
     "https://google.serper.dev/search",
-    { q: query, num: 10 },
+    body,
     {
       headers: { "X-API-KEY": key, "Content-Type": "application/json" },
       timeout: 15000,
@@ -510,7 +522,7 @@ async function run(cfg, cb) {
 
   const inRange = (dateStr) => {
     const d = parseDateStr(dateStr);
-    if (!d) return true;
+    if (!d) return false; // exclude articles with no parseable date
     const f = new Date(DATE_FROM),
       t = new Date(DATE_TO);
     t.setDate(t.getDate() + 1);
@@ -532,7 +544,7 @@ async function run(cfg, cb) {
       const q = `"${org}" ${kw} India`;
       cb(`  ${q}`);
       try {
-        const results = await serperSearch(q, cfg.SERPER_KEY);
+        const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
         let added = 0;
         for (const r of results) {
           const k = r.link || r.title;
@@ -542,11 +554,12 @@ async function run(cfg, cb) {
               skipped++;
               continue;
             }
-            if (isThirdParty(r.link || "", org)) {
+            const outlet = canonOutlet(r.source || dom(r.link || ""));
+            if (outlet !== null && isThirdParty(r.link || "", org)) {
               arts[org].push({
                 title: r.title || "",
                 snippet: r.snippet || "",
-                source: r.source || dom(r.link || ""),
+                source: outlet,
                 url: r.link || "",
                 date: r.date || "",
               });
@@ -571,7 +584,7 @@ async function run(cfg, cb) {
       const q = `site:${domain} "${org}" air quality OR air pollution India`;
       cb(`  ${q}`);
       try {
-        const results = await serperWebSearch(q, cfg.SERPER_KEY);
+        const results = await serperWebSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
         let added = 0;
         for (const r of results) {
           const k = r.link || r.title;
@@ -2352,6 +2365,66 @@ async function buildPPTX(
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+//  COVERAGE MOMENTUM CHART
+// ══════════════════════════════════════════════════════════════════════════
+function momentumSection(arts, ORGS, DATE_FROM, DATE_TO) {
+  const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const start = new Date(DATE_FROM);
+  const end   = new Date(DATE_TO);
+
+  // Generate Monday-aligned week start dates
+  const weeks = [];
+  const cur = new Date(start);
+  cur.setDate(cur.getDate() - ((cur.getDay() + 6) % 7)); // back to Monday
+  if (cur > start) cur.setDate(cur.getDate() - 7);
+  while (cur <= end) {
+    weeks.push(new Date(cur));
+    cur.setDate(cur.getDate() + 7);
+  }
+
+  // Count articles per week per org
+  const buckets = weeks.map(() => ORGS.map(() => 0));
+  ORGS.forEach((org, oi) => {
+    (arts[org] || []).forEach((art) => {
+      const d = parseDateStr(art.date || "");
+      if (!d) return;
+      for (let wi = 0; wi < weeks.length; wi++) {
+        const wEnd = new Date(weeks[wi]);
+        wEnd.setDate(wEnd.getDate() + 7);
+        if (d >= weeks[wi] && d < wEnd) { buckets[wi][oi]++; break; }
+      }
+    });
+  });
+
+  const maxCount = Math.max(...buckets.flat(), 1);
+  const orgColors = ORGS.map((_, i) => ORG_COLORS_HEX[i % ORG_COLORS_HEX.length]);
+  const totalPerOrg = ORGS.map((o) => (arts[o] || []).length);
+
+  const legend = ORGS.map((o, i) =>
+    `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:12px;height:12px;border-radius:2px;background:#${orgColors[i]}"></div>${esc(o)}</div>`
+  ).join("");
+
+  const weekBars = weeks.map((w, wi) => {
+    const label = `${String(w.getMonth() + 1).padStart(2, "0")}-${String(w.getDate()).padStart(2, "0")}`;
+    const bars = ORGS.map((org, oi) => {
+      const count = buckets[wi][oi];
+      const h = count > 0 ? Math.max(2, Math.round((count / maxCount) * 76)) : 2;
+      return `<div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#${orgColors[oi]};height:${h}px" title="${esc(org)}: ${count}"></div>`;
+    }).join("");
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px">${bars}</div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">${label}</div></div>`;
+  }).join("");
+
+  const summary = ORGS.map((o, i) => `${esc(o)}: ${totalPerOrg[i]}`).join(" · ");
+
+  return `
+<section class="sec" id="momentum"><div class="sh"><div class="se">Section 03a</div><h2 class="st">Coverage Momentum</h2>
+<div class="sd">Weekly article volume per organisation. Taller bars = more articles in that week. Dates parsed from Serper metadata.</div><div class="sdiv"></div></div>
+<div class="mch"><div class="ch-hdr"><div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">Weekly AQ volume</div><div style="font-size:11px;color:var(--muted)">${esc(DATE_FROM)} to ${esc(DATE_TO)} &middot; ${summary}</div></div>
+<div style="display:flex;gap:12px;flex-wrap:wrap">${legend}</div></div>
+<div class="wbars">${weekBars}</div></div></section>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 //  HTML BUILDER  (adds AEO + Social sections)
 // ══════════════════════════════════════════════════════════════════════════
 function buildHTML(
@@ -2846,7 +2919,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a><a href="#method" class="nav-a">Methodology</a>
-<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Source Appendix</a><a href="#em" class="nav-a">White-Space Gaps</a>
+<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#momentum" class="nav-a">Momentum</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a>
 <div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a><a href="#social" class="nav-a">Social Media</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>${navOrgs}CONFIDENTIAL</div></nav>
@@ -2877,6 +2950,8 @@ ${sovBar()}
 <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-family:monospace;font-size:11px;color:var(--muted2)"><strong style="color:var(--amber)">Reading this table:</strong> Total = all AQ-scoped articles across orgs at that outlet. Top orgs shows the three highest-coverage orgs as badges.</div>
 <table class="nt"><thead><tr><th>Outlet</th><th>Total</th><th>Top orgs by coverage</th><th>Evidence</th></tr></thead><tbody>${outletRows()}</tbody></table></section>
 
+${momentumSection(arts, ORGS, DATE_FROM, DATE_TO)}
+
 <section class="sec" id="tv"><div class="sh"><div class="se">Section 03b</div><h2 class="st">TV Channel Coverage</h2>
 <div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (Aaj Tak, India TV, ABP News) channels.</div><div class="sdiv"></div></div>
 <div style="margin-bottom:16px">
@@ -2900,7 +2975,7 @@ ${clsNotice}
 </div>
 ${topicCards()}</section>
 
-<section class="sec" id="appendix"><div class="sh"><div class="se">Section 05</div><h2 class="st">Source Appendix</h2><div class="sd">All indexed articles. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
+<section class="sec" id="appendix"><div class="sh"><div class="se">Section 05</div><h2 class="st">Citations</h2><div class="sd">All indexed articles from tracked outlets. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
 ${appendixSections}</section>
 
 <section class="sec" id="em"><div class="sh"><div class="se">Section 06</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations are <strong style="color:var(--warn)">not yet part of</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. These are emerging narrative opportunities: the conversation is active but your orgs are absent. <strong>Gap signal</strong> = evidence of the absence. <strong>Opportunity</strong> = a concrete action to enter the conversation.</div><div class="sdiv"></div></div>
