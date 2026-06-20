@@ -1,8 +1,9 @@
 'use strict';
 /**
  * social-er.js — Social Engagement Rate module
- * Platforms: Twitter/X, Instagram, LinkedIn via Apify REST API
- * ER formula: (Likes + Comments + Shares) × 100 / FollowerCount, averaged across AQ posts
+ * Platforms: Instagram, LinkedIn, YouTube via Apify REST API
+ * ER formula: (Likes + Comments) × 100 / FollowerCount, averaged across AQ posts
+ * YouTube shares not available; Twitter/X removed.
  */
 
 const axios = require('axios');
@@ -10,20 +11,23 @@ const axios = require('axios');
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // Keys must match exactly what the UI/pipeline sends as org names
+// youtube: YouTube channel handle (the part after youtube.com/@)
 const ORG_HANDLES = {
-  'WRI India':                                        { twitter: 'WRIIndia',          instagram: 'wri_india',           linkedin: 'wri-india' },
-  'Air Pollution Action Group':                       { twitter: 'APAGIndia',         instagram: 'apagindia',           linkedin: 'air-pollution-action-group' },
-  'Chintan Environmental Research and Action Group':  { twitter: 'ChintanIndia',      instagram: 'chintan_india',       linkedin: 'chintan-environmental-research-and-action-group' },
-  'IIT Kanpur':                                       { twitter: 'IITKanpur',         instagram: 'iitkanpur',           linkedin: 'iit-kanpur' },
-  'CSTEP':                                            { twitter: 'CSTEP_India',       instagram: 'cstep_india',         linkedin: 'cstep-india' },
-  'IIT Delhi':                                        { twitter: 'IITDelhi',          instagram: 'iitdelhi',            linkedin: 'iit-delhi' },
-  'Health Effects Institute':                         { twitter: 'HEIResearch',       instagram: 'heiresearch',         linkedin: 'health-effects-institute' },
-  'ICCT':                                             { twitter: 'TheICCT',           instagram: 'theicct',             linkedin: 'icct' },
-  'EPIC India':                                       { twitter: 'EPICIndia_',        instagram: 'epicindia_uchicago',  linkedin: 'epic-india' },
-  'Council on Energy, Environment and Water':         { twitter: 'CEEWIndia',         instagram: 'ceewindia',           linkedin: 'council-on-energy-environment-and-water' },
-  'Centre for Science and Environment':               { twitter: 'CSEIndia',          instagram: 'cseindia',            linkedin: 'centre-for-science-and-environment' },
-  'Climate Trends':                                   { twitter: 'ClimateTrendsIN',   instagram: 'climatetrendsin',     linkedin: 'climate-trends' },
-  'Sustainable Futures Collaborative':                { twitter: 'SFC_India',         instagram: 'sfc_india',           linkedin: 'sustainable-futures-collaborative' },
+  'WRI India':                                        { instagram: 'wri_india',           linkedin: 'wri-india',                                          youtube: 'WRIIndia' },
+  'Air Pollution Action Group':                       { instagram: 'apagindia',            linkedin: 'air-pollution-action-group',                         youtube: 'APAGIndia' },
+  'Chintan Environmental Research and Action Group':  { instagram: 'chintan_india',        linkedin: 'chintan-environmental-research-and-action-group',    youtube: 'ChintanIndia' },
+  'IIT Kanpur':                                       { instagram: 'iitkanpur',            linkedin: 'iit-kanpur',                                         youtube: 'IITKanpur' },
+  'CSTEP':                                            { instagram: 'cstep_india',          linkedin: 'cstep-india',                                        youtube: 'CSTEPIndia' },
+  'IIT Delhi':                                        { instagram: 'iitdelhi',             linkedin: 'iit-delhi',                                          youtube: 'IITDelhi' },
+  'Health Effects Institute':                         { instagram: 'heiresearch',          linkedin: 'health-effects-institute',                           youtube: 'HEIResearch' },
+  'ICCT':                                             { instagram: 'theicct',              linkedin: 'icct',                                               youtube: 'TheICCT' },
+  'EPIC India':                                       { instagram: 'epicindia_uchicago',   linkedin: 'epic-india',                                         youtube: 'EPICIndia' },
+  'Council on Energy, Environment and Water':         { instagram: 'ceewindia',            linkedin: 'council-on-energy-environment-and-water',            youtube: 'CEEWIndia' },
+  'Centre for Science and Environment':               { instagram: 'cseindia',             linkedin: 'centre-for-science-and-environment',                 youtube: 'cseindia' },
+  'CEEW':                                             { instagram: 'ceewindia',            linkedin: 'council-on-energy-environment-and-water',            youtube: 'CEEWIndia' },
+  'CSE':                                              { instagram: 'cseindia',             linkedin: 'centre-for-science-and-environment',                 youtube: 'cseindia' },
+  'Climate Trends':                                   { instagram: 'climatetrendsin',      linkedin: 'climate-trends',                                     youtube: 'ClimateTrendsIn' },
+  'Sustainable Futures Collaborative':                { instagram: 'sfc_india',            linkedin: 'sustainable-futures-collaborative',                  youtube: 'SFCIndia' },
 };
 
 async function runApifyActor(actorId, input) {
@@ -53,30 +57,6 @@ async function runApifyActor(actorId, input) {
     { timeout: 15000 }
   );
   return dataRes.data;
-}
-
-async function fetchTwitterPosts(handle, dateFrom, dateTo) {
-  try {
-    const items = await runApifyActor('apidojo/tweet-scraper-v2', {
-      searchTerms: [`from:${handle} air quality OR "air pollution" OR AQI OR PM2.5`],
-      maxTweets: 10,
-      start: dateFrom,
-      end: dateTo,
-    });
-    return (items || []).slice(0, 5).map(t => ({
-      platform: 'twitter',
-      url: t.url || t.tweetUrl || '',
-      text: t.text || t.fullText || '',
-      date: t.createdAt || '',
-      likes: t.likeCount || 0,
-      comments: t.replyCount || 0,
-      shares: t.retweetCount || 0,
-      followerCount: t.author?.followers || t.authorFollowersCount || 0,
-    }));
-  } catch (e) {
-    console.error(`[SocialER] Twitter fetch failed for ${handle}:`, e.message);
-    return [];
-  }
 }
 
 async function fetchInstagramPosts(handle, dateFrom) {
@@ -138,6 +118,38 @@ async function fetchLinkedInPosts(companySlug, dateFrom, dateTo) {
   }
 }
 
+async function fetchYouTubePosts(channelHandle, dateFrom, dateTo) {
+  try {
+    const items = await runApifyActor('streamers/youtube-scraper', {
+      startUrls: [{ url: `https://www.youtube.com/@${channelHandle}/videos` }],
+      maxResults: 10,
+    });
+    const aqKeywords = /air quality|air pollution|aqi|pm2\.5|pm10|ncap|smog|particulate/i;
+    const fromDate = new Date(dateFrom);
+    const toDate   = new Date(dateTo);
+    return (items || [])
+      .filter(v => {
+        const vDate = new Date(v.date || 0);
+        return vDate >= fromDate && vDate <= toDate &&
+               aqKeywords.test(v.title || v.description || '');
+      })
+      .slice(0, 5)
+      .map(v => ({
+        platform: 'youtube',
+        url: v.url || '',
+        text: v.title || '',
+        date: v.date || '',
+        likes: v.likes || 0,
+        comments: v.commentsCount || 0,
+        shares: 0,
+        followerCount: v.numberOfSubscribers || 0,
+      }));
+  } catch (e) {
+    console.error(`[SocialER] YouTube fetch failed for ${channelHandle}:`, e.message);
+    return [];
+  }
+}
+
 function calcER(posts) {
   const withFollowers = posts.filter(p => p.followerCount > 0);
   if (!withFollowers.length) return 0;
@@ -168,7 +180,7 @@ async function run(cfg, selectedOrgs, cb) {
     return [];
   }
 
-  cb?.('social-er', `Starting Social ER for ${selectedOrgs.length} orgs across Twitter, Instagram, LinkedIn…`);
+  cb?.('social-er', `Starting Social ER for ${selectedOrgs.length} orgs across Instagram, LinkedIn, YouTube…`);
   const orgResults = [];
 
   for (const orgName of selectedOrgs) {
@@ -179,15 +191,15 @@ async function run(cfg, selectedOrgs, cb) {
     }
     cb?.('social-er', `Fetching ${orgName}…`);
 
-    const [twPosts, igPosts, liPosts] = await Promise.allSettled([
-      fetchTwitterPosts(handles.twitter,  cfg.DATE_FROM, cfg.DATE_TO),
+    const [igPosts, liPosts, ytPosts] = await Promise.allSettled([
       fetchInstagramPosts(handles.instagram, cfg.DATE_FROM),
       fetchLinkedInPosts(handles.linkedin, cfg.DATE_FROM, cfg.DATE_TO),
+      fetchYouTubePosts(handles.youtube, cfg.DATE_FROM, cfg.DATE_TO),
     ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : []));
 
-    const allPosts = [...twPosts, ...igPosts, ...liPosts];
+    const allPosts = [...igPosts, ...liPosts, ...ytPosts];
     const avgER = allPosts.length
-      ? parseFloat(((calcER(twPosts) + calcER(igPosts) + calcER(liPosts)) / 3).toFixed(2))
+      ? parseFloat(((calcER(igPosts) + calcER(liPosts) + calcER(ytPosts)) / 3).toFixed(2))
       : 0;
 
     const bestPost = [...allPosts].sort((a, b) =>
@@ -195,17 +207,17 @@ async function run(cfg, selectedOrgs, cb) {
     )[0] || null;
 
     orgResults.push({
-      org:           orgName,
-      twitterER:     calcER(twPosts),
-      instagramER:   calcER(igPosts),
-      linkedinER:    calcER(liPosts),
+      org:            orgName,
+      instagramER:    calcER(igPosts),
+      linkedinER:     calcER(liPosts),
+      youtubeER:      calcER(ytPosts),
       avgER,
-      twitterPosts:  twPosts.length,
       instagramPosts: igPosts.length,
-      linkedinPosts: liPosts.length,
-      totalPosts:    allPosts.length,
+      linkedinPosts:  liPosts.length,
+      youtubePosts:   ytPosts.length,
+      totalPosts:     allPosts.length,
       bestPost,
-      insight:       deriveInsight(allPosts),
+      insight:        deriveInsight(allPosts),
     });
 
     cb?.('social-er', `${orgName} done — avgER: ${avgER}%`);
@@ -248,9 +260,9 @@ function buildSocialERHtml(erResults) {
   const orgRows = erResults.map((r, i) => {
     const barPct = Math.round((r.avgER / maxAvgER) * 100);
     const rankLabel = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${r.rank}`;
-    const twBar  = r.twitterER   > 0 ? Math.round((r.twitterER   / maxAvgER) * 100) : 0;
     const igBar  = r.instagramER > 0 ? Math.round((r.instagramER / maxAvgER) * 100) : 0;
     const liBar  = r.linkedinER  > 0 ? Math.round((r.linkedinER  / maxAvgER) * 100) : 0;
+    const ytBar  = r.youtubeER   > 0 ? Math.round((r.youtubeER   / maxAvgER) * 100) : 0;
     const platformPill = (label, er, barW, col) => er > 0
       ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
            <span style="font-family:monospace;font-size:10px;color:#5e7494;width:64px;flex-shrink:0">${label}</span>
@@ -278,13 +290,13 @@ function buildSocialERHtml(erResults) {
           <div style="font-size:11px;color:#5e7494">${r.insight}</div>
         </div>
         <div style="flex-shrink:0;min-width:220px">
-          ${platformPill('X/Twitter', r.twitterER, twBar, '#4a9fd4')}
           ${platformPill('Instagram', r.instagramER, igBar, '#c46ab3')}
-          ${platformPill('LinkedIn', r.linkedinER, liBar, '#4a7fd4')}
+          ${platformPill('LinkedIn',  r.linkedinER,  liBar, '#4a7fd4')}
+          ${platformPill('YouTube',   r.youtubeER,   ytBar, '#e05c3a')}
         </div>
         <div style="flex-shrink:0;text-align:right">
           <div style="font-family:monospace;font-size:10px;color:#5e7494;margin-bottom:4px">Posts analysed</div>
-          <div style="font-family:monospace;font-size:11px;color:#8fa3b8">${r.twitterPosts}<span style="color:#4a9fd4">T</span> / ${r.instagramPosts}<span style="color:#c46ab3">I</span> / ${r.linkedinPosts}<span style="color:#4a7fd4">L</span></div>
+          <div style="font-family:monospace;font-size:11px;color:#8fa3b8">${r.instagramPosts}<span style="color:#c46ab3">I</span> / ${r.linkedinPosts}<span style="color:#4a7fd4">L</span> / ${r.youtubePosts}<span style="color:#e05c3a">Y</span></div>
           ${r.bestPost ? `<div style="margin-top:6px;font-family:monospace;font-size:10px;color:#5e7494">Best post</div>
           <div style="font-family:monospace;font-size:10px;color:#4caf74">${r.bestPost.likes + r.bestPost.comments + r.bestPost.shares} engagements</div>` : ''}
         </div>
@@ -328,23 +340,23 @@ function buildSocialERHtml(erResults) {
   <div class="sh">
     <div class="se">Section 08b</div>
     <h2 class="st">Social Engagement Rate</h2>
-    <div class="sd">Real engagement rate (ER) per org across X/Twitter, Instagram, and LinkedIn — sourced via Apify. ER&nbsp;=&nbsp;(Likes&nbsp;+&nbsp;Comments&nbsp;+&nbsp;Shares)&nbsp;&times;&nbsp;100&nbsp;&divide;&nbsp;Followers, averaged across up to ${MAX_POSTS_PER_PLATFORM} AQ posts per platform. Instagram and LinkedIn shares are not publicly available and are excluded from those platform ERs.</div>
+    <div class="sd">Real engagement rate (ER) per org across Instagram, LinkedIn, and YouTube — sourced via Apify. ER&nbsp;=&nbsp;(Likes&nbsp;+&nbsp;Comments)&nbsp;&times;&nbsp;100&nbsp;&divide;&nbsp;Followers/Subscribers, averaged across up to ${MAX_POSTS_PER_PLATFORM} AQ posts per platform.</div>
     <div class="sdiv"></div>
   </div>
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">${statCards}</div>
 
   <div style="background:rgba(74,159,212,.06);border:1px solid rgba(74,159,212,.18);border-radius:8px;padding:12px 16px;margin-bottom:24px;font-size:12px;color:#8fa3b8;line-height:1.7">
-    <strong style="color:#4a9fd4">Methodology:</strong> Apify actors fetch up to ${MAX_POSTS_PER_PLATFORM} posts per org per platform (apidojo/tweet-scraper-v2 &middot; apify/instagram-scraper &middot; harvestapi/linkedin-profile-posts-scraper), filtered to air quality content. ER is normalised 0&ndash;10 and used in the composite AQ Intelligence score.
+    <strong style="color:#4a9fd4">Methodology:</strong> Apify actors fetch up to ${MAX_POSTS_PER_PLATFORM} posts per org per platform (apify/instagram-scraper &middot; harvestapi/linkedin-profile-posts-scraper &middot; streamers/youtube-scraper), filtered to air quality content. ER is normalised 0&ndash;10 and used in the composite AQ Intelligence score.
   </div>
 
   <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:32px">${orgRows}</div>
 
   <div style="font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:12px">Per-Platform Leaderboard</div>
   <div style="display:flex;gap:12px;flex-wrap:wrap">
-    ${platformLeaderboard('X / Twitter', '𝕏', '#4a9fd4', 'twitterER', 'twitterPosts')}
-    ${platformLeaderboard('Instagram',   '◉', '#c46ab3', 'instagramER', 'instagramPosts')}
-    ${platformLeaderboard('LinkedIn',    'in', '#4a7fd4', 'linkedinER', 'linkedinPosts')}
+    ${platformLeaderboard('Instagram', '◉',  '#c46ab3', 'instagramER', 'instagramPosts')}
+    ${platformLeaderboard('LinkedIn',  'in', '#4a7fd4', 'linkedinER',  'linkedinPosts')}
+    ${platformLeaderboard('YouTube',   '▶',  '#e05c3a', 'youtubeER',   'youtubePosts')}
   </div>
 </section>`;
 }
