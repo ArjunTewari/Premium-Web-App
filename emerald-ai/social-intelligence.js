@@ -194,10 +194,24 @@ function buildAEOHtml(aeoResults, orgs) {
 
   const maxMentions = Math.max(...orgs.map(o => (aeoResults[o]?.mentions || 0)), 1);
 
-  const orgPanels = orgs.map((org, oi) => {
+  // Sort by mentions descending, compute tied ranks
+  const sortedOrgs = [...orgs]
+    .map((org, oi) => ({ org, oi, m: aeoResults[org]?.mentions || 0 }))
+    .sort((a, b) => b.m - a.m);
+  let _lastM = null, _lastRank = 0;
+  sortedOrgs.forEach((item, idx) => {
+    if (item.m === _lastM) {
+      item.rank = _lastRank;
+    } else {
+      item.rank = idx + 1;
+      _lastRank = idx + 1;
+      _lastM = item.m;
+    }
+  });
+
+  const orgPanels = sortedOrgs.map(({ org, oi, m, rank }) => {
     const col = orgColorList[oi % orgColorList.length];
     const d = aeoResults[org] || { mentions: 0, llmBreakdown: {}, topResponse: '', questionResults: {} };
-    const m = d.mentions || 0;
     const barW = Math.round((m / maxMentions) * 100);
     const isGood = m > 0;
 
@@ -218,27 +232,30 @@ function buildAEOHtml(aeoResults, orgs) {
       : `<strong style="color:${noticeTextCol}">Visibility gap.</strong> ${escHtml(org)} not cited in any LLM responses.`;
 
     return `
-    <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:20px;border-top:2px solid ${col}">
-      <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${col};margin-bottom:14px">${escHtml(org)}</div>
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-        <div style="flex:1">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:32px;line-height:1;font-weight:700;color:${col}">${m}</div>
-          <div style="font-size:12px;color:#8fa3b8;margin-top:4px;margin-bottom:8px">LLM mentions across all models</div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden">
-              <div style="height:100%;border-radius:3px;background:${col};width:${barW}%"></div>
+    <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:20px;border-top:2px solid ${col};display:flex;gap:20px;align-items:flex-start">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:#2e3a52;flex-shrink:0;width:36px;padding-top:2px">#${rank}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${col};margin-bottom:14px">${escHtml(org)}</div>
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+          <div style="flex:1">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:32px;line-height:1;font-weight:700;color:${col}">${m}</div>
+            <div style="font-size:12px;color:#8fa3b8;margin-top:4px;margin-bottom:8px">LLM mentions across all models</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden">
+                <div style="height:100%;border-radius:3px;background:${col};width:${barW}%"></div>
+              </div>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">${barW}% vs top</span>
             </div>
-            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">${barW}% vs top</span>
           </div>
         </div>
+        <div style="margin-bottom:12px">${llmRows || '<div style="font-size:11px;color:#5e7494">No LLM keys provided</div>'}</div>
+        ${d.topResponse ? `
+        <div style="background:#0a0e17;border:1px solid #2e3a52;border-left:2px solid #c9922a;border-radius:0 5px 5px 0;padding:10px 12px;margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8fa3b8;line-height:1.65">
+          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#c9922a;margin-bottom:5px">Example LLM response</div>
+          &ldquo;${escHtml(d.topResponse)}&rdquo;
+        </div>` : ''}
+        <div style="background:${noticeColor};border:1px solid ${noticeBorder};border-radius:6px;padding:10px 14px;font-size:12px;color:#8fa3b8;margin-top:12px;line-height:1.6">${noticeText}</div>
       </div>
-      <div style="margin-bottom:12px">${llmRows || '<div style="font-size:11px;color:#5e7494">No LLM keys provided</div>'}</div>
-      ${d.topResponse ? `
-      <div style="background:#0a0e17;border:1px solid #2e3a52;border-left:2px solid #c9922a;border-radius:0 5px 5px 0;padding:10px 12px;margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8fa3b8;line-height:1.65">
-        <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#c9922a;margin-bottom:5px">Example LLM response</div>
-        &ldquo;${escHtml(d.topResponse)}&rdquo;
-      </div>` : ''}
-      <div style="background:${noticeColor};border:1px solid ${noticeBorder};border-radius:6px;padding:10px 14px;font-size:12px;color:#8fa3b8;margin-top:12px;line-height:1.6">${noticeText}</div>
     </div>`;
   }).join('');
 
@@ -278,7 +295,7 @@ function buildAEOHtml(aeoResults, orgs) {
   <div style="background:rgba(201,146,42,.06);border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:14px 18px;font-size:12px;color:#8fa3b8;margin-bottom:20px;line-height:1.7">
     <strong style="color:#c9922a">How AEO is measured:</strong> ${queriesUsed.length} discovery questions sent to GPT-4o mini, Perplexity Sonar, and Gemini 1.5 Flash. Each response that names the organisation = <strong style="color:#c9922a">1 mention</strong>. Total possible responses per org = ${queriesUsed.length * 3}.
   </div>
-  <div style="display:grid;grid-template-columns:repeat(${Math.min(orgs.length, 2)},1fr);gap:16px;margin-bottom:16px">${orgPanels}</div>
+  <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">${orgPanels}</div>
   <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:16px 18px;margin-bottom:12px">
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c9922a;margin-bottom:2px">Sample AEO Queries (first 5 of ${queriesUsed.length})</div>
     <div style="font-size:10px;color:#5e7494;margin-bottom:10px">These questions were sent to each LLM verbatim — no org names included.</div>
