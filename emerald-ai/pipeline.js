@@ -26,6 +26,14 @@ const OUTLETS = [
   "India TV",
   "ABP News",
 ];
+// Key print/digital outlets shown in the outlet breakdown table
+const PRINT_OUTLETS = [
+  "Times of India",
+  "Hindustan Times",
+  "India Today",
+  "The Hindu",
+  "News18",
+];
 const TV_CHANNELS_ENGLISH = ["NDTV", "News18", "India Today"];
 const TV_CHANNELS_HINDI = ["Aaj Tak", "India TV", "ABP News"];
 const ALL_TV_CHANNELS = [...TV_CHANNELS_ENGLISH, ...TV_CHANNELS_HINDI];
@@ -498,6 +506,73 @@ function isThirdParty(url, orgName) {
   return true;
 }
 
+// ── Spike detection + Claude annotation ───────────────────────────────────
+async function computeSpikeAnnotations(arts, ORGS, DATE_FROM, DATE_TO, claudeKey, cb) {
+  if (!claudeKey) return [];
+  const start = new Date(DATE_FROM);
+  const end   = new Date(DATE_TO);
+
+  const weeks = [];
+  const cur = new Date(start);
+  cur.setDate(cur.getDate() - ((cur.getDay() + 6) % 7));
+  if (cur > start) cur.setDate(cur.getDate() - 7);
+  while (cur <= end) { weeks.push(new Date(cur)); cur.setDate(cur.getDate() + 7); }
+
+  // Build article buckets per week per org
+  const buckets = weeks.map(() => ORGS.map(() => []));
+  ORGS.forEach((org, oi) => {
+    (arts[org] || []).forEach((art) => {
+      const d = parseDateStr(art.date || "");
+      if (!d) return;
+      for (let wi = 0; wi < weeks.length; wi++) {
+        const wEnd = new Date(weeks[wi]); wEnd.setDate(wEnd.getDate() + 7);
+        if (d >= weeks[wi] && d < wEnd) { buckets[wi][oi].push(art); break; }
+      }
+    });
+  });
+
+  // Detect spikes: week count >= max(3, 2× org average)
+  const spikes = [];
+  ORGS.forEach((org, oi) => {
+    const counts = buckets.map((b) => b[oi].length);
+    const avg = counts.reduce((s, c) => s + c, 0) / (counts.length || 1);
+    const threshold = Math.max(3, avg * 2);
+    counts.forEach((count, wi) => {
+      if (count < threshold) return;
+      const wEnd = new Date(weeks[wi]); wEnd.setDate(wEnd.getDate() + 6);
+      const fmt = (d) => `${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      spikes.push({ org, wi, count, wLabel: `${fmt(weeks[wi])} to ${fmt(wEnd)}`, articles: buckets[wi][oi] });
+    });
+  });
+
+  if (!spikes.length) return [];
+
+  const spikeDescs = spikes.map((s, i) => {
+    const lines = s.articles.slice(0, 5).map((a) =>
+      `  - "${(a.title || a.snippet || "").slice(0, 80)}" (${a.source || ""}, ${a.date || ""})`
+    ).join("\n");
+    return `Spike ${i+1}: ${s.org}, week ${s.wLabel}, ${s.count} articles:\n${lines}`;
+  }).join("\n\n");
+
+  try {
+    const raw = await callClaude(
+      `Analyse these AQ media coverage spikes. For each, write ONE punchy sentence identifying the likely trigger (report release, government event, announcement) and top outlets involved. Be factual.
+
+${spikeDescs}
+
+Return ONLY a JSON array: [{"idx":0,"annotation":"..."},...]`,
+      claudeKey, 600
+    );
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (!match) return spikes.map((s) => ({ ...s, annotation: "" }));
+    const parsed = JSON.parse(match[0]);
+    return spikes.map((s, i) => ({ ...s, annotation: parsed.find((p) => p.idx === i)?.annotation || "" }));
+  } catch (e) {
+    cb(`  Spike annotation skipped: ${e.message}`, "warn");
+    return spikes.map((s) => ({ ...s, annotation: "" }));
+  }
+}
+
 // ── Cost accumulator (reset per run) ──────────────────────────────────────
 const costTracker = { serperQueries: 0, claudeInputTokens: 0, claudeOutputTokens: 0 };
 
@@ -960,6 +1035,15 @@ ${txt}`;
     cb(`  actions err: ${e.message}`, "err");
   }
 
+  // ── Spike annotations for coverage momentum ───────────────
+  let spikeAnnotations = [];
+  try {
+    spikeAnnotations = await computeSpikeAnnotations(arts, ORGS, DATE_FROM, DATE_TO, cfg.CLAUDE_KEY, cb);
+    if (spikeAnnotations.length) cb(`  ${spikeAnnotations.length} coverage spike(s) annotated`, "ok");
+  } catch (e) {
+    cb(`  Spike annotation failed: ${e.message}`, "warn");
+  }
+
   // ── STEP 6: Build outputs ─────────────────────────────────
   cb(`\nSTEP 6/6 — Building report files...`, "head");
   const stamp = new Date().toISOString().slice(0, 10);
@@ -1002,6 +1086,7 @@ ${txt}`;
     youtubeERHtml,
     socialERResults,
     youtubeERResults,
+    spikeAnnotations,
   );
   fs.writeFileSync(htmlFile, html, "utf8");
   cb(`  HTML: ${base}.html (${Math.round(html.length / 1024)}KB)`, "ok");
@@ -2431,7 +2516,7 @@ async function buildPPTX(
 // ══════════════════════════════════════════════════════════════════════════
 //  COVERAGE MOMENTUM CHART
 // ══════════════════════════════════════════════════════════════════════════
-function momentumSection(arts, ORGS, DATE_FROM, DATE_TO) {
+function momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations = []) {
   const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const start = new Date(DATE_FROM);
   const end   = new Date(DATE_TO);
@@ -2480,12 +2565,32 @@ function momentumSection(arts, ORGS, DATE_FROM, DATE_TO) {
 
   const summary = ORGS.map((o, i) => `${esc(o)}: ${totalPerOrg[i]}`).join(" · ");
 
+  const spikeCards = spikeAnnotations.length
+    ? `<div style="display:flex;flex-direction:column;gap:8px;margin-top:20px">
+${spikeAnnotations.sort((a, b) => b.count - a.count).map((s) => {
+  const orgIdx = ORGS.indexOf(s.org);
+  const col = ORG_COLORS_HEX[orgIdx % ORG_COLORS_HEX.length] || "3d8ef0";
+  const outlets = [...new Set(s.articles.map((a) => a.source || "").filter(Boolean))].slice(0, 4).join(", ");
+  return `<div style="display:flex;gap:14px;align-items:flex-start;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid #${col};border-radius:6px">
+  <div style="flex-shrink:0;font-family:monospace;font-size:10px;color:var(--muted);width:80px;padding-top:1px">${esc(s.wLabel)}</div>
+  <div style="flex:1">
+    <div style="font-size:12px;font-weight:700;color:#${col};margin-bottom:3px">${esc(s.org)} spike: ${s.count} articles</div>
+    ${s.annotation ? `<div style="font-size:12px;color:var(--text);line-height:1.55">${esc(s.annotation)}</div>` : ""}
+    ${outlets ? `<div style="margin-top:4px;font-size:11px;color:var(--muted2)">${esc(outlets)}</div>` : ""}
+  </div>
+</div>`;
+}).join("")}
+</div>`
+    : "";
+
   return `
 <section class="sec" id="momentum"><div class="sh"><div class="se">Section 03c</div><h2 class="st">Coverage Momentum</h2>
-<div class="sd">Weekly article volume per organisation. Taller bars = more articles in that week. Dates parsed from Serper metadata.</div><div class="sdiv"></div></div>
-<div class="mch"><div class="ch-hdr"><div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">Weekly AQ volume</div><div style="font-size:11px;color:var(--muted)">${esc(DATE_FROM)} to ${esc(DATE_TO)} &middot; ${summary}</div></div>
+<div class="sd">Weekly AQ article volume per organisation over the report period. Spikes are identified and traced to triggering events.</div><div class="sdiv"></div></div>
+<div class="mch"><div class="ch-hdr"><div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:11px;color:var(--muted)">${esc(DATE_FROM)} to ${esc(DATE_TO)} &middot; ${summary}</div></div>
 <div style="display:flex;gap:12px;flex-wrap:wrap">${legend}</div></div>
-<div class="wbars">${weekBars}</div></div></section>`;
+<div class="wbars">${weekBars}</div>
+<div style="font-size:10px;color:var(--muted);margin-top:6px">Bar height = article count that week. Hover for exact count. Spikes annotated below.</div>
+</div>${spikeCards}</section>`;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -2505,6 +2610,7 @@ function buildHTML(
   youtubeERHtml = "",
   socialERResults = [],
   youtubeERResults = [],
+  spikeAnnotations = [],
 ) {
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
   const now = new Date().toUTCString();
@@ -2520,7 +2626,7 @@ function buildHTML(
   }
 
   function outletRows() {
-    return OUTLETS.map((outlet) => {
+    return PRINT_OUTLETS.map((outlet) => {
       if (!ORGS.some((o) => (data[o]?.outletCounts[outlet] || 0) > 0))
         return "";
       const orgCnts = ORGS.map((o, i) => ({
@@ -2543,14 +2649,26 @@ function buildHTML(
         orgCnts.length > 3
           ? `<span style="font-family:monospace;font-size:10px;color:var(--muted)"> +${orgCnts.length - 3} more</span>`
           : "";
+
+      // Advantage: top org vs second org
+      let advantage = `<span style="color:var(--muted)">—</span>`;
+      if (orgCnts.length >= 2) {
+        const ratio = (orgCnts[0].n / orgCnts[1].n).toFixed(1);
+        advantage = `<span style="font-family:monospace;font-size:12px;font-weight:700;color:${orgHex(orgCnts[0].i)}">${ratio}&times;</span><span style="font-size:10px;color:var(--muted);margin-left:4px">${esc(orgCnts[0].o)}</span>`;
+      } else if (orgCnts.length === 1) {
+        advantage = `<span style="font-size:11px;color:var(--muted2)">Sole presence</span>`;
+      }
+
       const eid = "ot" + outlet.replace(/\W/g, "");
       let evItems = "";
-      orgCnts.slice(0, 5).forEach((x) => {
-        const a = arts[x.o].find((a) => canonOutlet(a.source || "") == outlet);
-        if (a)
-          evItems += `<div class="ei"><div class="en" style="color:${orgHex(x.i)};font-weight:600">${esc(x.o)}</div><div class="eb"><div class="eq">${esc((a.snippet || a.title).slice(0, 130))}</div><div class="es">${esc(outlet)} &middot; ${esc(a.date)}${a.url ? `<br><a href="${esc(a.url)}" target="_blank">${esc(a.url.slice(0, 65))}</a>` : ""}</div></div></div>`;
+      orgCnts.forEach((x) => {
+        arts[x.o]
+          .filter((a) => canonOutlet(a.source || "") == outlet)
+          .forEach((a) => {
+            evItems += `<div class="ei"><div class="en" style="color:${orgHex(x.i)};font-weight:600">${esc(x.o)}</div><div class="eb"><div class="eq">${esc((a.snippet || a.title).slice(0, 130))}</div><div class="es">${esc(outlet)} &middot; ${esc(a.date)}${a.url ? `<br><a href="${esc(a.url)}" target="_blank">${esc(a.url.slice(0, 65))}</a>` : ""}</div></div></div>`;
+          });
       });
-      return `<tr><td style="font-weight:600">${esc(outlet)}</td><td style="font-family:monospace;font-size:13px;font-weight:700;color:var(--muted2)">${total}</td><td style="line-height:2.2">${top3}${more}</td><td>${evItems ? `<a class="ctag" onclick="td('${eid}')">&#8599; articles</a><div class="evd" id="${eid}">${evItems}</div>` : '<span class="lc">&#9888; no articles</span>'}</td></tr>`;
+      return `<tr><td style="font-weight:600">${esc(outlet)}</td><td style="font-family:monospace;font-size:13px;font-weight:700;color:var(--muted2)">${total}</td><td style="line-height:2.2">${top3}${more}</td><td>${advantage}</td><td>${evItems ? `<a class="ctag" onclick="td('${eid}')">&#8599; articles</a><div class="evd" id="${eid}">${evItems}</div>` : '<span class="lc">&#9888; no articles</span>'}</td></tr>`;
     }).join("");
   }
 
@@ -3063,7 +3181,7 @@ ${sovBar()}
 <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o, i) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join("")}</div>
 </div>
 <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-family:monospace;font-size:11px;color:var(--muted2)"><strong style="color:var(--amber)">Reading this table:</strong> Total = all AQ-scoped articles across orgs at that outlet. Top orgs shows the three highest-coverage orgs as badges.</div>
-<table class="nt"><thead><tr><th>Outlet</th><th>Total</th><th>Top orgs by coverage</th><th>Evidence</th></tr></thead><tbody>${outletRows()}</tbody></table></section>
+<table class="nt"><thead><tr><th>Outlet</th><th>Total</th><th>Top orgs by coverage</th><th>Advantage</th><th>Evidence</th></tr></thead><tbody>${outletRows()}</tbody></table></section>
 
 <section class="sec" id="tv"><div class="sh"><div class="se">Section 03b</div><h2 class="st">TV Channel Coverage</h2>
 <div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (Aaj Tak, India TV, ABP News) channels.</div><div class="sdiv"></div></div>
@@ -3078,7 +3196,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
 ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_HINDI.map((ch) => `<td style="font-family:monospace">${data[org]?.outletCounts[ch] || 0}</td>`).join("")}</tr>`).join("")}
 </tbody></table></div></section>
 
-${momentumSection(arts, ORGS, DATE_FROM, DATE_TO)}
+${momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations)}
 
 <section class="sec" id="topics"><div class="sh"><div class="se">Section 04</div><h2 class="st">Topic Ownership Map</h2>
 <div class="sd">${TOPICS.length} AQ sub-topics including NCAP &middot; Policy &middot; PM2.5 Exposure &middot; Stubble Burning &middot; Vehicular Pollution &middot; Health Impact &middot; Brick Kilns &middot; Thermal Power Plants &middot; and more.</div><div class="sdiv"></div></div>
