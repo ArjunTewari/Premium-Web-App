@@ -114,10 +114,26 @@ async function searchYouTube(orgName, serperKey, dateFrom, dateTo) {
   return data.organic || [];
 }
 
+// ─── Resolve @handle → channelId via YouTube Data API ──────────────────────
+async function resolveHandleToChannelId(handle, apiKey) {
+  if (!handle || !apiKey) return null;
+  const h = handle.startsWith('@') ? handle : `@${handle}`;
+  try {
+    const { data } = await axios.get(YT_CHANNELS_URL, {
+      params: { part: 'id', forHandle: h, key: apiKey },
+      timeout: 10000,
+    });
+    return data.items?.[0]?.id || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 // ─── Main run ───────────────────────────────────────────────────────────────
 async function run(cfg, selectedOrgs, cb) {
-  const YOUTUBE_KEY = cfg.YOUTUBE_KEY || '';
-  const SERPER_KEY  = cfg.SERPER_KEY  || '';
+  const YOUTUBE_KEY   = cfg.YOUTUBE_KEY    || '';
+  const SERPER_KEY    = cfg.SERPER_KEY     || '';
+  const ORG_HANDLES   = cfg.ORG_YT_HANDLES || {};
 
   if (!SERPER_KEY) {
     cb?.('[YouTubeER] No SERPER_KEY — skipping', 'warn');
@@ -125,15 +141,46 @@ async function run(cfg, selectedOrgs, cb) {
   }
 
   if (!YOUTUBE_KEY) {
-    cb?.('[YouTubeER] No YOUTUBE_KEY — finding videos only, no ER metrics', 'warn');
+    cb?.('[YouTubeER] No YOUTUBE_KEY — official channel filtering unavailable, YT counts set to 0', 'warn');
   }
 
   cb?.(`[YouTubeER] Searching YouTube for ${selectedOrgs.length} orgs...`);
+
+  // Resolve handles → channelIds up front (requires YOUTUBE_KEY)
+  const orgChannelIds = {};
+  if (YOUTUBE_KEY) {
+    for (const orgName of selectedOrgs) {
+      const handle = ORG_HANDLES[orgName];
+      if (handle) {
+        const cid = await resolveHandleToChannelId(handle, YOUTUBE_KEY);
+        if (cid) {
+          orgChannelIds[orgName] = cid;
+          cb?.(`  [YouTubeER] Resolved ${handle} → ${cid}`);
+        } else {
+          cb?.(`  [YouTubeER] Could not resolve handle ${handle} for ${orgName}`, 'warn');
+        }
+      }
+    }
+  }
 
   const orgResults = [];
 
   for (const orgName of selectedOrgs) {
     cb?.(`  [YouTubeER] "${orgName}"...`);
+
+    const officialChannelId = orgChannelIds[orgName] || null;
+    const orgHandle         = ORG_HANDLES[orgName]   || null;
+
+    // If no handle configured at all, skip this org for YT
+    if (!orgHandle) {
+      cb?.(`  [YouTubeER] ${orgName}: no YT handle configured — skipping`, 'warn');
+      orgResults.push({
+        org: orgName, videos: [], videoCount: 0,
+        avgER: 0, avgViewER: 0, totalViews: 0, totalLikes: 0, totalComments: 0,
+        erMethod: 'none',
+      });
+      continue;
+    }
 
     // ── Step 1: find YouTube video URLs via Serper ────────────────────────
     let serperItems = [];
@@ -236,9 +283,25 @@ async function run(cfg, selectedOrgs, cb) {
       };
     });
 
+    // ── Filter to official channel only ──────────────────────────────────
+    // If we resolved a channelId, drop any video not from that channel.
+    // If we have a handle but couldn't resolve it (no API key or API error),
+    // drop all videos — we can't confirm they're from the official channel.
+    const filteredVideos = officialChannelId
+      ? videos.filter(v => v.channelId === officialChannelId)
+      : [];
+
+    if (videos.length && !filteredVideos.length) {
+      cb?.(`  [YouTubeER] ${orgName}: ${videos.length} videos found but none from official channel (${orgHandle})`, 'warn');
+    } else if (filteredVideos.length < videos.length) {
+      cb?.(`  [YouTubeER] ${orgName}: kept ${filteredVideos.length}/${videos.length} videos from official channel`);
+    }
+
+    const finalVideos = filteredVideos;
+
     // Determine the org-level ER method (prefer subscriber-based)
-    const subERVideos  = videos.filter(v => v.subscriberER !== null);
-    const viewERVideos = videos.filter(v => v.viewER !== null);
+    const subERVideos  = finalVideos.filter(v => v.subscriberER !== null);
+    const viewERVideos = finalVideos.filter(v => v.viewER !== null);
 
     let avgER     = 0;
     let avgViewER = 0;
@@ -253,16 +316,16 @@ async function run(cfg, selectedOrgs, cb) {
       if (erMethod === 'none') erMethod = 'view';
     }
 
-    const totalViews    = videos.reduce((s, v) => s + (v.views    ?? 0), 0);
-    const totalLikes    = videos.reduce((s, v) => s + (v.likes    ?? 0), 0);
-    const totalComments = videos.reduce((s, v) => s + (v.comments ?? 0), 0);
+    const totalViews    = finalVideos.reduce((s, v) => s + (v.views    ?? 0), 0);
+    const totalLikes    = finalVideos.reduce((s, v) => s + (v.likes    ?? 0), 0);
+    const totalComments = finalVideos.reduce((s, v) => s + (v.comments ?? 0), 0);
 
-    cb?.(`  [YouTubeER] ${orgName}: ${videos.length} videos | avgER=${avgER}% (${erMethod}) | views=${totalViews.toLocaleString()}`, videos.length > 0 ? 'ok' : 'warn');
+    cb?.(`  [YouTubeER] ${orgName}: ${finalVideos.length} official-channel videos | avgER=${avgER}% (${erMethod}) | views=${totalViews.toLocaleString()}`, finalVideos.length > 0 ? 'ok' : 'warn');
 
     orgResults.push({
       org: orgName,
-      videos,
-      videoCount:   videos.length,
+      videos:       finalVideos,
+      videoCount:   finalVideos.length,
       avgER,
       avgViewER,
       erMethod,

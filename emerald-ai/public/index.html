@@ -584,11 +584,15 @@ html, body {
       </label>
       <div id="orgCheckboxes" class="org-grid"></div>
       <div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap">
-        <input id="orgCustom" placeholder="Add custom org name…"
-          style="flex:1;min-width:160px;background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;padding:8px 11px;color:var(--tx);font-size:11.5px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color .2s,box-shadow .2s">
+        <input id="orgCustom" placeholder="Organisation name…"
+          style="flex:2;min-width:160px;background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;padding:8px 11px;color:var(--tx);font-size:11.5px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color .2s,box-shadow .2s"
+          onkeydown="if(event.key==='Enter')addCustomOrg()">
+        <input id="orgYtHandle" placeholder="@YouTubeHandle"
+          style="flex:1;min-width:120px;background:var(--sur2);border:1px solid var(--bdr);border-radius:6px;padding:8px 11px;color:var(--tx);font-size:11.5px;font-family:'JetBrains Mono',monospace;outline:none;transition:border-color .2s,box-shadow .2s"
+          onkeydown="if(event.key==='Enter')addCustomOrg()">
         <button onclick="addCustomOrg()" class="mini-btn">+ Add</button>
       </div>
-      <div class="hint">Select up to 13. Each org adds ~5 Serper queries + ~2 Claude API calls.</div>
+      <div class="hint">Select up to 13. YouTube handle is used to filter videos to the org's official channel only.</div>
     </div>
 
     <div class="row3">
@@ -790,18 +794,40 @@ const DEFAULT_ORGS = [
   'Climate Trends',
   'Sustainable Futures Collaborative',
 ];
+
+// Official YouTube channel handles for each preset org
+const ORG_YT_HANDLES = {
+  'WRI India':                                        '@WRIIndiaChannel',
+  'Air Pollution Action Group':                       '@theconvergencefoundation',
+  'Chintan Environmental Research and Action Group':  '@ChintanEnviroGroup',
+  'IIT Kanpur':                                       '@iitkanpur',
+  'CSTEP':                                            '@centerforstudyofsciencetec7663',
+  'IIT Delhi':                                        '@IITDelhiOfficial',
+  'Health Effects Institute':                         '@HEIresearch',
+  'ICCT':                                             '@ICCT',
+  'EPIC India':                                       '@epicindia.uchicago',
+  'Council on Energy, Environment and Water':         '@CEEWIndia',
+  'Centre for Science and Environment':               '@cse_india',
+  'Climate Trends':                                   '@ClimateTrendsIN',
+  'Sustainable Futures Collaborative':                '@SFC_India',
+};
+
+// Custom orgs added by the user: { name, ytHandle }
 const customOrgs = [];
 
 function renderOrgCheckboxes() {
   const box  = document.getElementById('orgCheckboxes');
-  const all  = [...DEFAULT_ORGS, ...customOrgs];
+  const allDefault = DEFAULT_ORGS.map(name => ({ name, ytHandle: ORG_YT_HANDLES[name] || '' }));
+  const all  = [...allDefault, ...customOrgs];
   const sel  = getSelectedOrgs();
-  box.innerHTML = all.map(org => {
-    const chk = sel.includes(org) ||
-      (sel.length === 0 && (org === 'Council on Energy, Environment and Water' || org === 'CSTEP'));
-    return `<label>
-      <input type="checkbox" value="${org}" ${chk ? 'checked' : ''} onchange="updateOrgCount()">
-      ${org}</label>`;
+  box.innerHTML = all.map(({ name, ytHandle }) => {
+    const chk = sel.includes(name) ||
+      (sel.length === 0 && (name === 'Council on Energy, Environment and Water' || name === 'CSTEP'));
+    return `<label style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <input type="checkbox" value="${name}" ${chk ? 'checked' : ''} onchange="updateOrgCount()">
+      <span>${name}</span>
+      ${ytHandle ? `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mt);background:var(--sur3);border:1px solid var(--bdr);border-radius:3px;padding:1px 5px;flex-shrink:0">${ytHandle}</span>` : `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--bad);background:rgba(224,92,92,.08);border:1px solid rgba(224,92,92,.2);border-radius:3px;padding:1px 5px;flex-shrink:0">no YT handle</span>`}
+    </label>`;
   }).join('');
   updateOrgCount();
 }
@@ -822,14 +848,27 @@ function updateOrgCount() {
 }
 
 function addCustomOrg() {
-  const inp = document.getElementById('orgCustom');
-  const val = inp.value.trim();
-  if (!val || DEFAULT_ORGS.includes(val) || customOrgs.includes(val)) { inp.value = ''; return; }
-  customOrgs.push(val);
-  inp.value = '';
+  const nameInp   = document.getElementById('orgCustom');
+  const handleInp = document.getElementById('orgYtHandle');
+  const name      = nameInp.value.trim();
+  const ytHandle  = handleInp ? handleInp.value.trim() : '';
+  if (!name) return;
+  const alreadyExists = DEFAULT_ORGS.includes(name) || customOrgs.some(o => o.name === name);
+  if (alreadyExists) { nameInp.value = ''; if (handleInp) handleInp.value = ''; return; }
+  customOrgs.push({ name, ytHandle: ytHandle || '' });
+  nameInp.value = '';
+  if (handleInp) handleInp.value = '';
   renderOrgCheckboxes();
-  document.querySelectorAll('#orgCheckboxes input').forEach(cb => { if (cb.value === val) cb.checked = true; });
+  document.querySelectorAll('#orgCheckboxes input').forEach(cb => { if (cb.value === name) cb.checked = true; });
   updateOrgCount();
+}
+
+function getOrgYtHandles() {
+  const handles = { ...ORG_YT_HANDLES };
+  for (const { name, ytHandle } of customOrgs) {
+    if (ytHandle) handles[name] = ytHandle;
+  }
+  return handles;
 }
 
 /* ── Scope keywords ─────────────────────────────────────────────────────── */
@@ -961,6 +1000,7 @@ async function startRun() {
     dateTo:        document.getElementById('dateTo').value,
     clientName:    document.getElementById('clientName').value,
     scopeKeywords: getScopeKeywords(),
+    orgYtHandles:  getOrgYtHandles(),
   };
 
   try {

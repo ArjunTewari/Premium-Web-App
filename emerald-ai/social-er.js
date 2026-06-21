@@ -187,47 +187,66 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   const maxPosts = Math.max(...erResults.map(r => r.totalPosts), 1);
   const maxYtVids = Math.max(...ytResults.map(r => r.videoCount || 0), 1);
 
-  // ── Summary table: orgs as rows ──────────────────────────────────────────
-  const summaryTable = `<div style="overflow-x:auto;border:1px solid #252d40;border-radius:8px;margin-bottom:20px;overflow:hidden">
+  // ── Unified summary table ranked by total indexed posts ──────────────────
+  const cohortTotal = erResults.reduce((s, r) => {
+    const yt = ytResults.find(y => y.org === r.org) || { videoCount: 0 };
+    return s + r.linkedinPosts + r.twitterPosts + (r.instagramPosts || 0) + (yt.videoCount || 0);
+  }, 0) || 1;
+
+  const unifiedRows = erResults
+    .map(r => {
+      const yt    = ytResults.find(y => y.org === r.org) || { videoCount: 0 };
+      const total = r.linkedinPosts + r.twitterPosts + (r.instagramPosts || 0) + (yt.videoCount || 0);
+      return { r, yt, total };
+    })
+    .sort((a, b) => b.total - a.total);
+
+  // Assign unified ranks
+  let _lastTotal = null, _lastRank = 0;
+  unifiedRows.forEach(({ total }, idx) => {
+    if (total === _lastTotal) { unifiedRows[idx].unifiedRank = _lastRank; }
+    else { _lastRank = idx + 1; unifiedRows[idx].unifiedRank = _lastRank; _lastTotal = total; }
+  });
+
+  const summaryTable = `<div style="overflow-x:auto;border:1px solid #252d40;border-radius:8px;margin-bottom:16px;overflow:hidden">
   <table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead>
       <tr style="background:#181e2e">
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">Rank</th>
         <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494">Org</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Score</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LinkedIn</th>
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">Volume</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Breadth</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap">Relevance</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">Instagram</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YouTube</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap">SoV %</th>
       </tr>
     </thead>
     <tbody>
-      ${erResults.map(r => {
-        const yt  = ytResults.find(y => y.org === r.org) || { videoCount: 0 };
-        const col = scoreColor(r.presenceScore);
-        const bd  = r.scoreBreakdown;
+      ${unifiedRows.map(({ r, yt, total, unifiedRank }) => {
+        const sov = cohortTotal > 0 ? ((total / cohortTotal) * 100).toFixed(1) : '0.0';
+        const maxTotal = unifiedRows[0].total || 1;
+        const barW = Math.round((total / maxTotal) * 100);
+        const col = total >= 10 ? '#4caf74' : total >= 5 ? '#c9922a' : total >= 1 ? '#4a9fd4' : '#5e7494';
         return `<tr style="border-top:1px solid #252d40">
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#2e3a52">#${r.rank}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#2e3a52">#${unifiedRank}</td>
           <td style="padding:8px 12px"><span style="font-family:monospace;font-size:11px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a7fd4">${r.linkedinPosts}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a9fd4">${r.twitterPosts}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e53935">${yt.videoCount || 0}</td>
           <td style="padding:8px 12px;text-align:center">
-            <span style="font-family:monospace;font-size:15px;font-weight:700;color:${col}">${r.presenceScore}</span>
-            <span style="font-size:10px;color:#5e7494">/10</span>
-            <div style="margin:3px auto;width:60px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:${col};width:${Math.round(r.presenceScore/10*100)}%"></div></div>
+            <span style="font-family:monospace;font-size:15px;font-weight:700;color:${col}">${total}</span>
+            <div style="margin:4px auto;width:70px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:${col};width:${barW}%"></div></div>
           </td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4a7fd4">${r.linkedinPosts}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4a9fd4">${r.twitterPosts}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#e53935">${yt.videoCount || 0}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px;color:#4a9fd4">${bd.volume.pts}/4</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px;color:#c9922a">${bd.breadth.pts}/3</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px;color:#4caf74">${bd.relevance.pts}/3</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:600;color:#4caf74">${sov}%</td>
         </tr>`;
       }).join('')}
     </tbody>
   </table>
+</div>
+<div style="font-family:monospace;font-size:9px;color:#3a4a5e;margin-bottom:16px">
+  Counts = Google-indexed posts / official YouTube channel videos in the report period. LinkedIn · X/Twitter · Instagram via Serper index. YouTube = official channel videos only (filtered by configured @handle). SoV % = org total ÷ cohort total.
 </div>`;
 
   // ── Per-org collapsible detail sections ───────────────────────────────────
@@ -310,18 +329,11 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   <div class="sh">
     <div class="se">Section 08</div>
     <h2 class="st">Social AQ Presence</h2>
-    <div class="sd">Google-indexed posts mentioning each organisation in an air quality context on LinkedIn, X/Twitter, Instagram, and YouTube. Scored 0–10 on a transparent formula: Volume (0–4) + Platform Breadth (0–3) + AQ Keyword Relevance (0–3).</div>
+    <div class="sd">Indexed AQ-related posts published by each organisation on LinkedIn, X/Twitter, Instagram, and YouTube (official channel only). Ranked by total publishing volume across all platforms. SoV % = org's share of all tracked cohort posts.</div>
     <div class="sdiv"></div>
   </div>
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">${statCards}</div>
-
-  <div style="background:rgba(74,159,212,.06);border:1px solid rgba(74,159,212,.18);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:#8fa3b8;line-height:1.7">
-    <strong style="color:#4a9fd4">Scoring formula:</strong>
-    <strong>Volume</strong> (0–4): 0 posts=0, 1=1, 2–3=2, 4–6=3, 7+=4 &nbsp;·&nbsp;
-    <strong>Breadth</strong> (0–3): 1pt per platform (LinkedIn / X / Instagram) with &ge;1 indexed post &nbsp;·&nbsp;
-    <strong>Relevance</strong> (0–3): avg AQ keyword hits per post title+snippet (&lt;0.5=0, &lt;1=1, &lt;2=2, 2+=3)
-  </div>
 
   ${ytKeyNotice}
 

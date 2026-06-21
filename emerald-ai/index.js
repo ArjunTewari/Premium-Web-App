@@ -56,7 +56,9 @@ app.post('/run', async (req, res) => {
     PERPLEXITY_KEY:body.perplexityKey|| process.env.PERPLEXITY_KEY|| '',
     GEMINI_KEY:    body.geminiKey    || process.env.GEMINI_KEY    || '',
     // YouTube ER — optional, from form or server env
-    YOUTUBE_KEY:   body.youtubeKey  || process.env.YOUTUBE_KEY  || '',
+    YOUTUBE_KEY:    body.youtubeKey   || process.env.YOUTUBE_KEY  || '',
+    // Official YT channel handles per org — map of { orgName: '@handle' }
+    ORG_YT_HANDLES: (body.orgYtHandles && typeof body.orgYtHandles === 'object') ? body.orgYtHandles : {},
     // Social — always from server secrets
     TWITTER_KEY:           process.env.TWITTER_KEY           || '',
     outDir: OUT_DIR
