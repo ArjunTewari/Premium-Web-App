@@ -308,7 +308,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   return `
 <section class="sec" id="social">
   <div class="sh">
-    <div class="se">Section 08b</div>
+    <div class="se">Section 08</div>
     <h2 class="st">Social AQ Presence</h2>
     <div class="sd">Google-indexed posts mentioning each organisation in an air quality context on LinkedIn, X/Twitter, Instagram, and YouTube. Scored 0–10 on a transparent formula: Volume (0–4) + Platform Breadth (0–3) + AQ Keyword Relevance (0–3).</div>
     <div class="sdiv"></div>

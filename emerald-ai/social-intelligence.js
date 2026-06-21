@@ -331,7 +331,7 @@ function buildAEOHtml(aeoResults, orgs) {
   return `
 <section style="margin-bottom:56px;scroll-margin-top:24px" id="aeo">
   <div style="margin-bottom:24px">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#5e7494;margin-bottom:6px">AEO — LLM Visibility</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#5e7494;margin-bottom:6px">Section 07 — AEO / LLM Visibility</div>
     <h2 style="font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;color:#d8e4f0;line-height:1.2">AI Engine Optimisation</h2>
     <div style="margin-top:8px;font-size:13px;color:#8fa3b8;max-width:680px;line-height:1.65">When someone asks an AI model about Indian air quality, which organisations does it cite? ${queriesUsed.length} questions sent to ${allLlms.length} LLMs. Each mention = 1. Max possible per org = ${queriesUsed.length * allLlms.length}. ✓ = cited · ✗ = not cited · dim rows = zero mentions across all orgs.</div>
     <div style="width:40px;height:2px;background:#c9922a;margin:14px 0 0"></div>
