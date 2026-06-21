@@ -4,7 +4,7 @@
  * pipeline/social-intelligence.js
  *
  * Generates the AEO (LLM Visibility) section of the AQ report.
- * Social media is handled by social-er.js (Apify Engagement Rate).
+ * Social media is handled by social-er.js (Serper-based engagement rate).
  * Called from the main pipeline after news classification is done.
  *
  * Usage (from pipeline.js):

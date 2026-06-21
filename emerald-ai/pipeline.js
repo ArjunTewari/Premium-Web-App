@@ -779,8 +779,8 @@ ${txt}`;
     cb(`  AEO error: ${e.message}`, "err");
   }
 
-  // ── STEP 4: Social Engagement Rate (Apify) ────────────────
-  cb(`\nSTEP 4/6 — Social Engagement Rate (Apify)...`, "head");
+  // ── STEP 4: Social Engagement Rate (Serper) ────────────────
+  cb(`\nSTEP 4/6 — Social Engagement Rate (Serper)...`, "head");
   const SocialER = require("./social-er");
   let socialERResults = [];
   let socialERHtml = "";
@@ -1887,14 +1887,14 @@ async function buildPPTX(
     footer(sl);
   }
 
-  // Slide 8: Social Engagement Rate (Apify)
+  // Slide 8: Social Engagement Rate (Serper)
   {
     const sl = pres.addSlide();
     darkBg(sl);
     eyebrow(sl, "Social Media Intelligence");
     stitle(sl, "Social Engagement Rate");
     sl.addText(
-      "ER = (Likes + Comments + Shares) × 100 ÷ Followers, averaged across AQ posts per org. Apify: X/Twitter · Instagram · LinkedIn.",
+      "ER = (Likes + Replies + Reposts) / Views × 100, averaged across AQ posts per org. Sources: Serper web search (LinkedIn + X/Twitter) · X metrics via page text scrape.",
       {
         x: 0.5,
         y: 1.12,
@@ -2094,7 +2094,7 @@ async function buildPPTX(
       });
     }
     sl.addText(
-      "Apify actors: apidojo/tweet-scraper-v2 · apify/instagram-scraper · harvestapi/linkedin-profile-posts-scraper · Instagram and LinkedIn shares excluded from ER",
+      "Serper web search: site:linkedin.com/posts + site:x.com queries · X metrics extracted via Serper page text scrape · ER = (likes + replies + reposts) / views × 100",
       {
         x: 0.5,
         y: 6.98,
@@ -3063,7 +3063,7 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
 </div>
 <div id="exec-draft" style="display:none;padding:0 18px 18px">${execCards}</div>
 </div></section>
-<section class="sec" id="method"><div class="sh"><div class="se">Section 02</div><h2 class="st">Methodology</h2><div class="sd">How data was collected, filtered, and analysed. Serper News API for media coverage · Claude Haiku 4.5 for article classification · LLM probing (GPT-4o, Perplexity, Gemini) for AEO visibility · Apify for social media engagement (Twitter/X, Instagram, LinkedIn), no YouTube.</div><div class="sdiv"></div></div></section>
+<section class="sec" id="method"><div class="sh"><div class="se">Section 02</div><h2 class="st">Methodology</h2><div class="sd">How data was collected, filtered, and analysed. Serper News API for media coverage · Claude Haiku 4.5 for article classification · LLM probing (GPT-4o, Perplexity, Gemini) for AEO visibility · Serper web search for social AQ presence (LinkedIn + X/Twitter) · X metrics via page text scrape.</div><div class="sdiv"></div></div></section>
 <section class="sec" id="sov"><div class="sh"><div class="se">Section 03</div><h2 class="st">Share of Voice</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
 <div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div>
 <div style="display:flex;gap:12px;flex-wrap:wrap">${ORGS.map((o, i) => `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:12px;height:12px;border-radius:2px;background:${orgHex(i)}"></div>${esc(o)}</div>`).join("")}</div></div>
