@@ -811,24 +811,10 @@ ${txt}`;
     cb(`  YouTube ER error: ${e.message}`, "err");
   }
 
-  // ── ER normalisation: 0–10 score per org (Twitter + YouTube combined) ───
-  // Build a lookup map for YouTube ER by org name
-  const ytERByOrg = {};
-  for (const r of youtubeERResults)
-    ytERByOrg[r.org] = r.avgER || r.avgViewER || 0;
-
-  // Combined ER = average of available platform ERs (Twitter + YouTube)
-  const combinedERByOrg = {};
-  for (const org of ORGS) {
-    const tw = socialERResults.find((r) => r.org === org)?.avgER || 0;
-    const yt = ytERByOrg[org] || 0;
-    const vals = [tw, yt].filter((v) => v > 0);
-    combinedERByOrg[org] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-  }
-  const maxER = Math.max(...Object.values(combinedERByOrg), 0.01);
+  // ── Social presence score (0–10) from transparent formula in social-er.js ──
   const erScoreByOrg = {};
   for (const org of ORGS)
-    erScoreByOrg[org] = Math.round((combinedERByOrg[org] / maxER) * 10);
+    erScoreByOrg[org] = socialERResults.find((r) => r.org === org)?.presenceScore || 0;
 
   // ── STEP 5: Aggregate + Score ─────────────────────────────
   cb(`\nSTEP 5/6 — Aggregating and scoring...`, "head");
@@ -899,7 +885,7 @@ ${txt}`;
   const orgSummary = ORGS.map((o) => {
     const er = socialERResults.find((r) => r.org === o);
     const yt = youtubeERResults.find((r) => r.org === o);
-    return `${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo} mentions, Social ER ${data[o].social}/10 (TW=${er?.twitterER || 0}% LI=${er?.linkedinER || 0}% YT=${yt?.avgER || yt?.avgViewER || 0}% ${yt?.videoCount || 0} videos), top outlet: ${data[o].topOutlet}, topics 2+: ${
+    return `${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo} mentions, Social Presence ${data[o].social}/10 (LI=${er?.linkedinPosts || 0} X=${er?.twitterPosts || 0} IG=${er?.instagramPosts || 0} YT=${yt?.videoCount || 0} videos), top outlet: ${data[o].topOutlet}, topics 2+: ${
       Object.entries(data[o].topicCounts)
         .filter(([, v]) => v >= 2)
         .map(([k]) => k)
@@ -1941,7 +1927,7 @@ async function buildPPTX(
           const yt = youtubeERResults.find((y) => y.org === r.org);
           return { ...r, youtubeER: yt?.avgER || yt?.avgViewER || 0 };
         })
-        .sort((a, b) => b.avgER - a.avgER);
+        .sort((a, b) => b.presenceScore - a.presenceScore);
       const trows = [
         [
           {
@@ -3110,8 +3096,8 @@ ${socialERHtml}
 ${youtubeERHtml}
 
 <section class="sec" id="score"><div class="sh"><div class="se">Section 07</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social (X/Twitter + YouTube combined). Formula shown in full.</div><div class="sdiv"></div></div>
-<div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social/10&times;20) &nbsp;&mdash;&nbsp; Social/10 = avg(X ER%, YT ER%) normalised 0–10<br>
-<span style="color:var(--muted)">${ORGS.map((o) => { const er = socialERResults.find(r => r.org === o); const yt = youtubeERResults.find(r => r.org === o); return `${esc(o)}: SoV=${data[o].sov} Cit=${data[o].dataPct}% AEO=${data[o].aeo} XER=${er?.twitterER||0}% YTER=${yt?.avgER||yt?.avgViewER||0}% Social=${data[o].social}/10 → Score=${data[o].score}`; }).join(" &middot; ")}</span></div>
+<div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social/10&times;20) &nbsp;&mdash;&nbsp; Social/10 = Presence score: Volume(0–4)+Breadth(0–3)+Relevance(0–3)<br>
+<span style="color:var(--muted)">${ORGS.map((o) => { const er = socialERResults.find(r => r.org === o); const yt = youtubeERResults.find(r => r.org === o); return `${esc(o)}: SoV=${data[o].sov} Cit=${data[o].dataPct}% AEO=${data[o].aeo} Social=${data[o].social}/10 (LI=${er?.linkedinPosts||0} X=${er?.twitterPosts||0} IG=${er?.instagramPosts||0}) YT=${yt?.videoCount||0}vids → Score=${data[o].score}`; }).join(" &middot; ")}</span></div>
 ${scorecards}</section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 08</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including AEO and social media actions.</div><div class="sdiv"></div></div>
