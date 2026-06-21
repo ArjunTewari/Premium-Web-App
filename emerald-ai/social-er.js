@@ -44,16 +44,6 @@ function parseXNumber(s) {
   return parseInt(s) || 0;
 }
 
-// Try to extract metrics from raw page text (fast path)
-function parseMetricsFromText(text) {
-  const views   = parseXNumber(text.match(/(\d[\d,.]*[KkMm]?)\s*[Vv]iews?/)?.[1]);
-  const likes   = parseXNumber(text.match(/(\d[\d,.]*[KkMm]?)\s*[Ll]ikes?/)?.[1]);
-  const reposts = parseXNumber(text.match(/(\d[\d,.]*[KkMm]?)\s*(?:[Rr]eposts?|[Rr]etweets?)/)?.[1]);
-  const replies = parseXNumber(text.match(/(\d[\d,.]*[KkMm]?)\s*[Rr]eplies?/)?.[1]);
-  if (!views && !likes && !reposts && !replies) return null;
-  return { likes: likes || 0, replies: replies || 0, reposts: reposts || 0, views: views || 0 };
-}
-
 // Screenshot + Claude vision fallback
 async function screenshotAndVision(tweetUrl, cfg, cb) {
   if (!cfg.SCREENSHOTONE_KEY || !cfg.CLAUDE_KEY) return null;
@@ -96,28 +86,9 @@ async function screenshotAndVision(tweetUrl, cfg, cb) {
   return null;
 }
 
-// Main metrics fetcher: text scrape first, then vision
+// X/Twitter is login-walled — text scrape via Serper always fails/times out.
+// Use screenshot + Claude vision if keys are available; otherwise skip metrics.
 async function getXMetrics(tweetUrl, cfg, cb) {
-  // Step 1: text scrape via Serper
-  if (cfg.SERPER_KEY) {
-    try {
-      const res = await axios.post(
-        'https://scrape.serper.dev',
-        { url: tweetUrl },
-        { headers: { 'X-API-KEY': cfg.SERPER_KEY, 'Content-Type': 'application/json' }, timeout: 15000 }
-      );
-      const text = res.data.text || res.data.content || '';
-      const metrics = parseMetricsFromText(text);
-      if (metrics) {
-        cb?.(`    [XMetrics] Text scrape: likes=${metrics.likes} reposts=${metrics.reposts} views=${metrics.views}`, 'ok');
-        return { ...metrics, source: 'text' };
-      }
-    } catch (e) {
-      cb?.(`    [XMetrics] Text scrape failed: ${e.message}`, 'warn');
-    }
-  }
-
-  // Step 2: screenshot + Claude vision
   const metrics = await screenshotAndVision(tweetUrl, cfg, cb);
   return metrics ? { ...metrics, source: 'vision' } : null;
 }
