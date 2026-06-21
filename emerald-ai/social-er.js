@@ -135,15 +135,16 @@ async function run(cfg, selectedOrgs, cb) {
   }
 
   const hasMetrics = cfg.SERPER_KEY && (cfg.SCREENSHOTONE_KEY || cfg.CLAUDE_KEY);
-  cb?.(`  Social Presence: searching ${selectedOrgs.length} orgs via Serper (LinkedIn + X)${hasMetrics ? ' + X metrics' : ''}…`);
+  cb?.(`  Social Presence: searching ${selectedOrgs.length} orgs via Serper (LinkedIn + X + Instagram)${hasMetrics ? ' + X metrics' : ''}…`);
   const orgResults = [];
 
   for (const orgName of selectedOrgs) {
     cb?.(`  [SocialPresence] "${orgName}"…`);
 
-    const [liItems, xItems] = await Promise.all([
+    const [liItems, xItems, igItems] = await Promise.all([
       serperSearch(`"${orgName}" ${AQ_TERMS} site:linkedin.com/posts`, SERPER_KEY, cfg.DATE_FROM, cfg.DATE_TO, cb),
       serperSearch(`"${orgName}" ${AQ_TERMS} (site:x.com OR site:twitter.com)`, SERPER_KEY, cfg.DATE_FROM, cfg.DATE_TO, cb),
+      serperSearch(`"${orgName}" ${AQ_TERMS} site:instagram.com`, SERPER_KEY, cfg.DATE_FROM, cfg.DATE_TO, cb),
     ]);
 
     // Fetch metrics for up to 5 X posts
@@ -167,34 +168,36 @@ async function run(cfg, selectedOrgs, cb) {
     const totalViews   = xWithMetrics.reduce((s, p) => s + (p.metrics?.views   || 0), 0);
     const totalReplies = xWithMetrics.reduce((s, p) => s + (p.metrics?.replies || 0), 0);
 
-    const totalFound = liItems.length + xItems.length;
-    const topItem    = liItems[0] || xItems[0] || null;
+    const totalFound = liItems.length + xItems.length + igItems.length;
+    const topItem    = liItems[0] || xItems[0] || igItems[0] || null;
 
     orgResults.push({
-      org:           orgName,
+      org:              orgName,
       twitterER,
-      linkedinER:    0,
-      youtubeER:     0,
-      avgER:         twitterER,
-      twitterPosts:  xItems.length,
-      linkedinPosts: liItems.length,
-      youtubePosts:  0,
-      totalPosts:    totalFound,
+      linkedinER:       0,
+      youtubeER:        0,
+      avgER:            twitterER,
+      twitterPosts:     xItems.length,
+      linkedinPosts:    liItems.length,
+      instagramPosts:   igItems.length,
+      youtubePosts:     0,
+      totalPosts:       totalFound,
       // X metric totals
       totalLikes,
       totalReposts,
       totalViews,
       totalReplies,
       xWithMetrics,
-      bestPost: topItem ? { platform: liItems[0] ? 'linkedin' : 'x', url: topItem.link, text: topItem.snippet || topItem.title || '', date: topItem.date || '' } : null,
+      bestPost: topItem ? { platform: liItems[0] ? 'linkedin' : xItems[0] ? 'x' : 'instagram', url: topItem.link, text: topItem.snippet || topItem.title || '', date: topItem.date || '' } : null,
       insight: totalFound > 0
-        ? `${liItems.length} LinkedIn · ${xItems.length} X/Twitter posts${twitterER > 0 ? ` · ${twitterER}% avg ER` : ''}`
+        ? `${liItems.length} LinkedIn · ${xItems.length} X/Twitter · ${igItems.length} Instagram posts${twitterER > 0 ? ` · ${twitterER}% avg ER` : ''}`
         : 'No indexed social posts found in this period',
       liResults:  liItems,
       xResults:   xItems,
+      igResults:  igItems,
     });
 
-    cb?.(`  [SocialPresence] ${orgName}: LI=${liItems.length} X=${xItems.length} ER=${twitterER}%`, totalFound > 0 ? 'ok' : 'warn');
+    cb?.(`  [SocialPresence] ${orgName}: LI=${liItems.length} X=${xItems.length} IG=${igItems.length} ER=${twitterER}%`, totalFound > 0 ? 'ok' : 'warn');
   }
 
   orgResults.sort((a, b) => (b.twitterER || b.totalPosts) - (a.twitterER || a.totalPosts));
@@ -219,12 +222,14 @@ function buildSocialERHtml(erResults) {
   const topOrg           = erResults[0];
   const totalLiIndexed   = erResults.reduce((s, r) => s + r.linkedinPosts, 0);
   const totalXIndexed    = erResults.reduce((s, r) => s + r.twitterPosts, 0);
+  const totalIgIndexed   = erResults.reduce((s, r) => s + (r.instagramPosts || 0), 0);
   const hasER            = erResults.some(r => r.twitterER > 0);
 
   const statCards = [
     { label: 'Orgs with social AQ posts', value: orgsWithPresence,  unit: `of ${erResults.length} tracked`, col: '#4caf74' },
     { label: 'LinkedIn posts indexed',    value: totalLiIndexed,    unit: 'via Google index',               col: '#4a7fd4' },
     { label: 'X/Twitter posts indexed',   value: totalXIndexed,     unit: 'via Google index',               col: '#4a9fd4' },
+    { label: 'Instagram posts indexed',   value: totalIgIndexed,    unit: 'via Google index',               col: '#e05c9c' },
     hasER
       ? { label: 'Best X engagement rate', value: Math.max(...erResults.map(r => r.twitterER || 0)).toFixed(2) + '%', unit: erResults.find(r => r.twitterER === Math.max(...erResults.map(r => r.twitterER || 0)))?.org || '', col: '#c9922a' }
       : { label: 'Most visible org', value: topOrg?.org?.split(' ').slice(-1)[0] || '—', unit: `${topOrg?.totalPosts || 0} posts`, col: '#c9922a' },
@@ -242,6 +247,7 @@ function buildSocialERHtml(erResults) {
     const barPct  = Math.round((r.totalPosts / maxPosts) * 100);
     const liPct   = Math.round((r.linkedinPosts / maxPosts) * 100);
     const xPct    = Math.round((r.twitterPosts / maxPosts) * 100);
+    const igPct   = Math.round(((r.instagramPosts || 0) / maxPosts) * 100);
     const erPct   = Math.round(((r.twitterER || 0) / maxER) * 100);
     const hasData = r.totalPosts > 0;
     const col     = hasData ? '#4caf74' : '#252d40';
@@ -278,6 +284,13 @@ function buildSocialERHtml(erResults) {
         ${s.link ? `<a href="${escHtml(s.link)}" style="font-size:10px;color:#4a7fd4;text-decoration:none;display:inline-block;margin-top:4px" target="_blank">↗ view post</a>` : ''}
       </div>`).join('') || '';
 
+    const igSnippets = r.igResults?.slice(0, 2).map(s => `
+      <div style="margin-top:8px;padding:8px 10px;background:#0a0e17;border-left:2px solid #252d40;border-radius:0 4px 4px 0">
+        <div style="font-size:10px;color:#5e7494;margin-bottom:3px">${escHtml((s.title || '').slice(0, 70))}</div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.55">${escHtml((s.snippet || '').slice(0, 140))}</div>
+        ${s.link ? `<a href="${escHtml(s.link)}" style="font-size:10px;color:#e05c9c;text-decoration:none;display:inline-block;margin-top:4px" target="_blank">↗ view post</a>` : ''}
+      </div>`).join('') || '';
+
     const noData = !hasData
       ? `<div style="margin-top:8px;font-size:11px;color:#3a4a5e">No indexed posts found in this period</div>`
       : '';
@@ -297,7 +310,8 @@ function buildSocialERHtml(erResults) {
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
             <span style="font-size:11px;color:#5e7494">
               <span style="font-family:monospace;font-weight:700;color:#4a7fd4">${r.linkedinPosts}</span> LI &nbsp;
-              <span style="font-family:monospace;font-weight:700;color:#4a9fd4">${r.twitterPosts}</span> X
+              <span style="font-family:monospace;font-weight:700;color:#4a9fd4">${r.twitterPosts}</span> X &nbsp;
+              <span style="font-family:monospace;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}</span> IG
             </span>
             ${r.twitterER > 0 ? `<span style="font-family:monospace;font-size:11px;font-weight:700;color:#c9922a">${r.twitterER}% X ER</span>` : ''}
             ${r.totalViews > 0 ? `<span style="font-size:11px;color:#5e7494">👁 ${fmtNum(r.totalViews)} total views</span>` : ''}
@@ -312,6 +326,7 @@ function buildSocialERHtml(erResults) {
           </div>` : ''}
           ${xPostCards}
           ${liSnippets}
+          ${igSnippets}
           ${noData}
         </div>
         <div style="flex-shrink:0;min-width:160px">
@@ -323,12 +338,19 @@ function buildSocialERHtml(erResults) {
             </div>
             <span style="font-family:monospace;font-size:11px;font-weight:700;color:#4a7fd4;width:16px;text-align:right">${r.linkedinPosts}</span>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
             <span style="font-family:monospace;font-size:10px;color:#4a9fd4;width:20px">X</span>
             <div style="flex:1;height:5px;background:#1e2638;border-radius:3px;overflow:hidden">
               <div style="height:100%;width:${xPct}%;background:#4a9fd4;border-radius:3px"></div>
             </div>
             <span style="font-family:monospace;font-size:11px;font-weight:700;color:#4a9fd4;width:16px;text-align:right">${r.twitterPosts}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-family:monospace;font-size:10px;color:#e05c9c;width:20px">IG</span>
+            <div style="flex:1;height:5px;background:#1e2638;border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${igPct}%;background:#e05c9c;border-radius:3px"></div>
+            </div>
+            <span style="font-family:monospace;font-size:11px;font-weight:700;color:#e05c9c;width:16px;text-align:right">${r.instagramPosts || 0}</span>
           </div>
           ${r.totalViews > 0 ? `
           <div style="margin-top:8px;padding:8px;background:#0a0e17;border:1px solid #252d40;border-radius:5px">
@@ -352,14 +374,14 @@ function buildSocialERHtml(erResults) {
   <div class="sh">
     <div class="se">Section 08b</div>
     <h2 class="st">Social AQ Presence</h2>
-    <div class="sd">Google-indexed posts mentioning each organisation in an air quality context on LinkedIn and X/Twitter during the report period. X posts include live engagement metrics (likes, reposts, replies, views) where available.</div>
+    <div class="sd">Google-indexed posts mentioning each organisation in an air quality context on LinkedIn, X/Twitter, and Instagram during the report period. X posts include live engagement metrics (likes, reposts, replies, views) where available.</div>
     <div class="sdiv"></div>
   </div>
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">${statCards}</div>
 
   <div style="background:rgba(74,159,212,.06);border:1px solid rgba(74,159,212,.18);border-radius:8px;padding:12px 16px;margin-bottom:24px;font-size:12px;color:#8fa3b8;line-height:1.7">
-    <strong style="color:#4a9fd4">Methodology:</strong> Serper web search queries <code style="background:#1e2638;padding:1px 5px;border-radius:3px;font-size:11px">"Org Name" ("air quality" OR PM2.5 OR AQI) site:linkedin.com/posts</code> and equivalent for X/Twitter. Date range filtered using Google's <code style="background:#1e2638;padding:1px 5px;border-radius:3px;font-size:11px">tbs=cdr</code> parameter. ${erMethodNote}
+    <strong style="color:#4a9fd4">Methodology:</strong> Serper web search queries <code style="background:#1e2638;padding:1px 5px;border-radius:3px;font-size:11px">"Org Name" ("air quality" OR PM2.5 OR AQI) site:linkedin.com/posts</code> and equivalent for X/Twitter and Instagram. Date range filtered using Google's <code style="background:#1e2638;padding:1px 5px;border-radius:3px;font-size:11px">tbs=cdr</code> parameter. ${erMethodNote}
   </div>
 
   <div style="display:flex;flex-direction:column;gap:10px">${orgRows}</div>
