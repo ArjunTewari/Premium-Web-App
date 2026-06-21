@@ -1545,7 +1545,7 @@ async function buildPPTX(
       });
       if (gIdx === ORG_GROUPS.length - 1)
         sl.addText(
-          "Owns = 5+ · Contests = 2–4 · Absent = 0–1 · Clustered by Claude Haiku",
+          "Bar length = relative article count per topic · Clustered by Claude Haiku",
           {
             x: 0.5,
             y: 6.98,
@@ -2563,33 +2563,27 @@ function buildHTML(
           return { org, i, cv, ex };
         }).sort((a, b) => b.cv - a.cv);
         const maxCv = orgData[0]?.cv || 1;
-        const owning = orgData.filter((x) => x.cv >= 5);
-        const contesting = orgData.filter((x) => x.cv >= 2 && x.cv < 5);
-        const absent = orgData.filter((x) => x.cv < 2);
-        const bars = [...owning, ...contesting]
+        const withArticles = orgData.filter((x) => x.cv >= 1);
+        const absent = orgData.filter((x) => x.cv === 0);
+        const bars = withArticles
           .map((x) => {
             const pct = Math.round((x.cv / maxCv) * 100);
-            const badge = x.cv >= 5 ? "badge-owns" : "badge-con";
-            const lbl = x.cv >= 5 ? "Owns" : "Contests";
             const link = x.ex?.url
               ? `<a href="${esc(x.ex.url)}" target="_blank" style="color:var(--amber);font-family:monospace;font-size:10px;text-decoration:none;flex-shrink:0" title="${esc(x.ex.evidence_quote || "")}">&#8599;</a>`
               : x.ex?.evidence_quote
                 ? `<span style="font-family:monospace;font-size:10px;color:var(--muted);flex-shrink:0;cursor:default" title="${esc(x.ex.evidence_quote || "")}">&#9432;</span>`
                 : "";
-            return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:11px;font-weight:600;color:${orgHex(x.i)};width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.org)}</span><div style="flex:1;height:7px;background:var(--surface3);border-radius:4px;overflow:hidden"><div style="height:100%;background:${orgHex(x.i)};width:${pct}%;border-radius:4px"></div></div><span style="font-family:monospace;font-size:11px;font-weight:700;width:20px;text-align:right;color:${orgHex(x.i)};flex-shrink:0">${x.cv}</span><span class="ob ${badge}" style="flex-shrink:0">${lbl}</span>${link}</div>`;
+            return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:11px;font-weight:600;color:${orgHex(x.i)};width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.org)}</span><div style="flex:1;height:7px;background:var(--surface3);border-radius:4px;overflow:hidden"><div style="height:100%;background:${orgHex(x.i)};width:${pct}%;border-radius:4px"></div></div><span style="font-family:monospace;font-size:11px;font-weight:700;width:20px;text-align:right;color:${orgHex(x.i)};flex-shrink:0">${x.cv}</span>${link}</div>`;
           })
           .join("");
         const absentId = "abs" + t.k.replace(/\W/g, "");
         const absentList = absent
-          .map(
-            (x) =>
-              `<span style="font-family:monospace;font-size:10px;color:var(--muted)">${esc(x.org)} (${x.cv})</span>`,
-          )
+          .map((x) => `<span style="font-family:monospace;font-size:10px;color:var(--muted)">${esc(x.org)}</span>`)
           .join("  ");
         const absentBlock = absent.length
-          ? `<div style="margin-top:8px"><a class="ctag" onclick="td('${absentId}')">${absent.length} absent (0–1 art${absent.length !== 1 ? "s" : ""})</a><div class="evd" id="${absentId}" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px">${absentList}</div></div></div>`
+          ? `<div style="margin-top:8px"><a class="ctag" onclick="td('${absentId}')">${absent.length} not covered</a><div class="evd" id="${absentId}" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px">${absentList}</div></div></div>`
           : "";
-        return `<div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px"><div><div style="font-size:15px;font-weight:600;color:var(--text)">${esc(t.k)}</div><div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(t.s)}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0">${owning.length ? `<span style="font-family:monospace;font-size:10px;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.25);border-radius:3px;padding:2px 7px">${owning.length} owns</span>` : ""}${contesting.length ? `<span style="font-family:monospace;font-size:10px;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.25);border-radius:3px;padding:2px 7px">${contesting.length} contests</span>` : ""}</div></div>${bars || `<div style="font-size:12px;color:var(--muted);padding:8px 0">No orgs with 2+ articles on this topic yet.</div>`}${absentBlock}</div>`;
+        return `<div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="margin-bottom:12px"><div style="font-size:15px;font-weight:600;color:var(--text)">${esc(t.k)}</div><div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(t.s)}</div></div>${bars || `<div style="font-size:12px;color:var(--muted);padding:8px 0">No coverage on this topic yet.</div>`}${absentBlock}</div>`;
       })
       .join("");
   }
@@ -3058,11 +3052,6 @@ ${momentumSection(arts, ORGS, DATE_FROM, DATE_TO)}
 <section class="sec" id="topics"><div class="sh"><div class="se">Section 04</div><h2 class="st">Topic Ownership Map</h2>
 <div class="sd">${TOPICS.length} AQ sub-topics including NCAP &middot; Policy &middot; PM2.5 Exposure &middot; Stubble Burning &middot; Vehicular Pollution &middot; Health Impact &middot; Brick Kilns &middot; Thermal Power Plants &middot; and more.</div><div class="sdiv"></div></div>
 ${clsNotice}
-<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:20px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--muted2)">
-<span><span class="ob badge-owns">Owns</span> = 5+ articles</span>
-<span><span class="ob badge-con">Contests</span> = 2&ndash;4 articles</span>
-<span><span class="ob badge-absent">Absent</span> = 0&ndash;1 articles</span>
-</div>
 ${topicCards()}</section>
 
 <section class="sec" id="appendix"><div class="sh"><div class="se">Section 05</div><h2 class="st">Citations</h2><div class="sd">All indexed articles from tracked outlets. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
