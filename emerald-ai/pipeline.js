@@ -3087,12 +3087,20 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
               )
               .join("");
             const artCount = (n.supporting_articles || []).length;
+            const absentBadges = ORGS.map((o, i) =>
+              `<span style="font-family:monospace;font-size:10px;font-weight:700;padding:1px 7px;border-radius:3px;background:${orgHex(i)}1a;color:${orgHex(i)};border:1px solid ${orgHex(i)}4d">${esc(o)}</span>`
+            ).join(" ");
             return `<div class="em-card">
-<div class="em-hdr"><div class="em-topic">${esc(n.topic)}</div>${artCount > 0 ? `<span style="font-family:monospace;font-size:10px;background:rgba(201,146,42,.12);color:var(--amber);border:1px solid rgba(201,146,42,.25);border-radius:3px;padding:2px 8px;flex-shrink:0">${artCount} article${artCount !== 1 ? "s" : ""}</span>` : ""}</div>
+<div class="em-hdr"><div class="em-topic">${esc(n.topic)}</div></div>
 <div class="em-body">${esc(n.description || "")}</div>
-${n.gap_signal ? `<div class="em-inf" style="color:var(--warn)">&#9888; Gap signal: ${esc(n.gap_signal)}</div>` : ""}
-${n.opportunity ? `<div class="em-inf" style="color:var(--good);margin-top:6px">&#8594; Opportunity: ${esc(n.opportunity)}</div>` : ""}
-${articleLinks ? `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">${articleLinks}</div>` : ""}
+<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+  <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Absent:</span>
+  ${absentBadges}
+</div>
+${articleLinks ? `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+  ${artCount > 0 ? `<div style="font-family:monospace;font-size:10px;color:var(--muted2);margin-bottom:7px;letter-spacing:.04em">${artCount} article${artCount !== 1 ? "s" : ""} in this narrative</div>` : ""}
+  ${articleLinks}
+</div>` : ""}
 </div>`;
           })
           .join("");
