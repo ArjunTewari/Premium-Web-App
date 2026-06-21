@@ -796,11 +796,24 @@ ${txt}`;
     cb(`  YouTube ER error: ${e.message}`, "err");
   }
 
-  // ── ER normalisation: 0–10 score per org ─────────────────
-  const maxER = Math.max(...socialERResults.map((r) => r.avgER), 0.01);
+  // ── ER normalisation: 0–10 score per org (Twitter + YouTube combined) ───
+  // Build a lookup map for YouTube ER by org name
+  const ytERByOrg = {};
+  for (const r of youtubeERResults)
+    ytERByOrg[r.org] = r.avgER || r.avgViewER || 0;
+
+  // Combined ER = average of available platform ERs (Twitter + YouTube)
+  const combinedERByOrg = {};
+  for (const org of ORGS) {
+    const tw = socialERResults.find((r) => r.org === org)?.avgER || 0;
+    const yt = ytERByOrg[org] || 0;
+    const vals = [tw, yt].filter((v) => v > 0);
+    combinedERByOrg[org] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  }
+  const maxER = Math.max(...Object.values(combinedERByOrg), 0.01);
   const erScoreByOrg = {};
-  for (const r of socialERResults)
-    erScoreByOrg[r.org] = Math.round((r.avgER / maxER) * 10);
+  for (const org of ORGS)
+    erScoreByOrg[org] = Math.round((combinedERByOrg[org] / maxER) * 10);
 
   // ── STEP 5: Aggregate + Score ─────────────────────────────
   cb(`\nSTEP 5/6 — Aggregating and scoring...`, "head");
@@ -868,7 +881,8 @@ ${txt}`;
   );
   const orgSummary = ORGS.map((o) => {
     const er = socialERResults.find((r) => r.org === o);
-    return `${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo} mentions, Social ER ${data[o].social}/10 (TW=${er?.twitterER || 0}% LI=${er?.linkedinER || 0}% YT=${er?.youtubeER || 0}%), top outlet: ${data[o].topOutlet}, topics 2+: ${
+    const yt = youtubeERResults.find((r) => r.org === o);
+    return `${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo} mentions, Social ER ${data[o].social}/10 (TW=${er?.twitterER || 0}% LI=${er?.linkedinER || 0}% YT=${yt?.avgER || yt?.avgViewER || 0}% ${yt?.videoCount || 0} videos), top outlet: ${data[o].topOutlet}, topics 2+: ${
       Object.entries(data[o].topicCounts)
         .filter(([, v]) => v >= 2)
         .map(([k]) => k)
@@ -1880,7 +1894,12 @@ async function buildPPTX(
         },
       );
     } else {
-      const sorted = [...socialERResults].sort((a, b) => b.avgER - a.avgER);
+      const sorted = [...socialERResults]
+        .map((r) => {
+          const yt = youtubeERResults.find((y) => y.org === r.org);
+          return { ...r, youtubeER: yt?.avgER || yt?.avgViewER || 0 };
+        })
+        .sort((a, b) => b.avgER - a.avgER);
       const trows = [
         [
           {
@@ -2434,7 +2453,7 @@ function momentumSection(arts, ORGS, DATE_FROM, DATE_TO) {
   const summary = ORGS.map((o, i) => `${esc(o)}: ${totalPerOrg[i]}`).join(" · ");
 
   return `
-<section class="sec" id="momentum"><div class="sh"><div class="se">Section 03a</div><h2 class="st">Coverage Momentum</h2>
+<section class="sec" id="momentum"><div class="sh"><div class="se">Section 03c</div><h2 class="st">Coverage Momentum</h2>
 <div class="sd">Weekly article volume per organisation. Taller bars = more articles in that week. Dates parsed from Serper metadata.</div><div class="sdiv"></div></div>
 <div class="mch"><div class="ch-hdr"><div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">Weekly AQ volume</div><div style="font-size:11px;color:var(--muted)">${esc(DATE_FROM)} to ${esc(DATE_TO)} &middot; ${summary}</div></div>
 <div style="display:flex;gap:12px;flex-wrap:wrap">${legend}</div></div>
@@ -2717,23 +2736,72 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
         ORGS.reduce((s, o) => s + (data[o].dataPct || 0), 0) / ORGS.length,
       )
     : 0;
-  const scorecards = rankedOrgs
-    .map(({ org, i, rank }) => {
-      const d = data[org];
-      const citDelta = d.dataPct - avgCitedPct;
-      const citDeltaStr = (citDelta >= 0 ? "+" : "") + citDelta + "% vs avg";
-      const citDeltaCol =
-        citDelta > 0
-          ? "var(--good)"
-          : citDelta < 0
-            ? "var(--bad)"
-            : "var(--muted)";
-      return `<div class="sca" style="border-top:3px solid ${orgHex(i)}"><div class="scn" style="color:${orgHex(i)}">${esc(org)}</div><div class="scg" style="color:${rankCol(rank)}">${ordinal(rank)}</div><div style="font-family:monospace;font-size:11px;font-weight:600;color:${citDeltaCol};margin-bottom:14px">${citDeltaStr} cited</div>
-<div style="display:flex;flex-direction:column;gap:8px;text-align:left">
-${scRow("Share of Voice", d.sov, orgHex(i))}${scRow("Citation", d.dataPct, orgHex(i))}${scRow("AEO", d.aeo, d.aeo > 0 ? orgHex(i) : "#5e7494")}${scRow("Social", d.social || 0, d.social > 0 ? orgHex(i) : "#5e7494", (d.social || 0) * 10)}
-</div></div>`;
-    })
-    .join("");
+  // Pre-compute max values for bar scaling
+  const maxSov  = Math.max(...ORGS.map((o) => data[o].sov     || 0), 1);
+  const maxCit  = Math.max(...ORGS.map((o) => data[o].dataPct || 0), 1);
+  const maxAeo  = Math.max(...ORGS.map((o) => data[o].aeo     || 0), 1);
+  const maxScr  = Math.max(...ORGS.map((o) => data[o].score   || 0), 1);
+
+  const inlineBar = (val, max, col) => {
+    const pct = Math.round((val / max) * 100);
+    return `<div style="display:flex;align-items:center;gap:6px">
+      <div style="width:60px;height:5px;background:var(--surface3);border-radius:3px;flex-shrink:0;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${col};border-radius:3px"></div>
+      </div>
+      <span style="font-family:monospace;font-size:12px;font-weight:600;color:${col}">${val}</span>
+    </div>`;
+  };
+
+  const scorecardRows = rankedOrgs.map(({ org, i, rank }) => {
+    const d   = data[org];
+    const col = orgHex(i);
+    const er  = socialERResults.find((r) => r.org === org);
+    const yt  = youtubeERResults.find((r) => r.org === org);
+    const twER = er?.twitterER  || 0;
+    const ytER = yt?.avgER || yt?.avgViewER || 0;
+    const socialScore = d.social || 0;
+    const twCell = twER > 0
+      ? `<span style="font-family:monospace;font-size:12px;color:var(--text)">${twER}%</span>`
+      : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`;
+    const ytCell = ytER > 0
+      ? `<span style="font-family:monospace;font-size:12px;color:var(--text)">${ytER}%</span>`
+      : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`;
+    const socialCell = socialScore > 0
+      ? `<span style="font-family:monospace;font-size:13px;font-weight:600;color:${col}">${socialScore}<span style="font-size:10px;font-weight:400;color:var(--muted)">/10</span></span>`
+      : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`;
+    return `<tr>
+      <td style="text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:${rankCol(rank)}">${ordinal(rank)}</td>
+      <td><span style="font-size:12px;font-weight:700;color:${col};letter-spacing:.04em">${esc(org)}</span></td>
+      <td>${inlineBar(d.sov, maxSov, col)}</td>
+      <td>${inlineBar(d.dataPct, maxCit, col)}</td>
+      <td>${d.aeo > 0 ? inlineBar(d.aeo, maxAeo, col) : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`}</td>
+      <td style="text-align:center">${twCell}</td>
+      <td style="text-align:center">${ytCell}</td>
+      <td style="text-align:center">${socialCell}</td>
+      <td>${inlineBar(d.score, maxScr, col)}</td>
+    </tr>`;
+  }).join("");
+
+  const scorecards = `<div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead>
+      <tr style="border-bottom:2px solid var(--border)">
+        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Rank</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Organisation</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Share of Voice</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Citation %</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">AEO Mentions</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">X/Twitter ER</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">YouTube ER</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Social /10</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${scorecardRows}
+    </tbody>
+  </table>
+</div>`;
 
   const appendixSections = ORGS.map((org) => {
     const d = data[org];
@@ -2902,6 +2970,10 @@ body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line
 .sca{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:22px;text-align:center}
 .scn{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
 .scg{font-family:'DM Serif Display',serif;font-size:44px;line-height:1;margin:8px 0 4px;font-weight:400}
+#score table tbody tr{border-bottom:1px solid var(--border)}
+#score table tbody tr:hover{background:var(--surface2)}
+#score table td{padding:12px 12px}
+#score table thead th{padding:10px 12px;background:var(--surface3)}
 .scs{font-family:monospace;font-size:13px;color:var(--muted2);margin-bottom:14px}
 .scf{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:12px 16px;font-family:monospace;font-size:11px;color:var(--muted2);margin-top:8px}
 .scf strong{color:var(--amber)}
@@ -2937,7 +3009,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a><a href="#method" class="nav-a">Methodology</a>
-<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#momentum" class="nav-a">Momentum</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social &amp; Digital</div><a href="#social" class="nav-a">Social Presence</a><a href="#youtube-er" class="nav-a">YouTube ER</a>
+<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social &amp; Digital</div><a href="#social" class="nav-a">Social Presence</a><a href="#youtube-er" class="nav-a">YouTube ER</a>
 <div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>${navOrgs}CONFIDENTIAL</div></nav>
@@ -2968,8 +3040,6 @@ ${sovBar()}
 <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-family:monospace;font-size:11px;color:var(--muted2)"><strong style="color:var(--amber)">Reading this table:</strong> Total = all AQ-scoped articles across orgs at that outlet. Top orgs shows the three highest-coverage orgs as badges.</div>
 <table class="nt"><thead><tr><th>Outlet</th><th>Total</th><th>Top orgs by coverage</th><th>Evidence</th></tr></thead><tbody>${outletRows()}</tbody></table></section>
 
-${momentumSection(arts, ORGS, DATE_FROM, DATE_TO)}
-
 <section class="sec" id="tv"><div class="sh"><div class="se">Section 03b</div><h2 class="st">TV Channel Coverage</h2>
 <div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (Aaj Tak, India TV, ABP News) channels.</div><div class="sdiv"></div></div>
 <div style="margin-bottom:16px">
@@ -2982,6 +3052,8 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
 <table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_HINDI.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
 ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_HINDI.map((ch) => `<td style="font-family:monospace">${data[org]?.outletCounts[ch] || 0}</td>`).join("")}</tr>`).join("")}
 </tbody></table></div></section>
+
+${momentumSection(arts, ORGS, DATE_FROM, DATE_TO)}
 
 <section class="sec" id="topics"><div class="sh"><div class="se">Section 04</div><h2 class="st">Topic Ownership Map</h2>
 <div class="sd">${TOPICS.length} AQ sub-topics including NCAP &middot; Policy &middot; PM2.5 Exposure &middot; Stubble Burning &middot; Vehicular Pollution &middot; Health Impact &middot; Brick Kilns &middot; Thermal Power Plants &middot; and more.</div><div class="sdiv"></div></div>
@@ -3003,10 +3075,10 @@ ${SI.buildAEOHtml(aeoResults, ORGS)}
 ${socialERHtml}
 ${youtubeERHtml}
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 07</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social. Formula shown in full.</div><div class="sdiv"></div></div>
-<div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social/10&times;20)<br>
-<span style="color:var(--muted)">${ORGS.map((o) => `${esc(o)}: ${data[o].sov}&times;0.25+${data[o].dataPct}&times;0.25+${data[o].aeo}&times;0.30+${data[o].social}&times;2=${data[o].score}`).join(" &middot; ")}</span></div>
-<div class="scc">${scorecards}</div></section>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 07</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social (X/Twitter + YouTube combined). Formula shown in full.</div><div class="sdiv"></div></div>
+<div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social/10&times;20) &nbsp;&mdash;&nbsp; Social/10 = avg(X ER%, YT ER%) normalised 0–10<br>
+<span style="color:var(--muted)">${ORGS.map((o) => { const er = socialERResults.find(r => r.org === o); const yt = youtubeERResults.find(r => r.org === o); return `${esc(o)}: SoV=${data[o].sov} Cit=${data[o].dataPct}% AEO=${data[o].aeo} XER=${er?.twitterER||0}% YTER=${yt?.avgER||yt?.avgViewER||0}% Social=${data[o].social}/10 → Score=${data[o].score}`; }).join(" &middot; ")}</span></div>
+${scorecards}</section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 08</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including AEO and social media actions.</div><div class="sdiv"></div></div>
 <table class="at"><thead><tr><th>Org</th><th>Priority</th><th>Area</th><th>Action</th><th>Data rationale</th></tr></thead><tbody>${actionRows}</tbody></table></section>

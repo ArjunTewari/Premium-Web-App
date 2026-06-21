@@ -86,7 +86,7 @@ async function runAEO(cfg, orgs, cb) {
             count++;
             if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
           }
-          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'GPT-4o', cited: mentioned });
+          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'GPT-4o', cited: mentioned, text });
         });
         results[org].llmBreakdown['GPT-4o mini'] = {
           mentions: count, total: queriesUsed.length
@@ -117,7 +117,7 @@ async function runAEO(cfg, orgs, cb) {
             count++;
             if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
           }
-          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Perplexity', cited: mentioned });
+          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Perplexity', cited: mentioned, text });
         });
         results[org].llmBreakdown['Perplexity'] = {
           mentions: count, total: queriesUsed.length
@@ -151,7 +151,7 @@ async function runAEO(cfg, orgs, cb) {
             count++;
             if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
           }
-          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Gemini', cited: mentioned });
+          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Gemini', cited: mentioned, text });
         });
         results[org].llmBreakdown['Gemini 1.5 Flash'] = {
           mentions: count, total: queriesUsed.length
@@ -285,10 +285,55 @@ function buildAEOHtml(aeoResults, orgs) {
       const label = total === 0 ? `${org} —` : citedCount > 0 ? `${org} ✓ ${citedCount}/${total}` : `${org} ✗ 0/${total}`;
       return `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:${col};background:${bg};border:1px solid ${bdr};border-radius:3px;padding:1px 6px">${escHtml(label)}</span>`;
     }).join('');
+
+    // Deep-link URLs to re-run the same query in each LLM's web UI
+    const llmLinks = {
+      'GPT-4o':     `https://chatgpt.com/?q=${encodeURIComponent(q)}`,
+      'Perplexity': `https://www.perplexity.ai/search?q=${encodeURIComponent(q)}`,
+      'Gemini':     `https://gemini.google.com/app?q=${encodeURIComponent(q)}`,
+    };
+
+    // Collect unique LLM responses for this query (one entry per LLM, full text)
+    const llmResponsesMap = {};
+    for (const org of orgs) {
+      const qResults = aeoResults[org]?.questionResults?.[qKey] || [];
+      for (const r of qResults) {
+        if (r.text && !llmResponsesMap[r.llm]) {
+          llmResponsesMap[r.llm] = r.text;
+        }
+      }
+    }
+    const llmResponseBlocks = Object.entries(llmResponsesMap).map(([llm, text]) => {
+      let highlighted = escHtml(text);
+      for (const org of orgs) {
+        const re = new RegExp(escHtml(org).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        highlighted = highlighted.replace(re, `<strong style="color:#c9922a">$&</strong>`);
+      }
+      const openLink = llmLinks[llm] ? `<a href="${llmLinks[llm]}" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none;margin-left:8px">↗ open in ${llm}</a>` : '';
+      return `<div style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;margin-bottom:4px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">${escHtml(llm)}</span>
+          ${openLink}
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.65;background:#0a0e17;border:1px solid #252d40;border-radius:5px;padding:10px 12px;white-space:pre-wrap">${highlighted}</div>
+      </div>`;
+    }).join('');
+
+    const detailsBlock = llmResponseBlocks ? `
+    <details style="margin-top:6px">
+      <summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;user-select:none;list-style:none;display:inline-flex;align-items:center;gap:4px">
+        <span style="color:#c9922a">▶</span> View captured responses
+      </summary>
+      <div style="margin-top:8px;border-left:2px solid #252d40;padding-left:12px">${llmResponseBlocks}</div>
+    </details>` : '';
+
     return `
-    <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #252d40;align-items:flex-start;font-size:12px">
-      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q${qi + 1}</span>
-      <div style="color:#8fa3b8;flex:1;line-height:1.55">${escHtml(q)} <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px">${badges}</span></div>
+    <div style="padding:9px 0;border-bottom:1px solid #252d40;font-size:12px">
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q${qi + 1}</span>
+        <div style="color:#8fa3b8;flex:1;line-height:1.55">${escHtml(q)} <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px">${badges}</span></div>
+      </div>
+      ${detailsBlock ? `<div style="padding-left:32px">${detailsBlock}</div>` : ''}
     </div>`;
   };
 
