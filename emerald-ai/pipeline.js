@@ -2766,66 +2766,51 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
       });
     });
 
-    const headerCols = ORGS.map((o, i) =>
-      `<th style="text-align:left;padding:10px 16px;font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${orgHex(i)}">${esc(o)}</th>`,
-    ).join("");
-
-    const rows = TOPICS.map((tk) => {
-      const displayName = topicDisplayNames[tk] || tk;
-      const subtitle = topicSubtitles[tk] || "";
-
-      const orgCells = ORGS.map((org, i) => {
-        const cv = data[org]?.topicCounts[tk] || 0;
-        const label = cv >= 5 ? "Leader" : cv >= 2 ? "Active" : "Not Present";
-        const [bgCol, borderCol, textCol] =
-          cv >= 5
-            ? ["rgba(74,222,128,.10)", "rgba(74,222,128,.30)", "#4ade80"]
-            : cv >= 2
-              ? ["rgba(251,191,36,.10)", "rgba(251,191,36,.30)", "#fbbf24"]
-              : ["rgba(100,116,139,.10)", "rgba(100,116,139,.25)", "var(--muted)"];
-        const badge = `<div style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:4px;background:${bgCol};border:1px solid ${borderCol};margin-bottom:9px"><span style="font-family:monospace;font-size:11px;font-weight:700;color:${textCol}">${label} &middot; ${cv} article${cv !== 1 ? "s" : ""}</span></div>`;
-
-        const artList = topicArts[tk][org] || [];
-        let body = "";
-        if (cv === 0) {
-          body = `<div style="font-size:11px;color:var(--muted)">No ${esc(org)} coverage on this topic in period</div>`;
-        } else if (cv === 1) {
-          const a = artList[0] || {};
-          const src = a.outlet || "";
-          const dt = (a.date || "").replace(/,?\s*\d{4}$/, "");
-          const titlePart = a.title ? ` — ${esc(a.title)}` : "";
-          const srcPart = [src, dt].filter(Boolean).join(", ");
-          body = `<div style="font-size:11px;color:var(--muted);line-height:1.55">One peripheral mention${titlePart}${srcPart ? ` (${esc(srcPart)})` : ""}</div>`;
-        } else {
-          const snippets = artList.slice(0, 2).map((a) => {
-            const src = a.outlet || "";
-            const dt = (a.date || "").replace(/,?\s*\d{4}$/, "");
-            const srcPart = [src, dt].filter(Boolean).join(", ");
-            return a.title
-              ? `&ldquo;${esc(a.title)}&rdquo;${srcPart ? ` (${esc(srcPart)})` : ""}`
-              : srcPart ? `(${esc(srcPart)})` : "";
-          }).filter(Boolean);
-          body = `<div style="font-size:11px;color:#94a3b8;line-height:1.6">${snippets.join(" &middot; ")}</div>`;
-        }
-
-        let sourcesBtn = "";
-        if (cv >= 2) {
-          const srcId = `src${org.replace(/\W/g, "")}${tk.replace(/\W/g, "")}`;
-          const srcLinks = artList.map((a) =>
-            a.url
-              ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.title || a.url)}</a>`
-              : `<div style="font-size:10px;color:var(--muted);padding:2px 0">${esc(a.title || a.outlet || "")}</div>`,
-          ).join("");
-          sourcesBtn = `<div style="margin-top:8px"><a class="ctag" onclick="td('${srcId}')" style="cursor:pointer;font-size:10px;padding:3px 8px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.25);border-radius:3px;color:var(--amber);font-weight:700;text-decoration:none">&#8599; sources</a><div class="evd" id="${srcId}" style="padding:8px 0;border:none;max-height:220px;overflow-y:auto">${srcLinks}</div></div>`;
-        }
-
-        return `<td style="padding:14px 16px;vertical-align:top;border-bottom:1px solid var(--border)">${badge}${body}${sourcesBtn}</td>`;
-      }).join("");
-
-      return `<tr><td style="padding:14px 16px;vertical-align:top;border-bottom:1px solid var(--border);min-width:170px;max-width:200px"><div style="font-size:13px;font-weight:700;color:var(--text)">${esc(displayName)}</div><div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.45">${esc(subtitle)}</div></td>${orgCells}</tr>`;
+    // Transposed: orgs as rows, topics as columns
+    const theadTopics = TOPICS.map((tk) => {
+      const dn = topicDisplayNames[tk] || tk;
+      const sub = topicSubtitles[tk] || "";
+      return `<th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="${esc(sub)}">${esc(dn)}</th>`;
     }).join("");
 
-    return `<div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;overflow:hidden"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--surface2)"><th style="text-align:left;padding:10px 16px;font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">AQ SUB-TOPIC</th>${headerCols}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    const tbodyRows = ORGS.map((org, i) => {
+      const orgCells = TOPICS.map((tk) => {
+        const artList = topicArts[tk][org] || [];
+        const cv = artList.length;
+        const label = cv >= 5 ? "Leader" : cv >= 2 ? "Active" : "Not Present";
+        const [bgCol, borderCol, textCol] = cv >= 5
+          ? ["rgba(74,222,128,.10)", "rgba(74,222,128,.30)", "#4ade80"]
+          : cv >= 2
+            ? ["rgba(251,191,36,.10)", "rgba(251,191,36,.30)", "#fbbf24"]
+            : ["rgba(100,116,139,.06)", "rgba(100,116,139,.15)", "var(--muted)"];
+        if (cv === 0) {
+          return `<td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td>`;
+        }
+        const uid = `tm${org.replace(/\W/g,"")}${tk.replace(/\W/g,"")}`;
+        const srcLinks = artList.map((a) =>
+          a.url
+            ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.title||a.url)}</a>`
+            : `<div style="font-size:10px;color:var(--muted);padding:2px 0">${esc(a.title||"")}</div>`
+        ).join("");
+        return `<td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top">
+          <div style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:3px;background:${bgCol};border:1px solid ${borderCol};margin-bottom:5px;white-space:nowrap">
+            <span style="font-family:monospace;font-size:10px;font-weight:700;color:${textCol}">${label} &middot; ${cv}</span>
+          </div>
+          <div><a class="ctag" onclick="td('${uid}')" style="cursor:pointer;font-size:10px;padding:2px 6px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.25);border-radius:3px;color:var(--amber);font-weight:700;text-decoration:none">&#8599; sources</a><div class="evd" id="${uid}" style="padding:4px 0;border:none;max-height:200px;overflow-y:auto">${srcLinks}</div></div>
+        </td>`;
+      }).join("");
+      return `<tr>
+        <td style="padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1">
+          <span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span>
+        </td>
+        ${orgCells}
+      </tr>`;
+    }).join("");
+
+    return `<div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;overflow:hidden"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--surface2)">
+      <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Org</th>
+      ${theadTopics}
+    </tr></thead><tbody>${tbodyRows}</tbody></table></div>`;
   }
 
   function narrTable() {

@@ -209,98 +209,66 @@ function buildAEOHtml(aeoResults, orgs) {
     }
   });
 
-  const orgPanels = sortedOrgs.map(({ org, oi, m, rank }) => {
-    const col = orgColorList[oi % orgColorList.length];
-    const d = aeoResults[org] || { mentions: 0, llmBreakdown: {}, topResponse: '', questionResults: {} };
-    const barW = Math.round((m / maxMentions) * 100);
-    const isGood = m > 0;
-
-    const llmRows = Object.entries(d.llmBreakdown).map(([llm, v]) => `
-      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #252d40">
-        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8fa3b8;width:130px;flex-shrink:0">${escHtml(llm)}</span>
-        <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden">
-          <div style="height:100%;border-radius:3px;background:${col};width:${Math.round((v.mentions / Math.max(v.total, 1)) * 100)}%"></div>
-        </div>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:${col};width:38px;text-align:right">${v.mentions}/${v.total}</span>
-      </div>`).join('');
-
-    const noticeColor = isGood ? 'rgba(76,175,116,.06)' : 'rgba(224,92,92,.06)';
-    const noticeBorder = isGood ? 'rgba(76,175,116,.2)' : 'rgba(224,92,92,.2)';
-    const noticeTextCol = isGood ? '#4caf74' : '#e05c5c';
-    const noticeText = isGood
-      ? `<strong style="color:${noticeTextCol}">Consistent presence.</strong> ${escHtml(org)} cited in ${m} LLM responses across all models.`
-      : `<strong style="color:${noticeTextCol}">Visibility gap.</strong> ${escHtml(org)} not cited in any LLM responses.`;
-
-    return `
-    <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:20px;border-top:2px solid ${col};display:flex;gap:20px;align-items:flex-start">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;color:#2e3a52;flex-shrink:0;width:36px;padding-top:2px">#${rank}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${col};margin-bottom:14px">${escHtml(org)}</div>
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-          <div style="flex:1">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:32px;line-height:1;font-weight:700;color:${col}">${m}</div>
-            <div style="font-size:12px;color:#8fa3b8;margin-top:4px;margin-bottom:8px">LLM mentions across all models</div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden">
-                <div style="height:100%;border-radius:3px;background:${col};width:${barW}%"></div>
-              </div>
-              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">${barW}% vs top</span>
-            </div>
-          </div>
-        </div>
-        <div style="margin-bottom:12px">${llmRows || '<div style="font-size:11px;color:#5e7494">No LLM keys provided</div>'}</div>
-        ${d.topResponse ? `
-        <div style="background:#0a0e17;border:1px solid #2e3a52;border-left:2px solid #c9922a;border-radius:0 5px 5px 0;padding:10px 12px;margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#8fa3b8;line-height:1.65">
-          <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#c9922a;margin-bottom:5px">Example LLM response</div>
-          &ldquo;${escHtml(d.topResponse)}&rdquo;
-        </div>` : ''}
-        <div style="background:${noticeColor};border:1px solid ${noticeBorder};border-radius:6px;padding:10px 14px;font-size:12px;color:#8fa3b8;margin-top:12px;line-height:1.6">${noticeText}</div>
-      </div>
-    </div>`;
-  }).join('');
-
   const queriesUsed = aeoResults._queriesUsed || AEO_QUESTIONS;
 
-  // Split queries: those where ≥1 org was mentioned vs complete blanks
-  const queriesWithHits = [];
-  const queriesWithZero = [];
-  queriesUsed.forEach((q, qi) => {
+  // ── Summary table: orgs as rows, LLMs as columns ─────────────────────────
+  const allLlms = [...new Set(
+    orgs.flatMap(o => Object.keys(aeoResults[o]?.llmBreakdown || {}))
+  )];
+
+  const summaryTable = `<div style="overflow-x:auto;border:1px solid #252d40;border-radius:8px;margin-bottom:20px;overflow:hidden">
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead>
+      <tr style="background:#181e2e">
+        <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">Rank</th>
+        <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494">Org</th>
+        <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
+        ${allLlms.map(llm => `<th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">${escHtml(llm)}</th>`).join('')}
+      </tr>
+    </thead>
+    <tbody>
+      ${sortedOrgs.map(({ org, oi, m, rank }) => {
+        const col = orgColorList[oi % orgColorList.length];
+        const d = aeoResults[org] || { llmBreakdown: {} };
+        const maxQ = queriesUsed ? queriesUsed.length : 1;
+        return `<tr style="border-top:1px solid #252d40">
+          <td style="padding:10px 14px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#2e3a52">#${rank}</td>
+          <td style="padding:10px 14px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${col}">${escHtml(org)}</span></td>
+          <td style="padding:10px 14px;text-align:center">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:${col}">${m}</span>
+            <div style="margin:4px auto;width:80px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:${col};width:${Math.round((m/maxMentions)*100)}%"></div></div>
+          </td>
+          ${allLlms.map(llm => {
+            const v = d.llmBreakdown?.[llm] || { mentions: 0, total: maxQ };
+            const pct = Math.round((v.mentions / Math.max(v.total, 1)) * 100);
+            const tc = v.mentions === v.total && v.total > 0 ? '#4caf74' : v.mentions > 0 ? '#d4a017' : '#5e7494';
+            return `<td style="padding:10px 14px;text-align:center">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${tc}">${v.mentions}/${v.total}</span>
+              <div style="margin:3px auto;width:60px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:${tc};width:${pct}%"></div></div>
+            </td>`;
+          }).join('')}
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>
+</div>`;
+
+  // ── Q×Org matrix table ────────────────────────────────────────────────────
+  const llmLinks = {
+    'GPT-4o':     (q) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`,
+    'Perplexity': (q) => `https://www.perplexity.ai/search?q=${encodeURIComponent(q)}`,
+    'Gemini':     (q) => `https://gemini.google.com/app?q=${encodeURIComponent(q)}`,
+  };
+
+  const qMatrixRows = queriesUsed.map((q, qi) => {
     const qKey = `Q${qi + 1}`;
-    const anyMentioned = orgs.some(org =>
-      (aeoResults[org]?.questionResults?.[qKey] || []).some(r => r.cited)
-    );
-    if (anyMentioned) queriesWithHits.push({ q, qi });
-    else              queriesWithZero.push({ q, qi });
-  });
+    const anyMentioned = orgs.some(o => (aeoResults[o]?.questionResults?.[qKey] || []).some(r => r.cited));
 
-  const makeQRow = ({ q, qi }) => {
-    const qKey = `Q${qi + 1}`;
-    const badges = orgs.map(org => {
-      const qResults = aeoResults[org]?.questionResults?.[qKey] || [];
-      const citedCount = qResults.filter(r => r.cited).length;
-      const total = qResults.length;
-      const col = total === 0 ? '#5e7494' : citedCount === total ? '#4caf74' : citedCount > 0 ? '#d4a017' : '#5e7494';
-      const bg  = total === 0 ? '#1e2638' : citedCount === total ? 'rgba(76,175,116,.1)' : citedCount > 0 ? 'rgba(212,160,23,.1)' : '#1e2638';
-      const bdr = total === 0 ? '#252d40' : citedCount === total ? 'rgba(76,175,116,.25)' : citedCount > 0 ? 'rgba(212,160,23,.25)' : '#252d40';
-      const label = total === 0 ? `${org} —` : citedCount > 0 ? `${org} ✓ ${citedCount}/${total}` : `${org} ✗ 0/${total}`;
-      return `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:${col};background:${bg};border:1px solid ${bdr};border-radius:3px;padding:1px 6px">${escHtml(label)}</span>`;
-    }).join('');
-
-    // Deep-link URLs to re-run the same query in each LLM's web UI
-    const llmLinks = {
-      'GPT-4o':     `https://chatgpt.com/?q=${encodeURIComponent(q)}`,
-      'Perplexity': `https://www.perplexity.ai/search?q=${encodeURIComponent(q)}`,
-      'Gemini':     `https://gemini.google.com/app?q=${encodeURIComponent(q)}`,
-    };
-
-    // Collect unique LLM responses for this query (one entry per LLM, full text)
+    // Collect unique LLM responses for this query
     const llmResponsesMap = {};
     for (const org of orgs) {
-      const qResults = aeoResults[org]?.questionResults?.[qKey] || [];
-      for (const r of qResults) {
-        if (r.text && !llmResponsesMap[r.llm]) {
-          llmResponsesMap[r.llm] = r.text;
-        }
+      for (const r of (aeoResults[org]?.questionResults?.[qKey] || [])) {
+        if (r.text && !llmResponsesMap[r.llm]) llmResponsesMap[r.llm] = r.text;
       }
     }
     const llmResponseBlocks = Object.entries(llmResponsesMap).map(([llm, text]) => {
@@ -309,76 +277,69 @@ function buildAEOHtml(aeoResults, orgs) {
         const re = new RegExp(escHtml(org).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
         highlighted = highlighted.replace(re, `<strong style="color:#c9922a">$&</strong>`);
       }
-      const openLink = llmLinks[llm] ? `<a href="${llmLinks[llm]}" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none;margin-left:8px">↗ open in ${llm}</a>` : '';
-      return `<div style="margin-bottom:12px">
-        <div style="display:flex;align-items:center;margin-bottom:4px">
+      const openHref = llmLinks[llm] ? llmLinks[llm](q) : '#';
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
           <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">${escHtml(llm)}</span>
-          ${openLink}
+          <a href="${openHref}" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
         </div>
-        <div style="font-size:11px;color:#8fa3b8;line-height:1.65;background:#0a0e17;border:1px solid #252d40;border-radius:5px;padding:10px 12px;white-space:pre-wrap">${highlighted}</div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">${highlighted}</div>
       </div>`;
     }).join('');
 
-    const detailsBlock = llmResponseBlocks ? `
-    <details style="margin-top:6px">
-      <summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;user-select:none;list-style:none;display:inline-flex;align-items:center;gap:4px">
-        <span style="color:#c9922a">▶</span> View captured responses
-      </summary>
-      <div style="margin-top:8px;border-left:2px solid #252d40;padding-left:12px">${llmResponseBlocks}</div>
-    </details>` : '';
+    const orgCells = orgs.map(org => {
+      const qResults = aeoResults[org]?.questionResults?.[qKey] || [];
+      const cited = qResults.filter(r => r.cited).length;
+      const total = qResults.length;
+      if (total === 0) return `<td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40"><span style="color:#2e3a52;font-size:12px">—</span></td>`;
+      const tc  = cited === total ? '#4caf74' : cited > 0 ? '#d4a017' : '#5e7494';
+      const sym = cited > 0 ? '✓' : '✗';
+      return `<td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${tc}">${sym} ${cited}/${total}</span>
+      </td>`;
+    }).join('');
 
-    return `
-    <div style="padding:9px 0;border-bottom:1px solid #252d40;font-size:12px">
-      <div style="display:flex;gap:14px;align-items:flex-start">
-        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#c9922a;flex-shrink:0;width:18px;padding-top:2px">Q${qi + 1}</span>
-        <div style="color:#8fa3b8;flex:1;line-height:1.55">${escHtml(q)} <span style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:8px">${badges}</span></div>
-      </div>
-      ${detailsBlock ? `<div style="padding-left:32px">${detailsBlock}</div>` : ''}
-    </div>`;
-  };
+    const detailsBlock = llmResponseBlocks
+      ? `<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px">${llmResponseBlocks}</div></details>`
+      : '';
 
-  const hitRows  = queriesWithHits.map(makeQRow).join('');
-  const gapBlock = queriesWithZero.length ? `
-  <div style="background:rgba(224,92,92,.04);border:1px solid rgba(224,92,92,.15);border-radius:8px;padding:16px 18px;margin-top:16px">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#e05c5c;margin-bottom:4px">
-      Content &amp; Visibility Gaps — ${queriesWithZero.length} Topics with Zero Mentions
-    </div>
-    <div style="font-size:12px;color:#8fa3b8;margin-bottom:12px;line-height:1.65;max-width:680px">
-      None of the tracked organisations appeared in LLM responses to these ${queriesWithZero.length} queries.
-      This is a strategic opportunity — organisations that publish credible, citable content on these specific topics
-      could own these AI citations. Right now, <strong style="color:#e05c5c">no one does</strong>.
-    </div>
-    ${queriesWithZero.map(({ q, qi }) => `
-    <div style="display:flex;gap:14px;padding:8px 0;border-bottom:1px solid rgba(224,92,92,.08);align-items:flex-start">
-      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#e05c5c;flex-shrink:0;width:18px;padding-top:2px">Q${qi + 1}</span>
-      <div style="flex:1">
-        <div style="font-size:12px;color:#8fa3b8;line-height:1.55;margin-bottom:4px">${escHtml(q)}</div>
-        <div style="font-size:11px;color:#5e7494">→ Publish a report, brief, or data update addressing this specific question to capture AI visibility</div>
-      </div>
-    </div>`).join('')}
-  </div>` : '';
+    return `<tr style="border-top:1px solid #252d40${anyMentioned ? '' : ';opacity:.5'}">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:${anyMentioned ? '#c9922a' : '#5e7494'};white-space:nowrap;vertical-align:top">Q${qi+1}</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">${escHtml(q)}${detailsBlock}</td>
+      ${orgCells}
+    </tr>`;
+  }).join('');
+
+  const orgHeaderCells = orgs.map((org, oi) => {
+    const col = orgColorList[oi % orgColorList.length];
+    return `<th style="padding:10px 12px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${col};border-left:1px solid #252d40;white-space:nowrap">${escHtml(org)}</th>`;
+  }).join('');
+
+  const qMatrix = `<div style="overflow-x:auto;border:1px solid #252d40;border-radius:8px;overflow:hidden;margin-bottom:12px">
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead>
+      <tr style="background:#181e2e">
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">Q#</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494">Question sent to LLMs</th>
+        ${orgHeaderCells}
+      </tr>
+    </thead>
+    <tbody>${qMatrixRows}</tbody>
+  </table>
+</div>`;
 
   return `
 <section style="margin-bottom:56px;scroll-margin-top:24px" id="aeo">
   <div style="margin-bottom:24px">
     <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#5e7494;margin-bottom:6px">AEO — LLM Visibility</div>
     <h2 style="font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;color:#d8e4f0;line-height:1.2">AI Engine Optimisation</h2>
-    <div style="margin-top:8px;font-size:13px;color:#8fa3b8;max-width:680px;line-height:1.65">When someone asks an AI model about Indian air quality, which organisations does it cite? ${queriesUsed.length} discovery questions were sent to three LLMs. The metric is the raw number of LLM mentions — no score out of 100, no grades. Contributes 30% of the Competitive Scorecard.</div>
+    <div style="margin-top:8px;font-size:13px;color:#8fa3b8;max-width:680px;line-height:1.65">When someone asks an AI model about Indian air quality, which organisations does it cite? ${queriesUsed.length} questions sent to ${allLlms.length} LLMs. Each mention = 1. Max possible per org = ${queriesUsed.length * allLlms.length}. ✓ = cited · ✗ = not cited · dim rows = zero mentions across all orgs.</div>
     <div style="width:40px;height:2px;background:#c9922a;margin:14px 0 0"></div>
   </div>
-  <div style="background:rgba(201,146,42,.06);border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:14px 18px;font-size:12px;color:#8fa3b8;margin-bottom:20px;line-height:1.7">
-    <strong style="color:#c9922a">How AEO is measured:</strong> ${queriesUsed.length} discovery questions sent to GPT-4o mini, Perplexity Sonar, and Gemini 1.5 Flash. Each response that names the organisation = <strong style="color:#c9922a">1 mention</strong>. Total possible responses per org = ${queriesUsed.length * 3}.
-  </div>
-  <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">${orgPanels}</div>
-  <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:16px 18px;margin-bottom:12px">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#c9922a;margin-bottom:2px">
-      AEO Queries with Org Mentions (${queriesWithHits.length} of ${queriesUsed.length})
-    </div>
-    <div style="font-size:10px;color:#5e7494;margin-bottom:10px">Queries where at least one tracked organisation was cited by an LLM.</div>
-    ${hitRows || '<div style="font-size:12px;color:#5e7494;padding:8px 0">No org mentions found across any queries.</div>'}
-    ${gapBlock}
-  </div>
-  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">GPT-4o mini · Perplexity Sonar · Gemini 1.5 Flash · ${queriesUsed.length} questions × 3 LLMs = ${queriesUsed.length * 3} responses per org</div>
+  ${summaryTable}
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;margin-bottom:8px">Question × Organisation Matrix</div>
+  ${qMatrix}
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">${allLlms.join(' · ')} · ${queriesUsed.length} questions</div>
 </section>`;
 }
 

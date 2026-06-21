@@ -187,137 +187,122 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   const maxPosts = Math.max(...erResults.map(r => r.totalPosts), 1);
   const maxYtVids = Math.max(...ytResults.map(r => r.videoCount || 0), 1);
 
-  const orgRows = erResults.map(r => {
-    const yt       = ytResults.find(y => y.org === r.org) || { videoCount: 0, videos: [], totalViews: 0, totalLikes: 0, totalComments: 0, avgER: 0, avgViewER: 0, erMethod: 'none' };
-    const hasData  = r.totalPosts > 0;
-    const col      = scoreColor(r.presenceScore);
-    const liPct    = Math.round((r.linkedinPosts / maxPosts) * 100);
-    const xPct     = Math.round((r.twitterPosts  / maxPosts) * 100);
-    const igPct    = Math.round(((r.instagramPosts || 0) / maxPosts) * 100);
-    const ytPct    = Math.round(((yt.videoCount || 0) / maxYtVids) * 100);
-    const bd       = r.scoreBreakdown;
+  // ── Summary table: orgs as rows ──────────────────────────────────────────
+  const summaryTable = `<div style="overflow-x:auto;border:1px solid #252d40;border-radius:8px;margin-bottom:20px;overflow:hidden">
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead>
+      <tr style="background:#181e2e">
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">Rank</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494">Org</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Score</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">Volume</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Breadth</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap">Relevance</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${erResults.map(r => {
+        const yt  = ytResults.find(y => y.org === r.org) || { videoCount: 0 };
+        const col = scoreColor(r.presenceScore);
+        const bd  = r.scoreBreakdown;
+        return `<tr style="border-top:1px solid #252d40">
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#2e3a52">#${r.rank}</td>
+          <td style="padding:8px 12px"><span style="font-family:monospace;font-size:11px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
+          <td style="padding:8px 12px;text-align:center">
+            <span style="font-family:monospace;font-size:15px;font-weight:700;color:${col}">${r.presenceScore}</span>
+            <span style="font-size:10px;color:#5e7494">/10</span>
+            <div style="margin:3px auto;width:60px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:${col};width:${Math.round(r.presenceScore/10*100)}%"></div></div>
+          </td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4a7fd4">${r.linkedinPosts}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4a9fd4">${r.twitterPosts}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#e53935">${yt.videoCount || 0}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px;color:#4a9fd4">${bd.volume.pts}/4</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px;color:#c9922a">${bd.breadth.pts}/3</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px;color:#4caf74">${bd.relevance.pts}/3</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>
+</div>`;
+
+  // ── Per-org collapsible detail sections ───────────────────────────────────
+  const orgDetails = erResults.map(r => {
+    const yt  = ytResults.find(y => y.org === r.org) || { videoCount: 0, videos: [], avgER: 0, avgViewER: 0, erMethod: 'none', totalViews: 0 };
+    const col = scoreColor(r.presenceScore);
 
     const postSnippets = (platform, items, linkCol) => items.slice(0, 1).map(s => `
-      <div style="margin-top:7px;padding:7px 10px;background:#0a0e17;border-left:2px solid #252d40;border-radius:0 4px 4px 0">
+      <div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #252d40;border-radius:0 4px 4px 0;margin-top:5px">
         <div style="font-size:11px;color:#8fa3b8;line-height:1.5">${escHtml((s.title || s.snippet || '').slice(0, 120))}</div>
         ${s.link ? `<a href="${escHtml(s.link)}" style="font-size:10px;color:${linkCol};text-decoration:none;display:inline-block;margin-top:3px" target="_blank">↗ ${platform}</a>` : ''}
       </div>`).join('');
 
-    // All YouTube videos sorted by views descending
     const sortedYtVideos = [...(yt.videos || [])].sort((a, b) => (b.views ?? -1) - (a.views ?? -1));
     const hasApiMetrics  = sortedYtVideos.some(v => v.views !== null);
-    // ER method label — makes explicit what the number means
-    const erMethodLabel = yt.erMethod === 'subscriber'
-      ? 'Video ER vs channel subscribers = (likes+comments) ÷ subscribers × 100'
-      : yt.erMethod === 'view'
-        ? 'Video ER vs view count = (likes+comments) ÷ views × 100 (subscriber count hidden)'
-        : null;
     const avgER = yt.avgER || yt.avgViewER || 0;
+    const erMethodLabel = yt.erMethod === 'subscriber'
+      ? 'ER = (likes+comments) ÷ subscribers × 100'
+      : yt.erMethod === 'view'
+        ? 'ER = (likes+comments) ÷ views × 100 (subscriber count hidden)'
+        : null;
 
-    const ytSection = yt.videoCount > 0
-      ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e2638">
-          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px">
-            <div style="font-size:10px;color:#5e7494;text-transform:uppercase;letter-spacing:.08em">
-              YouTube <span style="color:#e53935">${yt.videoCount} video${yt.videoCount === 1 ? '' : 's'} mentioning ${escHtml(r.org)}</span>${yt.totalViews > 0 ? ` &middot; ${yt.totalViews.toLocaleString()} total views` : ''}
-            </div>
-            ${avgER > 0 ? `<div style="font-family:monospace;font-size:10px;color:#e53935;background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.2);border-radius:4px;padding:1px 7px">
-              avg ER ${avgER}%
-            </div>` : ''}
+    const ytVideosHtml = sortedYtVideos.map((v, idx) => {
+      const metricsStr = v.views !== null
+        ? `${(v.views||0).toLocaleString()} views &middot; ${(v.likes||0).toLocaleString()} likes &middot; ${(v.comments||0).toLocaleString()} comments`
+        : '<span style="color:#5e7494">metrics unavailable</span>';
+      const erStr = (v.subscriberER !== null)
+        ? ` &middot; <span style="color:#e53935">ER ${v.subscriberER}% (sub)</span>`
+        : (v.viewER !== null)
+          ? ` &middot; <span style="color:#e05c5c">ER ${v.viewER}% (view)</span>`
+          : '';
+      return `<div style="padding:6px 10px;background:#0a0e17;border-left:2px solid ${idx === 0 ? '#e53935' : '#1e2638'};border-radius:0 4px 4px 0;margin-bottom:4px">
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <span style="font-family:monospace;font-size:9px;color:#3a4a5e;flex-shrink:0;margin-top:2px">#${idx+1}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;color:#8fa3b8;line-height:1.4;margin-bottom:2px">${escHtml((v.title || v.url || '').slice(0, 120))}</div>
+            <div style="font-family:monospace;font-size:9px;color:#5e7494">${metricsStr}${erStr}</div>
+            ${v.url ? `<a href="${escHtml(v.url)}" target="_blank" style="font-size:10px;color:#e53935;text-decoration:none;margin-top:2px;display:inline-block">↗ watch</a>` : ''}
           </div>
-          ${erMethodLabel ? `<div style="font-size:9.5px;color:#3a4a5e;margin-bottom:7px;font-style:italic">${escHtml(erMethodLabel)}</div>` : ''}
-          ${!hasApiMetrics ? `<div style="font-size:10px;color:#c9922a;margin-bottom:7px">
-            &#9432; View/like counts unavailable — enable <strong>YouTube Data API v3</strong> in Google Cloud Console for the configured API key.
-          </div>` : ''}
-          <div style="display:flex;flex-direction:column;gap:5px">
-            ${sortedYtVideos.map((v, idx) => {
-              const metricsStr = v.views !== null
-                ? `${(v.views||0).toLocaleString()} views &middot; ${(v.likes||0).toLocaleString()} likes &middot; ${(v.comments||0).toLocaleString()} comments`
-                : '<span style="color:#5e7494">metrics unavailable</span>';
-              const erStr = (v.subscriberER !== null)
-                ? `<span style="color:#e53935;font-size:9px"> &middot; ER ${v.subscriberER}% (sub-based)</span>`
-                : (v.viewER !== null)
-                  ? `<span style="color:#e05c5c;font-size:9px"> &middot; ER ${v.viewER}% (view-based)</span>`
-                  : '';
-              return `<div style="padding:6px 10px;background:#0a0e17;border-left:2px solid ${idx === 0 ? '#e53935' : '#1e2638'};border-radius:0 4px 4px 0">
-                <div style="display:flex;align-items:flex-start;gap:8px">
-                  <span style="font-family:monospace;font-size:9px;color:#3a4a5e;flex-shrink:0;margin-top:2px">#${idx+1}</span>
-                  <div style="flex:1;min-width:0">
-                    <div style="font-size:11px;color:#8fa3b8;line-height:1.45;margin-bottom:2px;word-break:break-word">${escHtml((v.title || v.url || '').slice(0, 120))}</div>
-                    <div style="font-family:monospace;font-size:9.5px;color:#5e7494">${metricsStr}${erStr}</div>
-                    ${v.url ? `<a href="${escHtml(v.url)}" target="_blank" style="font-size:10px;color:#e53935;text-decoration:none;display:inline-block;margin-top:3px">↗ watch</a>` : ''}
-                  </div>
-                </div>
-              </div>`;
-            }).join('')}
-          </div>
-        </div>`
-      : `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e2638;font-size:11px;color:#3a4a5e">No YouTube videos indexed in this period</div>`;
-
-    const noData = !hasData
-      ? `<div style="margin-top:8px;font-size:11px;color:#3a4a5e">No indexed posts found in this period</div>`
-      : '';
-
-    return `
-    <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:16px 20px;border-left:3px solid ${col}">
-      <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
-
-        <div style="flex-shrink:0;width:28px;font-family:monospace;font-size:14px;font-weight:700;color:#5e7494;padding-top:2px">#${r.rank}</div>
-
-        <div style="flex:1;min-width:200px">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-            <span style="font-family:monospace;font-size:12px;font-weight:700;color:#d8e4f0">${escHtml(r.org)}</span>
-            <span style="font-family:monospace;font-size:18px;font-weight:700;color:${col}">${r.presenceScore}<span style="font-size:11px;color:#5e7494">/10</span></span>
-          </div>
-
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;color:#5e7494">
-            <span><span style="font-family:monospace;font-weight:700;color:#4a7fd4">${r.linkedinPosts}</span> LI</span>
-            <span><span style="font-family:monospace;font-weight:700;color:#4a9fd4">${r.twitterPosts}</span> X</span>
-            <span><span style="font-family:monospace;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}</span> IG</span>
-            <span><span style="font-family:monospace;font-weight:700;color:#e53935">${yt.videoCount}</span> YT</span>
-          </div>
-
-          <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px">
-            ${[
-              { label: 'Volume',    pts: bd.volume.pts,    max: 4, detail: bd.volume.detail,    col: '#4a9fd4' },
-              { label: 'Breadth',   pts: bd.breadth.pts,   max: 3, detail: bd.breadth.detail,   col: '#c9922a' },
-              { label: 'Relevance', pts: bd.relevance.pts, max: 3, detail: bd.relevance.detail, col: '#4caf74' },
-            ].map(c => `
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:10px;color:#5e7494;width:62px;flex-shrink:0">${c.label}</span>
-              <div style="flex:1;height:5px;background:#1e2638;border-radius:3px;overflow:hidden">
-                <div style="height:100%;width:${Math.round(c.pts/c.max*100)}%;background:${c.col};border-radius:3px"></div>
-              </div>
-              <span style="font-family:monospace;font-size:10px;color:${c.col};width:28px;text-align:right">${c.pts}/${c.max}</span>
-              <span style="font-size:10px;color:#3a4a5e;flex-shrink:0">${c.detail}</span>
-            </div>`).join('')}
-          </div>
-
-          ${postSnippets('linkedin',  r.liResults || [], '#4a7fd4')}
-          ${postSnippets('x.com',     r.xResults  || [], '#4a9fd4')}
-          ${postSnippets('instagram', r.igResults  || [], '#e05c9c')}
-          ${noData}
-          ${ytSection}
         </div>
+      </div>`;
+    }).join('');
 
-        <div style="flex-shrink:0;min-width:140px">
-          <div style="font-size:10px;color:#5e7494;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Platform</div>
-          ${[
-            { label: 'LI', pct: liPct, count: r.linkedinPosts,         col: '#4a7fd4' },
-            { label: 'X',  pct: xPct,  count: r.twitterPosts,          col: '#4a9fd4' },
-            { label: 'IG', pct: igPct, count: r.instagramPosts || 0,    col: '#e05c9c' },
-            { label: 'YT', pct: ytPct, count: yt.videoCount || 0,       col: '#e53935' },
-          ].map(p => `
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-            <span style="font-family:monospace;font-size:10px;color:${p.col};width:20px">${p.label}</span>
-            <div style="flex:1;height:5px;background:#1e2638;border-radius:3px;overflow:hidden">
-              <div style="height:100%;width:${p.pct}%;background:${p.col};border-radius:3px"></div>
-            </div>
-            <span style="font-family:monospace;font-size:11px;font-weight:700;color:${p.col};width:16px;text-align:right">${p.count}</span>
-          </div>`).join('')}
-        </div>
+    const hasAnyPost = r.totalPosts > 0 || yt.videoCount > 0;
 
+    return `<details style="border:1px solid #252d40;border-radius:6px;margin-bottom:6px">
+      <summary style="padding:10px 14px;cursor:pointer;background:#181e2e;border-radius:6px;list-style:none;display:flex;align-items:center;gap:12px;user-select:none">
+        <span style="font-family:monospace;font-size:10px;font-weight:700;color:#2e3a52">#${r.rank}</span>
+        <span style="font-family:monospace;font-size:11px;font-weight:700;color:${col}">${escHtml(r.org)}</span>
+        <span style="font-family:monospace;font-size:12px;font-weight:700;color:${col}">${r.presenceScore}/10</span>
+        <span style="font-size:10px;color:#5e7494;margin-left:4px">
+          <span style="color:#4a7fd4">${r.linkedinPosts} LI</span> &middot;
+          <span style="color:#4a9fd4">${r.twitterPosts} X</span> &middot;
+          <span style="color:#e05c9c">${r.instagramPosts||0} IG</span> &middot;
+          <span style="color:#e53935">${yt.videoCount||0} YT</span>
+        </span>
+        <span style="color:#c9922a;font-size:11px;margin-left:auto">▾</span>
+      </summary>
+      <div style="padding:12px 14px;background:#0e1420">
+        ${!hasAnyPost ? '<div style="font-size:11px;color:#3a4a5e">No indexed posts found in this period</div>' : ''}
+        ${postSnippets('linkedin',  r.liResults || [], '#4a7fd4')}
+        ${postSnippets('x.com',     r.xResults  || [], '#4a9fd4')}
+        ${postSnippets('instagram', r.igResults  || [], '#e05c9c')}
+        ${yt.videoCount > 0 ? `
+        <div style="margin-top:10px">
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:5px">
+            <span style="font-size:10px;color:#5e7494;text-transform:uppercase;letter-spacing:.08em">YouTube — <span style="color:#e53935">${yt.videoCount} video${yt.videoCount===1?'':'s'}</span>${yt.totalViews>0 ? ` &middot; ${yt.totalViews.toLocaleString()} total views` : ''}</span>
+            ${avgER > 0 ? `<span style="font-family:monospace;font-size:10px;color:#e53935;background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.2);border-radius:4px;padding:1px 7px">avg ER ${avgER}%</span>` : ''}
+          </div>
+          ${erMethodLabel ? `<div style="font-size:9px;color:#3a4a5e;margin-bottom:5px;font-style:italic">${escHtml(erMethodLabel)}</div>` : ''}
+          ${!hasApiMetrics ? `<div style="font-size:10px;color:#c9922a;margin-bottom:6px">&#9432; Enable YouTube Data API v3 for view/like metrics.</div>` : ''}
+          ${ytVideosHtml}
+        </div>` : `<div style="margin-top:8px;font-size:11px;color:#3a4a5e">No YouTube videos indexed in this period</div>`}
       </div>
-    </div>`;
+    </details>`;
   }).join('');
 
   return `
@@ -340,7 +325,10 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
 
   ${ytKeyNotice}
 
-  <div style="display:flex;flex-direction:column;gap:10px">${orgRows}</div>
+  ${summaryTable}
+
+  <div style="font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;margin-bottom:8px">Per-Org Detail</div>
+  ${orgDetails}
 </section>`;
 }
 
