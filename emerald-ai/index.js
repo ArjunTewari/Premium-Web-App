@@ -6,6 +6,18 @@
  * GET  /download/:file → serves generated HTML/PPTX
  */
 
+// Load .env file without requiring the dotenv package
+try {
+  const _fs = require('fs'), _path = require('path');
+  const _envPath = _path.join(__dirname, '.env');
+  if (_fs.existsSync(_envPath)) {
+    _fs.readFileSync(_envPath, 'utf8').split('\n').forEach(line => {
+      const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.+?)\s*(?:#.*)?$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, '');
+    });
+  }
+} catch {}
+
 const express = require('express');
 const path    = require('path');
 const fs      = require('fs');
