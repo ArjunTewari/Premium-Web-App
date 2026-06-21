@@ -203,16 +203,53 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         ${s.link ? `<a href="${escHtml(s.link)}" style="font-size:10px;color:${linkCol};text-decoration:none;display:inline-block;margin-top:3px" target="_blank">↗ ${platform}</a>` : ''}
       </div>`).join('');
 
-    // Top YouTube video card
-    const topYtVideo = [...(yt.videos || [])].sort((a, b) => (b.views ?? 0) - (a.views ?? 0))[0];
+    // All YouTube videos sorted by views descending
+    const sortedYtVideos = [...(yt.videos || [])].sort((a, b) => (b.views ?? -1) - (a.views ?? -1));
+    const hasApiMetrics  = sortedYtVideos.some(v => v.views !== null);
+    // ER method label — makes explicit what the number means
+    const erMethodLabel = yt.erMethod === 'subscriber'
+      ? 'Video ER vs channel subscribers = (likes+comments) ÷ subscribers × 100'
+      : yt.erMethod === 'view'
+        ? 'Video ER vs view count = (likes+comments) ÷ views × 100 (subscriber count hidden)'
+        : null;
+    const avgER = yt.avgER || yt.avgViewER || 0;
+
     const ytSection = yt.videoCount > 0
       ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e2638">
-          <div style="font-size:10px;color:#5e7494;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">YouTube <span style="color:#e53935">${yt.videoCount} video${yt.videoCount === 1 ? '' : 's'}</span>${yt.totalViews > 0 ? ` &middot; ${yt.totalViews.toLocaleString()} views` : ''}</div>
-          ${topYtVideo ? `<div style="padding:7px 10px;background:#0a0e17;border-left:2px solid #e53935;border-radius:0 4px 4px 0">
-            <div style="font-size:11px;color:#8fa3b8;line-height:1.5;margin-bottom:3px">${escHtml((topYtVideo.title || topYtVideo.url || '').slice(0, 100))}</div>
-            <div style="font-family:monospace;font-size:10px;color:#5e7494">${topYtVideo.views !== null ? `${(topYtVideo.views||0).toLocaleString()} views · ${(topYtVideo.likes||0).toLocaleString()} likes` : '<span style="color:#c9922a">YouTube API key may need \'YouTube Data API v3\' enabled in Google Cloud Console</span>'}</div>
-            ${topYtVideo.url ? `<a href="${escHtml(topYtVideo.url)}" target="_blank" style="font-size:10px;color:#e53935;text-decoration:none;display:inline-block;margin-top:3px">↗ watch</a>` : ''}
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+            <div style="font-size:10px;color:#5e7494;text-transform:uppercase;letter-spacing:.08em">
+              YouTube <span style="color:#e53935">${yt.videoCount} video${yt.videoCount === 1 ? '' : 's'} mentioning ${escHtml(r.org)}</span>${yt.totalViews > 0 ? ` &middot; ${yt.totalViews.toLocaleString()} total views` : ''}
+            </div>
+            ${avgER > 0 ? `<div style="font-family:monospace;font-size:10px;color:#e53935;background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.2);border-radius:4px;padding:1px 7px">
+              avg ER ${avgER}%
+            </div>` : ''}
+          </div>
+          ${erMethodLabel ? `<div style="font-size:9.5px;color:#3a4a5e;margin-bottom:7px;font-style:italic">${escHtml(erMethodLabel)}</div>` : ''}
+          ${!hasApiMetrics ? `<div style="font-size:10px;color:#c9922a;margin-bottom:7px">
+            &#9432; View/like counts unavailable — enable <strong>YouTube Data API v3</strong> in Google Cloud Console for the configured API key.
           </div>` : ''}
+          <div style="display:flex;flex-direction:column;gap:5px">
+            ${sortedYtVideos.map((v, idx) => {
+              const metricsStr = v.views !== null
+                ? `${(v.views||0).toLocaleString()} views &middot; ${(v.likes||0).toLocaleString()} likes &middot; ${(v.comments||0).toLocaleString()} comments`
+                : '<span style="color:#5e7494">metrics unavailable</span>';
+              const erStr = (v.subscriberER !== null)
+                ? `<span style="color:#e53935;font-size:9px"> &middot; ER ${v.subscriberER}% (sub-based)</span>`
+                : (v.viewER !== null)
+                  ? `<span style="color:#e05c5c;font-size:9px"> &middot; ER ${v.viewER}% (view-based)</span>`
+                  : '';
+              return `<div style="padding:6px 10px;background:#0a0e17;border-left:2px solid ${idx === 0 ? '#e53935' : '#1e2638'};border-radius:0 4px 4px 0">
+                <div style="display:flex;align-items:flex-start;gap:8px">
+                  <span style="font-family:monospace;font-size:9px;color:#3a4a5e;flex-shrink:0;margin-top:2px">#${idx+1}</span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:11px;color:#8fa3b8;line-height:1.45;margin-bottom:2px;word-break:break-word">${escHtml((v.title || v.url || '').slice(0, 120))}</div>
+                    <div style="font-family:monospace;font-size:9.5px;color:#5e7494">${metricsStr}${erStr}</div>
+                    ${v.url ? `<a href="${escHtml(v.url)}" target="_blank" style="font-size:10px;color:#e53935;text-decoration:none;display:inline-block;margin-top:3px">↗ watch</a>` : ''}
+                  </div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
         </div>`
       : `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e2638;font-size:11px;color:#3a4a5e">No YouTube videos indexed in this period</div>`;
 

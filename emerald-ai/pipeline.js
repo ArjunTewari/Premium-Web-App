@@ -3278,7 +3278,7 @@ ${emergingCards}</section>
 ${SI.buildAEOHtml(aeoResults, ORGS)}
 ${socialERHtml}
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 07</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social (X/Twitter + YouTube combined). Formula shown in full.</div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 07</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social presence. <strong>YouTube ER</strong> = avg engagement rate of YouTube videos <em>mentioning</em> the org (not the org's own channel) — method: (likes+comments) ÷ subscribers × 100; falls back to ÷ views when subscriber count is hidden.</div><div class="sdiv"></div></div>
 <div class="scf" style="margin-bottom:20px"><strong>Score</strong> = (SoV&times;0.25)+(Citation&times;0.25)+(AEO&times;0.30)+(Social/10&times;20) &nbsp;&mdash;&nbsp; Social/10 = Presence score: Volume(0–4)+Breadth(0–3)+Relevance(0–3)<br>
 <span style="color:var(--muted)">${ORGS.map((o) => { const er = socialERResults.find(r => r.org === o); const yt = youtubeERResults.find(r => r.org === o); return `${esc(o)}: SoV=${data[o].sov} Cit=${data[o].dataPct}% AEO=${data[o].aeo} Social=${data[o].social}/10 (LI=${er?.linkedinPosts||0} X=${er?.twitterPosts||0} IG=${er?.instagramPosts||0}) YT=${yt?.videoCount||0}vids → Score=${data[o].score}`; }).join(" &middot; ")}</span></div>
 ${scorecards}</section>
