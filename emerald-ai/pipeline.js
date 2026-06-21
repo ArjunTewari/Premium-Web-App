@@ -996,6 +996,7 @@ ${txt}`;
     arts,
     aeoResults,
     socialERResults,
+    youtubeERResults,
     pptxFile,
     cfg,
   );
@@ -1013,6 +1014,8 @@ ${txt}`;
     cfg,
     socialERHtml,
     youtubeERHtml,
+    socialERResults,
+    youtubeERResults,
   );
   fs.writeFileSync(htmlFile, html, "utf8");
   cb(`  HTML: ${base}.html (${Math.round(html.length / 1024)}KB)`, "ok");
@@ -1054,6 +1057,7 @@ async function buildPPTX(
   arts,
   aeoResults,
   socialERResults,
+  youtubeERResults,
   outFile,
   cfg,
 ) {
@@ -2513,6 +2517,8 @@ function buildHTML(
   cfg,
   socialERHtml = "",
   youtubeERHtml = "",
+  socialERResults = [],
+  youtubeERResults = [],
 ) {
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
   const now = new Date().toUTCString();
