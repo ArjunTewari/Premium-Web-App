@@ -815,17 +815,17 @@ export default function Home() {
               ✓ Report ready
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              {/* Client report button (strips Action Matrix) */}
+              {/* Shareable report (strips Action Matrix) */}
               <button
                 onClick={() => downloadClientReport(result.htmlName)}
                 style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.green, color: C.bg, fontFamily: "'Space Grotesk', sans-serif", border: "none" }}
-              >⬇ Client Report</button>
-              {/* Admin report link (full report, includes Action Matrix) */}
+              >⬇ Shareable Report</button>
+              {/* Full report (includes Action Matrix) */}
               <a
                 href={`/api/download/${encodeURIComponent(result.htmlName)}`}
                 download={result.htmlName}
                 style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: "rgba(76,175,116,.15)", color: C.green, border: `1px solid rgba(76,175,116,.35)`, fontFamily: "'Space Grotesk', sans-serif" }}
-              >⬇ Admin (Full Report)</a>
+              >⬇ Full Report</a>
               {/* PowerPoint */}
               <a
                 href={`/api/download/${encodeURIComponent(result.pptxName)}`}
@@ -834,7 +834,7 @@ export default function Home() {
               >⬇ PowerPoint</a>
             </div>
             <div style={{ fontSize: 10, color: C.muted, marginTop: 8, fontFamily: "'DM Mono', monospace" }}>
-              Client Report excludes Action Matrix · Admin version is the full report
+              Shareable Report excludes Action Matrix · Full Report includes everything
             </div>
           </div>
         )}
@@ -892,19 +892,31 @@ export default function Home() {
                           </div>
                         </div>
                       </div>
-                      <a
-                        href={`/api/download/${encodeURIComponent(f.name)}`}
-                        download={f.name}
-                        style={{
-                          flexShrink: 0, marginLeft: 16,
-                          padding: "7px 16px", borderRadius: 8,
-                          background: "rgba(201,146,42,.12)", color: C.gold,
-                          border: `1px solid rgba(201,146,42,.25)`,
-                          fontSize: 12, fontWeight: 600, textDecoration: "none",
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          transition: "background .2s",
-                        }}
-                      >⬇ Download</a>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 16 }}>
+                        {f.name.endsWith(".html") && (
+                          <button
+                            onClick={() => downloadClientReport(f.name)}
+                            style={{
+                              padding: "7px 14px", borderRadius: 8,
+                              background: "rgba(76,175,116,.12)", color: C.green,
+                              border: `1px solid rgba(76,175,116,.25)`,
+                              fontSize: 12, fontWeight: 600, cursor: "pointer",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >⬇ Shareable</button>
+                        )}
+                        <a
+                          href={`/api/download/${encodeURIComponent(f.name)}`}
+                          download={f.name}
+                          style={{
+                            padding: "7px 14px", borderRadius: 8,
+                            background: "rgba(201,146,42,.12)", color: C.gold,
+                            border: `1px solid rgba(201,146,42,.25)`,
+                            fontSize: 12, fontWeight: 600, textDecoration: "none",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >{f.name.endsWith(".html") ? "⬇ Full" : "⬇ Download"}</a>
+                      </div>
                     </div>
                   ))}
                 </div>
