@@ -30,6 +30,7 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     OPENAI_KEY: body.openaiKey || process.env.OPENAI_KEY || "",
     PERPLEXITY_KEY: body.perplexityKey || process.env.PERPLEXITY_KEY || "",
     GEMINI_KEY: body.geminiKey || process.env.GEMINI_KEY || "",
+    YOUTUBE_KEY: process.env.YOUTUBE_KEY || "",
     TWITTER_KEY: process.env.TWITTER_KEY || "",
     outDir: OUT_DIR,
   };
