@@ -246,6 +246,7 @@ async function serperSearch(query, key, dateFrom, dateTo) {
       timeout: 15000,
     },
   );
+  costTracker.serperQueries++;
   return res.data.news || res.data.organic || [];
 }
 
@@ -261,6 +262,7 @@ async function serperWebSearch(query, key, dateFrom, dateTo) {
       timeout: 15000,
     },
   );
+  costTracker.serperQueries++;
   return (res.data.organic || []).map((r) => ({
     title: r.title || "",
     link: r.link || "",
@@ -280,6 +282,7 @@ async function serperScrape(url, key) {
         timeout: 15000,
       },
     );
+    costTracker.serperQueries++;
     return (res.data.text || res.data.content || "")
       .replace(/\s+/g, " ")
       .trim()
@@ -308,6 +311,11 @@ async function callClaude(prompt, key, maxTokens = 2500) {
       timeout: 60000,
     },
   );
+  const usage = res.data.usage;
+  if (usage) {
+    costTracker.claudeInputTokens += usage.input_tokens || 0;
+    costTracker.claudeOutputTokens += usage.output_tokens || 0;
+  }
   return res.data.content[0].text;
 }
 
@@ -490,6 +498,9 @@ function isThirdParty(url, orgName) {
   return true;
 }
 
+// ── Cost accumulator (reset per run) ──────────────────────────────────────
+const costTracker = { serperQueries: 0, claudeInputTokens: 0, claudeOutputTokens: 0 };
+
 // ══════════════════════════════════════════════════════════════════════════
 //  MAIN PIPELINE EXPORT
 // ══════════════════════════════════════════════════════════════════════════
@@ -497,6 +508,10 @@ async function run(cfg, cb) {
   // cfg: { ORGS[], DATE_FROM, DATE_TO, CLIENT_NAME, SERPER_KEY, CLAUDE_KEY, CLAUDE_MODEL,
   //         OPENAI_KEY?, PERPLEXITY_KEY?, GEMINI_KEY?, TWITTER_KEY?, YOUTUBE_KEY?, outDir }
   // cb(message, level) — streams log lines
+
+  costTracker.serperQueries = 0;
+  costTracker.claudeInputTokens = 0;
+  costTracker.claudeOutputTokens = 0;
 
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
 
@@ -1003,6 +1018,27 @@ ${txt}`;
   cb(`  HTML: ${base}.html (${Math.round(html.length / 1024)}KB)`, "ok");
 
   cb(`\n✓ Done — ${base}.html + ${pptxName}`, "ok");
+
+  const SERPER_COST_PER_QUERY = 0.001;
+  const CLAUDE_INPUT_COST_PER_M = 1.0;
+  const CLAUDE_OUTPUT_COST_PER_M = 5.0;
+  const USD_TO_INR = 84;
+  const serperCostUSD = costTracker.serperQueries * SERPER_COST_PER_QUERY;
+  const claudeCostUSD =
+    (costTracker.claudeInputTokens / 1_000_000) * CLAUDE_INPUT_COST_PER_M +
+    (costTracker.claudeOutputTokens / 1_000_000) * CLAUDE_OUTPUT_COST_PER_M;
+  const totalUSD = serperCostUSD + claudeCostUSD;
+  const totalINR = totalUSD * USD_TO_INR;
+  cb("cost", {
+    serperQueries: costTracker.serperQueries,
+    serperCostUSD: serperCostUSD.toFixed(4),
+    claudeInputTokens: costTracker.claudeInputTokens,
+    claudeOutputTokens: costTracker.claudeOutputTokens,
+    claudeCostUSD: claudeCostUSD.toFixed(4),
+    totalUSD: totalUSD.toFixed(4),
+    totalINR: Math.round(totalINR),
+  });
+
   return { htmlFile, pptxFile, htmlName: `${base}.html`, pptxName };
 }
 
@@ -3009,7 +3045,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social &amp; Digital</div><a href="#social" class="nav-a">Social Presence</a><a href="#youtube-er" class="nav-a">YouTube ER</a>
 <div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
-<div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>${navOrgs}CONFIDENTIAL</div></nav>
+<div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>${navOrgs}CONFIDENTIAL<br><span style="display:inline-block;margin-top:6px;padding:4px 8px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.3);border-radius:4px;color:var(--amber);font-weight:700">&#8377;${52 * ORGS.length}/month</span></div></nav>
 <main class="main">
 <header class="rh" id="header"><div class="ey">Air Quality Media Intelligence &middot; India &middot; ${esc(DATE_FROM)} to ${esc(DATE_TO)}</div>
 <h1 class="rt">Air Quality<br><span class="rti">TRIPLE Media Analytics</span></h1>
