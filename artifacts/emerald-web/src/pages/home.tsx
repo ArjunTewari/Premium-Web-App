@@ -146,6 +146,8 @@ export default function Home() {
   const [aeoEditIdx, setAeoEditIdx] = useState<number | null>(null);
   const [aeoEditVal, setAeoEditVal] = useState("");
 
+  const [activeTab, setActiveTab] = useState<"dashboard" | "reports">("dashboard");
+
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [progress, setProgress] = useState(0);
@@ -383,8 +385,8 @@ export default function Home() {
 
         {/* Nav */}
         <nav style={{ display: "flex", gap: 4 }}>
-          <a href="#" className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, color: C.goldLight, textDecoration: "none", background: "rgba(255,255,255,.06)", transition: "color .2s, background .2s" }}>Dashboard</a>
-          <a href="#" className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, color: C.muted, textDecoration: "none", transition: "color .2s, background .2s" }}>Reports</a>
+          <a onClick={() => setActiveTab("dashboard")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "dashboard" ? C.goldLight : C.muted, background: activeTab === "dashboard" ? "rgba(255,255,255,.06)" : "transparent" }}>Dashboard</a>
+          <a onClick={() => setActiveTab("reports")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "reports" ? C.goldLight : C.muted, background: activeTab === "reports" ? "rgba(255,255,255,.06)" : "transparent" }}>Reports</a>
           {user?.role === "admin" && (
             <a onClick={() => navigate("/admin")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, color: C.muted, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s" }}>Admin</a>
           )}
@@ -411,6 +413,8 @@ export default function Home() {
 
       {/* ── Page content ────────────────────────────────────────────────── */}
       <div style={{ maxWidth: 980, margin: "0 auto", padding: "0 32px 80px", position: "relative", zIndex: 1 }}>
+
+        {activeTab === "dashboard" && (<div>
 
         {/* Hero */}
         <SlideUp delay={60} style={{ padding: "48px 0 8px" }}>
@@ -544,12 +548,12 @@ export default function Home() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#2a3a4a", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>FROM</div>
-                    <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
+                    <input type="text" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} placeholder="YYYY-MM-DD" style={inputStyle} />
                   </div>
                   <span style={{ color: C.muted, fontSize: 16, paddingTop: 20 }}>→</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#2a3a4a", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>TO</div>
-                    <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
+                    <input type="text" value={dateTo} onChange={(e) => setDateTo(e.target.value)} placeholder="YYYY-MM-DD" style={inputStyle} />
                   </div>
                 </div>
                 <div style={{ marginTop: 14 }}>
@@ -749,35 +753,80 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── Previous reports ─────────────────────────────────────────── */}
-        {prevReports.length > 0 && (
-          <SlideUp delay={0} style={{ marginTop: 24 }}>
-            <Card>
-              <SectionLabel>Previous Reports</SectionLabel>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {prevReports.map((f) => (
-                  <div key={f.name} style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "9px 12px", background: "rgba(255,255,255,.03)",
-                    border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12,
-                  }}>
-                    <span style={{ color: C.text, fontFamily: "'DM Mono', monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {extIcon(f.name)} {f.name}
-                    </span>
-                    <span style={{ color: C.muted, fontFamily: "'DM Mono', monospace", fontSize: 10, margin: "0 12px", flexShrink: 0 }}>
-                      {f.size}KB · {f.mtime}
-                    </span>
-                    <a
-                      href={`/api/download/${encodeURIComponent(f.name)}`}
-                      download={f.name}
-                      style={{ color: C.gold, fontSize: 11, textDecoration: "none", flexShrink: 0, fontWeight: 500 }}
-                    >download</a>
-                  </div>
-                ))}
+        </div>)}
+
+        {/* ── Reports tab ─────────────────────────────────────────────── */}
+        {activeTab === "reports" && (
+          <div style={{ paddingTop: 40 }}>
+            <SlideUp delay={40}>
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: C.gold, marginBottom: 10 }}>
+                  Reports
+                </div>
+                <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 32, fontWeight: 700, letterSpacing: "-.02em", color: C.textHi, margin: 0 }}>
+                  Previous Reports
+                </h2>
+                <p style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>
+                  All generated HTML and PowerPoint reports, most recent first.
+                </p>
               </div>
-            </Card>
-          </SlideUp>
+            </SlideUp>
+
+            {prevReports.length === 0 ? (
+              <SlideUp delay={80}>
+                <div style={{
+                  textAlign: "center", padding: "60px 0",
+                  background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: 14,
+                }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>
+                  <div style={{ fontSize: 14, color: C.muted }}>No reports yet — generate one from the Dashboard tab.</div>
+                </div>
+              </SlideUp>
+            ) : (
+              <SlideUp delay={80}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {prevReports.map((f, i) => (
+                    <div key={f.name} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "14px 18px",
+                      background: C.surface, border: `1px solid ${C.border}`,
+                      borderRadius: 12, fontSize: 13,
+                      transition: "border-color .2s",
+                      animationDelay: `${i * 40}ms`,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: 20, flexShrink: 0 }}>{extIcon(f.name)}</span>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ color: C.text, fontFamily: "'DM Mono', monospace", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {f.name}
+                          </div>
+                          <div style={{ color: C.muted, fontFamily: "'DM Mono', monospace", fontSize: 10, marginTop: 3 }}>
+                            {f.size} KB · {f.mtime}
+                          </div>
+                        </div>
+                      </div>
+                      <a
+                        href={`/api/download/${encodeURIComponent(f.name)}`}
+                        download={f.name}
+                        style={{
+                          flexShrink: 0, marginLeft: 16,
+                          padding: "7px 16px", borderRadius: 8,
+                          background: "rgba(201,146,42,.12)", color: C.gold,
+                          border: `1px solid rgba(201,146,42,.25)`,
+                          fontSize: 12, fontWeight: 600, textDecoration: "none",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          transition: "background .2s",
+                        }}
+                      >⬇ Download</a>
+                    </div>
+                  ))}
+                </div>
+              </SlideUp>
+            )}
+          </div>
         )}
+
       </div>
     </div>
   );
