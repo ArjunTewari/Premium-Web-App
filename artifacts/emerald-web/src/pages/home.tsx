@@ -3,10 +3,36 @@ import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 
 const DEFAULT_ORGS = [
-  "CEEW", "CSTEP", "TERI", "CSE", "WRI India", "Greenpeace India",
-  "Climate Trends", "iForest", "Urban Emissions", "CREA", "ATREE",
-  "Respirer Living Sciences", "CLEAN",
+  "WRI India",
+  "Air Pollution Action Group",
+  "Chintan Environmental Research and Action Group",
+  "IIT Kanpur",
+  "CSTEP",
+  "IIT Delhi",
+  "Health Effects Institute",
+  "ICCT",
+  "EPIC India",
+  "Council on Energy, Environment and Water",
+  "Centre for Science and Environment",
+  "Climate Trends",
+  "Sustainable Futures Collaborative",
 ];
+
+const ORG_YT_HANDLES: Record<string, string> = {
+  "WRI India":                                        "@WRIIndiaChannel",
+  "Air Pollution Action Group":                       "@theconvergencefoundation",
+  "Chintan Environmental Research and Action Group":  "@ChintanEnviroGroup",
+  "IIT Kanpur":                                       "@iitkanpur",
+  "CSTEP":                                            "@centerforstudyofsciencetec7663",
+  "IIT Delhi":                                        "@IITDelhiOfficial",
+  "Health Effects Institute":                         "@HEIresearch",
+  "ICCT":                                             "@ICCT",
+  "EPIC India":                                       "@epicindia.uchicago",
+  "Council on Energy, Environment and Water":         "@CEEWIndia",
+  "Centre for Science and Environment":               "@cse_india",
+  "Climate Trends":                                   "@ClimateTrendsIN",
+  "Sustainable Futures Collaborative":                "@SFC_India",
+};
 
 const DEFAULT_SCOPE = [
   "AQI", "PM2.5", "PM10", "air pollution", "air quality", "smog",
@@ -128,9 +154,10 @@ export default function Home() {
   const { user, logout } = useAuth();
   const [, navigate] = useLocation();
 
-  const [selectedOrgs, setSelectedOrgs] = useState<string[]>(["CEEW", "CSTEP"]);
-  const [customOrgs, setCustomOrgs] = useState<string[]>([]);
+  const [selectedOrgs, setSelectedOrgs] = useState<string[]>(["Council on Energy, Environment and Water", "CSTEP"]);
+  const [customOrgs, setCustomOrgs] = useState<{ name: string; ytHandle: string }[]>([]);
   const [orgCustomInput, setOrgCustomInput] = useState("");
+  const [orgYtHandleInput, setOrgYtHandleInput] = useState("");
 
   const [dateFrom, setDateFrom] = useState("2026-03-08");
   const [dateTo, setDateTo] = useState("2026-06-08");
@@ -158,8 +185,13 @@ export default function Home() {
 
   const logBoxRef = useRef<HTMLDivElement>(null);
 
-  const allOrgs = [...DEFAULT_ORGS, ...customOrgs];
+  const allOrgs = [...DEFAULT_ORGS, ...customOrgs.map(o => o.name)];
   const orgCount = selectedOrgs.length;
+
+  const allOrgHandles: Record<string, string> = {
+    ...ORG_YT_HANDLES,
+    ...Object.fromEntries(customOrgs.map(o => [o.name, o.ytHandle])),
+  };
 
   const loadPrev = useCallback(async () => {
     try {
@@ -187,10 +219,13 @@ export default function Home() {
 
   function addCustomOrg() {
     const val = orgCustomInput.trim();
-    if (!val || DEFAULT_ORGS.includes(val) || customOrgs.includes(val)) { setOrgCustomInput(""); return; }
-    setCustomOrgs((prev) => [...prev, val]);
+    const handle = orgYtHandleInput.trim();
+    if (!val || DEFAULT_ORGS.includes(val) || customOrgs.some(o => o.name === val)) {
+      setOrgCustomInput(""); setOrgYtHandleInput(""); return;
+    }
+    setCustomOrgs((prev) => [...prev, { name: val, ytHandle: handle }]);
     setSelectedOrgs((prev) => (prev.length < 13 ? [...prev, val] : prev));
-    setOrgCustomInput("");
+    setOrgCustomInput(""); setOrgYtHandleInput("");
   }
 
   function addScope() {
@@ -216,11 +251,35 @@ export default function Home() {
     setAeoEditIdx(null); setAeoEditVal("");
   }
 
+  async function downloadClientReport(htmlName: string) {
+    try {
+      const res = await fetch(`/api/download/${encodeURIComponent(htmlName)}`, { credentials: "include" });
+      if (!res.ok) { alert("Could not fetch report."); return; }
+      const html = await res.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      const actionsSection = doc.getElementById("actions") || doc.querySelector('[id*="action"]');
+      if (actionsSection) actionsSection.remove();
+      const clientHtml = "<!DOCTYPE html>" + doc.documentElement.outerHTML;
+      const blob = new Blob([clientHtml], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = htmlName.replace(/\.html$/i, "-client.html");
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Download failed.");
+    }
+  }
+
   async function startRun() {
     if (!selectedOrgs.length) { alert("Select at least one organisation."); return; }
     setRunning(true); setLogs([]); setProgress(0); setResult(null); setTrendStatus(null);
 
-    const payload = { orgs: selectedOrgs, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries };
+    const payload = { orgs: selectedOrgs, orgYtHandles: allOrgHandles, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries };
     const TOTAL_STEPS = 60;
     let stepCount = 0;
 
@@ -491,13 +550,14 @@ export default function Home() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7 }}>
                 {allOrgs.map((org) => {
                   const on = selectedOrgs.includes(org);
+                  const handle = allOrgHandles[org];
                   return (
                     <button
                       key={org}
                       className="mo-org-btn"
                       onClick={() => toggleOrg(org)}
                       style={{
-                        display: "flex", alignItems: "center", gap: 8,
+                        display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 3,
                         padding: "9px 11px", borderRadius: 9, cursor: "pointer",
                         background: on ? "rgba(201,146,42,.1)" : "rgba(255,255,255,.03)",
                         border: `1px solid ${on ? "rgba(201,146,42,.3)" : "rgba(255,255,255,.08)"}`,
@@ -506,31 +566,47 @@ export default function Home() {
                         textAlign: "left", transition: "all .2s",
                       }}
                     >
-                      <span className="mo-org-dot" style={{
-                        width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
-                        background: on ? C.gold : "#2a3a4a",
-                        boxShadow: on ? `0 0 6px ${C.gold}` : "none",
-                        transition: "background .2s, box-shadow .2s",
-                      }} />
-                      {org}
+                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span className="mo-org-dot" style={{
+                          width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                          background: on ? C.gold : "#2a3a4a",
+                          boxShadow: on ? `0 0 6px ${C.gold}` : "none",
+                          transition: "background .2s, box-shadow .2s",
+                        }} />
+                        {org}
+                      </span>
+                      {handle && (
+                        <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: on ? "rgba(201,146,42,.55)" : "rgba(74,96,112,.7)", paddingLeft: 14 }}>
+                          {handle}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
               </div>
               {/* Custom org input */}
-              <div style={{ marginTop: 12, display: "flex", gap: 6 }}>
-                <input
-                  value={orgCustomInput}
-                  onChange={(e) => setOrgCustomInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomOrg(); } }}
-                  placeholder="Add custom org name…"
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-                <button onClick={addCustomOrg} style={{
-                  background: "rgba(255,255,255,.07)", color: C.text, border: `1px solid ${C.border}`,
-                  borderRadius: 8, padding: "8px 14px", fontSize: 12, cursor: "pointer",
-                  fontFamily: "'Space Grotesk', sans-serif",
-                }}>+ Add</button>
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    value={orgCustomInput}
+                    onChange={(e) => setOrgCustomInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomOrg(); } }}
+                    placeholder="Organisation name…"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <input
+                    value={orgYtHandleInput}
+                    onChange={(e) => setOrgYtHandleInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomOrg(); } }}
+                    placeholder="@YouTubeHandle (optional)"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button onClick={addCustomOrg} style={{
+                    background: "rgba(255,255,255,.07)", color: C.text, border: `1px solid ${C.border}`,
+                    borderRadius: 8, padding: "8px 14px", fontSize: 12, cursor: "pointer",
+                    fontFamily: "'Space Grotesk', sans-serif", whiteSpace: "nowrap",
+                  }}>+ Add</button>
+                </div>
               </div>
               <div style={{ fontSize: 10, color: "#2a3a4a", marginTop: 5, fontFamily: "'DM Mono', monospace" }}>
                 Select up to 13 · each org adds ~5 Serper queries + ~2 Claude calls
@@ -738,17 +814,27 @@ export default function Home() {
             <div style={{ fontSize: 14, fontWeight: 600, color: C.green, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
               ✓ Report ready
             </div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+              {/* Client report button (strips Action Matrix) */}
+              <button
+                onClick={() => downloadClientReport(result.htmlName)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.green, color: C.bg, fontFamily: "'Space Grotesk', sans-serif", border: "none" }}
+              >⬇ Client Report</button>
+              {/* Admin report link (full report, includes Action Matrix) */}
               <a
                 href={`/api/download/${encodeURIComponent(result.htmlName)}`}
                 download={result.htmlName}
-                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.green, color: C.bg, fontFamily: "'Space Grotesk', sans-serif" }}
-              >⬇ Download HTML</a>
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: "rgba(76,175,116,.15)", color: C.green, border: `1px solid rgba(76,175,116,.35)`, fontFamily: "'Space Grotesk', sans-serif" }}
+              >⬇ Admin (Full Report)</a>
+              {/* PowerPoint */}
               <a
                 href={`/api/download/${encodeURIComponent(result.pptxName)}`}
                 download={result.pptxName}
                 style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.gold, color: C.bg, fontFamily: "'Space Grotesk', sans-serif" }}
-              >⬇ Download PowerPoint</a>
+              >⬇ PowerPoint</a>
+            </div>
+            <div style={{ fontSize: 10, color: C.muted, marginTop: 8, fontFamily: "'DM Mono', monospace" }}>
+              Client Report excludes Action Matrix · Admin version is the full report
             </div>
           </div>
         )}

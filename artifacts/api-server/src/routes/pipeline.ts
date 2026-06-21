@@ -32,10 +32,13 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     GEMINI_KEY: body.geminiKey || process.env.GEMINI_KEY || "",
     YOUTUBE_KEY: process.env.YOUTUBE_KEY || "",
     TWITTER_KEY: process.env.TWITTER_KEY || "",
+    ORG_YT_HANDLES: (body.orgYtHandles && typeof body.orgYtHandles === "object" && !Array.isArray(body.orgYtHandles))
+      ? body.orgYtHandles
+      : {},
     outDir: OUT_DIR,
   };
 
-  if (!cfg.ORGS.length) cfg.ORGS = ["CEEW", "CSTEP"];
+  if (!cfg.ORGS.length) cfg.ORGS = ["Council on Energy, Environment and Water", "CSTEP"];
   if (cfg.ORGS.length > 13) cfg.ORGS = cfg.ORGS.slice(0, 13);
 
   if (!cfg.SERPER_KEY)
