@@ -209,8 +209,8 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
       ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e2638">
           <div style="font-size:10px;color:#5e7494;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em">YouTube <span style="color:#e53935">${yt.videoCount} video${yt.videoCount === 1 ? '' : 's'}</span>${yt.totalViews > 0 ? ` &middot; ${yt.totalViews.toLocaleString()} views` : ''}</div>
           ${topYtVideo ? `<div style="padding:7px 10px;background:#0a0e17;border-left:2px solid #e53935;border-radius:0 4px 4px 0">
-            <div style="font-size:11px;color:#8fa3b8;line-height:1.5;margin-bottom:3px">${escHtml((topYtVideo.title || '').slice(0, 100))}</div>
-            <div style="font-family:monospace;font-size:10px;color:#5e7494">${topYtVideo.views !== null ? `${(topYtVideo.views||0).toLocaleString()} views · ${(topYtVideo.likes||0).toLocaleString()} likes` : 'metrics not fetched'}</div>
+            <div style="font-size:11px;color:#8fa3b8;line-height:1.5;margin-bottom:3px">${escHtml((topYtVideo.title || topYtVideo.url || '').slice(0, 100))}</div>
+            <div style="font-family:monospace;font-size:10px;color:#5e7494">${topYtVideo.views !== null ? `${(topYtVideo.views||0).toLocaleString()} views · ${(topYtVideo.likes||0).toLocaleString()} likes` : '<span style="color:#c9922a">YouTube API key may need \'YouTube Data API v3\' enabled in Google Cloud Console</span>'}</div>
             ${topYtVideo.url ? `<a href="${escHtml(topYtVideo.url)}" target="_blank" style="font-size:10px;color:#e53935;text-decoration:none;display:inline-block;margin-top:3px">↗ watch</a>` : ''}
           </div>` : ''}
         </div>`

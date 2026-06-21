@@ -143,13 +143,14 @@ async function run(cfg, selectedOrgs, cb) {
       cb?.(`  [YouTubeER] Serper error (${orgName}): ${e.message}`, 'warn');
     }
 
-    // Map videoId → { url, serperTitle, serperSnippet }
+    // Map videoId → { url, title, serperSnippet, date }
     const videoMeta = {};
     for (const item of serperItems) {
       const vid = extractVideoId(item.link || '');
       if (vid && !videoMeta[vid]) {
         videoMeta[vid] = {
           url:     item.link || '',
+          title:   item.title || '',
           snippet: item.snippet || '',
           date:    item.date || '',
         };
@@ -177,8 +178,15 @@ async function run(cfg, selectedOrgs, cb) {
         const channelIds = [...new Set(Object.values(videoStats).map(v => v.channelId).filter(Boolean))];
         channelStats = await fetchChannelStats(channelIds, YOUTUBE_KEY);
       } catch (e) {
-        const msg = e.response?.data?.error?.message || e.message;
-        cb?.(`  [YouTubeER] YouTube API error (${orgName}): ${msg}`, 'warn');
+        const status = e.response?.status;
+        const reason = e.response?.data?.error?.errors?.[0]?.reason || '';
+        const msg    = e.response?.data?.error?.message || e.message;
+        cb?.(`  [YouTubeER] YouTube API error (${orgName}) HTTP ${status || '?'} ${reason}: ${msg}`, 'warn');
+        if (status === 403) {
+          cb?.('  [YouTubeER] 403 Fix: enable "YouTube Data API v3" in Google Cloud Console for this API key, and remove any HTTP-referrer restrictions on the key.', 'warn');
+        } else if (status === 400) {
+          cb?.('  [YouTubeER] 400 Fix: check the API key value — it may be malformed or belong to the wrong project.', 'warn');
+        }
       }
     }
 
@@ -213,7 +221,7 @@ async function run(cfg, selectedOrgs, cb) {
       return {
         videoId:     vid,
         url:         meta.url,
-        title:       vs?.title || '(title not fetched)',
+        title:       vs?.title || meta.title || '',
         publishedAt: vs?.publishedAt || meta.date || '',
         channelId:   vs?.channelId || '',
         channelName: cs?.name || vs?.channelTitle || '',

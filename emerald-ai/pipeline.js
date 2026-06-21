@@ -2966,12 +2966,8 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
     const col = orgHex(i);
     const er  = socialERResults.find((r) => r.org === org);
     const yt  = youtubeERResults.find((r) => r.org === org);
-    const twER = er?.twitterER  || 0;
     const ytER = yt?.avgER || yt?.avgViewER || 0;
     const socialScore = d.social || 0;
-    const twCell = twER > 0
-      ? `<span style="font-family:monospace;font-size:12px;color:var(--text)">${twER}%</span>`
-      : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`;
     const ytCell = ytER > 0
       ? `<span style="font-family:monospace;font-size:12px;color:var(--text)">${ytER}%</span>`
       : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`;
@@ -2984,7 +2980,6 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       <td>${inlineBar(d.sov, maxSov, col)}</td>
       <td>${inlineBar(d.dataPct, maxCit, col)}</td>
       <td>${d.aeo > 0 ? inlineBar(d.aeo, maxAeo, col) : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`}</td>
-      <td style="text-align:center">${twCell}</td>
       <td style="text-align:center">${ytCell}</td>
       <td style="text-align:center">${socialCell}</td>
       <td>${inlineBar(d.score, maxScr, col)}</td>
@@ -3000,7 +2995,6 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
         <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Share of Voice</th>
         <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Citation %</th>
         <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">AEO Mentions</th>
-        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">X/Twitter ER</th>
         <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">YouTube ER</th>
         <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Social /10</th>
         <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Score</th>
