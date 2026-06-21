@@ -2673,12 +2673,34 @@ function buildHTML(
   }
 
   function topicCards() {
+    const topicDisplayNames = {
+      NCAP: "NCAP / Policy Targets",
+      Policy: "Policy & Regulations",
+      "PM2.5 Exposure": "PM2.5 Exposure Mapping",
+      "Stubble Burning": "Stubble Burning",
+      "Clean Air Finance": "Clean Air Finance",
+      "Vehicular Pollution": "Vehicular Pollution",
+      "Health Impact": "Health Impact",
+      "Industrial Pollution": "Industrial Pollution",
+      "Heat-AQI": "Heat-AQI Interaction",
+      "Brick Kilns": "Brick Kilns",
+      "Petrol Emissions": "Petrol Emissions",
+      "Diesel Emissions": "Diesel Emissions",
+      "Super Emitters": "Super Emitters",
+      "Thermal Power Plants": "Thermal Power Plants",
+      "Household Pollution": "Household Pollution",
+      "Indoor Pollution": "Indoor Pollution",
+      "Biomass Air Pollution": "Biomass Air Pollution",
+      "Rice Residue Burning": "Rice Residue Burning",
+      "Wheat Residue Burning": "Wheat Residue Burning",
+      "Road Dust": "Road Dust",
+    };
     const topicSubtitles = {
-      NCAP: "National Clean Air Programme — targets and compliance",
+      NCAP: "National Clean Air Programme progress & compliance",
       Policy: "Air quality regulations, standards, government actions",
       "PM2.5 Exposure": "City & ward-level exposure data, health burden",
       "Stubble Burning": "Parali, enforcement, seasonal contribution",
-      "Clean Air Finance": "Funding flows, investment gaps, budgets",
+      "Clean Air Finance": "Funding flows, investment gaps, municipal budgets",
       "Vehicular Pollution": "EV targets, transport emissions, FAME",
       "Health Impact": "Mortality, hospital admissions, DALY data",
       "Industrial Pollution": "Factory emissions, cement, steel plants",
@@ -2695,45 +2717,88 @@ function buildHTML(
       "Wheat Residue Burning": "Wheat stubble burning, post-harvest",
       "Road Dust": "Resuspended road dust, unpaved roads",
     };
-    const tdefs = TOPICS.map((k) => ({ k, s: topicSubtitles[k] || k }));
-    return tdefs
-      .map((t) => {
-        const orgData = ORGS.map((org, i) => {
-          const cv = data[org]?.topicCounts[t.k] || 0;
-          const ex = data[org]?.classifications.find(
-            (c) =>
-              c.aq_subtopic &&
-              c.aq_subtopic
-                .replace("-", " ")
-                .toLowerCase()
-                .includes(t.k.replace("-", " ").toLowerCase().split("/")[0]),
-          );
-          return { org, i, cv, ex };
-        }).sort((a, b) => b.cv - a.cv);
-        const maxCv = orgData[0]?.cv || 1;
-        const withArticles = orgData.filter((x) => x.cv >= 1);
-        const absent = orgData.filter((x) => x.cv === 0);
-        const bars = withArticles
-          .map((x) => {
-            const pct = Math.round((x.cv / maxCv) * 100);
-            const link = x.ex?.url
-              ? `<a href="${esc(x.ex.url)}" target="_blank" style="color:var(--amber);font-family:monospace;font-size:10px;text-decoration:none;flex-shrink:0" title="${esc(x.ex.evidence_quote || "")}">&#8599;</a>`
-              : x.ex?.evidence_quote
-                ? `<span style="font-family:monospace;font-size:10px;color:var(--muted);flex-shrink:0;cursor:default" title="${esc(x.ex.evidence_quote || "")}">&#9432;</span>`
-                : "";
-            return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:11px;font-weight:600;color:${orgHex(x.i)};width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.org)}</span><div style="flex:1;height:7px;background:var(--surface3);border-radius:4px;overflow:hidden"><div style="height:100%;background:${orgHex(x.i)};width:${pct}%;border-radius:4px"></div></div><span style="font-family:monospace;font-size:11px;font-weight:700;width:20px;text-align:right;color:${orgHex(x.i)};flex-shrink:0">${x.cv}</span>${link}</div>`;
-          })
-          .join("");
-        const absentId = "abs" + t.k.replace(/\W/g, "");
-        const absentList = absent
-          .map((x) => `<span style="font-family:monospace;font-size:10px;color:var(--muted)">${esc(x.org)}</span>`)
-          .join("  ");
-        const absentBlock = absent.length
-          ? `<div style="margin-top:8px"><a class="ctag" onclick="td('${absentId}')">${absent.length} not covered</a><div class="evd" id="${absentId}" style="padding:10px 0;border:none"><div style="display:flex;flex-wrap:wrap;gap:8px">${absentList}</div></div></div>`
-          : "";
-        return `<div class="em-card" style="margin-bottom:14px;padding:16px 20px"><div style="margin-bottom:12px"><div style="font-size:15px;font-weight:600;color:var(--text)">${esc(t.k)}</div><div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(t.s)}</div></div>${bars || `<div style="font-size:12px;color:var(--muted);padding:8px 0">No coverage on this topic yet.</div>`}${absentBlock}</div>`;
-      })
-      .join("");
+
+    // Build topic→org→articles index (join classification with original article for title/url)
+    const topicArts = {};
+    TOPICS.forEach((tp) => {
+      topicArts[tp] = {};
+      ORGS.forEach((org) => { topicArts[tp][org] = []; });
+    });
+    ORGS.forEach((org) => {
+      (data[org]?.classifications || []).forEach((c) => {
+        const t = (c.aq_subtopic || "").trim();
+        const match = TOPICS.find(
+          (tp) =>
+            tp.toLowerCase() === t.toLowerCase() ||
+            t.toLowerCase().includes(tp.toLowerCase().split(" ")[0].toLowerCase()),
+        );
+        if (match) {
+          const art = arts[org]?.[c.index] || {};
+          topicArts[match][org].push({ ...c, title: art.title || "", url: art.url || "" });
+        }
+      });
+    });
+
+    const headerCols = ORGS.map((o, i) =>
+      `<th style="text-align:left;padding:10px 16px;font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${orgHex(i)}">${esc(o)}</th>`,
+    ).join("");
+
+    const rows = TOPICS.map((tk) => {
+      const displayName = topicDisplayNames[tk] || tk;
+      const subtitle = topicSubtitles[tk] || "";
+
+      const orgCells = ORGS.map((org, i) => {
+        const cv = data[org]?.topicCounts[tk] || 0;
+        const label = cv >= 5 ? "Owns" : cv >= 2 ? "Contests" : "Absent";
+        const [bgCol, borderCol, textCol] =
+          cv >= 5
+            ? ["rgba(74,222,128,.10)", "rgba(74,222,128,.30)", "#4ade80"]
+            : cv >= 2
+              ? ["rgba(251,191,36,.10)", "rgba(251,191,36,.30)", "#fbbf24"]
+              : ["rgba(100,116,139,.10)", "rgba(100,116,139,.25)", "var(--muted)"];
+        const badge = `<div style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:4px;background:${bgCol};border:1px solid ${borderCol};margin-bottom:9px"><span style="font-family:monospace;font-size:11px;font-weight:700;color:${textCol}">${label} &middot; ${cv} article${cv !== 1 ? "s" : ""}</span></div>`;
+
+        const artList = topicArts[tk][org] || [];
+        let body = "";
+        if (cv === 0) {
+          body = `<div style="font-size:11px;color:var(--muted)">No ${esc(org)} coverage on this topic in period</div>`;
+        } else if (cv === 1) {
+          const a = artList[0] || {};
+          const src = a.outlet || "";
+          const dt = (a.date || "").replace(/,?\s*\d{4}$/, "");
+          const titlePart = a.title ? ` — ${esc(a.title)}` : "";
+          const srcPart = [src, dt].filter(Boolean).join(", ");
+          body = `<div style="font-size:11px;color:var(--muted);line-height:1.55">One peripheral mention${titlePart}${srcPart ? ` (${esc(srcPart)})` : ""}</div>`;
+        } else {
+          const snippets = artList.slice(0, 2).map((a) => {
+            const src = a.outlet || "";
+            const dt = (a.date || "").replace(/,?\s*\d{4}$/, "");
+            const srcPart = [src, dt].filter(Boolean).join(", ");
+            return a.title
+              ? `&ldquo;${esc(a.title)}&rdquo;${srcPart ? ` (${esc(srcPart)})` : ""}`
+              : srcPart ? `(${esc(srcPart)})` : "";
+          }).filter(Boolean);
+          body = `<div style="font-size:11px;color:#94a3b8;line-height:1.6">${snippets.join(" &middot; ")}</div>`;
+        }
+
+        let sourcesBtn = "";
+        if (cv >= 2) {
+          const srcId = `src${org.replace(/\W/g, "")}${tk.replace(/\W/g, "")}`;
+          const srcLinks = artList.map((a) =>
+            a.url
+              ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.title || a.url)}</a>`
+              : `<div style="font-size:10px;color:var(--muted);padding:2px 0">${esc(a.title || a.outlet || "")}</div>`,
+          ).join("");
+          sourcesBtn = `<div style="margin-top:8px"><a class="ctag" onclick="td('${srcId}')" style="cursor:pointer;font-size:10px;padding:3px 8px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.25);border-radius:3px;color:var(--amber);font-weight:700;text-decoration:none">&#8599; sources</a><div class="evd" id="${srcId}" style="padding:8px 0;border:none;max-height:220px;overflow-y:auto">${srcLinks}</div></div>`;
+        }
+
+        return `<td style="padding:14px 16px;vertical-align:top;border-bottom:1px solid var(--border)">${badge}${body}${sourcesBtn}</td>`;
+      }).join("");
+
+      return `<tr><td style="padding:14px 16px;vertical-align:top;border-bottom:1px solid var(--border);min-width:170px;max-width:200px"><div style="font-size:13px;font-weight:700;color:var(--text)">${esc(displayName)}</div><div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.45">${esc(subtitle)}</div></td>${orgCells}</tr>`;
+    }).join("");
+
+    return `<div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;overflow:hidden"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--surface2)"><th style="text-align:left;padding:10px 16px;font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">AQ SUB-TOPIC</th>${headerCols}</tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
   function narrTable() {
@@ -3198,8 +3263,8 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
 
 ${momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations)}
 
-<section class="sec" id="topics"><div class="sh"><div class="se">Section 04</div><h2 class="st">Topic Ownership Map</h2>
-<div class="sd">${TOPICS.length} AQ sub-topics including NCAP &middot; Policy &middot; PM2.5 Exposure &middot; Stubble Burning &middot; Vehicular Pollution &middot; Health Impact &middot; Brick Kilns &middot; Thermal Power Plants &middot; and more.</div><div class="sdiv"></div></div>
+<section class="sec" id="topics"><div class="sh"><div class="se">Section 05</div><h2 class="st">Topic Ownership Map</h2>
+<div class="sd">AQ sub-topics clustered from article headlines and snippets by Claude. Each cell shows article count and representative headlines. Classification: <strong style="color:var(--text)">Owns</strong> (&ge;5 articles, authoritative tone) &middot; <strong style="color:var(--text)">Contests</strong> (2&ndash;4 articles) &middot; <strong style="color:var(--text)">Absent</strong> (0&ndash;1).</div><div class="sdiv"></div></div>
 ${clsNotice}
 ${topicCards()}</section>
 
