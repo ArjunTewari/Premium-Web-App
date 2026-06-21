@@ -759,7 +759,7 @@ async function run(cfg, cb) {
         index: j,
         outlet: a.source || "",
         date: a.date || "",
-        citation_quality: "Mention Not In Scraped Text",
+        citation_quality: "Not in scraped text",
         mention_count: 0,
         aq_subtopic: "General AQ",
         evidence_quote: "org name not found in scraped text",
@@ -788,7 +788,7 @@ async function run(cfg, cb) {
 
 For EACH numbered article, return one JSON object with:
 - index: the article number shown in [brackets]
-- citation_quality: "Data Cited" if a specific number, %, statistic, or named report FROM "${org}" appears in the CONTENT excerpt. "Named Mention" if org is named but no specific data cited. "Not Mentioned" if org does not appear in the excerpt. (Do NOT use "Mention Not In Scraped Text" — that is set before this step for articles not shown here.)
+- citation_quality: "Data Cited" if a specific number, %, statistic, or named report FROM "${org}" appears in the CONTENT excerpt. "Named Mention" if org is named but no specific data cited. "Not Mentioned" if org does not appear in the excerpt. (Do NOT use "Not in scraped text" — that is set before this step for articles not shown here.)
 - mention_count: copy the ORG MENTIONS IN FULL SCRAPED TEXT number exactly as given — do not recount from the excerpt
 - aq_subtopic: EXACTLY one of: NCAP, Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance, Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI, Brick Kilns, Petrol Emissions, Diesel Emissions, Super Emitters, Thermal Power Plants, Household Pollution, Indoor Pollution, Biomass Air Pollution, Rice Residue Burning, Wheat Residue Burning, Road Dust, General AQ
 - evidence_quote: exact phrase ≤12 words from content. "not mentioned" if absent.
@@ -983,7 +983,7 @@ ${txt}`;
   try {
     cb("  Executive summary...");
     const r = await callClaude(
-      `Write 3 comparative findings for a media intelligence report comparing these orgs on Indian air quality coverage ${DATE_FROM} to ${DATE_TO}.\nOrgs: ${ORGS.join(", ")}\n\nDATA (includes AEO/LLM visibility and social media):\n${orgSummary}\n\nRULES — follow strictly:\n- Cite ONLY directly observable counts and scores. NEVER use these phrases: "authoritative tone", "institutional credibility", "greater credibility", "more trustworthy".\n- When EITHER compared value is below 10, use raw counts (e.g. "4 vs 1 articles") not percentages. Use "Nx" ratios only when BOTH values are ≥5.\n- Each headline max 12 words. Each detail 2-3 sentences with specific numbers.\n- section_ref must be one of: "§03 Share of Voice", "§05 Topic Ownership", "§06 Narrative Position", "§07 Citation Quality", "§AEO LLM Visibility", "§Social Media".\nReturn ONLY JSON array of 3: [{"headline":"...","detail":"...","section_ref":"§03 Share of Voice"}]`,
+      `Write 3 comparative findings for a media intelligence report comparing these orgs on Indian air quality coverage ${DATE_FROM} to ${DATE_TO}.\nOrgs: ${ORGS.join(", ")}\n\nDATA (includes AEO/LLM visibility and social media):\n${orgSummary}\n\nRULES — follow strictly:\n- State facts directly. NEVER use inferential or interpretive language: banned words include "reflects", "indicates", "demonstrates", "shows", "suggests", "implies", "highlights", "underscores", "signals", "points to", "speaks to", "reveals", "evidences".\n- Do NOT editorialize about what numbers mean. Report the numbers and let the reader draw conclusions.\n- Cite ONLY directly observable counts and scores. NEVER use these phrases: "authoritative tone", "institutional credibility", "greater credibility", "more trustworthy".\n- When EITHER compared value is below 10, use raw counts (e.g. "4 vs 1 articles") not percentages. Use "Nx" ratios only when BOTH values are ≥5.\n- Each headline max 12 words. Each detail 2-3 sentences with specific numbers only.\n- section_ref must be one of: "§03 Share of Voice", "§05 Topic Ownership", "§06 Narrative Position", "§07 Citation Quality", "§AEO LLM Visibility", "§Social Media".\nReturn ONLY JSON array of 3: [{"headline":"...","detail":"...","section_ref":"§03 Share of Voice"}]`,
       cfg.CLAUDE_KEY,
       1200,
     );
@@ -1640,7 +1640,7 @@ async function buildPPTX(
           },
           ...ORGS.map((org) => {
             const cnt = data[org].topicCounts[topic] || 0;
-            const label = cnt >= 5 ? "Owns" : cnt >= 2 ? "Contests" : "Absent";
+            const label = cnt >= 5 ? "Leader" : cnt >= 2 ? "Active" : "Not Present";
             const fc = cnt >= 5 ? GOOD : cnt >= 2 ? "2d6ea8" : BORD;
             return {
               text: `${label} · ${cnt}`,
@@ -2632,6 +2632,26 @@ function buildHTML(
     return `<div style="height:28px;background:#1e2638;border-radius:4px;overflow:hidden;display:flex;margin-bottom:12px">${bars}</div>`;
   }
 
+  function sovByOrgTable() {
+    const activeOutlets = PRINT_OUTLETS.filter((outlet) =>
+      ORGS.some((o) => (data[o]?.outletCounts[outlet] || 0) > 0)
+    );
+    if (!activeOutlets.length)
+      return `<p style="color:var(--muted);font-size:12px">No newspaper site coverage indexed in this period.</p>`;
+    return `<table class="nt"><thead><tr><th>Org</th>${activeOutlets.map((o) => `<th>${esc(o)}</th>`).join("")}</tr></thead><tbody>
+${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${activeOutlets.map((outlet) => {
+      const evArts = (arts[org] || []).filter((a) => canonOutlet(a.source || "") === outlet);
+      const n = evArts.length;
+      if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`;
+      const uid = `sov_${org}_${outlet}`.replace(/\W/g, "_");
+      const links = evArts.slice(0, 5).map((a) =>
+        `<a href="${esc(a.url || "#")}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || "").length > 70 ? (a.title || "").slice(0, 70) + "…" : (a.title || ""))}</a>`
+      ).join("");
+      return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:10px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`;
+    }).join("")}</tr>`).join("\n")}
+</tbody></table>`;
+  }
+
   function outletRows() {
     return PRINT_OUTLETS.map((outlet) => {
       if (!ORGS.some((o) => (data[o]?.outletCounts[outlet] || 0) > 0))
@@ -2756,7 +2776,7 @@ function buildHTML(
 
       const orgCells = ORGS.map((org, i) => {
         const cv = data[org]?.topicCounts[tk] || 0;
-        const label = cv >= 5 ? "Owns" : cv >= 2 ? "Contests" : "Absent";
+        const label = cv >= 5 ? "Leader" : cv >= 2 ? "Active" : "Not Present";
         const [bgCol, borderCol, textCol] =
           cv >= 5
             ? ["rgba(74,222,128,.10)", "rgba(74,222,128,.30)", "#4ade80"]
@@ -3018,7 +3038,7 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
         ? "var(--good)"
         : q === "Named Mention"
           ? "var(--muted2)"
-          : q === "Mention Not In Scraped Text"
+          : q === "Not in scraped text"
             ? "#8b7cf8"
             : "var(--muted)";
     const rows = arts[org]
@@ -3246,8 +3266,8 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
 ${sovBar()}
 <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o, i) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join("")}</div>
 </div>
-<div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:14px;font-family:monospace;font-size:11px;color:var(--muted2)"><strong style="color:var(--amber)">Reading this table:</strong> Total = all AQ-scoped articles across orgs at that outlet. Top orgs shows the three highest-coverage orgs as badges.</div>
-<table class="nt"><thead><tr><th>Outlet</th><th>Total</th><th>Top orgs by coverage</th><th>Advantage</th><th>Evidence</th></tr></thead><tbody>${outletRows()}</tbody></table></section>
+<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Newspaper Sites</div>
+${sovByOrgTable()}</section>
 
 <section class="sec" id="tv"><div class="sh"><div class="se">Section 03b</div><h2 class="st">TV Channel Coverage</h2>
 <div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (Aaj Tak, India TV, ABP News) channels.</div><div class="sdiv"></div></div>
@@ -3265,7 +3285,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
 ${momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations)}
 
 <section class="sec" id="topics"><div class="sh"><div class="se">Section 05</div><h2 class="st">Topic Ownership Map</h2>
-<div class="sd">AQ sub-topics clustered from article headlines and snippets by Claude. Each cell shows article count and representative headlines. Classification: <strong style="color:var(--text)">Owns</strong> (&ge;5 articles, authoritative tone) &middot; <strong style="color:var(--text)">Contests</strong> (2&ndash;4 articles) &middot; <strong style="color:var(--text)">Absent</strong> (0&ndash;1).</div><div class="sdiv"></div></div>
+<div class="sd">AQ sub-topics clustered from article headlines and snippets by Claude. Each cell shows article count and representative headlines. Position: <strong style="color:#4ade80">Leader</strong> (&ge;5 articles) &middot; <strong style="color:#fbbf24">Active</strong> (2&ndash;4 articles) &middot; <strong style="color:var(--muted)">Not Present</strong> (0&ndash;1).</div><div class="sdiv"></div></div>
 ${clsNotice}
 ${topicCards()}</section>
 
