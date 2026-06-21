@@ -668,10 +668,15 @@ async function run(cfg, cb) {
 
   // ── STEP 1c: TV channel targeted searches ──────────────────
   cb(`\nSTEP 1c/6 — Fetching TV channel coverage (site: searches)...`, "head");
+  // Build a broad OR clause from the user's scope keywords (up to 6)
+  const tvKws = SCOPE_KEYWORDS.slice(0, 6);
+  const tvKwClause = tvKws.length === 1
+    ? `"${tvKws[0]}"`
+    : `(${tvKws.map((k) => `"${k}"`).join(" OR ")})`;
   for (const org of ORGS) {
     const tvSeen = new Set(arts[org].map((a) => a.url || a.title));
     for (const [channel, domain] of Object.entries(TV_CHANNEL_DOMAINS)) {
-      const q = `site:${domain} "${org}" air quality OR air pollution India`;
+      const q = `site:${domain} "${org}" ${tvKwClause}`;
       cb(`  ${q}`);
       try {
         const results = await serperWebSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
