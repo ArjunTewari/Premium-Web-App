@@ -106,6 +106,17 @@ app.get('/download/:file', (req, res) => {
   res.download(fpath, fname);
 });
 
+// ── GET /view/:file — serve HTML report inline (no attachment) ─────────────
+app.get('/view/:file', (req, res) => {
+  const fname = path.basename(req.params.file);
+  const fpath = path.join(OUT_DIR, fname);
+  if (!fs.existsSync(fpath)) return res.status(404).send('File not found');
+  if (!fname.endsWith('.html')) return res.status(400).send('Only HTML files can be previewed');
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.sendFile(fpath);
+});
+
 // ── GET /outputs — list available reports ─────────────────────────────────
 app.get('/outputs', (req, res) => {
   const files = fs.readdirSync(OUT_DIR)
