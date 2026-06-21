@@ -843,6 +843,8 @@ ${txt}`;
       `air quality India ${orgExclusions}`,
       `air pollution India policy ${orgExclusions}`,
       `India AQI PM2.5 health ${orgExclusions}`,
+      `India air pollution research study ${orgExclusions}`,
+      `India smog pollution news ${orgExclusions}`,
     ];
     const rawGeneral = [];
     for (const q of generalQueries) {
@@ -914,16 +916,16 @@ ${txt}`;
       emerging = [];
     } else {
       const wsCombined = whiteSpaceArticles
-        .slice(0, 30)
+        .slice(0, 50)
         .map(
           (a) =>
             `${a.date || "unknown"}|${a.title || ""}|${a.link || a.url || ""}|${(a.snippet || "").slice(0, 120)}`,
         )
         .join("\n");
       const r = await callClaude(
-        `You are analysing the broader Indian air quality media landscape from ${DATE_FROM} to ${DATE_TO}.\n\nThe tracked organisations are: ${ORGS.join(", ")}.\n\nThe articles below are from GENERAL Indian AQ news coverage — these articles do NOT mention any of the tracked organisations. They represent the AQ media landscape where the tracked orgs are ABSENT.\n\nIdentify 2–3 distinct topic clusters from these articles that the tracked organisations are NOT participating in. These are white-space opportunities — genuine gaps where the AQ media conversation is active but the tracked orgs have no presence.\n\nFor each gap topic:\n- "topic": short name (3–5 words)\n- "description": 1 sentence on what this topic covers and why it matters\n- "gap_signal": specific evidence from the articles (e.g. "6 articles on X, none mentioning ${ORGS.join("/")}") \n- "opportunity": 1 actionable sentence — what a tracked org could publish or say to enter this conversation\n- Only include supporting_articles that actually appear in the list below\n\nReturn ONLY JSON array: [{"topic":"...","description":"...","gap_signal":"...","opportunity":"...","supporting_articles":[{"title":"...","url":"...","date":"YYYY-MM-DD"}]}]\n\nARTICLES (date|title|url|snippet):\n${wsCombined}`,
+        `You are analysing the broader Indian air quality media landscape from ${DATE_FROM} to ${DATE_TO}.\n\nThe tracked organisations are: ${ORGS.join(", ")}.\n\nThe articles below are from GENERAL Indian AQ news coverage — these articles do NOT mention any of the tracked organisations. They represent the AQ media landscape where the tracked orgs are ABSENT.\n\nIdentify 2–3 distinct topic clusters from these articles that the tracked organisations are NOT participating in. These are white-space opportunities — genuine gaps where the AQ media conversation is active but the tracked orgs have no presence.\n\nFor each gap topic:\n- "topic": short name (3–5 words)\n- "description": 1 sentence on what this topic covers and why it matters\n- "gap_signal": specific evidence citing article count and themes (e.g. "5 articles on X between March–May 2026, none mentioning ${ORGS.join("/")}")\n- "opportunity": 1 actionable sentence — what a tracked org could publish or say to enter this conversation\n- "supporting_articles": include AT LEAST 3 articles from the list below that belong to this cluster. Only include articles that actually appear in the list.\n\nReturn ONLY JSON array: [{"topic":"...","description":"...","gap_signal":"...","opportunity":"...","supporting_articles":[{"title":"...","url":"...","date":"YYYY-MM-DD"}]}]\n\nARTICLES (date|title|url|snippet):\n${wsCombined}`,
         cfg.CLAUDE_KEY,
-        1600,
+        2400,
       );
       emerging = parseJ(r) || [];
       cb(
@@ -2852,8 +2854,9 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
                   : `<div class="em-src">${esc(a.title || a)}</div>`,
               )
               .join("");
+            const artCount = (n.supporting_articles || []).length;
             return `<div class="em-card">
-<div class="em-hdr"><div class="em-topic">${esc(n.topic)}</div></div>
+<div class="em-hdr"><div class="em-topic">${esc(n.topic)}</div>${artCount > 0 ? `<span style="font-family:monospace;font-size:10px;background:rgba(201,146,42,.12);color:var(--amber);border:1px solid rgba(201,146,42,.25);border-radius:3px;padding:2px 8px;flex-shrink:0">${artCount} article${artCount !== 1 ? "s" : ""}</span>` : ""}</div>
 <div class="em-body">${esc(n.description || "")}</div>
 ${n.gap_signal ? `<div class="em-inf" style="color:var(--warn)">&#9888; Gap signal: ${esc(n.gap_signal)}</div>` : ""}
 ${n.opportunity ? `<div class="em-inf" style="color:var(--good);margin-top:6px">&#8594; Opportunity: ${esc(n.opportunity)}</div>` : ""}
