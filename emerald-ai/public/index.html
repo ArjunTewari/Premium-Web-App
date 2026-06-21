@@ -505,6 +505,41 @@ html, body {
 }
 .pv-btn-dl:hover { background: #5bc87f; box-shadow: 0 4px 14px rgba(76,175,116,.3); }
 
+/* ── Download split-button dropdown ─────────────────────────────────────── */
+.dl-split {
+  position: relative; display: inline-flex;
+}
+.dl-split .pv-btn-dl { border-radius: 5px 0 0 5px; }
+.dl-chevron {
+  background: var(--good); color: #070b12;
+  border: none; border-left: 1px solid rgba(7,11,18,.25);
+  border-radius: 0 5px 5px 0;
+  padding: 6px 9px; cursor: pointer; font-size: 11px;
+  transition: background .15s;
+}
+.dl-chevron:hover { background: #5bc87f; }
+.dl-menu {
+  position: absolute; top: calc(100% + 5px); right: 0;
+  background: var(--sur2); border: 1px solid var(--bdr2);
+  border-radius: 7px; min-width: 210px; z-index: 99;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  overflow: hidden;
+}
+.dl-menu button {
+  display: block; width: 100%; text-align: left;
+  padding: 10px 15px; background: none; border: none;
+  color: var(--tx2); font-size: 12px; font-family: 'Space Grotesk', sans-serif;
+  cursor: pointer; transition: background .12s, color .12s;
+}
+.dl-menu button:hover { background: var(--bdr); color: var(--tx); }
+.dl-menu button + button { border-top: 1px solid var(--bdr); }
+.dl-menu .dl-menu-label {
+  padding: 6px 15px 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--mt); pointer-events: none;
+}
+
 .preview-collapse-btn {
   background: none; border: none; cursor: pointer;
   font-family: 'JetBrains Mono', monospace;
@@ -684,9 +719,15 @@ html, body {
         <button class="pv-btn pv-btn-edit" id="editToggleBtn" onclick="toggleEdit()">
           ✏ Enable Editing
         </button>
-        <button class="pv-btn pv-btn-dl" onclick="downloadFinal()">
-          ↓ Download Final
-        </button>
+        <div class="dl-split" id="dlSplit">
+          <button class="pv-btn pv-btn-dl" onclick="downloadClient()" title="Download client-facing report (Action Matrix excluded)">↓ Download</button>
+          <button class="dl-chevron" onclick="toggleDlMenu(event)" title="More download options">▾</button>
+          <div class="dl-menu" id="dlMenu" style="display:none">
+            <div class="dl-menu-label">Download as</div>
+            <button onclick="downloadClient(); closeDlMenu()">↓ Client Report <span style="font-size:10px;color:var(--mt)">— Action Matrix excluded</span></button>
+            <button onclick="downloadAdmin(); closeDlMenu()">↓ Admin (Full Report) <span style="font-size:10px;color:var(--mt)">— includes Action Matrix</span></button>
+          </div>
+        </div>
         <button class="preview-collapse-btn" id="collapseBtn" onclick="collapsePreview()">▴ collapse</button>
       </div>
     </div>
@@ -1166,32 +1207,70 @@ function toggleEdit() {
   }
 }
 
-function downloadFinal() {
+/* ── Download helpers ────────────────────────────────────────────────────── */
+function toggleDlMenu(e) {
+  if (e) e.stopPropagation();
+  const m = document.getElementById('dlMenu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+function closeDlMenu() {
+  const m = document.getElementById('dlMenu');
+  if (m) m.style.display = 'none';
+}
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('dlSplit');
+  if (wrap && !wrap.contains(e.target)) closeDlMenu();
+});
+
+function _serializeReport(includeActions) {
   const frame = document.getElementById('reportFrame');
-  const doc = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
-  if (!doc || !doc.body) {
-    // Fallback: just download original
+  const doc   = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+  if (!doc || !doc.body) return null;
+
+  const wasEditing = doc.body.contentEditable === 'true';
+  if (wasEditing) doc.body.contentEditable = 'false';
+
+  const clone = doc.documentElement.cloneNode(true);
+
+  if (!includeActions) {
+    const sec = clone.querySelector('#actions');
+    if (sec) sec.remove();
+    const navLink = clone.querySelector('.nav-a[href="#actions"]');
+    if (navLink) navLink.remove();
+  }
+
+  const html = '<!DOCTYPE html>\n' + clone.outerHTML;
+  if (wasEditing) doc.body.contentEditable = 'true';
+  return html;
+}
+
+function _triggerDownload(html, filename) {
+  if (!html) {
     const a = document.createElement('a');
     a.href = '/download/' + encodeURIComponent(_currentHtmlName);
     a.download = _currentHtmlName;
     a.click();
     return;
   }
-  // Temporarily disable contenteditable so it doesn't appear in saved HTML
-  const wasEditing = doc.body.contentEditable === 'true';
-  if (wasEditing) doc.body.contentEditable = 'false';
-  const html = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
-  if (wasEditing) doc.body.contentEditable = 'true';
-
   const blob = new Blob([html], { type: 'text/html' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href     = url;
-  a.download = (_currentHtmlName.replace(/\.html$/i, '') || 'report') + '-final.html';
+  a.href = url;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function downloadClient() {
+  const base = _currentHtmlName.replace(/\.html$/i, '') || 'report';
+  _triggerDownload(_serializeReport(false), base + '-client.html');
+}
+
+function downloadAdmin() {
+  const base = _currentHtmlName.replace(/\.html$/i, '') || 'report';
+  _triggerDownload(_serializeReport(true), base + '-admin.html');
 }
 </script>
 </body>
