@@ -162,6 +162,8 @@ export default function Home() {
 
   const [dateFrom, setDateFrom] = useState("2026-03-08");
   const [dateTo, setDateTo] = useState("2026-06-08");
+  const [localDateFrom, setLocalDateFrom] = useState("2026-03-08");
+  const [localDateTo, setLocalDateTo] = useState("2026-06-08");
   const [clientName, setClientName] = useState("Chetan Bhattacharji");
 
   const [scopeOpen, setScopeOpen] = useState(false);
@@ -625,12 +627,28 @@ export default function Home() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#2a3a4a", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>FROM</div>
-                    <input type="text" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} placeholder="YYYY-MM-DD" style={inputStyle} />
+                    <input
+                      type="text"
+                      value={localDateFrom}
+                      onChange={(e) => setLocalDateFrom(e.target.value)}
+                      onBlur={() => setDateFrom(localDateFrom)}
+                      onKeyDown={(e) => { if (e.key === "Enter") setDateFrom(localDateFrom); }}
+                      placeholder="YYYY-MM-DD"
+                      style={inputStyle}
+                    />
                   </div>
                   <span style={{ color: C.muted, fontSize: 16, paddingTop: 20 }}>→</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#2a3a4a", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>TO</div>
-                    <input type="text" value={dateTo} onChange={(e) => setDateTo(e.target.value)} placeholder="YYYY-MM-DD" style={inputStyle} />
+                    <input
+                      type="text"
+                      value={localDateTo}
+                      onChange={(e) => setLocalDateTo(e.target.value)}
+                      onBlur={() => setDateTo(localDateTo)}
+                      onKeyDown={(e) => { if (e.key === "Enter") setDateTo(localDateTo); }}
+                      placeholder="YYYY-MM-DD"
+                      style={inputStyle}
+                    />
                   </div>
                 </div>
                 <div style={{ marginTop: 14 }}>
