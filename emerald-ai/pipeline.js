@@ -588,6 +588,19 @@ async function run(cfg, cb) {
   costTracker.claudeInputTokens = 0;
   costTracker.claudeOutputTokens = 0;
 
+  // Simple concurrency limiter — no extra npm dep needed
+  function pLimit(concurrency) {
+    let active = 0;
+    const queue = [];
+    const next = () => {
+      if (active >= concurrency || queue.length === 0) return;
+      active++;
+      const { fn, resolve, reject } = queue.shift();
+      fn().then(r => { active--; resolve(r); next(); }).catch(e => { active--; reject(e); next(); });
+    };
+    return fn => new Promise((resolve, reject) => { queue.push({ fn, resolve, reject }); next(); });
+  }
+
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
 
   const SCOPE_KEYWORDS = cfg.SCOPE_KEYWORDS?.length
@@ -627,43 +640,37 @@ async function run(cfg, cb) {
   const arts = {};
   for (const o of ORGS) arts[o] = [];
 
-  for (const org of ORGS) {
-    const seen = new Set();
-    let skipped = 0;
-    for (const kw of SCOPE_KEYWORDS.slice(0, 8)) {
-      const q = `"${org}" ${kw} India`;
-      cb(`  ${q}`);
-      try {
-        const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
-        let added = 0;
-        for (const r of results) {
-          const k = r.link || r.title;
-          if (!seen.has(k)) {
-            seen.add(k);
-            if (!inRange(r.date || "")) {
-              skipped++;
-              continue;
-            }
-            const outlet = canonOutlet(r.source || dom(r.link || ""));
-            if (outlet !== null && isThirdParty(r.link || "", org)) {
-              arts[org].push({
-                title: r.title || "",
-                snippet: r.snippet || "",
-                source: outlet,
-                url: r.link || "",
-                date: r.date || "",
-              });
-              added++;
+  {
+    const limit1 = pLimit(4); // 4 orgs in parallel — safe for Serper rate limits
+    await Promise.allSettled(ORGS.map(org => limit1(async () => {
+      const seen = new Set();
+      let skipped = 0;
+      for (const kw of SCOPE_KEYWORDS.slice(0, 8)) {
+        const q = `"${org}" ${kw} India`;
+        cb(`  ${q}`);
+        try {
+          const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+          let added = 0;
+          for (const r of results) {
+            const k = r.link || r.title;
+            if (!seen.has(k)) {
+              seen.add(k);
+              if (!inRange(r.date || "")) { skipped++; continue; }
+              const outlet = canonOutlet(r.source || dom(r.link || ""));
+              if (outlet !== null && isThirdParty(r.link || "", org)) {
+                arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: outlet, url: r.link || "", date: r.date || "" });
+                added++;
+              }
             }
           }
+          cb(`  +${added} kept, ${skipped} outside date range`, "ok");
+        } catch (e) {
+          cb(`  Serper error: ${e.message}`, "warn");
         }
-        cb(`  +${added} kept, ${skipped} outside date range`, "ok");
-      } catch (e) {
-        cb(`  Serper error: ${e.message}`, "warn");
+        await sleep(300);
       }
-      await sleep(300);
-    }
-    cb(`  ${org}: ${arts[org].length} articles`, "ok");
+      cb(`  ${org}: ${arts[org].length} articles`, "ok");
+    })));
   }
 
   // ── STEP 1c: TV channel targeted searches ──────────────────
@@ -673,60 +680,55 @@ async function run(cfg, cb) {
   const tvKwClause = tvKws.length === 1
     ? `"${tvKws[0]}"`
     : `(${tvKws.map((k) => `"${k}"`).join(" OR ")})`;
-  for (const org of ORGS) {
-    const tvSeen = new Set(arts[org].map((a) => a.url || a.title));
-    for (const [channel, domain] of Object.entries(TV_CHANNEL_DOMAINS)) {
-      const q = `site:${domain} "${org}" ${tvKwClause}`;
-      cb(`  ${q}`);
-      try {
-        const results = await serperWebSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
-        let added = 0;
-        for (const r of results) {
-          const k = r.link || r.title;
-          if (!tvSeen.has(k)) {
-            tvSeen.add(k);
-            if (!inRange(r.date || "")) continue;
-            if (isThirdParty(r.link || "", org)) {
-              arts[org].push({
-                title: r.title || "",
-                snippet: r.snippet || "",
-                source: channel,
-                url: r.link || "",
-                date: r.date || "",
-              });
-              added++;
+  {
+    const limit1c = pLimit(4); // 4 orgs in parallel
+    await Promise.allSettled(ORGS.map(org => limit1c(async () => {
+      const tvSeen = new Set(arts[org].map((a) => a.url || a.title));
+      for (const [channel, domain] of Object.entries(TV_CHANNEL_DOMAINS)) {
+        const q = `site:${domain} "${org}" ${tvKwClause}`;
+        cb(`  ${q}`);
+        try {
+          const results = await serperWebSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+          let added = 0;
+          for (const r of results) {
+            const k = r.link || r.title;
+            if (!tvSeen.has(k)) {
+              tvSeen.add(k);
+              if (!inRange(r.date || "")) continue;
+              if (isThirdParty(r.link || "", org)) {
+                arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "" });
+                added++;
+              }
             }
           }
+          cb(`  ${channel} · ${org}: +${added}`, added > 0 ? "ok" : "warn");
+        } catch (e) {
+          cb(`  TV search error (${channel}): ${e.message}`, "warn");
         }
-        cb(`  ${channel} · ${org}: +${added}`, added > 0 ? "ok" : "warn");
-      } catch (e) {
-        cb(`  TV search error (${channel}): ${e.message}`, "warn");
+        await sleep(300);
       }
-      await sleep(300);
-    }
+    })));
   }
 
   // ── STEP 1b: Scrape article text ───────────────────────────
   cb(`\nSTEP 1b/6 — Scraping full article text...`, "head");
-  for (const org of ORGS) {
-    // Cap at 6 scrapes per org — at 13 orgs this is 78 total, keeping runtime reasonable
-    const toEnrich = arts[org].slice(0, 6);
-    for (let i = 0; i < toEnrich.length; i++) {
-      const a = toEnrich[i];
-      if (!a.url) continue;
+  {
+    // Flatten all (org, article) pairs and scrape concurrently — 8 at a time
+    const scrapeLimit = pLimit(8);
+    const scrapeJobs = ORGS.flatMap(org =>
+      arts[org].slice(0, 6).map((a, i) => ({ org, a, i, total: Math.min(arts[org].length, 6) }))
+    );
+    await Promise.allSettled(scrapeJobs.map(({ org, a, i, total }) => scrapeLimit(async () => {
+      if (!a.url) return;
       const txt = await serperScrape(a.url, cfg.SERPER_KEY);
       if (txt && txt.length > 300) {
         a.fullText = txt;
-        cb(
-          `  [${org} ${i + 1}/${toEnrich.length}] scraped ${txt.length} chars`,
-          "ok",
-        );
+        cb(`  [${org} ${i + 1}/${total}] scraped ${txt.length} chars`, "ok");
       } else {
         a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet}\n[Full text unavailable. If ${org} is not explicitly cited with data, mark Secondary Mention.]`;
-        cb(`  [${org} ${i + 1}/${toEnrich.length}] snippet fallback`, "warn");
+        cb(`  [${org} ${i + 1}/${total}] snippet fallback`, "warn");
       }
-      await sleep(250);
-    }
+    })));
   }
 
   // ── STEP 2: Classify with Claude ──────────────────────────
@@ -734,7 +736,9 @@ async function run(cfg, cb) {
   const cls = {};
   for (const o of ORGS) cls[o] = [];
 
-  for (const org of ORGS) {
+  {
+    const limit2 = pLimit(4); // 4 orgs in parallel; within each org batches stay sequential
+    await Promise.allSettled(ORGS.map(org => limit2(async () => {
     // Cap at 16 articles per org for classification — enough for signal at large org counts
     const al = arts[org].slice(0, 16);
     const batches = [];
@@ -835,6 +839,7 @@ ${txt}`;
       `  ${org} total classified: ${cls[org].length}`,
       cls[org].length > 0 ? "ok" : "err",
     );
+    })));
   }
 
   // ── STEP 3: AEO Visibility (via Social Intelligence module) ──
