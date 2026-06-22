@@ -90,7 +90,7 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   res.end();
 });
 
-router.get("/outputs", requireAuth, (_req: Request, res: Response) => {
+router.get("/outputs", requireAuth, async (_req: Request, res: Response) => {
   try {
     const files = fs
       .readdirSync(OUT_DIR)
@@ -101,7 +101,15 @@ router.get("/outputs", requireAuth, (_req: Request, res: Response) => {
         mtime: fs.statSync(path.join(OUT_DIR, f)).mtime.toISOString().slice(0, 16),
       }))
       .sort((a, b) => b.mtime.localeCompare(a.mtime));
-    res.json(files);
+
+    const logs = await db.select({ htmlName: reportLogsTable.htmlName, pptxName: reportLogsTable.pptxName, costInr: reportLogsTable.costInr }).from(reportLogsTable);
+    const costMap: Record<string, string> = {};
+    for (const log of logs) {
+      if (log.htmlName && log.costInr) costMap[log.htmlName] = log.costInr;
+      if (log.pptxName && log.costInr) costMap[log.pptxName] = log.costInr;
+    }
+
+    res.json(files.map((f) => ({ ...f, costInr: costMap[f.name] ?? null })));
   } catch {
     res.json([]);
   }
