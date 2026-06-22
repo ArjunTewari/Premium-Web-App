@@ -89,6 +89,8 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
+  req.setTimeout(0);
+  req.socket?.setTimeout(0);
 
   const send = (type: string, data: unknown) => {
     res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
