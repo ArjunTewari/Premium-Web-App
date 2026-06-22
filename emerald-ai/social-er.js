@@ -170,7 +170,6 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     { label: 'X/Twitter posts indexed',   value: totalXIndexed,    unit: '',               col: '#4a9fd4' },
     { label: 'Instagram posts indexed',   value: totalIgIndexed,   unit: '',               col: '#e05c9c' },
     { label: 'YouTube videos indexed',    value: totalYtVideos,    unit: '',               col: '#e53935' },
-    { label: 'Avg presence score',        value: `${avgScore}/10`, unit: topOrg ? `led by ${topOrg.org.split(' ').slice(-1)[0]}` : '', col: '#c9922a' },
   ].map(c => `
     <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
       <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">${c.label}</div>
