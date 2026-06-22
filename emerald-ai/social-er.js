@@ -166,10 +166,10 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
 
   const statCards = [
     { label: 'Orgs with social AQ posts', value: orgsWithPresence, unit: `of ${erResults.length} tracked`, col: '#4caf74' },
-    { label: 'LinkedIn posts indexed',    value: totalLiIndexed,   unit: 'via Google index',               col: '#4a7fd4' },
-    { label: 'X/Twitter posts indexed',   value: totalXIndexed,    unit: 'via Google index',               col: '#4a9fd4' },
-    { label: 'Instagram posts indexed',   value: totalIgIndexed,   unit: 'via Google index',               col: '#e05c9c' },
-    { label: 'YouTube videos indexed',    value: totalYtVideos,    unit: 'via Google index',               col: '#e53935' },
+    { label: 'LinkedIn posts indexed',    value: totalLiIndexed,   unit: '',               col: '#4a7fd4' },
+    { label: 'X/Twitter posts indexed',   value: totalXIndexed,    unit: '',               col: '#4a9fd4' },
+    { label: 'Instagram posts indexed',   value: totalIgIndexed,   unit: '',               col: '#e05c9c' },
+    { label: 'YouTube videos indexed',    value: totalYtVideos,    unit: '',               col: '#e53935' },
     { label: 'Avg presence score',        value: `${avgScore}/10`, unit: topOrg ? `led by ${topOrg.org.split(' ').slice(-1)[0]}` : '', col: '#c9922a' },
   ].map(c => `
     <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
