@@ -181,7 +181,12 @@ html, body {
   color: var(--tx); font-size: 12.5px;
   font-family: 'JetBrains Mono', monospace;
   outline: none;
+  color-scheme: dark;
   transition: border-color .2s, background .2s, box-shadow .2s;
+}
+.fld input[type=date]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
 }
 .fld input:focus, .fld textarea:focus {
   border-color: var(--amb);
@@ -633,11 +638,11 @@ html, body {
     <div class="row3">
       <div class="fld">
         <label>Date From</label>
-        <input id="dateFrom" value="2026-03-08" placeholder="YYYY-MM-DD">
+        <input type="date" id="dateFrom" value="2026-03-08">
       </div>
       <div class="fld">
         <label>Date To</label>
-        <input id="dateTo" value="2026-06-08" placeholder="YYYY-MM-DD">
+        <input type="date" id="dateTo" value="2026-06-08">
       </div>
       <div class="fld">
         <label>Client Name</label>
