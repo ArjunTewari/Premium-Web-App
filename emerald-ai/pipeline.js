@@ -3259,7 +3259,7 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
 ${sovBar()}
 <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o, i) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join("")}</div>
 </div>
-<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Newspaper Sites</div>
+<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Outlets</div>
 ${sovByOrgTable()}</section>
 
 <section class="sec" id="tv"><div class="sh"><div class="se">Section 03b</div><h2 class="st">TV Channel Coverage</h2>
