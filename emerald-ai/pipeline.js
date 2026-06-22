@@ -3265,7 +3265,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>${navOrgs}CONFIDENTIAL<br><span style="display:inline-block;margin-top:6px;padding:4px 8px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.3);border-radius:4px;color:var(--amber);font-weight:700">&#8377;${52 * ORGS.length}/month</span></div></nav>
 <main class="main">
-<header class="rh" id="header"><div class="ey">Air Quality Media Intelligence &middot; India &middot; ${esc(DATE_FROM)} to ${esc(DATE_TO)}</div>
+<header class="rh" id="header"><div class="ey">Air Quality Media Intelligence &middot; India</div>
 <h1 class="rt">Air Quality<br><span class="rti">TRIPLE Media Analytics</span></h1>
 <div class="rm">Period: ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)} &middot; ${tot} AQ articles &middot; ${now}</div>
 <div class="chips">${orgChips}</div>
