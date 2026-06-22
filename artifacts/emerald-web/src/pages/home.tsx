@@ -180,7 +180,7 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [trendStatus, setTrendStatus] = useState<{ text: string; ok: boolean } | null>(null);
 
-  const [result, setResult] = useState<{ htmlName: string; pptxName: string } | null>(null);
+  const [result, setResult] = useState<{ htmlName: string; pptxName: string; costInr?: number } | null>(null);
   const [prevReports, setPrevReports] = useState<ReportFile[]>([]);
 
   const logBoxRef = useRef<HTMLDivElement>(null);

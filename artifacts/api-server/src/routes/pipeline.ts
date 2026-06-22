@@ -65,9 +65,8 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { run } = require(pipelinePath) as any;
     const result = await run(cfg, cb);
-    send("done", { htmlName: result.htmlName, pptxName: result.pptxName });
-
     const costs = calculateReportCosts(cfg.ORGS, cfg.DATE_FROM, cfg.DATE_TO);
+    send("done", { htmlName: result.htmlName, pptxName: result.pptxName, costInr: costs.costInr });
     db.insert(reportLogsTable).values({
       organizations: cfg.ORGS,
       dateFrom: cfg.DATE_FROM,
