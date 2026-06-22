@@ -625,12 +625,12 @@ export default function Home() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#2a3a4a", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>FROM</div>
-                    <input type="text" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} placeholder="YYYY-MM-DD" style={inputStyle} />
+                    <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
                   </div>
                   <span style={{ color: C.muted, fontSize: 16, paddingTop: 20 }}>→</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#2a3a4a", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>TO</div>
-                    <input type="text" value={dateTo} onChange={(e) => setDateTo(e.target.value)} placeholder="YYYY-MM-DD" style={inputStyle} />
+                    <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
                   </div>
                 </div>
                 <div style={{ marginTop: 14 }}>
