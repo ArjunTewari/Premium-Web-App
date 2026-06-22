@@ -5,6 +5,45 @@ import { createRequire } from "node:module";
 import { db, reportLogsTable } from "@workspace/db";
 import { calculateReportCosts } from "../lib/auth.js";
 import { requireAuth, requireAdmin } from "../middleware/require-auth.js";
+import { ReplitConnectors } from "@replit/connectors-sdk";
+
+const ALERT_TO = "+918588098882";
+
+async function sendReportSms(costInr: number, orgs: string[], htmlName: string) {
+  try {
+    const connectors = new ReplitConnectors();
+
+    const accountsRes = await connectors.proxy("twilio", "/2010-04-01/Accounts.json", { method: "GET" });
+    const accountsData = await accountsRes.json() as { accounts?: { sid: string }[] };
+    const sid = accountsData.accounts?.[0]?.sid;
+    if (!sid) { console.warn("[SMS] Could not resolve Twilio account SID"); return; }
+
+    const numsRes = await connectors.proxy("twilio", `/2010-04-01/Accounts/${sid}/IncomingPhoneNumbers.json`, { method: "GET" });
+    const numsData = await numsRes.json() as { incoming_phone_numbers?: { phone_number: string }[] };
+    const from = numsData.incoming_phone_numbers?.[0]?.phone_number;
+    if (!from) { console.warn("[SMS] No From number on Twilio account"); return; }
+
+    const body = new URLSearchParams({
+      To:   ALERT_TO,
+      From: from,
+      Body: `Emerald AI ✓ Report ready\nOrgs: ${orgs.slice(0, 3).join(", ")}${orgs.length > 3 ? ` +${orgs.length - 3} more` : ""}\nFile: ${htmlName}\nCost: ₹${costInr.toFixed(2)}`,
+    });
+
+    const smsRes = await connectors.proxy("twilio", `/2010-04-01/Accounts/${sid}/Messages.json`, {
+      method: "POST",
+      body: body.toString(),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    const smsData = await smsRes.json() as { sid?: string; error_message?: string };
+    if (smsData.sid) {
+      console.log(`[SMS] Sent — SID ${smsData.sid}`);
+    } else {
+      console.warn("[SMS] Send failed:", smsData.error_message);
+    }
+  } catch (e) {
+    console.error("[SMS] Error:", e);
+  }
+}
 
 const require = createRequire(import.meta.url);
 
@@ -67,6 +106,7 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     const result = await run(cfg, cb);
     const costs = calculateReportCosts(cfg.ORGS, cfg.DATE_FROM, cfg.DATE_TO);
     send("done", { htmlName: result.htmlName, pptxName: result.pptxName, costInr: costs.costInr });
+    sendReportSms(costs.costInr, cfg.ORGS, result.htmlName ?? "").catch(() => {});
     db.insert(reportLogsTable).values({
       organizations: cfg.ORGS,
       dateFrom: cfg.DATE_FROM,
