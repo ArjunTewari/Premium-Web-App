@@ -3021,7 +3021,7 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
   </table>
 </div>`;
 
-  const appendixSections = ORGS.map((org) => {
+  const appendixSections = ORGS.map((org, orgIdx) => {
     const d = data[org];
     const cqColor = (q) =>
       q === "Data Cited"
@@ -3039,8 +3039,14 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
         return `<tr><td>${i + 1}</td><td>${esc(a.source || "")}</td><td style="font-size:10px">${esc(a.date || "")}</td><td style="max-width:260px">${esc(a.title || "")}</td><td style="font-size:10px;font-family:monospace;color:${cqColor(cq)}">${esc(cq)}</td><td>${a.url ? `<a href="${esc(a.url)}" target="_blank">link</a>` : "—"}</td></tr>`;
       })
       .join("");
-    return `<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:9px">${esc(org)} &mdash; ${d.total} articles</div>
-<table class="apt"><thead><tr><th>#</th><th>Outlet</th><th>Date</th><th>Headline</th><th>Classification</th><th>URL</th></tr></thead><tbody>${rows}</tbody></table><div style="margin-bottom:24px"></div>`;
+    return `<details ${orgIdx === 0 ? 'open' : ''} style="border:1px solid var(--border);border-radius:6px;margin-bottom:8px;overflow:hidden">
+<summary style="padding:10px 16px;cursor:pointer;background:var(--surface2);display:flex;align-items:center;justify-content:space-between;list-style:none;user-select:none">
+  <span style="font-size:13px;font-weight:600;color:var(--text)">${esc(org)} <span style="color:var(--muted);font-weight:400">&mdash; ${d.total} articles</span></span>
+  <span style="font-family:monospace;font-size:10px;color:var(--muted)">▾</span>
+</summary>
+<div style="padding:0 0 4px">
+<table class="apt"><thead><tr><th>#</th><th>Outlet</th><th>Date</th><th>Headline</th><th>Classification</th><th>URL</th></tr></thead><tbody>${rows}</tbody></table>
+</div></details>`;
   }).join("");
 
   const execCards = (
