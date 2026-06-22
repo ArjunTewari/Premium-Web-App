@@ -471,7 +471,7 @@ export default function Home() {
       </header>
 
       {/* ── Page content ────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: 980, margin: "0 auto", padding: "0 32px 80px", position: "relative", zIndex: 1 }}>
+      <div style={{ padding: "0 40px 80px", position: "relative", zIndex: 1 }}>
 
         {activeTab === "dashboard" && (<div>
 
@@ -770,6 +770,17 @@ export default function Home() {
               <>▶&nbsp; Generate Report</>
             )}
           </button>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10 }}>
+            <span style={{ fontSize: 11, color: C.muted, fontFamily: "'DM Mono', monospace" }}>
+              Estimated cost:
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: C.gold, fontFamily: "'DM Mono', monospace" }}>
+              ~₹52 ± 3
+            </span>
+            <span style={{ fontSize: 11, color: C.muted, fontFamily: "'DM Mono', monospace" }}>
+              per report &nbsp;·&nbsp; Serper + Claude + storage
+            </span>
+          </div>
         </SlideUp>
 
         {/* Trend status */}
