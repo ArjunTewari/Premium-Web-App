@@ -3304,7 +3304,7 @@ Data: Serper News API &middot; Claude Haiku 4.5 &middot; LLM AEO probing &middot
 <strong style="color:var(--text)">CONFIDENTIAL</strong> &mdash; prepared for ${esc(CLIENT_NAME || "client")}</footer>
 </main></div>
 <script>
-function td(id){var e=document.getElementById(id);if(e)e.classList.toggle('open');}
+function td(id){var e=document.getElementById(id);if(!e)return;if(e.classList.contains('evd')){e.classList.toggle('open');}else{e.style.display=e.style.display==='none'?'block':'none';}}
 var secs=document.querySelectorAll('.sec[id],header[id]');
 var nis=document.querySelectorAll('.nav-a');
 secs.forEach(function(s){new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){nis.forEach(function(n){n.classList.remove('active');});var a=document.querySelector('.nav-a[href="#'+e.target.id+'"]');if(a)a.classList.add('active');}});},{threshold:0.25,rootMargin:'-10% 0px -60% 0px'}).observe(s);});
