@@ -3130,7 +3130,7 @@ body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line
 .nav-a{display:block;padding:7px 20px;font-size:12px;color:var(--muted2);text-decoration:none;border-left:2px solid transparent}
 .nav-a:hover{color:var(--text);background:var(--surface2)}.nav-a.active{color:var(--amber);border-left-color:var(--amber);background:var(--amber-glow)}
 .sidenav-footer{margin-top:auto;padding:16px 20px 0;border-top:1px solid var(--border);font-family:monospace;font-size:10px;color:var(--muted);line-height:1.8}
-.main{flex:1;min-width:0;padding:0 48px 80px;max-width:960px}
+.main{flex:1;min-width:0;padding:0 48px 80px}
 .rh{padding:52px 0 44px;border-bottom:1px solid var(--border);margin-bottom:48px}
 .ey{font-family:monospace;font-size:11px;color:var(--amber);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
 .rt{font-family:'DM Serif Display',serif;font-size:42px;line-height:1.15;margin-bottom:10px;font-weight:400}
