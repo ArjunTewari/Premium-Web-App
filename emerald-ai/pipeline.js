@@ -2807,10 +2807,10 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
       </tr>`;
     }).join("");
 
-    return `<div style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;overflow:hidden"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--surface2)">
+    return `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--surface2)">
       <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Org</th>
       ${theadTopics}
-    </tr></thead><tbody>${tbodyRows}</tbody></table></div>`;
+    </tr></thead><tbody>${tbodyRows}</tbody></table></div></div>`;
   }
 
   function narrTable() {
