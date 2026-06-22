@@ -312,7 +312,7 @@ export default function Home() {
             if (line.startsWith("data:")) data = line.slice(5).trim();
           }
           if (!data) continue;
-          let parsed: { msg?: string; level?: string; htmlName?: string; pptxName?: string };
+          let parsed: { msg?: string; level?: string; htmlName?: string; pptxName?: string; costInr?: number };
           try { parsed = JSON.parse(data); } catch { continue; }
 
           if (event === "log") {
@@ -332,7 +332,7 @@ export default function Home() {
             }
           } else if (event === "done") {
             setProgress(100);
-            setResult({ htmlName: parsed.htmlName!, pptxName: parsed.pptxName! });
+            setResult({ htmlName: parsed.htmlName!, pptxName: parsed.pptxName!, costInr: parsed.costInr });
             await loadPrev();
           } else if (event === "error") {
             setLogs((prev) => [...prev, { msg: "✗ Fatal error: " + parsed.msg, level: "err" }]);
@@ -813,7 +813,9 @@ export default function Home() {
           <div style={{ background: "rgba(76,175,116,.06)", border: "1px solid rgba(76,175,116,.25)", borderRadius: 12, padding: 20, marginTop: 18 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: C.green, marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span>✓ Report ready</span>
-              <span style={{ fontSize: 12, fontWeight: 500, fontFamily: "'DM Mono', monospace", color: C.gold }}>~₹52 ± 3</span>
+              {result.costInr != null && (
+                <span style={{ fontSize: 12, fontWeight: 500, fontFamily: "'DM Mono', monospace", color: C.gold }}>₹{result.costInr.toFixed(2)}</span>
+              )}
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
               {/* Shareable report (strips Action Matrix) */}
