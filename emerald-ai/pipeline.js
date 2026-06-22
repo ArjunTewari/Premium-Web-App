@@ -316,7 +316,7 @@ async function callClaude(prompt, key, maxTokens = 2500) {
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
       },
-      timeout: 60000,
+      timeout: 90000,
     },
   );
   const usage = res.data.usage;
@@ -1034,12 +1034,12 @@ ${txt}`;
       callClaude(
         `Generate 4 actions for EACH of these orgs: ${ORGS.join(", ")} — based on Indian AQ media + AEO + social media intelligence.\n${orgSummary}\nWhite-space gap topics (AQ media conversations tracked orgs are absent from): ${emerging.map((e) => e.topic).join(",") || "none"}\nReturn ONLY JSON array of ${ORGS.length * 4} objects: [{"org":"orgname","priority":"Fix Now|Leverage|Optimise|Invest","area":"Media|Topics|Narrative|AEO|Social","action":"...","rationale":"1-2 sentences with specific data"}]`,
         cfg.CLAUDE_KEY,
-        Math.min(4000, 1000 + ORGS.length * 250),
+        Math.min(8000, 1200 + ORGS.length * 350),
       ),
       new Promise((_, rej) =>
         setTimeout(
-          () => rej(new Error("Action matrix timed out after 60s")),
-          60000,
+          () => rej(new Error("Action matrix timed out after 85s")),
+          85000,
         ),
       ),
     ]);
