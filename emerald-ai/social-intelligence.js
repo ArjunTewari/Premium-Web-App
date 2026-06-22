@@ -337,8 +337,13 @@ function buildAEOHtml(aeoResults, orgs) {
     <div style="width:40px;height:2px;background:#c9922a;margin:14px 0 0"></div>
   </div>
   ${summaryTable}
-  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;margin-bottom:8px">Question × Organisation Matrix</div>
-  ${qMatrix}
+  <details style="border:1px solid #252d40;border-radius:8px;overflow:hidden;margin-bottom:12px">
+    <summary style="padding:10px 16px;cursor:pointer;background:#181e2e;display:flex;align-items:center;justify-content:space-between;list-style:none;user-select:none">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a">Question × Organisation Matrix</span>
+      <span style="font-family:monospace;font-size:10px;color:#5e7494">▾ expand</span>
+    </summary>
+    <div style="padding:12px 0 4px">${qMatrix}</div>
+  </details>
   <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">${allLlms.join(' · ')} · ${queriesUsed.length} questions</div>
 </section>`;
 }
