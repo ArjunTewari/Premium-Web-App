@@ -770,17 +770,6 @@ export default function Home() {
               <>▶&nbsp; Generate Report</>
             )}
           </button>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10 }}>
-            <span style={{ fontSize: 11, color: C.muted, fontFamily: "'DM Mono', monospace" }}>
-              Estimated cost:
-            </span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: C.gold, fontFamily: "'DM Mono', monospace" }}>
-              ~₹52 ± 3
-            </span>
-            <span style={{ fontSize: 11, color: C.muted, fontFamily: "'DM Mono', monospace" }}>
-              per report &nbsp;·&nbsp; Serper + Claude + storage
-            </span>
-          </div>
         </SlideUp>
 
         {/* Trend status */}
@@ -822,8 +811,9 @@ export default function Home() {
         {/* ── Results ─────────────────────────────────────────────────── */}
         {result && (
           <div style={{ background: "rgba(76,175,116,.06)", border: "1px solid rgba(76,175,116,.25)", borderRadius: 12, padding: 20, marginTop: 18 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: C.green, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
-              ✓ Report ready
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.green, marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span>✓ Report ready</span>
+              <span style={{ fontSize: 12, fontWeight: 500, fontFamily: "'DM Mono', monospace", color: C.gold }}>~₹52 ± 3</span>
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
               {/* Shareable report (strips Action Matrix) */}
