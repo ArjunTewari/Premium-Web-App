@@ -254,11 +254,18 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const yt  = ytResults.find(y => y.org === r.org) || { videoCount: 0, videos: [], avgER: 0, avgViewER: 0, erMethod: 'none', totalViews: 0 };
     const col = scoreColor(r.presenceScore);
 
-    const postSnippets = (platform, items, linkCol) => items.slice(0, 1).map(s => `
-      <div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #252d40;border-radius:0 4px 4px 0;margin-top:5px">
-        <div style="font-size:11px;color:#8fa3b8;line-height:1.5">${escHtml((s.title || s.snippet || '').slice(0, 120))}</div>
-        ${s.link ? `<a href="${escHtml(s.link)}" style="font-size:10px;color:${linkCol};text-decoration:none;display:inline-block;margin-top:3px" target="_blank">↗ ${platform}</a>` : ''}
-      </div>`).join('');
+    const postSnippets = (platform, items, linkCol) => items.length === 0 ? '' : `
+      <div style="margin-top:6px">
+        <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">${platform} — ${items.length} post${items.length===1?'':'s'}</div>
+        ${items.map(s => `
+        <div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #252d40;border-radius:0 4px 4px 0;margin-bottom:3px">
+          ${s.link
+            ? `<a href="${escHtml(s.link)}" target="_blank" style="font-size:11px;color:${linkCol};text-decoration:none;line-height:1.4;display:block;font-weight:600">${escHtml((s.title || s.snippet || '').slice(0, 150))}${(s.title||s.snippet||'').length > 150 ? '…' : ''}</a>`
+            : `<div style="font-size:11px;color:#8fa3b8;line-height:1.4">${escHtml((s.title || s.snippet || '').slice(0, 150))}</div>`
+          }
+          ${s.snippet && s.title && s.link ? `<div style="font-size:10px;color:#5e7494;margin-top:2px;line-height:1.4">${escHtml(s.snippet.slice(0, 120))}${s.snippet.length>120?'…':''}</div>` : ''}
+        </div>`).join('')}
+      </div>`;
 
     const sortedYtVideos = [...(yt.videos || [])].sort((a, b) => (b.views ?? -1) - (a.views ?? -1));
     const hasApiMetrics  = sortedYtVideos.some(v => v.views !== null);
@@ -282,9 +289,10 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         <div style="display:flex;align-items:flex-start;gap:8px">
           <span style="font-family:monospace;font-size:9px;color:#3a4a5e;flex-shrink:0;margin-top:2px">#${idx+1}</span>
           <div style="flex:1;min-width:0">
-            <div style="font-size:11px;color:#8fa3b8;line-height:1.4;margin-bottom:2px">${escHtml((v.title || v.url || '').slice(0, 120))}</div>
+            ${v.url
+              ? `<a href="${escHtml(v.url)}" target="_blank" style="font-size:11px;color:#e53935;text-decoration:none;line-height:1.4;display:block;font-weight:600;margin-bottom:2px">${escHtml((v.title || v.url || '').slice(0, 150))}${(v.title||v.url||'').length>150?'…':''}</a>`
+              : `<div style="font-size:11px;color:#8fa3b8;line-height:1.4;margin-bottom:2px">${escHtml((v.title || '').slice(0, 150))}</div>`}
             <div style="font-family:monospace;font-size:9px;color:#5e7494">${metricsStr}${erStr}</div>
-            ${v.url ? `<a href="${escHtml(v.url)}" target="_blank" style="font-size:10px;color:#e53935;text-decoration:none;margin-top:2px;display:inline-block">↗ watch</a>` : ''}
           </div>
         </div>
       </div>`;
