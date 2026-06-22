@@ -3221,7 +3221,36 @@ body.edit-mode [contenteditable="true"]:focus{outline:1.5px solid rgba(201,146,4
 .sec-x:hover{background:rgba(224,92,92,.28)}
 body.edit-mode .sec-x{display:flex}
 .sec.sec-hidden{display:none}
-@media(max-width:900px){.sidenav{display:none}.main{padding:24px 20px 60px}.cp,.scc,.mg{grid-template-columns:1fr}.tg{grid-template-columns:1fr!important}.rt{font-size:28px}}`;
+@media(max-width:900px){
+  .sidenav{display:none}
+  .main{padding:24px 20px 60px;max-width:100%}
+  .rh{padding:32px 0 28px;margin-bottom:32px}
+  .rt{font-size:28px}
+  .st{font-size:22px}
+  .sd{font-size:12px}
+  .cp,.scc,.mg{grid-template-columns:1fr}
+  .tg{grid-template-columns:1fr!important}
+  .ch-hdr{flex-direction:column;gap:8px}
+  .wbars{height:64px}
+  .fc{flex-direction:column;gap:10px}
+  .fn{font-size:26px}
+  .em-hdr{flex-direction:column;gap:6px}
+  .scg{font-size:32px}
+  .edit-bar{top:8px;right:8px;gap:5px}
+  .nt,.at,.apt{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #score table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+@media(max-width:480px){
+  .main{padding:16px 14px 60px}
+  .rt{font-size:20px}
+  .st{font-size:18px}
+  .op{padding:14px 12px}
+  .sec{margin-bottom:36px}
+  .mch{padding:14px 12px}
+  .em-card{padding:14px 16px}
+  .scg{font-size:26px}
+  .ey{font-size:9px;letter-spacing:.08em}
+}`;
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AQ Intelligence &mdash; ${esc(ORGS.join(" vs "))}</title>

@@ -1235,8 +1235,9 @@ function _serializeReport(includeActions) {
   if (!includeActions) {
     const sec = clone.querySelector('#actions');
     if (sec) sec.remove();
-    const navLink = clone.querySelector('.nav-a[href="#actions"]');
-    if (navLink) navLink.remove();
+    clone.querySelectorAll('a.nav-a').forEach(function(a) {
+      if (a.getAttribute('href') === '#actions') a.parentNode.removeChild(a);
+    });
   }
 
   const html = '<!DOCTYPE html>\n' + clone.outerHTML;
