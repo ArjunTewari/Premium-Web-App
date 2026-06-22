@@ -216,7 +216,7 @@ function buildAEOHtml(aeoResults, orgs) {
     orgs.flatMap(o => Object.keys(aeoResults[o]?.llmBreakdown || {}))
   )];
 
-  const summaryTable = `<div style="overflow-x:auto;border:1px solid #252d40;border-radius:8px;margin-bottom:20px;overflow:hidden">
+  const summaryTable = `<div style="border:1px solid #252d40;border-radius:8px;margin-bottom:20px;overflow:hidden"><div style="overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead>
       <tr style="background:#181e2e">
@@ -251,7 +251,7 @@ function buildAEOHtml(aeoResults, orgs) {
       }).join('')}
     </tbody>
   </table>
-</div>`;
+</div></div>`;
 
   // ── Q×Org matrix table ────────────────────────────────────────────────────
   const llmLinks = {
@@ -315,7 +315,7 @@ function buildAEOHtml(aeoResults, orgs) {
     return `<th style="padding:10px 12px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${col};border-left:1px solid #252d40;white-space:nowrap">${escHtml(org)}</th>`;
   }).join('');
 
-  const qMatrix = `<div style="overflow-x:auto;border:1px solid #252d40;border-radius:8px;overflow:hidden;margin-bottom:12px">
+  const qMatrix = `<div style="border:1px solid #252d40;border-radius:8px;overflow:hidden;margin-bottom:12px"><div style="overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead>
       <tr style="background:#181e2e">
@@ -326,7 +326,7 @@ function buildAEOHtml(aeoResults, orgs) {
     </thead>
     <tbody>${qMatrixRows}</tbody>
   </table>
-</div>`;
+</div></div>`;
 
   return `
 <section style="margin-bottom:56px;scroll-margin-top:24px" id="aeo">
