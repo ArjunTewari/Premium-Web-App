@@ -70,7 +70,7 @@ async function runAEO(cfg, orgs, cb) {
       const responses = await Promise.allSettled(
         queriesUsed.map(q =>
           axios.post('https://api.openai.com/v1/chat/completions',
-            { model: 'gpt-4o-mini', max_tokens: 400, messages: [{ role: 'user', content: q }] },
+            { model: 'gpt-4o-mini', max_tokens: 150, messages: [{ role: 'system', content: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }, { role: 'user', content: q }] },
             { headers: { 'Authorization': `Bearer ${cfg.OPENAI_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000 }
           )
         )
@@ -101,7 +101,7 @@ async function runAEO(cfg, orgs, cb) {
       const responses = await Promise.allSettled(
         queriesUsed.map(q =>
           axios.post('https://api.perplexity.ai/chat/completions',
-            { model: 'sonar', max_tokens: 400, messages: [{ role: 'user', content: q }] },
+            { model: 'sonar', max_tokens: 150, messages: [{ role: 'system', content: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }, { role: 'user', content: q }] },
             { headers: { 'Authorization': `Bearer ${cfg.PERPLEXITY_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000 }
           )
         )
@@ -133,7 +133,7 @@ async function runAEO(cfg, orgs, cb) {
         queriesUsed.map(q =>
           axios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cfg.GEMINI_KEY}`,
-            { contents: [{ parts: [{ text: q }] }], generationConfig: { maxOutputTokens: 400 } },
+            { contents: [{ parts: [{ text: q }] }], systemInstruction: { parts: [{ text: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }] }, generationConfig: { maxOutputTokens: 150 } },
             { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
           )
         )
