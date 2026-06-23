@@ -723,10 +723,10 @@ async function run(cfg, cb) {
   cb(`\nSTEP 1c/6 — Filtering by org presence in scraped text...`, "head");
   for (const org of ORGS) {
     const before = arts[org].length;
-    arts[org] = arts[org].filter(a => countMentions(a.fullText || a.snippet || "", org) > 0);
+    arts[org] = arts[org].filter(a => a.fullText && countMentions(a.fullText, org) > 0);
     const dropped = before - arts[org].length;
     cb(
-      `  ${org}: ${dropped > 0 ? `dropped ${dropped} (org absent from scraped text) →` : "all present →"} ${arts[org].length} articles`,
+      `  ${org}: ${dropped > 0 ? `dropped ${dropped} (not scraped or org absent) →` : "all present →"} ${arts[org].length} articles`,
       arts[org].length > 0 ? "ok" : "warn",
     );
   }
@@ -810,17 +810,15 @@ ${txt}`;
   // ── STEP 2b: Filter unverified and off-topic articles ─────────
   cb(`\nSTEP 2b/6 — Filtering unverified and off-topic articles...`, "head");
   for (const org of ORGS) {
-    const classifiedArts = arts[org].slice(0, 16);
-    const unclassifiedArts = arts[org].slice(16);
-    const pairs = classifiedArts.map((a, i) => ({ art: a, cls: cls[org][i] }));
+    const pairs = arts[org].map((a, i) => ({ art: a, cls: cls[org][i] }));
     const kept = pairs.filter(({ cls: c }) => {
-      if (!c) return true;
+      if (!c) return false; // unclassified = not scraped or batch failed → drop
       if (c.citation_quality === "Not in scraped text") return false;
       if (c.aq_relevant === false) return false;
       return true;
     });
     const removed = pairs.length - kept.length;
-    arts[org] = kept.map((p) => p.art).concat(unclassifiedArts);
+    arts[org] = kept.map((p) => p.art);
     cls[org] = kept.map((p) => p.cls).filter(Boolean);
     cb(
       `  ${org}: ${removed > 0 ? `removed ${removed} unverified/off-topic →` : "all passed →"} ${arts[org].length} articles`,
