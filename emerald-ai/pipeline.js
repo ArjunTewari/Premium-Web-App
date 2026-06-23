@@ -25,9 +25,7 @@ const OUTLETS = [
 const PRINT_OUTLETS = [
   "Times of India",
   "Hindustan Times",
-  "India Today",
   "The Hindu",
-  "News18",
 ];
 const TV_CHANNELS_ENGLISH = ["NDTV", "News18", "India Today"];
 const TV_CHANNELS_HINDI = ["Aaj Tak", "India TV", "ABP News"];

@@ -24,6 +24,12 @@ const axios = require('axios');
 
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
 
+// Word-boundary org mention check — prevents "IIT" matching inside "IITM" etc.
+function orgMentioned(text, org) {
+  const escaped = org.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![A-Za-z])${escaped}(?![A-Za-z])`, 'i').test(text);
+}
+
 // The 5 AEO discovery questions asked to each LLM
 const AEO_QUESTIONS = [
   'Which Indian research organisations are the most authoritative sources on air quality data and policy in India?',
@@ -81,7 +87,7 @@ async function runAEO(cfg, orgs, cb) {
       for (const org of orgs) {
         let count = 0;
         texts.forEach((text, qi) => {
-          const mentioned = text.toLowerCase().includes(org.toLowerCase());
+          const mentioned = orgMentioned(text, org);
           if (mentioned) {
             count++;
             if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
@@ -112,7 +118,7 @@ async function runAEO(cfg, orgs, cb) {
       for (const org of orgs) {
         let count = 0;
         texts.forEach((text, qi) => {
-          const mentioned = text.toLowerCase().includes(org.toLowerCase());
+          const mentioned = orgMentioned(text, org);
           if (mentioned) {
             count++;
             if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
@@ -146,7 +152,7 @@ async function runAEO(cfg, orgs, cb) {
       for (const org of orgs) {
         let count = 0;
         texts.forEach((text, qi) => {
-          const mentioned = text.toLowerCase().includes(org.toLowerCase());
+          const mentioned = orgMentioned(text, org);
           if (mentioned) {
             count++;
             if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
