@@ -14,14 +14,9 @@ const OUTLETS = [
   "Times of India",
   "Hindustan Times",
   "The Hindu",
-  "Indian Express",
-  "Business Standard",
-  "The Print",
-  "Scroll",
-  "Deccan Herald",
-  "NDTV",
-  "News18",
   "India Today",
+  "News18",
+  "NDTV",
   "Aaj Tak",
   "India TV",
   "ABP News",
@@ -221,14 +216,6 @@ function canonOutlet(src) {
     return "India Today";
   if (s.includes("ndtv")) return "NDTV";
   if (s.includes("news18")) return "News18";
-  if (s.includes("the print") || s.includes("theprint")) return "The Print";
-  if (s.includes("scroll")) return "Scroll";
-  if (s.includes("indian express") || s.includes("indianexpress"))
-    return "Indian Express";
-  if (s.includes("business standard") || s.includes("bsind"))
-    return "Business Standard";
-  if (s.includes("deccan herald") || s.includes("deccanherald"))
-    return "Deccan Herald";
   if (s.includes("aaj tak") || s.includes("aajtak")) return "Aaj Tak";
   if (s.includes("india tv") || s.includes("indiatv")) return "India TV";
   if (s.includes("abp news") || s.includes("abplive")) return "ABP News";
