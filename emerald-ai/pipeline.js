@@ -293,20 +293,20 @@ async function serperScrape(url, key) {
     costTracker.serperQueries++;
     return (res.data.text || res.data.content || "")
       .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 2000);
+      .trim();
   } catch {
     return "";
   }
 }
 
 const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
+const CLAUDE_CLASSIFY_MODEL = "claude-sonnet-4-6";
 
-async function callClaude(prompt, key, maxTokens = 2500) {
+async function callClaude(prompt, key, maxTokens = 2500, model = CLAUDE_MODEL) {
   const res = await axios.post(
     "https://api.anthropic.com/v1/messages",
     {
-      model: CLAUDE_MODEL,
+      model,
       max_tokens: maxTokens,
       messages: [{ role: "user", content: prompt }],
     },
@@ -713,10 +713,10 @@ async function run(cfg, cb) {
   // ── STEP 1b: Scrape article text ───────────────────────────
   cb(`\nSTEP 1b/6 — Scraping full article text...`, "head");
   {
-    // Flatten all (org, article) pairs and scrape concurrently — 8 at a time
+    // Scrape up to 16 per org (matches classification cap) — concurrently, 8 at a time
     const scrapeLimit = pLimit(8);
     const scrapeJobs = ORGS.flatMap(org =>
-      arts[org].slice(0, 6).map((a, i) => ({ org, a, i, total: Math.min(arts[org].length, 6) }))
+      arts[org].slice(0, 16).map((a, i) => ({ org, a, i, total: Math.min(arts[org].length, 16) }))
     );
     await Promise.allSettled(scrapeJobs.map(({ org, a, i, total }) => scrapeLimit(async () => {
       if (!a.url) return;
@@ -725,10 +725,23 @@ async function run(cfg, cb) {
         a.fullText = txt;
         cb(`  [${org} ${i + 1}/${total}] scraped ${txt.length} chars`, "ok");
       } else {
-        a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet}\n[Full text unavailable. If ${org} is not explicitly cited with data, mark Secondary Mention.]`;
+        // Scrape failed — fall back to snippet so org mention can still be checked
+        a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet || ""}`;
         cb(`  [${org} ${i + 1}/${total}] snippet fallback`, "warn");
       }
     })));
+  }
+
+  // ── STEP 1c: Drop articles where org not found in scraped text ──
+  cb(`\nSTEP 1c/6 — Filtering by org presence in scraped text...`, "head");
+  for (const org of ORGS) {
+    const before = arts[org].length;
+    arts[org] = arts[org].filter(a => countMentions(a.fullText || a.snippet || "", org) > 0);
+    const dropped = before - arts[org].length;
+    cb(
+      `  ${org}: ${dropped > 0 ? `dropped ${dropped} (org absent from scraped text) →` : "all present →"} ${arts[org].length} articles`,
+      arts[org].length > 0 ? "ok" : "warn",
+    );
   }
 
   // ── STEP 2: Classify with Claude ──────────────────────────
@@ -739,7 +752,7 @@ async function run(cfg, cb) {
   {
     const limit2 = pLimit(4); // 4 orgs in parallel; within each org batches stay sequential
     await Promise.allSettled(ORGS.map(org => limit2(async () => {
-    // Cap at 16 articles per org for classification — enough for signal at large org counts
+    // All articles reaching this point already have the org in their scraped text (STEP 1c)
     const al = arts[org].slice(0, 16);
     const batches = [];
     for (let i = 0; i < al.length; i += 8) batches.push(al.slice(i, i + 8));
@@ -747,43 +760,17 @@ async function run(cfg, cb) {
     for (let bi = 0; bi < batches.length; bi++) {
       const batch = batches[bi];
 
-      // Separate articles: those with 0 mentions in scraped text are pre-classified;
-      // only articles where the org actually appears go to Claude.
-      const scrapeGap = [],
-        needsClaude = [];
-      batch.forEach((a, j) => {
+      // Every article here has the org in its text — compute mention counts and build prompt
+      const batchItems = batch.map((a, j) => {
         const ft = a.fullText || a.snippet || "";
-        const mc = countMentions(ft, org);
-        if (mc === 0) scrapeGap.push({ j, a, mc });
-        else needsClaude.push({ j, a, mc, ft });
+        return { j, a, mc: countMentions(ft, org), ft };
       });
 
-      // Pre-classify scrape-gap articles deterministically — Claude has nothing useful to see
-      const preItems = scrapeGap.map(({ j, a }) => ({
-        index: j,
-        outlet: a.source || "",
-        date: a.date || "",
-        citation_quality: "Not in scraped text",
-        mention_count: 0,
-        aq_subtopic: "General AQ",
-        evidence_quote: "org name not found in scraped text",
-        confidence: "Low",
-      }));
+      if (batchItems.length === 0) continue;
 
-      if (needsClaude.length === 0) {
-        cls[org] = cls[org].concat(preItems);
-        cb(
-          `  ${org} batch ${bi + 1}/${batches.length} — ${scrapeGap.length} scrape-gap, skipped Claude`,
-          "warn",
-        );
-        await sleep(100);
-        continue;
-      }
-
-      // Build prompt using centered 700-char windows for articles that do have mentions
-      const txt = needsClaude
+      const txt = batchItems
         .map(({ j, a, mc, ft }) => {
-          const window = extractRelevantWindow(ft, org, 700);
+          const window = extractRelevantWindow(ft, org, 1500);
           return `[${j}] SOURCE: ${a.source} | DATE: ${a.date} | ORG MENTIONS IN FULL SCRAPED TEXT: ${mc}\nTITLE: ${a.title}\nCONTENT: ${window}`;
         })
         .join("\n===\n");
@@ -792,7 +779,7 @@ async function run(cfg, cb) {
 
 For EACH numbered article, return one JSON object with:
 - index: the article number shown in [brackets]
-- citation_quality: "Data Cited" if a specific number, %, statistic, or named report FROM "${org}" appears in the CONTENT excerpt. "Named Mention" if org is named but no specific data cited. "Not Mentioned" if org does not appear in the excerpt. (Do NOT use "Not in scraped text" — that is set before this step for articles not shown here.)
+- citation_quality: "Data Cited" if a specific number, %, statistic, or named report FROM "${org}" appears in the CONTENT excerpt. "Named Mention" if org is named but no specific data cited. "Not Mentioned" if org does not appear in the excerpt.
 - aq_relevant: true if the article is substantively about air quality, pollution, emissions, AQ policy, or related environmental health in an Indian context. false if "${org}" appears only incidentally in an article whose main subject is unrelated to air quality (e.g. institutional rankings, awards, PhD programs, sports, unrelated research, general events).
 - mention_count: copy the ORG MENTIONS IN FULL SCRAPED TEXT number exactly as given — do not recount from the excerpt
 - aq_subtopic: EXACTLY one of: NCAP, Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance, Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI, Brick Kilns, Petrol Emissions, Diesel Emissions, Super Emitters, Thermal Power Plants, Household Pollution, Indoor Pollution, Biomass Air Pollution, Rice Residue Burning, Wheat Residue Burning, Road Dust, General AQ
@@ -801,7 +788,7 @@ For EACH numbered article, return one JSON object with:
 - date: date from DATE field
 - confidence: "High" or "Low"
 
-Note: CONTENT is a ~700-char window centered on the org's first mention in the scraped text — the org name should appear in it.
+Note: CONTENT is a ~700-char window centered on the org's first mention in the scraped text.
 
 Return ONLY a JSON array. No preamble, no markdown.
 [{"index":0,"outlet":"Times of India","date":"Mar 5, 2026","citation_quality":"Data Cited","aq_relevant":true,"mention_count":3,"aq_subtopic":"NCAP","evidence_quote":"CEEW found 23 of 131 cities met targets","confidence":"High"}]
@@ -809,30 +796,20 @@ Return ONLY a JSON array. No preamble, no markdown.
 ARTICLES:
 ${txt}`;
 
-      cb(
-        `  ${org} batch ${bi + 1}/${batches.length}${scrapeGap.length > 0 ? ` (${scrapeGap.length} scrape-gap pre-classified)` : ""}...`,
-      );
+      cb(`  ${org} batch ${bi + 1}/${batches.length} (${batchItems.length} articles)...`);
       try {
-        const raw = await callClaude(prompt, cfg.CLAUDE_KEY, 2500);
+        const raw = await callClaude(prompt, cfg.CLAUDE_KEY, 2500, CLAUDE_CLASSIFY_MODEL);
         cb(`  preview: ${raw.slice(0, 90).replace(/\n/g, " ")}`, "warn");
         const parsed = parseJ(raw);
         if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          // Merge Claude results with pre-classified, preserve original article order
-          const all = [...preItems, ...parsed].sort(
-            (a, b) => (a.index || 0) - (b.index || 0),
-          );
-          cls[org] = cls[org].concat(all);
-          cb(
-            `  +${all.length} classified (${parsed.length} Claude + ${preItems.length} scrape-gap)`,
-            "ok",
-          );
+          const sorted = [...parsed].sort((a, b) => (a.index || 0) - (b.index || 0));
+          cls[org] = cls[org].concat(sorted);
+          cb(`  +${sorted.length} classified`, "ok");
         } else {
           cb(`  parse failed: ${raw.slice(0, 80)}`, "err");
-          if (preItems.length > 0) cls[org] = cls[org].concat(preItems);
         }
       } catch (e) {
         cb(`  Claude error: ${e.message}`, "err");
-        if (preItems.length > 0) cls[org] = cls[org].concat(preItems);
       }
       await sleep(500);
     }
