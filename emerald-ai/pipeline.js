@@ -198,6 +198,26 @@ function extractRelevantWindow(text, org, windowSize = 700) {
   );
 }
 
+// Auto-generate a 3+ letter abbreviation from multi-word org names.
+// Returns null for short/single-word orgs that are already acronyms.
+const ABBR_STOP = new Set(['of','on','and','the','for','in','at','by','to','a','an','with','its','vs']);
+function getAbbreviation(orgName) {
+  const words = orgName.replace(/[^a-zA-Z\s]/g, ' ').trim().split(/\s+/)
+    .filter(w => w.length > 1 && !ABBR_STOP.has(w.toLowerCase()));
+  if (words.length < 2) return null;
+  const abbr = words.map(w => w[0].toUpperCase()).join('');
+  if (abbr.length < 3) return null;
+  if (orgName.replace(/[^a-zA-Z]/g, '').length <= 6) return null; // already short/acronym
+  return abbr;
+}
+
+// Word-boundary mention count for abbreviations (prevents "HEI" matching inside "their")
+function countAbbrMentions(text, abbr) {
+  if (!text || !abbr) return 0;
+  const esc = abbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return (text.match(new RegExp(`\\b${esc}\\b`, 'g')) || []).length;
+}
+
 function canonOutlet(src) {
   if (!src) return null;
   const s = src.toLowerCase();
@@ -654,6 +674,34 @@ async function run(cfg, cb) {
         }
         await sleep(300);
       }
+      // Abbreviation fallback — search for e.g. "HEI" if org = "Health Effects Institute"
+      const abbr = getAbbreviation(org);
+      if (abbr) {
+        cb(`  [abbr] searching for "${abbr}" (abbreviation of ${org})...`);
+        for (const kw of SCOPE_KEYWORDS.slice(0, 5)) {
+          const q = `"${abbr}" ${kw} India`;
+          try {
+            const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+            let added = 0;
+            for (const r of results) {
+              const k = r.link || r.title;
+              if (!seen.has(k)) {
+                seen.add(k);
+                if (!inRange(r.date || "")) continue;
+                const outlet = canonOutlet(r.source || dom(r.link || ""));
+                if (outlet !== null && isThirdParty(r.link || "", org)) {
+                  arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: outlet, url: r.link || "", date: r.date || "", matchTerm: abbr });
+                  added++;
+                }
+              }
+            }
+            if (added > 0) cb(`  +${added} via "${abbr}"`, "ok");
+          } catch (e) {
+            cb(`  Abbr search error: ${e.message}`, "warn");
+          }
+          await sleep(300);
+        }
+      }
       cb(`  ${org}: ${arts[org].length} articles`, "ok");
     })));
   }
@@ -669,6 +717,7 @@ async function run(cfg, cb) {
     const limit1c = pLimit(4); // 4 orgs in parallel
     await Promise.allSettled(ORGS.map(org => limit1c(async () => {
       const tvSeen = new Set(arts[org].map((a) => a.url || a.title));
+      const tvAbbr = getAbbreviation(org);
       for (const [channel, domain] of Object.entries(TV_CHANNEL_DOMAINS)) {
         const q = `site:${domain} "${org}" ${tvKwClause}`;
         cb(`  ${q}`);
@@ -689,6 +738,28 @@ async function run(cfg, cb) {
           cb(`  ${channel} · ${org}: +${added}`, added > 0 ? "ok" : "warn");
         } catch (e) {
           cb(`  TV search error (${channel}): ${e.message}`, "warn");
+        }
+        // Abbreviation TV search
+        if (tvAbbr) {
+          const qAbbr = `site:${domain} "${tvAbbr}" ${tvKwClause}`;
+          try {
+            const results = await serperWebSearch(qAbbr, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+            let added = 0;
+            for (const r of results) {
+              const k = r.link || r.title;
+              if (!tvSeen.has(k)) {
+                tvSeen.add(k);
+                if (!inRange(r.date || "")) continue;
+                if (isThirdParty(r.link || "", org)) {
+                  arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "", matchTerm: tvAbbr });
+                  added++;
+                }
+              }
+            }
+            if (added > 0) cb(`  ${channel} · "${tvAbbr}": +${added}`, "ok");
+          } catch (e) {
+            cb(`  TV abbr search error (${channel}): ${e.message}`, "warn");
+          }
         }
         await sleep(300);
       }
@@ -721,7 +792,11 @@ async function run(cfg, cb) {
   cb(`\nSTEP 1c/6 — Filtering by org presence in scraped text...`, "head");
   for (const org of ORGS) {
     const before = arts[org].length;
-    arts[org] = arts[org].filter(a => a.fullText && countMentions(a.fullText, org) > 0);
+    arts[org] = arts[org].filter(a => {
+      if (!a.fullText) return false;
+      if (a.matchTerm) return countAbbrMentions(a.fullText, a.matchTerm) > 0;
+      return countMentions(a.fullText, org) > 0;
+    });
     const dropped = before - arts[org].length;
     cb(
       `  ${org}: ${dropped > 0 ? `dropped ${dropped} (not scraped or org absent) →` : "all present →"} ${arts[org].length} articles`,
@@ -745,18 +820,21 @@ async function run(cfg, cb) {
     for (let bi = 0; bi < batches.length; bi++) {
       const batch = batches[bi];
 
-      // Every article here has the org in its text — compute mention counts and build prompt
+      // Every article here has the org (or its abbreviation) in its text
       const batchItems = batch.map((a, j) => {
-        const ft = a.fullText || a.snippet || "";
-        return { j, a, mc: countMentions(ft, org), ft };
+        const ft = a.fullText || "";
+        const term = a.matchTerm || org;
+        const mc = a.matchTerm ? countAbbrMentions(ft, a.matchTerm) : countMentions(ft, org);
+        return { j, a, mc, ft, term };
       });
 
       if (batchItems.length === 0) continue;
 
       const txt = batchItems
-        .map(({ j, a, mc, ft }) => {
-          const window = extractRelevantWindow(ft, org, 1500);
-          return `[${j}] SOURCE: ${a.source} | DATE: ${a.date} | ORG MENTIONS IN FULL SCRAPED TEXT: ${mc}\nTITLE: ${a.title}\nCONTENT: ${window}`;
+        .map(({ j, a, mc, ft, term }) => {
+          const window = extractRelevantWindow(ft, term, 1500);
+          const abbrNote = a.matchTerm ? ` (appears as "${a.matchTerm}")` : '';
+          return `[${j}] SOURCE: ${a.source} | DATE: ${a.date} | ORG MENTIONS IN FULL SCRAPED TEXT: ${mc}${abbrNote}\nTITLE: ${a.title}\nCONTENT: ${window}`;
         })
         .join("\n===\n");
 
