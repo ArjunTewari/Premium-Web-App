@@ -793,6 +793,7 @@ async function run(cfg, cb) {
 For EACH numbered article, return one JSON object with:
 - index: the article number shown in [brackets]
 - citation_quality: "Data Cited" if a specific number, %, statistic, or named report FROM "${org}" appears in the CONTENT excerpt. "Named Mention" if org is named but no specific data cited. "Not Mentioned" if org does not appear in the excerpt. (Do NOT use "Not in scraped text" — that is set before this step for articles not shown here.)
+- aq_relevant: true if the article is substantively about air quality, pollution, emissions, AQ policy, or related environmental health in an Indian context. false if "${org}" appears only incidentally in an article whose main subject is unrelated to air quality (e.g. institutional rankings, awards, PhD programs, sports, unrelated research, general events).
 - mention_count: copy the ORG MENTIONS IN FULL SCRAPED TEXT number exactly as given — do not recount from the excerpt
 - aq_subtopic: EXACTLY one of: NCAP, Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance, Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI, Brick Kilns, Petrol Emissions, Diesel Emissions, Super Emitters, Thermal Power Plants, Household Pollution, Indoor Pollution, Biomass Air Pollution, Rice Residue Burning, Wheat Residue Burning, Road Dust, General AQ
 - evidence_quote: exact phrase ≤12 words from content. "not mentioned" if absent.
@@ -803,7 +804,7 @@ For EACH numbered article, return one JSON object with:
 Note: CONTENT is a ~700-char window centered on the org's first mention in the scraped text — the org name should appear in it.
 
 Return ONLY a JSON array. No preamble, no markdown.
-[{"index":0,"outlet":"Times of India","date":"Mar 5, 2026","citation_quality":"Data Cited","mention_count":3,"aq_subtopic":"NCAP","evidence_quote":"CEEW found 23 of 131 cities met targets","confidence":"High"}]
+[{"index":0,"outlet":"Times of India","date":"Mar 5, 2026","citation_quality":"Data Cited","aq_relevant":true,"mention_count":3,"aq_subtopic":"NCAP","evidence_quote":"CEEW found 23 of 131 cities met targets","confidence":"High"}]
 
 ARTICLES:
 ${txt}`;
@@ -840,6 +841,27 @@ ${txt}`;
       cls[org].length > 0 ? "ok" : "err",
     );
     })));
+  }
+
+  // ── STEP 2b: Filter unverified and off-topic articles ─────────
+  cb(`\nSTEP 2b/6 — Filtering unverified and off-topic articles...`, "head");
+  for (const org of ORGS) {
+    const classifiedArts = arts[org].slice(0, 16);
+    const unclassifiedArts = arts[org].slice(16);
+    const pairs = classifiedArts.map((a, i) => ({ art: a, cls: cls[org][i] }));
+    const kept = pairs.filter(({ cls: c }) => {
+      if (!c) return true;
+      if (c.citation_quality === "Not in scraped text") return false;
+      if (c.aq_relevant === false) return false;
+      return true;
+    });
+    const removed = pairs.length - kept.length;
+    arts[org] = kept.map((p) => p.art).concat(unclassifiedArts);
+    cls[org] = kept.map((p) => p.cls).filter(Boolean);
+    cb(
+      `  ${org}: ${removed > 0 ? `removed ${removed} unverified/off-topic →` : "all passed →"} ${arts[org].length} articles`,
+      removed > 0 ? "warn" : "ok",
+    );
   }
 
   // ── STEP 3: AEO Visibility (via Social Intelligence module) ──
