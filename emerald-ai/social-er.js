@@ -187,6 +187,11 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   const maxYtVids = Math.max(...ytResults.map(r => r.videoCount || 0), 1);
 
   // ── Unified summary table ranked by total indexed posts ──────────────────
+  const colTotals = erResults.reduce((s, r) => {
+    const yt = ytResults.find(y => y.org === r.org) || { videoCount: 0 };
+    s.li += r.linkedinPosts; s.x += r.twitterPosts; s.ig += (r.instagramPosts || 0); s.yt += (yt.videoCount || 0);
+    return s;
+  }, { li: 0, x: 0, ig: 0, yt: 0 });
   const cohortTotal = erResults.reduce((s, r) => {
     const yt = ytResults.find(y => y.org === r.org) || { videoCount: 0 };
     return s + r.linkedinPosts + r.twitterPosts + (r.instagramPosts || 0) + (yt.videoCount || 0);
@@ -219,6 +224,15 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YouTube</th>
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap">SoV %</th>
+      </tr>
+      <tr style="background:#0f1422;border-top:1px solid #252d40">
+        <td colspan="2" style="padding:5px 12px;font-family:monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3a4a5e">COHORT TOTAL</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4a7fd4">${colTotals.li}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4a9fd4">${colTotals.x}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#e05c9c">${colTotals.ig}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#e53935">${colTotals.yt}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#c9922a">${cohortTotal}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4caf74">100%</td>
       </tr>
     </thead>
     <tbody>
