@@ -153,9 +153,8 @@ async function runAEO(cfg, orgs, cb) {
         }
         return r.value.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
       });
-      if (geminiErrors > 0) cb(`  Gemini: ${geminiErrors}/${queriesUsed.length} requests failed`, 'warn');
-      const successCount = texts.filter(t => t).length;
-      cb(`  Gemini: ${successCount}/${queriesUsed.length} responses received`, successCount > 0 ? 'ok' : 'warn');
+      if (geminiErrors > 0) cb(`  Gemini API: ${geminiErrors}/${queriesUsed.length} calls failed`, 'warn');
+      else cb(`  Gemini API: all ${queriesUsed.length} calls succeeded`, 'ok');
       for (const org of orgs) {
         let count = 0;
         texts.forEach((text, qi) => {
