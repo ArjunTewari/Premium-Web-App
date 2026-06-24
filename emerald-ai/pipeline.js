@@ -3092,7 +3092,6 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
             ? "#8b7cf8"
             : "var(--muted)";
     const rows = arts[org]
-      .slice(0, 15)
       .map((a, i) => {
         const c = d.classifications[i] || {};
         const cq = c.citation_quality || "—";
