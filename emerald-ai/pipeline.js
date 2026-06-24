@@ -2623,7 +2623,7 @@ function momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations = []) 
   const totalPerOrg = ORGS.map((o) => (arts[o] || []).length);
 
   const legend = ORGS.map((o, i) =>
-    `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:12px;height:12px;border-radius:2px;background:#${orgColors[i]}"></div>${esc(o)}</div>`
+    `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:#${orgColors[i]}"></div>${esc(o)}: <strong style="color:var(--text);font-weight:600">${totalPerOrg[i]}</strong></div>`
   ).join("");
 
   const weekBars = weeks.map((w, wi) => {
@@ -2633,7 +2633,8 @@ function momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations = []) 
       const h = count > 0 ? Math.max(2, Math.round((count / maxCount) * 76)) : 2;
       return `<div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#${orgColors[oi]};height:${h}px" title="${esc(org)}: ${count}"></div>`;
     }).join("");
-    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px">${bars}</div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">${label}</div></div>`;
+    const isLast = wi === weeks.length - 1;
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px${isLast ? "" : ";border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"}"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px">${bars}</div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">${label}</div></div>`;
   }).join("");
 
   const summary = ORGS.map((o, i) => `${esc(o)}: ${totalPerOrg[i]}`).join(" · ");
@@ -2659,8 +2660,7 @@ ${spikeAnnotations.sort((a, b) => b.count - a.count).map((s) => {
   return `
 <section class="sec" id="momentum"><div class="sh"><div class="se">Section 03c</div><h2 class="st">Coverage Momentum</h2>
 <div class="sd">Weekly AQ article volume per organisation over the report period. Spikes are identified and traced to triggering events.</div><div class="sdiv"></div></div>
-<div class="mch"><div class="ch-hdr"><div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:11px;color:var(--muted)">${esc(DATE_FROM)} to ${esc(DATE_TO)} &middot; ${summary}</div></div>
-<div style="display:flex;gap:12px;flex-wrap:wrap">${legend}</div></div>
+<div class="mch"><div style="margin-bottom:12px"><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:11px;color:var(--muted);margin-bottom:10px">${esc(DATE_FROM)} to ${esc(DATE_TO)}</div><div style="display:flex;gap:12px;flex-wrap:wrap">${legend}</div></div>
 <div class="wbars">${weekBars}</div>
 <div style="font-size:10px;color:var(--muted);margin-top:6px">Bar height = article count that week. Hover for exact count. Spikes annotated below.</div>
 </div>${spikeCards}</section>`;
