@@ -3330,7 +3330,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="edit-bar" id="edit-bar"><button class="edit-btn" id="edit-btn" onclick="toggleEdit()">&#9998; Edit Mode</button><button class="edit-btn edit-dl" id="dl-btn" onclick="dlEdit()">&#8595; Download Edited</button></div>
 <div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
-<div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a><a href="#method" class="nav-a">Methodology</a>
+<div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a>
 <div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">Share of Voice</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social &amp; Digital</div><a href="#social" class="nav-a">Social &amp; YouTube</a>
 <div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
@@ -3351,8 +3351,16 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
 <span id="exec-draft-icon" style="font-family:monospace;font-size:12px;color:var(--amber)">&#9660; Show draft</span>
 </div>
 <div id="exec-draft" style="display:none;padding:0 18px 18px">${execCards}</div>
-</div></section>
-<section class="sec" id="method"><div class="sh"><div class="se">Section 02</div><h2 class="st">Methodology</h2><div class="sd">How data was collected, filtered, and analysed. Serper News API for media coverage · Claude Haiku 4.5 for article classification · LLM probing (GPT-4o, Perplexity, Gemini) for AEO visibility · Serper web search for social AQ presence (LinkedIn + X/Twitter) · X metrics via page text scrape.</div><div class="sdiv"></div></div></section>
+</div>
+<div style="margin-top:20px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);font-size:11px;color:var(--muted2);line-height:1.7">
+  <strong style="font-weight:600;letter-spacing:.04em">METHODOLOGY</strong> &mdash;
+  Serper News API for media coverage &middot; Claude Sonnet 4.6 for article classification &middot;
+  LLM probing (GPT-4o, Perplexity Sonar, Gemini 1.5 Flash) for AEO visibility &middot;
+  Serper web search for social AQ presence (LinkedIn + X/Twitter) &middot;
+  Articles filtered to 9 core outlets: TOI, HT, The Hindu, NDTV, News18, India Today, Aaj Tak, India TV, ABP News &middot;
+  Only articles where the organisation is mentioned in scraped body text and classified as AQ-primary by Claude are included.
+</div>
+</section>
 <section class="sec" id="sov"><div class="sh"><div class="se">Section 03</div><h2 class="st">Share of Voice</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
 <div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div>
 <div style="display:flex;gap:12px;flex-wrap:wrap">${ORGS.map((o, i) => `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:12px;height:12px;border-radius:2px;background:${orgHex(i)}"></div>${esc(o)}</div>`).join("")}</div></div>
