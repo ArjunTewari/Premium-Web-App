@@ -139,16 +139,23 @@ async function runAEO(cfg, orgs, cb) {
         queriesUsed.map(q =>
           axios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cfg.GEMINI_KEY}`,
-            { contents: [{ parts: [{ text: q }] }], systemInstruction: { parts: [{ text: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }] }, generationConfig: { maxOutputTokens: 150 } },
+            { contents: [{ parts: [{ text: q }] }], generationConfig: { maxOutputTokens: 300 } },
             { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
           )
         )
       );
-      const texts = responses.map(r =>
-        r.status === 'fulfilled'
-          ? (r.value.data.candidates?.[0]?.content?.parts?.[0]?.text || '')
-          : ''
-      );
+      let geminiErrors = 0;
+      const texts = responses.map((r, i) => {
+        if (r.status === 'rejected') {
+          geminiErrors++;
+          if (i === 0) cb(`  Gemini error: ${r.reason?.response?.data?.error?.message || r.reason?.message || 'unknown'}`, 'warn');
+          return '';
+        }
+        return r.value.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      });
+      if (geminiErrors > 0) cb(`  Gemini: ${geminiErrors}/${queriesUsed.length} requests failed`, 'warn');
+      const successCount = texts.filter(t => t).length;
+      cb(`  Gemini: ${successCount}/${queriesUsed.length} responses received`, successCount > 0 ? 'ok' : 'warn');
       for (const org of orgs) {
         let count = 0;
         texts.forEach((text, qi) => {
