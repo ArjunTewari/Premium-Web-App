@@ -3362,8 +3362,7 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
 </div>
 </section>
 <section class="sec" id="sov"><div class="sh"><div class="se">Section 03</div><h2 class="st">AQ Press Analytics</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
-<div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div>
-<div style="display:flex;gap:12px;flex-wrap:wrap">${ORGS.map((o, i) => `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:12px;height:12px;border-radius:2px;background:${orgHex(i)}"></div>${esc(o)}</div>`).join("")}</div></div>
+<div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div></div>
 ${sovBar()}
 <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o, i) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join("")}</div>
 </div>
