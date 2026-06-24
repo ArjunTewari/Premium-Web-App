@@ -1705,7 +1705,7 @@ async function buildPPTX(
           },
           ...ORGS.map((org) => {
             const cnt = data[org].topicCounts[topic] || 0;
-            const label = cnt >= 5 ? "Leader" : cnt >= 2 ? "Active" : "Not Present";
+            const label = cnt >= 5 ? "Leader" : cnt >= 2 ? "Active" : "—";
             const fc = cnt >= 5 ? GOOD : cnt >= 2 ? "2d6ea8" : BORD;
             return {
               text: `${label} · ${cnt}`,
@@ -2842,13 +2842,11 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
       const orgCells = TOPICS.map((tk) => {
         const artList = topicArts[tk][org] || [];
         const cv = artList.length;
-        const label = cv >= 5 ? "Leader" : cv >= 2 ? "Active" : "Not Present";
+        const label = cv >= 5 ? "Leader" : "Active";
         const [bgCol, borderCol, textCol] = cv >= 5
           ? ["rgba(74,222,128,.10)", "rgba(74,222,128,.30)", "#4ade80"]
-          : cv >= 2
-            ? ["rgba(251,191,36,.10)", "rgba(251,191,36,.30)", "#fbbf24"]
-            : ["rgba(100,116,139,.06)", "rgba(100,116,139,.15)", "var(--muted)"];
-        if (cv === 0) {
+          : ["rgba(251,191,36,.10)", "rgba(251,191,36,.30)", "#fbbf24"];
+        if (cv <= 1) {
           return `<td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td>`;
         }
         const uid = `tm${org.replace(/\W/g,"")}${tk.replace(/\W/g,"")}`;
