@@ -59,8 +59,10 @@ app.post('/run', async (req, res) => {
     YOUTUBE_KEY:    body.youtubeKey   || process.env.YOUTUBE_KEY  || '',
     // Official YT channel handles per org — map of { orgName: '@handle' }
     ORG_YT_HANDLES: (body.orgYtHandles && typeof body.orgYtHandles === 'object') ? body.orgYtHandles : {},
-    // Social — always from server secrets
-    TWITTER_KEY:           process.env.TWITTER_KEY           || '',
+    // Social — always from server secrets (never from form body)
+    X_BEARER_TOKEN:          process.env.X_BEARER_TOKEN          || '',
+    META_ACCESS_TOKEN:       process.env.META_ACCESS_TOKEN       || '',
+    IG_BUSINESS_ACCOUNT_ID:  process.env.IG_BUSINESS_ACCOUNT_ID  || '',
     outDir: OUT_DIR
   };
 

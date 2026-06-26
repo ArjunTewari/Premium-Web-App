@@ -924,8 +924,8 @@ ${txt}`;
     cb(`  AEO error: ${e.message}`, "err");
   }
 
-  // ── STEP 4: Social Engagement Rate (Serper) ────────────────
-  cb(`\nSTEP 4/6 — Social Engagement Rate (Serper)...`, "head");
+  // ── STEP 4: Social Presence (X API / IG API / Serper fallback) ─────────
+  cb(`\nSTEP 4/6 — Social Presence (X API + Instagram API + Serper)...`, "head");
   const SocialER = require("./social-er");
   let socialERResults = [];
   let socialERHtml = "";
