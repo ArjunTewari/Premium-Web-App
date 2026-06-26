@@ -51,3 +51,4 @@ Thumbs.db
 # Secrets — never commit
 .env
 emerald-ai/.env
+.vercel

@@ -1,13 +1,16 @@
 {
   "version": 2,
-  "buildCommand": "pnpm --filter @workspace/api-zod build && pnpm --filter @workspace/db build && pnpm --filter @workspace/api-server build",
+  "buildCommand": "pnpm --filter @workspace/api-zod build && pnpm --filter @workspace/db build && pnpm --filter @workspace/api-server build && pnpm --filter @workspace/emerald-web build && cp -r artifacts/emerald-web/dist/. public/",
+  "outputDirectory": "public",
   "installCommand": "pnpm install",
   "functions": {
-    "artifacts/api-server/dist/index.mjs": {
-      "runtime": "nodejs22.x"
+    "artifacts/api-server/dist/handler.mjs": {
+      "maxDuration": 30
     }
   },
   "routes": [
-    { "src": "/(.*)", "dest": "artifacts/api-server/dist/index.mjs" }
+    { "src": "/api/(.*)", "dest": "artifacts/api-server/dist/handler.mjs" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
