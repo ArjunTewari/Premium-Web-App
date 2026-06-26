@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "pnpm --filter @workspace/api-zod build && pnpm --filter @workspace/db build && pnpm --filter @workspace/api-server build && pnpm --filter @workspace/emerald-web build && cp -r artifacts/emerald-web/dist/. public/",
+  "buildCommand": "pnpm --filter @workspace/api-zod build && pnpm --filter @workspace/db build && pnpm --filter @workspace/api-server build && pnpm --filter @workspace/emerald-web build",
   "outputDirectory": "public",
   "installCommand": "pnpm install",
   "routes": [
