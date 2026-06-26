@@ -4,8 +4,14 @@ import * as schema from "./schema";
 
 const { Pool } = pg;
 
-// Supabase Vercel integration sets POSTGRES_URL; fall back to DATABASE_URL for local dev
-const connectionString = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+// Check all common env var names across providers:
+// - DATABASE_URL: standard / local dev
+// - POSTGRES_URL: standard Vercel Postgres integration
+// - DATABASE_POSTGRES_URL: Supabase Vercel integration (prefixed)
+const connectionString =
+  process.env.DATABASE_URL ??
+  process.env.POSTGRES_URL ??
+  process.env.DATABASE_POSTGRES_URL;
 
 if (!connectionString) {
   throw new Error(
