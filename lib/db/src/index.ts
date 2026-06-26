@@ -4,12 +4,13 @@ import * as schema from "./schema";
 
 const { Pool } = pg;
 
-// Check all common env var names across providers:
-// - DATABASE_URL: standard / local dev
-// - POSTGRES_URL: standard Vercel Postgres integration
-// - DATABASE_POSTGRES_URL: Supabase Vercel integration (prefixed)
+// Prefer non-pooling URL for Drizzle/node-postgres compatibility
+// (PgBouncer pooling URLs don't support prepared statements).
+// Falls back through common env var names across providers.
 const connectionString =
   process.env.DATABASE_URL ??
+  process.env.POSTGRES_URL_NON_POOLING ??
+  process.env.DATABASE_POSTGRES_URL_NON_POOLING ??
   process.env.POSTGRES_URL ??
   process.env.DATABASE_POSTGRES_URL;
 
