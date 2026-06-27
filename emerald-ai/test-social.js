@@ -34,27 +34,6 @@ async function main() {
   console.log(`Orgs : ${ORGS.join(', ')}`);
   console.log(`Period: ${DATE_FROM} → ${DATE_TO}\n`);
 
-  // ── X API ──────────────────────────────────────────────────────────────
-  console.log('── X/Twitter ──────────────────────────────');
-  if (!process.env.X_BEARER_TOKEN) {
-    console.log('⚠  X_BEARER_TOKEN not set — skipping');
-  } else {
-    const xResults = await XCollector.run(ORGS, DATE_FROM, DATE_TO, process.env.X_BEARER_TOKEN, cb);
-    for (const org of ORGS) {
-      const r = xResults[org];
-      if (!r) { console.log(`  ${org}: no result`); continue; }
-      console.log(`\n  ${org} (@${r.handle})`);
-      console.log(`    Followers : ${(r.followers || 0).toLocaleString()}`);
-      console.log(`    Total tweets in period : ${r.totalPosts}`);
-      console.log(`    AQ tweets : ${r.aqPosts}`);
-      if (r.topPosts?.length) {
-        console.log(`    Top post  : ${r.topPosts[0].text?.slice(0, 100)}…`);
-        console.log(`    Likes     : ${r.topPosts[0].likes}`);
-      }
-      if (r.error) console.log(`    Error: ${r.error}`);
-    }
-  }
-
   // ── Instagram API ──────────────────────────────────────────────────────
   console.log('\n── Instagram ──────────────────────────────');
   if (!process.env.META_ACCESS_TOKEN || !process.env.IG_BUSINESS_ACCOUNT_ID) {
