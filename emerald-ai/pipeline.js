@@ -594,6 +594,7 @@ async function run(cfg, cb) {
 
   // ── STEP 1: Fetch articles via APIDirectio ────────────────
   cb(`\nSTEP 1/6 — Fetching articles via APIDirectio...`, "head");
+  cb(`  APIDirectio key: ${cfg.APIDIRECT_KEY ? cfg.APIDIRECT_KEY.slice(0,6) + '…' : 'MISSING'}`);
   const arts = {};
   for (const o of ORGS) arts[o] = [];
 
