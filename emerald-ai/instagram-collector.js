@@ -65,6 +65,18 @@ async function classifyPost(caption, claudeKey) {
   }
 }
 
+// taken_at can be an ISO string ("2026-06-23T12:31:34Z") or Unix seconds (taken_at_ts).
+// Returns milliseconds from epoch.
+function itemTs(m) {
+  // Prefer taken_at_ts (guaranteed Unix seconds) when present
+  if (m.taken_at_ts) return Number(m.taken_at_ts) * 1000;
+  const raw = m.taken_at ?? 0;
+  if (!raw) return 0;
+  if (typeof raw === 'string') return new Date(raw).getTime();
+  // Numeric: seconds if < 1e10, else already ms
+  return raw > 1e10 ? raw : raw * 1000;
+}
+
 async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, claudeKey, cb) {
   const fromTs = dateFrom ? new Date(dateFrom).getTime() : 0;
   const toTs   = dateTo   ? new Date(dateTo  ).getTime() : Date.now();
@@ -115,26 +127,12 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, cla
       const [items, cursor] = Array.isArray(res.data) ? res.data : [[], null];
       if (!items?.length) break;
 
-      // Debug: log first item's keys + timestamp fields on page 1
-      if (page === 0 && items[0]) {
-        const sample = items[0];
-        cb?.(`  IG DEBUG keys: ${Object.keys(sample).join(', ')}`, 'warn');
-        cb?.(`  IG DEBUG taken_at=${sample.taken_at} timestamp=${sample.timestamp} created_at=${sample.created_at} date=${sample.date}`, 'warn');
-      }
-
       allItems.push(...items);
       endCursor = cursor || null;
       page++;
 
       // Early stop: oldest post on this page is before our window — no point going further
-      // Use whichever timestamp field exists
-      const getTs = (m) => {
-        const raw = m.taken_at ?? m.timestamp ?? m.created_at ?? m.date ?? 0;
-        const n = typeof raw === 'string' ? parseInt(raw, 10) : Number(raw);
-        // If value looks like seconds (< 1e10), convert; if ms already, use as-is
-        return n > 1e10 ? n : n * 1000;
-      };
-      const oldestTs = items.reduce((min, m) => Math.min(min, getTs(m)), Infinity);
+      const oldestTs = items.reduce((min, m) => Math.min(min, itemTs(m)), Infinity);
       if (oldestTs > 0 && oldestTs < fromTs) break;
 
       if (endCursor) await sleep(400);
@@ -145,14 +143,8 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, cla
   } while (endCursor && page < MAX_PAGES);
 
   // ── Step 3: filter by report period ──────────────────────────────────────
-  const getTs = (m) => {
-    const raw = m.taken_at ?? m.timestamp ?? m.created_at ?? m.date ?? 0;
-    const n = typeof raw === 'string' ? parseInt(raw, 10) : Number(raw);
-    return n > 1e10 ? n : n * 1000;
-  };
-
   const inPeriod = allItems.filter(m => {
-    const ts = getTs(m);
+    const ts = itemTs(m);
     return ts >= fromTs && ts <= toTs;
   });
 
@@ -164,7 +156,7 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, cla
 
   // Normalise fields to match downstream expectations
   const normalised = inPeriod.map(m => {
-    const ts = getTs(m);
+    const ts = itemTs(m);
     const code = m.code || m.shortcode || '';
     return {
       caption:        m.caption_text || (typeof m.caption === 'string' ? m.caption : m.caption?.text) || '',
