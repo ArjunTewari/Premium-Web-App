@@ -101,7 +101,7 @@ async function run(cfg, selectedOrgs, cb) {
   }
 
   const useXApi = !!cfg.X_BEARER_TOKEN;
-  const useIgApi = !!(cfg.META_ACCESS_TOKEN && cfg.IG_BUSINESS_ACCOUNT_ID);
+  const useIgApi = !!cfg.HIKER_API_KEY;
 
   cb?.(`  Social Presence: ${selectedOrgs.length} orgs` +
     ` | X:${useXApi ? 'API' : 'Serper'} | IG:${useIgApi ? 'API' : 'Serper'} | LI:Serper`);
@@ -124,8 +124,7 @@ async function run(cfg, selectedOrgs, cb) {
       const IgCollector = require('./instagram-collector');
       igApiData = await IgCollector.run(
         selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO,
-        cfg.META_ACCESS_TOKEN, cfg.IG_BUSINESS_ACCOUNT_ID,
-        cfg.CLAUDE_KEY, cb
+        cfg.HIKER_API_KEY, cfg.CLAUDE_KEY, cb
       );
     } catch (e) {
       cb?.(`  IG API collection error: ${e.message}`, 'warn');
@@ -260,7 +259,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     <span style="font-family:monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Data sources:</span>
     <span style="font-family:monospace;font-size:10px;background:rgba(74,127,212,.12);border:1px solid rgba(74,127,212,.3);color:#4a7fd4;border-radius:4px;padding:2px 8px">LinkedIn · Serper index</span>
     <span style="font-family:monospace;font-size:10px;background:${useXApi  ? 'rgba(74,159,212,.12)' : 'rgba(94,116,148,.08)'};border:1px solid ${useXApi  ? 'rgba(74,159,212,.3)' : 'rgba(94,116,148,.2)'};color:${useXApi  ? '#4a9fd4' : '#5e7494'};border-radius:4px;padding:2px 8px">X/Twitter · ${useXApi  ? '✓ X API v2' : 'Serper index'}</span>
-    <span style="font-family:monospace;font-size:10px;background:${useIgApi ? 'rgba(224,92,156,.12)' : 'rgba(94,116,148,.08)'};border:1px solid ${useIgApi ? 'rgba(224,92,156,.3)' : 'rgba(94,116,148,.2)'};color:${useIgApi ? '#e05c9c' : '#5e7494'};border-radius:4px;padding:2px 8px">Instagram · ${useIgApi ? '✓ Meta Graph' : 'Serper index'}</span>
+    <span style="font-family:monospace;font-size:10px;background:${useIgApi ? 'rgba(224,92,156,.12)' : 'rgba(94,116,148,.08)'};border:1px solid ${useIgApi ? 'rgba(224,92,156,.3)' : 'rgba(94,116,148,.2)'};color:${useIgApi ? '#e05c9c' : '#5e7494'};border-radius:4px;padding:2px 8px">Instagram · ${useIgApi ? '✓ HikerAPI' : 'Serper index'}</span>
     <span style="font-family:monospace;font-size:10px;background:rgba(229,57,53,.12);border:1px solid rgba(229,57,53,.3);color:#e53935;border-radius:4px;padding:2px 8px">YouTube · ✓ Data API v3</span>
     <span style="font-family:monospace;font-size:10px;background:rgba(94,116,148,.08);border:1px solid rgba(94,116,148,.2);color:#5e7494;border-radius:4px;padding:2px 8px">LinkedIn API · pending</span>
   </div>`;
@@ -342,7 +341,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
 </div>
 <div style="font-family:monospace;font-size:9px;color:#3a4a5e;margin-bottom:16px">
   ${useXApi || useIgApi
-    ? `✓ = live API data (AQ-filtered). Counts reflect posts about air quality only.${useXApi ? ' X: client-side keyword filter.' : ''}${useIgApi ? ' IG: Claude Haiku AQ classification.' : ''} LI: Google-indexed posts (Serper). SoV % = org total ÷ cohort total.`
+    ? `✓ = live API data (AQ-filtered). Counts reflect posts about air quality only.${useXApi ? ' X: client-side keyword filter.' : ''}${useIgApi ? ' IG: HikerAPI + Claude Haiku AQ classification.' : ''} LI: Google-indexed posts (Serper). SoV % = org total ÷ cohort total.`
     : 'Counts = Google-indexed posts / official YouTube channel videos in the report period. LinkedIn · X/Twitter · Instagram via Serper index. SoV % = org total ÷ cohort total.'}
 </div>`;
 

@@ -36,13 +36,12 @@ async function main() {
 
   // ── Instagram API ──────────────────────────────────────────────────────
   console.log('\n── Instagram ──────────────────────────────');
-  if (!process.env.META_ACCESS_TOKEN || !process.env.IG_BUSINESS_ACCOUNT_ID) {
-    console.log('⚠  META_ACCESS_TOKEN or IG_BUSINESS_ACCOUNT_ID not set — skipping');
+  if (!process.env.HIKER_API_KEY) {
+    console.log('⚠  HIKER_API_KEY not set — skipping');
   } else {
     const igResults = await IgCollector.run(
       ORGS, DATE_FROM, DATE_TO,
-      process.env.META_ACCESS_TOKEN,
-      process.env.IG_BUSINESS_ACCOUNT_ID,
+      process.env.HIKER_API_KEY,
       process.env.CLAUDE_KEY,
       cb
     );

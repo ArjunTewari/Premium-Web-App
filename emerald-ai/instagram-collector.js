@@ -1,23 +1,22 @@
 'use strict';
 /**
- * instagram-collector.js — Instagram Graph API (Business Discovery)
+ * instagram-collector.js — Instagram data via HikerAPI
  *
- * Uses Business Discovery to read OTHER orgs' public Business/Creator accounts
- * WITHOUT requiring them to authenticate. Requires:
- *   - Your own Facebook Page linked to an Instagram Business Account
- *   - A long-lived Page Access Token (META_ACCESS_TOKEN)
- *   - Your IG Business Account ID (IG_BUSINESS_ACCOUNT_ID)
+ * HikerAPI wraps Instagram's private API to provide public profile + media data
+ * for ANY public account — no Meta app review, Business account, or user OAuth needed.
  *
  * Per org:
- *   1. Business Discovery → get target account's followers_count
- *   2. Business Discovery → paginate up to 150 recent media items
- *   3. Date filter (client-side — Meta API has no date range on Discovery)
+ *   1. GET /v1/user/by/username → pk (user ID) + follower_count
+ *   2. GET /v1/user/medias?user_id=pk&amount=150 → recent posts
+ *   3. Date filter (client-side — no server-side date range supported)
  *   4. Claude Haiku classification (captions use hashtags/emoji, not plain keywords)
+ *
+ * Auth: x-access-key header with HIKER_API_KEY
  */
 
 const axios = require('axios');
 
-const GRAPH_BASE = 'https://graph.facebook.com/v21.0';
+const HIKER_BASE = 'https://api.hikerapi.com/v2';
 const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
 
 // Default IG handles for tracked AQ orgs
@@ -66,65 +65,52 @@ async function classifyPost(caption, claudeKey) {
   }
 }
 
-async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, accessToken, igBusinessAccountId, claudeKey, cb) {
+async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, claudeKey, cb) {
   const fromTs = dateFrom ? new Date(dateFrom).getTime() : 0;
   const toTs   = dateTo   ? new Date(dateTo  ).getTime() : Date.now();
+  const headers = { 'x-access-key': hikerKey };
 
-  // ── Step 1: get target account info (followers) ───────────────────────────
-  let followers = 0;
+  // ── Step 1: get user info (pk + followers) ────────────────────────────────
+  let userId, followers;
   try {
-    const infoRes = await axios.get(`${GRAPH_BASE}/${igBusinessAccountId}`, {
-      params: {
-        fields:       'business_discovery.fields(id,username,followers_count)',
-        username:     igHandle,
-        access_token: accessToken,
-      },
+    const res = await axios.get(`${HIKER_BASE}/user/by/username`, {
+      params:  { username: igHandle },
+      headers,
       timeout: 15000,
     });
-    const bd = infoRes.data?.business_discovery;
-    if (!bd) {
-      cb?.(`  IG: @${igHandle} — not a Business/Creator account (Business Discovery returned no data)`, 'warn');
+    const u = res.data;
+    if (!u?.pk) {
+      cb?.(`  IG: @${igHandle} — not found or private`, 'warn');
       return { handle: igHandle, followers: 0, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalComments: 0, topPosts: [], ig_not_available: true };
     }
-    followers = bd.followers_count || 0;
+    userId    = u.pk;
+    followers = u.follower_count || 0;
   } catch (e) {
-    const errMsg = e.response?.data?.error?.message || e.message;
+    const errMsg = e.response?.data?.detail || e.response?.data?.message || e.message;
     cb?.(`  IG: @${igHandle} — ${errMsg}`, 'warn');
     return { handle: igHandle, followers: 0, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalComments: 0, topPosts: [], ig_not_available: true, error: errMsg };
   }
 
-  // ── Step 2: paginate media via Business Discovery (max 3 pages × 50) ────
-  const MEDIA_FIELDS = 'id,caption,timestamp,like_count,comments_count,media_type,permalink';
-  let allMedia  = [];
-  let afterCursor = null;
-  let page      = 0;
-
-  do {
-    const mediaField = afterCursor
-      ? `business_discovery.fields(media.after(${afterCursor}).limit(50){${MEDIA_FIELDS}})`
-      : `business_discovery.fields(media.limit(50){${MEDIA_FIELDS}})`;
-
-    try {
-      const res = await axios.get(`${GRAPH_BASE}/${igBusinessAccountId}`, {
-        params: { fields: mediaField, username: igHandle, access_token: accessToken },
-        timeout: 15000,
-      });
-      const edge = res.data?.business_discovery?.media;
-      if (!edge) break;
-
-      allMedia.push(...(edge.data || []));
-      afterCursor = edge.paging?.next ? (edge.paging?.cursors?.after || null) : null;
-      page++;
-      if (afterCursor) await sleep(300);
-    } catch (e) {
-      cb?.(`  IG: @${igHandle} media page error — ${e.message}`, 'warn');
-      break;
-    }
-  } while (afterCursor && page < 3); // cap: 150 posts
+  // ── Step 2: fetch up to 150 recent media ─────────────────────────────────
+  let items = [];
+  try {
+    const res = await axios.get(`${HIKER_BASE}/user/medias`, {
+      params:  { user_id: userId, amount: 150 },
+      headers,
+      timeout: 30000,
+    });
+    // HikerAPI may return { items: [...] } or the array directly
+    const body = res.data;
+    items = Array.isArray(body) ? body : (body?.items || []);
+  } catch (e) {
+    cb?.(`  IG: @${igHandle} media fetch error — ${e.message}`, 'warn');
+  }
 
   // ── Step 3: filter by report period ──────────────────────────────────────
-  const inPeriod = allMedia.filter(m => {
-    const ts = new Date(m.timestamp).getTime();
+  // taken_at is a Unix timestamp in seconds
+  const inPeriod = items.filter(m => {
+    const takenAt = typeof m.taken_at === 'string' ? parseInt(m.taken_at, 10) : (m.taken_at || 0);
+    const ts = takenAt * 1000;
     return ts >= fromTs && ts <= toTs;
   });
 
@@ -132,34 +118,47 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, accessToken, 
     return { handle: igHandle, followers, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalComments: 0, topPosts: [], ig_not_available: false };
   }
 
+  // Normalise fields to match downstream expectations
+  const normalised = inPeriod.map(m => {
+    const takenAt = typeof m.taken_at === 'string' ? parseInt(m.taken_at, 10) : (m.taken_at || 0);
+    const code = m.code || m.shortcode || '';
+    return {
+      caption:        m.caption_text || (typeof m.caption === 'string' ? m.caption : m.caption?.text) || '',
+      like_count:     m.like_count     || 0,
+      comments_count: m.comment_count  || m.comments_count || 0,
+      timestamp:      new Date(takenAt * 1000).toISOString(),
+      permalink:      code ? `https://www.instagram.com/p/${code}/` : '',
+    };
+  });
+
   // ── Step 4: classify with Claude Haiku in batches of 5 ───────────────────
   const aqMedia = [];
-  for (let i = 0; i < inPeriod.length; i += 5) {
-    const batch   = inPeriod.slice(i, i + 5);
-    const flags   = await Promise.all(batch.map(m => classifyPost(m.caption, claudeKey)));
+  for (let i = 0; i < normalised.length; i += 5) {
+    const batch = normalised.slice(i, i + 5);
+    const flags = await Promise.all(batch.map(m => classifyPost(m.caption, claudeKey)));
     flags.forEach((isAQ, j) => { if (isAQ) aqMedia.push(batch[j]); });
-    if (i + 5 < inPeriod.length) await sleep(500);
+    if (i + 5 < normalised.length) await sleep(500);
   }
 
-  const totalLikes    = aqMedia.reduce((s, m) => s + (m.like_count    || 0), 0);
-  const totalComments = aqMedia.reduce((s, m) => s + (m.comments_count || 0), 0);
+  const totalLikes    = aqMedia.reduce((s, m) => s + m.like_count,    0);
+  const totalComments = aqMedia.reduce((s, m) => s + m.comments_count, 0);
 
   const topPosts = aqMedia
-    .sort((a, b) => (b.like_count || 0) - (a.like_count || 0))
+    .sort((a, b) => b.like_count - a.like_count)
     .slice(0, 3)
     .map(m => ({
-      caption:   (m.caption || '').slice(0, 300),
-      likes:     m.like_count     || 0,
-      comments:  m.comments_count || 0,
+      caption:   m.caption.slice(0, 300),
+      likes:     m.like_count,
+      comments:  m.comments_count,
       timestamp: m.timestamp,
       permalink: m.permalink,
     }));
 
   return {
-    handle:          igHandle,
+    handle:           igHandle,
     followers,
-    totalPosts:      inPeriod.length,
-    aqPosts:         aqMedia.length,
+    totalPosts:       inPeriod.length,
+    aqPosts:          aqMedia.length,
     totalLikes,
     totalComments,
     topPosts,
@@ -168,19 +167,18 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, accessToken, 
 }
 
 /**
- * Collect Instagram data for all orgs.
+ * Collect Instagram data for all orgs via HikerAPI.
  * @param {string[]} orgs
- * @param {string}   dateFrom              - YYYY-MM-DD
- * @param {string}   dateTo                - YYYY-MM-DD
- * @param {string}   accessToken           - long-lived Page Access Token
- * @param {string}   igBusinessAccountId   - your own IG Business Account ID
- * @param {string}   claudeKey             - Anthropic API key (for Haiku classification)
- * @param {Function} cb                    - log callback
+ * @param {string}   dateFrom   - YYYY-MM-DD
+ * @param {string}   dateTo     - YYYY-MM-DD
+ * @param {string}   hikerKey   - HikerAPI access key
+ * @param {string}   claudeKey  - Anthropic API key (for Haiku classification)
+ * @param {Function} cb         - log callback
  * @returns {Object} { [orgName]: { handle, followers, aqPosts, topPosts, ... } }
  */
-async function run(orgs, dateFrom, dateTo, accessToken, igBusinessAccountId, claudeKey, cb) {
-  if (!accessToken || !igBusinessAccountId) {
-    cb?.('  Instagram API: missing META_ACCESS_TOKEN or IG_BUSINESS_ACCOUNT_ID — skipping', 'warn');
+async function run(orgs, dateFrom, dateTo, hikerKey, claudeKey, cb) {
+  if (!hikerKey) {
+    cb?.('  Instagram API: missing HIKER_API_KEY — skipping', 'warn');
     return {};
   }
   if (!claudeKey) {
@@ -188,7 +186,7 @@ async function run(orgs, dateFrom, dateTo, accessToken, igBusinessAccountId, cla
     return {};
   }
 
-  cb?.(`  Instagram API: collecting media for ${orgs.length} orgs…`);
+  cb?.(`  Instagram API (HikerAPI): collecting media for ${orgs.length} orgs…`);
   const results = {};
 
   for (const orgName of orgs) {
@@ -200,11 +198,11 @@ async function run(orgs, dateFrom, dateTo, accessToken, igBusinessAccountId, cla
     }
 
     cb?.(`  IG: @${handle} (${orgName})…`);
-    results[orgName] = await fetchOrgIGData(orgName, handle, dateFrom, dateTo, accessToken, igBusinessAccountId, claudeKey, cb);
+    results[orgName] = await fetchOrgIGData(orgName, handle, dateFrom, dateTo, hikerKey, claudeKey, cb);
     const r = results[orgName];
 
     if (r.ig_not_available) {
-      cb?.(`  IG → ${orgName}: not available (not a Business account)`, 'warn');
+      cb?.(`  IG → ${orgName}: not available`, 'warn');
     } else {
       cb?.(
         `  IG → ${orgName}: ${r.aqPosts} AQ posts / ${r.totalPosts} in period (${(r.followers || 0).toLocaleString()} followers)`,
