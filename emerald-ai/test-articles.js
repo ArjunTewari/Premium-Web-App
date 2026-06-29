@@ -50,7 +50,7 @@ const SOURCES = [
 // Query per org — use names journalists write, plus AQ terms.
 // Broader than the acronym alone to catch full-name references.
 const ORG_QUERY = {
-  'IIT Delhi':  'IIT Delhi air quality pollution AQI PM2.5',
+  'IIT Delhi':  '"IIT Delhi" air quality pollution AQI',
   'CSE India':  'Centre for Science and Environment air quality pollution',
   'CEEW':       'CEEW "Council on Energy Environment" air quality',
 };
