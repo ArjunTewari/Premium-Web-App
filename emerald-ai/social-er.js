@@ -3,12 +3,9 @@
  * social-er.js — Social AQ Presence
  *
  * Data sources (in priority order):
- *   X/Twitter  → X API v2 Bearer Token (x-collector.js) when X_BEARER_TOKEN set
- *                Fallback: Serper Google index
- *   Instagram  → Meta Graph Business Discovery (instagram-collector.js) when
- *                META_ACCESS_TOKEN + IG_BUSINESS_ACCOUNT_ID set
- *                Fallback: Serper Google index
- *   LinkedIn   → Serper Google index (no public API without user OAuth)
+ *   X/Twitter  → APIDirectio /v1/twitter/user/tweets (x-collector.js)
+ *   Instagram  → APIDirectio /v1/instagram/user/posts (instagram-collector.js)
+ *   LinkedIn   → APIDirectio /v1/linkedin/company/posts
  *   YouTube    → youtube-er.js (unchanged, called separately in pipeline.js)
  *
  * Presence scored 0–10:
@@ -17,9 +14,11 @@
  *   Relevance(0–3): 3 if any platform is API-verified, else keyword density
  */
 
-const axios = require('axios');
+const axios      = require('axios');
+const ORG_SOCIAL = require('./org-handles');
 
-const AQ_TERMS = '("air quality" OR "air pollution" OR AQI OR PM2.5 OR NCAP)';
+const APIDIR_BASE = 'https://apidirect.io';
+
 const AQ_KEYWORDS = [
   'air quality', 'air pollution', 'aqi', 'pm2.5', 'pm10', 'ncap', 'grap',
   'smog', 'clean air', 'pollution', 'black carbon', 'ozone', 'ammonia',
@@ -30,24 +29,32 @@ function escHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// ── Serper helper (LinkedIn fallback + X/IG fallback) ─────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-async function serperSearch(query, serperKey, dateFrom, dateTo, cb) {
+// ── APIDirectio LinkedIn company posts ─────────────────────────────────────
+
+async function fetchLinkedIn(companyUrl, apidirKey, dateFrom, dateTo, cb) {
+  if (!companyUrl) return [];
+  const fromMs = dateFrom ? new Date(dateFrom).getTime() : 0;
+  const toMs   = dateTo   ? new Date(dateTo  ).getTime() : Date.now();
   try {
-    const body = { q: query, num: 5 };
-    if (dateFrom && dateTo) {
-      const [fy, fm, fd] = dateFrom.split('-');
-      const [ty, tm, td] = dateTo.split('-');
-      body.tbs = `cdr:1,cd_min:${fm}/${fd}/${fy},cd_max:${tm}/${td}/${ty}`;
-    }
-    const res = await axios.post(
-      'https://google.serper.dev/search',
-      body,
-      { headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' }, timeout: 15000 }
-    );
-    return res.data.organic || [];
+    const res = await axios.get(`${APIDIR_BASE}/v1/linkedin/company/posts`, {
+      params:  { url: companyUrl, page: 1 },
+      headers: { 'X-API-Key': apidirKey },
+      timeout: 20000,
+    });
+    const posts = res.data.posts || [];
+    return posts.filter(p => {
+      if (!p.date) return true;
+      try {
+        const d = new Date(p.date);
+        if (isNaN(d.getTime())) return true;
+        const ms = d.getTime();
+        return ms >= fromMs && ms <= toMs;
+      } catch { return true; }
+    });
   } catch (e) {
-    cb?.(`  [SocialPresence] Serper error: ${e.message}`, 'warn');
+    cb?.(`  [SocialPresence] LinkedIn fetch error: ${e.response?.data?.error || e.message}`, 'warn');
     return [];
   }
 }
@@ -94,41 +101,30 @@ function scorePresence(liCount, xCount, igCount, apiVerified, liItems = []) {
 // ── Main run() ─────────────────────────────────────────────────────────────
 
 async function run(cfg, selectedOrgs, cb) {
-  const SERPER_KEY = cfg.SERPER_KEY;
-  if (!SERPER_KEY) {
-    cb?.('  [SocialPresence] No SERPER_KEY — skipping', 'warn');
+  const APIDIR_KEY = cfg.APIDIRECT_KEY;
+  if (!APIDIR_KEY) {
+    cb?.('  [SocialPresence] No APIDIRECT_KEY — skipping', 'warn');
     return [];
   }
 
-  const useXApi = !!cfg.X_BEARER_TOKEN;
-  const useIgApi = !!cfg.HIKER_API_KEY;
+  cb?.(`  Social Presence: ${selectedOrgs.length} orgs | X:APIDirectio | IG:APIDirectio | LI:APIDirectio`);
 
-  cb?.(`  Social Presence: ${selectedOrgs.length} orgs` +
-    ` | X:${useXApi ? 'API' : 'Serper'} | IG:${useIgApi ? 'API' : 'Serper'} | LI:Serper`);
-
-  // ── Pre-fetch X data for all orgs (one pass) ───────────────────────────
+  // ── Pre-fetch X data for all orgs ─────────────────────────────────────
   let xApiData = {};
-  if (useXApi) {
-    try {
-      const XCollector = require('./x-collector');
-      xApiData = await XCollector.run(selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO, cfg.X_BEARER_TOKEN, cb);
-    } catch (e) {
-      cb?.(`  X API collection error: ${e.message}`, 'warn');
-    }
+  try {
+    const XCollector = require('./x-collector');
+    xApiData = await XCollector.run(selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO, APIDIR_KEY, cb);
+  } catch (e) {
+    cb?.(`  X collection error: ${e.message}`, 'warn');
   }
 
-  // ── Pre-fetch IG data for all orgs (one pass) ──────────────────────────
+  // ── Pre-fetch IG data for all orgs ────────────────────────────────────
   let igApiData = {};
-  if (useIgApi) {
-    try {
-      const IgCollector = require('./instagram-collector');
-      igApiData = await IgCollector.run(
-        selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO,
-        cfg.HIKER_API_KEY, cfg.CLAUDE_KEY, cb
-      );
-    } catch (e) {
-      cb?.(`  IG API collection error: ${e.message}`, 'warn');
-    }
+  try {
+    const IgCollector = require('./instagram-collector');
+    igApiData = await IgCollector.run(selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO, APIDIR_KEY, cfg.CLAUDE_KEY, cb);
+  } catch (e) {
+    cb?.(`  IG collection error: ${e.message}`, 'warn');
   }
 
   // ── Per-org assembly ───────────────────────────────────────────────────
@@ -137,54 +133,27 @@ async function run(cfg, selectedOrgs, cb) {
   for (const orgName of selectedOrgs) {
     cb?.(`  [SocialPresence] "${orgName}"…`);
 
-    // LinkedIn: always Serper
-    const liItems = await serperSearch(
-      `"${orgName}" ${AQ_TERMS} site:linkedin.com/posts`,
-      SERPER_KEY, cfg.DATE_FROM, cfg.DATE_TO, cb
-    );
+    // LinkedIn: APIDirectio company posts
+    const liUrl   = ORG_SOCIAL[orgName]?.linkedin;
+    const liPosts = await fetchLinkedIn(liUrl, APIDIR_KEY, cfg.DATE_FROM, cfg.DATE_TO, cb);
+    const liCount = liPosts.length;
 
-    // X: API or Serper
-    let xItems      = [];
-    let xApiResult  = null;
-    let xApiCount   = 0;
-    if (useXApi && xApiData[orgName]) {
-      xApiResult = xApiData[orgName];
-      xApiCount  = xApiResult.aqPosts || 0;
-    } else {
-      xItems = await serperSearch(
-        `"${orgName}" ${AQ_TERMS} (site:x.com OR site:twitter.com)`,
-        SERPER_KEY, cfg.DATE_FROM, cfg.DATE_TO, cb
-      );
-    }
+    // X: APIDirectio user tweets
+    const xApiResult = xApiData[orgName] || null;
+    const xCount     = xApiResult?.aqPosts || 0;
 
-    // Instagram: API or Serper
-    let igItems     = [];
-    let igApiResult = null;
-    let igApiCount  = 0;
-    if (useIgApi && igApiData[orgName]) {
-      igApiResult = igApiData[orgName];
-      igApiCount  = igApiResult.ig_not_available ? 0 : (igApiResult.aqPosts || 0);
-    } else {
-      igItems = await serperSearch(
-        `"${orgName}" ${AQ_TERMS} site:instagram.com`,
-        SERPER_KEY, cfg.DATE_FROM, cfg.DATE_TO, cb
-      );
-    }
+    // Instagram: APIDirectio user posts
+    const igApiResult = igApiData[orgName] || null;
+    const igCount     = igApiResult?.ig_not_available ? 0 : (igApiResult?.aqPosts || 0);
 
-    // Effective counts for scoring
-    const xCount  = useXApi  ? xApiCount  : xItems.length;
-    const igCount = useIgApi ? igApiCount : igItems.length;
-    const liCount = liItems.length;
-    const apiVerified = useXApi || useIgApi;
-
-    const { presenceScore, scoreBreakdown } = scorePresence(liCount, xCount, igCount, apiVerified, liItems);
+    const { presenceScore, scoreBreakdown } = scorePresence(liCount, xCount, igCount, true, liPosts);
     const totalFound = liCount + xCount + igCount;
 
     orgResults.push({
       org:            orgName,
       presenceScore,
       scoreBreakdown,
-      avgER:          presenceScore, // pipeline.js compat
+      avgER:          presenceScore,
       twitterER:      0,
       linkedinER:     0,
       youtubeER:      0,
@@ -194,23 +163,23 @@ async function run(cfg, selectedOrgs, cb) {
       youtubePosts:   0,
       totalPosts:     totalFound,
       insight: totalFound > 0
-        ? `${liCount} LinkedIn · ${xCount} X${useXApi ? ' (API)' : ''} · ${igCount} Instagram${useIgApi ? ' (API)' : ''} · presence ${presenceScore}/10`
-        : 'No indexed social posts found in this period',
-      // Serper fallback data (used in HTML when API not available)
-      liResults:  liItems,
-      xResults:   xItems,
-      igResults:  igItems,
-      // API enrichment data (used in HTML when API available)
+        ? `${liCount} LinkedIn · ${xCount} X · ${igCount} Instagram · presence ${presenceScore}/10 (all via APIDirectio)`
+        : 'No AQ social posts found in this period',
+      liResults:  liPosts,
+      xResults:   [],
+      igResults:  [],
       xApiResult,
       igApiResult,
-      useXApi,
-      useIgApi,
+      useXApi:  true,
+      useIgApi: true,
     });
 
     cb?.(
-      `  [SocialPresence] ${orgName}: LI=${liCount} X=${xCount}${useXApi ? '(api)' : ''} IG=${igCount}${useIgApi ? '(api)' : ''} score=${presenceScore}/10`,
+      `  [SocialPresence] ${orgName}: LI=${liCount} X=${xCount}(api) IG=${igCount}(api) score=${presenceScore}/10`,
       totalFound > 0 ? 'ok' : 'warn'
     );
+
+    await sleep(300);
   }
 
   orgResults.sort((a, b) => b.presenceScore - a.presenceScore);
@@ -242,9 +211,9 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
 
   const statCards = [
     { label: 'Orgs with social AQ posts', value: orgsWithPresence, unit: `of ${erResults.length} tracked`, col: '#4caf74' },
-    { label: 'LinkedIn posts indexed',    value: totalLiIndexed,   unit: 'via Serper',                     col: '#4a7fd4' },
-    { label: 'X/Twitter AQ posts',        value: totalXIndexed,    unit: useXApi  ? 'via X API v2'  : 'via Serper index', col: '#4a9fd4' },
-    { label: 'Instagram AQ posts',        value: totalIgIndexed,   unit: useIgApi ? 'via Meta Graph' : 'via Serper index', col: '#e05c9c' },
+    { label: 'LinkedIn AQ posts',          value: totalLiIndexed,   unit: 'via APIDirectio',  col: '#4a7fd4' },
+    { label: 'X/Twitter AQ posts',        value: totalXIndexed,    unit: 'via APIDirectio',  col: '#4a9fd4' },
+    { label: 'Instagram AQ posts',        value: totalIgIndexed,   unit: 'via APIDirectio',  col: '#e05c9c' },
     { label: 'YouTube videos',            value: totalYtVideos,    unit: 'official channel',               col: '#e53935' },
   ].map(c => `
     <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">

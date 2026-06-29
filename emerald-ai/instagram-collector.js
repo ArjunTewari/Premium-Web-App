@@ -1,40 +1,21 @@
 'use strict';
 /**
- * instagram-collector.js — Instagram data via HikerAPI
+ * instagram-collector.js — Instagram data via APIDirectio
  *
- * HikerAPI wraps Instagram's private API to provide public profile + media data
- * for ANY public account — no Meta app review, Business account, or user OAuth needed.
+ * Replaces HikerAPI with APIDirectio /v1/instagram/user/posts.
+ * Fetches only from the org's own account (not keyword mentions).
  *
  * Per org:
- *   1. GET /v1/user/by/username → pk (user ID) + follower_count (User object, no wrapper)
- *   2. GET /v1/user/medias/chunk → [items[], end_cursor] — paginate up to 3 pages
- *   3. Date filter (client-side — no server-side date range supported)
- *   4. Claude Haiku classification (captions use hashtags/emoji, not plain keywords)
- *
- * Auth: x-access-key header with HIKER_API_KEY
+ *   1. GET /v1/instagram/user/posts?username={handle}&pages=3
+ *   2. Client-side date filter to report window
+ *   3. Claude Haiku AQ classification (captions use hashtags/emoji)
  */
 
-const axios = require('axios');
+const axios      = require('axios');
+const ORG_SOCIAL = require('./org-handles');
 
-const HIKER_BASE = 'https://api.hikerapi.com';
-const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
-
-// Default IG handles for tracked AQ orgs
-const ORG_IG_HANDLES = {
-  'CEEW':                             'ceewindia',
-  'WRI India':                        'wriindia',
-  'CSE India':                        'cseindia',
-  'CSTEP':                            'cstep_india',
-  'Air Pollution Action Group':       'apagindia',
-  'Chintan':                          'chintanindia',
-  'IIT Delhi':                        'iitdelhi',
-  'IIT Kanpur':                       'iitkanpur',
-  'Health Effects Institute':         'healtheffectsinstitute',
-  'ICCT':                             'theicct',
-  'EPIC India':                       'epic_india',
-  'Climate Trends':                   'climatetrendsindia',
-  'Sustainable Futures Collaborative':'sfc_india',
-};
+const APIDIR_BASE = 'https://apidirect.io';
+const CLAUDE_API  = 'https://api.anthropic.com/v1/messages';
 
 async function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
@@ -53,9 +34,9 @@ async function classifyPost(caption, claudeKey) {
       }],
     }, {
       headers: {
-        'x-api-key':          claudeKey,
-        'anthropic-version':  '2023-06-01',
-        'Content-Type':       'application/json',
+        'x-api-key':         claudeKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type':      'application/json',
       },
       timeout: 15000,
     });
@@ -65,168 +46,109 @@ async function classifyPost(caption, claudeKey) {
   }
 }
 
-// taken_at can be an ISO string ("2026-06-23T12:31:34Z") or Unix seconds (taken_at_ts).
-// Returns milliseconds from epoch.
-function itemTs(m) {
-  // Prefer taken_at_ts (guaranteed Unix seconds) when present
-  if (m.taken_at_ts) return Number(m.taken_at_ts) * 1000;
-  const raw = m.taken_at ?? 0;
-  if (!raw) return 0;
-  if (typeof raw === 'string') return new Date(raw).getTime();
-  // Numeric: seconds if < 1e10, else already ms
-  return raw > 1e10 ? raw : raw * 1000;
-}
+async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, apidirKey, claudeKey, cb) {
+  const fromMs = dateFrom ? new Date(dateFrom).getTime() : 0;
+  const toMs   = dateTo   ? new Date(dateTo  ).getTime() : Date.now();
 
-async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, claudeKey, cb) {
-  const fromTs = dateFrom ? new Date(dateFrom).getTime() : 0;
-  const toTs   = dateTo   ? new Date(dateTo  ).getTime() : Date.now();
-  const headers = { 'x-access-key': hikerKey };
-
-  // ── Step 1: get user info (pk + followers) ────────────────────────────────
-  // /v1/user/by/username returns the User object directly (no wrapper)
-  let userId, followers;
   try {
-    const res = await axios.get(`${HIKER_BASE}/v1/user/by/username`, {
-      params:  { username: igHandle },
-      headers,
-      timeout: 15000,
+    const res = await axios.get(`${APIDIR_BASE}/v1/instagram/user/posts`, {
+      params:  { username: igHandle, pages: 3 },
+      headers: { 'X-API-Key': apidirKey },
+      timeout: 60000,
     });
-    const u = res.data;
-    if (!u?.pk) {
-      cb?.(`  IG: @${igHandle} — not found or private`, 'warn');
-      return { handle: igHandle, followers: 0, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalComments: 0, topPosts: [], ig_not_available: true };
+
+    const posts = res.data.posts || [];
+
+    const inPeriod = posts.filter(p => {
+      if (!p.date) return true;
+      try {
+        const d = new Date(p.date);
+        if (isNaN(d.getTime())) return true;
+        const ms = d.getTime();
+        return ms >= fromMs && ms <= toMs;
+      } catch { return true; }
+    });
+
+    cb?.(`  IG: @${igHandle} fetched ${posts.length} posts, ${inPeriod.length} in period`);
+
+    if (inPeriod.length === 0) {
+      return { handle: igHandle, followers: 0, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalComments: 0, topPosts: [], ig_not_available: false };
     }
-    userId    = String(u.pk);
-    followers = u.follower_count || 0;
+
+    const normalised = inPeriod.map(p => ({
+      caption:        p.snippet || p.title || p.description || '',
+      like_count:     p.likes    || 0,
+      comments_count: p.comments || 0,
+      timestamp:      p.date     || '',
+      permalink:      p.url      || '',
+    }));
+
+    // Haiku AQ classification in batches of 5
+    const aqMedia = [];
+    for (let i = 0; i < normalised.length; i += 5) {
+      const batch = normalised.slice(i, i + 5);
+      const flags = await Promise.all(batch.map(m => classifyPost(m.caption, claudeKey)));
+      flags.forEach((isAQ, j) => { if (isAQ) aqMedia.push(batch[j]); });
+      if (i + 5 < normalised.length) await sleep(500);
+    }
+
+    const followers    = res.data.user?.followers || res.data.followers || 0;
+    const totalLikes   = aqMedia.reduce((s, m) => s + m.like_count,    0);
+    const totalComments = aqMedia.reduce((s, m) => s + m.comments_count, 0);
+
+    const topPosts = aqMedia
+      .sort((a, b) => b.like_count - a.like_count)
+      .slice(0, 3)
+      .map(m => ({
+        caption:   m.caption.slice(0, 300),
+        likes:     m.like_count,
+        comments:  m.comments_count,
+        timestamp: m.timestamp,
+        permalink: m.permalink,
+      }));
+
+    return {
+      handle:           igHandle,
+      followers,
+      totalPosts:       inPeriod.length,
+      aqPosts:          aqMedia.length,
+      totalLikes,
+      totalComments,
+      topPosts,
+      ig_not_available: false,
+    };
   } catch (e) {
-    const errMsg = e.response?.data?.detail || e.response?.data?.message || e.message;
+    const errMsg = e.response?.data?.error || e.response?.data?.message || e.message;
     cb?.(`  IG: @${igHandle} — ${errMsg}`, 'warn');
     return { handle: igHandle, followers: 0, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalComments: 0, topPosts: [], ig_not_available: true, error: errMsg };
   }
-
-  // ── Step 2: paginate media via /v1/user/medias/chunk ─────────────────────
-  // Returns [mediaItems[], end_cursor | null] — posts are newest-first.
-  // Stop when we've gone back past dateFrom or hit the page cap.
-  let allItems  = [];
-  let endCursor = null;
-  let page      = 0;
-  const MAX_PAGES = 15;
-
-  do {
-    try {
-      const params = { user_id: userId };
-      if (endCursor) params.end_cursor = endCursor;
-
-      const res = await axios.get(`${HIKER_BASE}/v1/user/medias/chunk`, {
-        params,
-        headers,
-        timeout: 30000,
-      });
-
-      // Response is [items[], end_cursor]
-      const [items, cursor] = Array.isArray(res.data) ? res.data : [[], null];
-      if (!items?.length) break;
-
-      allItems.push(...items);
-      endCursor = cursor || null;
-      page++;
-
-      // Early stop: oldest post on this page is before our window — no point going further
-      const oldestTs = items.reduce((min, m) => Math.min(min, itemTs(m)), Infinity);
-      if (oldestTs > 0 && oldestTs < fromTs) break;
-
-      if (endCursor) await sleep(400);
-    } catch (e) {
-      cb?.(`  IG: @${igHandle} media page ${page + 1} error — ${e.message}`, 'warn');
-      break;
-    }
-  } while (endCursor && page < MAX_PAGES);
-
-  // ── Step 3: filter by report period ──────────────────────────────────────
-  const inPeriod = allItems.filter(m => {
-    const ts = itemTs(m);
-    return ts >= fromTs && ts <= toTs;
-  });
-
-  cb?.(`  IG: @${igHandle} fetched ${allItems.length} total items, ${inPeriod.length} in period`);
-
-  if (inPeriod.length === 0) {
-    return { handle: igHandle, followers, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalComments: 0, topPosts: [], ig_not_available: false };
-  }
-
-  // Normalise fields to match downstream expectations
-  const normalised = inPeriod.map(m => {
-    const ts = itemTs(m);
-    const code = m.code || m.shortcode || '';
-    return {
-      caption:        m.caption_text || (typeof m.caption === 'string' ? m.caption : m.caption?.text) || '',
-      like_count:     m.like_count     || 0,
-      comments_count: m.comment_count  || m.comments_count || 0,
-      timestamp:      new Date(ts).toISOString(),
-      permalink:      code ? `https://www.instagram.com/p/${code}/` : '',
-    };
-  });
-
-  // ── Step 4: classify with Claude Haiku in batches of 5 ───────────────────
-  const aqMedia = [];
-  for (let i = 0; i < normalised.length; i += 5) {
-    const batch = normalised.slice(i, i + 5);
-    const flags = await Promise.all(batch.map(m => classifyPost(m.caption, claudeKey)));
-    flags.forEach((isAQ, j) => { if (isAQ) aqMedia.push(batch[j]); });
-    if (i + 5 < normalised.length) await sleep(500);
-  }
-
-  const totalLikes    = aqMedia.reduce((s, m) => s + m.like_count,    0);
-  const totalComments = aqMedia.reduce((s, m) => s + m.comments_count, 0);
-
-  const topPosts = aqMedia
-    .sort((a, b) => b.like_count - a.like_count)
-    .slice(0, 3)
-    .map(m => ({
-      caption:   m.caption.slice(0, 300),
-      likes:     m.like_count,
-      comments:  m.comments_count,
-      timestamp: m.timestamp,
-      permalink: m.permalink,
-    }));
-
-  return {
-    handle:           igHandle,
-    followers,
-    totalPosts:       inPeriod.length,
-    aqPosts:          aqMedia.length,
-    totalLikes,
-    totalComments,
-    topPosts,
-    ig_not_available: false,
-  };
 }
 
 /**
- * Collect Instagram data for all orgs via HikerAPI.
+ * Collect Instagram data for all orgs via APIDirectio.
  * @param {string[]} orgs
  * @param {string}   dateFrom   - YYYY-MM-DD
  * @param {string}   dateTo     - YYYY-MM-DD
- * @param {string}   hikerKey   - HikerAPI access key
+ * @param {string}   apidirKey  - APIDirectio API key
  * @param {string}   claudeKey  - Anthropic API key (for Haiku classification)
  * @param {Function} cb         - log callback
  * @returns {Object} { [orgName]: { handle, followers, aqPosts, topPosts, ... } }
  */
-async function run(orgs, dateFrom, dateTo, hikerKey, claudeKey, cb) {
-  if (!hikerKey) {
-    cb?.('  Instagram API: missing HIKER_API_KEY — skipping', 'warn');
+async function run(orgs, dateFrom, dateTo, apidirKey, claudeKey, cb) {
+  if (!apidirKey) {
+    cb?.('  Instagram: no APIDIRECT_KEY — skipping', 'warn');
     return {};
   }
   if (!claudeKey) {
-    cb?.('  Instagram API: no CLAUDE_KEY for Haiku classification — skipping', 'warn');
+    cb?.('  Instagram: no CLAUDE_KEY for Haiku classification — skipping', 'warn');
     return {};
   }
 
-  cb?.(`  Instagram API (HikerAPI): collecting media for ${orgs.length} orgs…`);
+  cb?.(`  Instagram (APIDirectio): collecting posts for ${orgs.length} orgs…`);
   const results = {};
 
   for (const orgName of orgs) {
-    const handle = ORG_IG_HANDLES[orgName];
+    const handle = ORG_SOCIAL[orgName]?.instagram;
     if (!handle) {
       cb?.(`  IG: no handle configured for "${orgName}" — skipping`, 'warn');
       results[orgName] = { handle: null, followers: 0, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalComments: 0, topPosts: [], ig_not_available: false };
@@ -234,7 +156,7 @@ async function run(orgs, dateFrom, dateTo, hikerKey, claudeKey, cb) {
     }
 
     cb?.(`  IG: @${handle} (${orgName})…`);
-    results[orgName] = await fetchOrgIGData(orgName, handle, dateFrom, dateTo, hikerKey, claudeKey, cb);
+    results[orgName] = await fetchOrgIGData(orgName, handle, dateFrom, dateTo, apidirKey, claudeKey, cb);
     const r = results[orgName];
 
     if (r.ig_not_available) {
@@ -249,8 +171,8 @@ async function run(orgs, dateFrom, dateTo, hikerKey, claudeKey, cb) {
     await sleep(500);
   }
 
-  cb?.('  Instagram API: collection complete', 'ok');
+  cb?.('  Instagram (APIDirectio): collection complete', 'ok');
   return results;
 }
 
-module.exports = { run, ORG_IG_HANDLES };
+module.exports = { run };

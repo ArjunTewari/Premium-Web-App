@@ -32,80 +32,8 @@ const DATE_FROM = '2026-02-01';
 const DATE_TO   = '2026-05-01';
 const API_BASE  = 'https://apidirect.io';
 
-// Official account handles per platform.
-// Twitter  → username without @  (used for /v1/twitter/user/tweets)
-// LinkedIn → full company page URL (used for /v1/linkedin/company/posts)
-// Instagram → username           (used for /v1/instagram/user/posts)
-// Verify / add slugs before running for new orgs.
-const ORG_SOCIAL = {
-  'CEEW': {
-    twitter:   'CEEWIndia',
-    linkedin:  'https://www.linkedin.com/company/council-on-energy-environment-and-water/',
-    instagram: 'ceewindia',
-    youtube:   'UCNF-vGnm1jdA_jhrIpk84Tg',
-  },
-  'CSE India': {
-    twitter:   'cseindia',
-    linkedin:  'https://www.linkedin.com/company/centre-for-science-and-environment-new-delhi/',
-    instagram: 'cseindia',
-    youtube:   null,
-  },
-  'WRI India': {
-    twitter:   'WRIIndia',
-    linkedin:  'https://www.linkedin.com/company/wri-india',
-    instagram: 'wriindia',
-  },
-  'CSTEP': {
-    twitter:   'CSTEP_India',
-    linkedin:  'https://www.linkedin.com/company/cstep',
-    instagram: 'cstep_india',
-  },
-  'Air Pollution Action Group': {
-    twitter:   'APAGIndia',
-    linkedin:  'https://www.linkedin.com/company/air-pollution-action-group',
-    instagram: 'apagindia',
-  },
-  'Chintan': {
-    twitter:   'ChintanIndia',
-    linkedin:  'https://www.linkedin.com/company/chintan-environmental-research-and-action-group',
-    instagram: 'chintanindia',
-  },
-  'IIT Delhi': {
-    twitter:   'IITDelhi',
-    linkedin:  'https://www.linkedin.com/school/indian-institute-of-technology-delhi',
-    instagram: 'iitdelhi',
-  },
-  'IIT Kanpur': {
-    twitter:   'IITKanpur',
-    linkedin:  'https://www.linkedin.com/school/indian-institute-of-technology-kanpur',
-    instagram: 'iitkanpur',
-  },
-  'Health Effects Institute': {
-    twitter:   'HealthEffects',
-    linkedin:  'https://www.linkedin.com/company/health-effects-institute',
-    instagram: 'healtheffectsinstitute',
-  },
-  'ICCT': {
-    twitter:   'TheICCT',
-    linkedin:  'https://www.linkedin.com/company/international-council-on-clean-transportation',
-    instagram: 'theicct',
-  },
-  'EPIC India': {
-    twitter:   'EPICIndia',
-    linkedin:  'https://www.linkedin.com/company/epic-india',
-    instagram: 'epic_india',
-  },
-  'Climate Trends': {
-    twitter:   'ClimateHound',
-    linkedin:  'https://www.linkedin.com/company/climate-trends',
-    instagram: 'climatetrendsindia',
-  },
-  'Sustainable Futures Collaborative': {
-    twitter:   'SFCIndia',
-    linkedin:  'https://www.linkedin.com/company/sustainable-futures-collaborative',
-    instagram: 'sfc_india',
-  },
-};
+// Official account handles — single source of truth is org-handles.js
+const ORG_SOCIAL = require('./org-handles');
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
