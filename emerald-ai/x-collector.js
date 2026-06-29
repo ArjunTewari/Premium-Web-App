@@ -97,7 +97,7 @@ async function fetchOrgXData(orgName, handle, dateFrom, dateTo, apidirKey, cb) {
  * @param {Function} cb         - log callback(msg, level)
  * @returns {Object} { [orgName]: { handle, followers, totalPosts, aqPosts, topPosts, ... } }
  */
-async function run(orgs, dateFrom, dateTo, apidirKey, cb) {
+async function run(orgs, dateFrom, dateTo, apidirKey, cb, extraHandles = {}) {
   if (!apidirKey) {
     cb?.('  X: no APIDIRECT_KEY — skipping', 'warn');
     return {};
@@ -107,7 +107,7 @@ async function run(orgs, dateFrom, dateTo, apidirKey, cb) {
   const results = {};
 
   for (const orgName of orgs) {
-    const handle = ORG_SOCIAL[orgName]?.twitter;
+    const handle = extraHandles[orgName]?.twitter || ORG_SOCIAL[orgName]?.twitter;
     if (!handle) {
       cb?.(`  X: no handle configured for "${orgName}" — skipping`, 'warn');
       results[orgName] = { handle: null, followers: 0, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalReplies: 0, topPosts: [] };

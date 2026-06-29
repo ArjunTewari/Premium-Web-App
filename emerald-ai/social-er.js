@@ -109,11 +109,13 @@ async function run(cfg, selectedOrgs, cb) {
 
   cb?.(`  Social Presence: ${selectedOrgs.length} orgs | X:APIDirectio | IG:APIDirectio | LI:APIDirectio`);
 
+  const extraHandles = cfg.customOrgHandles || {};
+
   // ── Pre-fetch X data for all orgs ─────────────────────────────────────
   let xApiData = {};
   try {
     const XCollector = require('./x-collector');
-    xApiData = await XCollector.run(selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO, APIDIR_KEY, cb);
+    xApiData = await XCollector.run(selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO, APIDIR_KEY, cb, extraHandles);
   } catch (e) {
     cb?.(`  X collection error: ${e.message}`, 'warn');
   }
@@ -122,7 +124,7 @@ async function run(cfg, selectedOrgs, cb) {
   let igApiData = {};
   try {
     const IgCollector = require('./instagram-collector');
-    igApiData = await IgCollector.run(selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO, APIDIR_KEY, cfg.CLAUDE_KEY, cb);
+    igApiData = await IgCollector.run(selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO, APIDIR_KEY, cfg.CLAUDE_KEY, cb, extraHandles);
   } catch (e) {
     cb?.(`  IG collection error: ${e.message}`, 'warn');
   }
@@ -133,8 +135,8 @@ async function run(cfg, selectedOrgs, cb) {
   for (const orgName of selectedOrgs) {
     cb?.(`  [SocialPresence] "${orgName}"…`);
 
-    // LinkedIn: APIDirectio company posts
-    const liUrl   = ORG_SOCIAL[orgName]?.linkedin;
+    // LinkedIn: APIDirectio company posts (custom handle takes priority)
+    const liUrl   = extraHandles[orgName]?.linkedin || ORG_SOCIAL[orgName]?.linkedin;
     const liPosts = await fetchLinkedIn(liUrl, APIDIR_KEY, cfg.DATE_FROM, cfg.DATE_TO, cb);
     const liCount = liPosts.length;
 

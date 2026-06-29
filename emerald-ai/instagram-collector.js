@@ -134,7 +134,7 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, apidirKey, cl
  * @param {Function} cb         - log callback
  * @returns {Object} { [orgName]: { handle, followers, aqPosts, topPosts, ... } }
  */
-async function run(orgs, dateFrom, dateTo, apidirKey, claudeKey, cb) {
+async function run(orgs, dateFrom, dateTo, apidirKey, claudeKey, cb, extraHandles = {}) {
   if (!apidirKey) {
     cb?.('  Instagram: no APIDIRECT_KEY — skipping', 'warn');
     return {};
@@ -148,7 +148,7 @@ async function run(orgs, dateFrom, dateTo, apidirKey, claudeKey, cb) {
   const results = {};
 
   for (const orgName of orgs) {
-    const handle = ORG_SOCIAL[orgName]?.instagram;
+    const handle = extraHandles[orgName]?.instagram || ORG_SOCIAL[orgName]?.instagram;
     if (!handle) {
       cb?.(`  IG: no handle configured for "${orgName}" — skipping`, 'warn');
       results[orgName] = { handle: null, followers: 0, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalComments: 0, topPosts: [], ig_not_available: false };

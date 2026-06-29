@@ -56,8 +56,8 @@ app.post('/run', async (req, res) => {
     GEMINI_KEY:     body.geminiKey     || process.env.GEMINI_KEY     || '',
     // YouTube ER — optional, from form or server env
     YOUTUBE_KEY:    body.youtubeKey    || process.env.YOUTUBE_KEY    || '',
-    // Official YT channel handles per org — map of { orgName: '@handle' }
-    ORG_YT_HANDLES: (body.orgYtHandles && typeof body.orgYtHandles === 'object') ? body.orgYtHandles : {},
+    // Custom org handles from UI — { orgName: { twitter, linkedin, instagram, youtube } }
+    customOrgHandles: (body.customOrgHandles && typeof body.customOrgHandles === 'object') ? body.customOrgHandles : {},
     outDir: OUT_DIR
   };
 
