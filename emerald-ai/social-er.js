@@ -290,15 +290,47 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         const sov  = cohortTotal > 0 ? ((total / cohortTotal) * 100).toFixed(1) : '0.0';
         const barW = Math.round((total / (unifiedRows[0].total || 1)) * 100);
         const col  = total >= 10 ? '#4caf74' : total >= 5 ? '#c9922a' : total >= 1 ? '#4a9fd4' : '#5e7494';
-        const xFol = r.xApiResult?.followers ? ` <span style="color:#3a4a5e">(${(r.xApiResult.followers/1000).toFixed(1)}K)</span>` : '';
-        const igFol = r.igApiResult?.followers && !r.igApiResult.ig_not_available ? ` <span style="color:#3a4a5e">(${(r.igApiResult.followers/1000).toFixed(1)}K)</span>` : '';
+
+        const fmtK = n => n >= 1000 ? (n / 1000).toFixed(1) + 'K' : String(n || 0);
+        const erPct = (eng, posts, fol) => (posts > 0 && fol > 0) ? ((eng / posts / fol) * 100).toFixed(2) + '%' : null;
+
+        // X metrics
+        const xr = r.xApiResult;
+        const xFol = xr?.followers ? fmtK(xr.followers) : null;
+        const xER  = xr ? erPct((xr.totalLikes || 0) + (xr.totalReplies || 0), xr.aqPosts || 0, xr.followers || 0) : null;
+
+        // IG metrics
+        const ig = r.igApiResult && !r.igApiResult.ig_not_available ? r.igApiResult : null;
+        const igFol = ig?.followers ? fmtK(ig.followers) : null;
+        const igER  = ig ? erPct((ig.totalLikes || 0) + (ig.totalComments || 0), ig.aqPosts || 0, ig.followers || 0) : null;
+
+        // YT metrics
+        const ytER = (yt.avgER || yt.avgViewER) > 0 ? (yt.avgER || yt.avgViewER).toFixed(2) + '%' : null;
+        const ytSubs = yt.subscribers ? fmtK(yt.subscribers) : null;
+
+        const subLine = (val, col2) => val ? `<div style="font-family:monospace;font-size:9px;color:${col2};margin-top:2px">${val}</div>` : '';
+
         return `<tr style="border-top:1px solid #252d40">
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#2e3a52">#${unifiedRank}</td>
           <td style="padding:8px 12px"><span style="font-family:monospace;font-size:11px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a7fd4">${r.linkedinPosts}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a9fd4">${r.twitterPosts}${xFol}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}${igFol}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e53935">${yt.videoCount || 0}</td>
+          <td style="padding:8px 12px;text-align:center">
+            <div style="font-family:monospace;font-size:13px;font-weight:700;color:#4a7fd4">${r.linkedinPosts}</div>
+          </td>
+          <td style="padding:8px 12px;text-align:center">
+            <div style="font-family:monospace;font-size:13px;font-weight:700;color:#4a9fd4">${r.twitterPosts}</div>
+            ${subLine(xFol ? xFol + ' followers' : null, '#3a4a5e')}
+            ${subLine(xER ? 'ER ' + xER : null, '#4a9fd4')}
+          </td>
+          <td style="padding:8px 12px;text-align:center">
+            <div style="font-family:monospace;font-size:13px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}</div>
+            ${subLine(igFol ? igFol + ' followers' : null, '#3a4a5e')}
+            ${subLine(igER ? 'ER ' + igER : null, '#e05c9c')}
+          </td>
+          <td style="padding:8px 12px;text-align:center">
+            <div style="font-family:monospace;font-size:13px;font-weight:700;color:#e53935">${yt.videoCount || 0}</div>
+            ${subLine(ytSubs ? ytSubs + ' subs' : null, '#3a4a5e')}
+            ${subLine(ytER ? 'ER ' + ytER : null, '#e53935')}
+          </td>
           <td style="padding:8px 12px;text-align:center">
             <span style="font-family:monospace;font-size:15px;font-weight:700;color:${col}">${total}</span>
             <div style="margin:4px auto;width:70px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:${col};width:${barW}%"></div></div>
