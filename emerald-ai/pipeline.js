@@ -60,21 +60,21 @@ const TOPICS = [
   "Wheat Residue Burning",
   "Road Dust",
 ];
-// 13 visually distinct colours — one per org slot
+// 13 colours — one per ~27° hue-wheel segment for maximum distinctiveness
 const ORG_COLORS_HEX = [
-  "3d8ef0",
-  "e05c3a",
-  "4caf74",
-  "c9922a",
-  "a371f7",
-  "e05c5c",
-  "14b8a6",
-  "f97316",
-  "8b5cf6",
-  "06b6d4",
-  "84cc16",
-  "ef4444",
-  "ec4899",
+  "ef4444",  // Red       (  0°)
+  "f97316",  // Orange    ( 25°)
+  "eab308",  // Yellow    ( 48°)
+  "84cc16",  // Lime      ( 83°)
+  "22c55e",  // Green     (142°)
+  "10b981",  // Emerald   (160°)
+  "14b8a6",  // Teal      (174°)
+  "06b6d4",  // Cyan      (191°)
+  "3b82f6",  // Blue      (217°)
+  "6366f1",  // Indigo    (239°)
+  "a855f7",  // Purple    (270°)
+  "ec4899",  // Pink      (322°)
+  "f43f5e",  // Rose      (351°)
 ];
 const orgHex = (i) => "#" + ORG_COLORS_HEX[i % ORG_COLORS_HEX.length];
 const orgPptx = (i) => ORG_COLORS_HEX[i % ORG_COLORS_HEX.length];
