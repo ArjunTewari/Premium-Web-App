@@ -115,16 +115,27 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, cla
       const [items, cursor] = Array.isArray(res.data) ? res.data : [[], null];
       if (!items?.length) break;
 
+      // Debug: log first item's keys + timestamp fields on page 1
+      if (page === 0 && items[0]) {
+        const sample = items[0];
+        cb?.(`  IG DEBUG keys: ${Object.keys(sample).join(', ')}`, 'warn');
+        cb?.(`  IG DEBUG taken_at=${sample.taken_at} timestamp=${sample.timestamp} created_at=${sample.created_at} date=${sample.date}`, 'warn');
+      }
+
       allItems.push(...items);
       endCursor = cursor || null;
       page++;
 
       // Early stop: oldest post on this page is before our window — no point going further
-      const oldestTs = items.reduce((min, m) => {
-        const t = typeof m.taken_at === 'string' ? parseInt(m.taken_at, 10) : (m.taken_at || 0);
-        return t < min ? t : min;
-      }, Infinity) * 1000;
-      if (oldestTs < fromTs) break;
+      // Use whichever timestamp field exists
+      const getTs = (m) => {
+        const raw = m.taken_at ?? m.timestamp ?? m.created_at ?? m.date ?? 0;
+        const n = typeof raw === 'string' ? parseInt(raw, 10) : Number(raw);
+        // If value looks like seconds (< 1e10), convert; if ms already, use as-is
+        return n > 1e10 ? n : n * 1000;
+      };
+      const oldestTs = items.reduce((min, m) => Math.min(min, getTs(m)), Infinity);
+      if (oldestTs > 0 && oldestTs < fromTs) break;
 
       if (endCursor) await sleep(400);
     } catch (e) {
@@ -134,12 +145,18 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, cla
   } while (endCursor && page < MAX_PAGES);
 
   // ── Step 3: filter by report period ──────────────────────────────────────
-  // taken_at is a Unix timestamp in seconds
+  const getTs = (m) => {
+    const raw = m.taken_at ?? m.timestamp ?? m.created_at ?? m.date ?? 0;
+    const n = typeof raw === 'string' ? parseInt(raw, 10) : Number(raw);
+    return n > 1e10 ? n : n * 1000;
+  };
+
   const inPeriod = allItems.filter(m => {
-    const takenAt = typeof m.taken_at === 'string' ? parseInt(m.taken_at, 10) : (m.taken_at || 0);
-    const ts = takenAt * 1000;
+    const ts = getTs(m);
     return ts >= fromTs && ts <= toTs;
   });
+
+  cb?.(`  IG: @${igHandle} fetched ${allItems.length} total items, ${inPeriod.length} in period`);
 
   if (inPeriod.length === 0) {
     return { handle: igHandle, followers, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalComments: 0, topPosts: [], ig_not_available: false };
@@ -147,13 +164,13 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, cla
 
   // Normalise fields to match downstream expectations
   const normalised = inPeriod.map(m => {
-    const takenAt = typeof m.taken_at === 'string' ? parseInt(m.taken_at, 10) : (m.taken_at || 0);
+    const ts = getTs(m);
     const code = m.code || m.shortcode || '';
     return {
       caption:        m.caption_text || (typeof m.caption === 'string' ? m.caption : m.caption?.text) || '',
       like_count:     m.like_count     || 0,
       comments_count: m.comment_count  || m.comments_count || 0,
-      timestamp:      new Date(takenAt * 1000).toISOString(),
+      timestamp:      new Date(ts).toISOString(),
       permalink:      code ? `https://www.instagram.com/p/${code}/` : '',
     };
   });
