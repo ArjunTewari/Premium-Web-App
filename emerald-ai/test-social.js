@@ -24,6 +24,17 @@ const DATE_FROM = '2026-02-01';
 const DATE_TO   = '2026-05-01';
 const AQ_TERMS  = '("air quality" OR "air pollution" OR AQI OR PM2.5 OR NCAP)';
 
+const AQ_KEYWORDS = [
+  'air quality', 'air pollution', 'aqi', 'pm2.5', 'pm10', 'ncap', 'grap',
+  'smog', 'clean air', 'black carbon', 'ozone', 'ammonia', 'nitrogen dioxide',
+  'particulate', 'emission', 'pollut', 'dust', 'haze', 'toxic air',
+];
+
+function isAQPost(caption) {
+  const lower = (caption || '').toLowerCase();
+  return AQ_KEYWORDS.some(kw => lower.includes(kw));
+}
+
 // Extract Instagram shortcode from any Instagram post URL
 // Handles both /p/{code}/ and /{user}/p/{code}/
 function shortcodeFromUrl(url) {
@@ -86,7 +97,7 @@ async function hikerFetchPosts(handle, hikerKey) {
       const ts = m.taken_at_ts
         ? Number(m.taken_at_ts) * 1000
         : (typeof m.taken_at === 'string' ? new Date(m.taken_at).getTime() : Number(m.taken_at) * 1000);
-      if (ts >= fromTs && ts <= toTs) {
+      if (ts >= fromTs && ts <= toTs && isAQPost(m.caption_text)) {
         posts.push({
           shortcode: m.code || m.shortcode || '',
           url:       m.code ? `https://www.instagram.com/p/${m.code}/` : '',
