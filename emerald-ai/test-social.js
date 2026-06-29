@@ -21,8 +21,8 @@ const XCollector  = require('./x-collector');
 const IgCollector = require('./instagram-collector');
 
 const ORGS     = ['CEEW', 'CSE India'];
-const DATE_FROM = '2026-03-27';
-const DATE_TO   = '2026-06-27';
+const DATE_FROM = '2026-02-01';
+const DATE_TO   = '2026-05-01';
 
 const cb = (msg, level) => {
   const prefix = level === 'warn' ? '⚠ ' : level === 'ok' ? '✓ ' : '  ';
