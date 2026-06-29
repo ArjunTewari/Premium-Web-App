@@ -170,16 +170,17 @@ async function main() {
   for (const org of ORGS) {
     console.log(`\n══ ${org} ${'═'.repeat(Math.max(0, 44 - org.length))}`);
 
-    // Fetch all 9 sources in parallel
-    const sourceResults = await Promise.all(
-      SOURCES.map(source =>
-        fetchArticles(org, source, API_KEY).catch(e => {
-          const msg = e.response?.data?.error || e.response?.data?.message || e.message;
-          console.log(`  ⚠ ${source.name}: ${msg}`);
-          return [];
-        })
-      )
-    );
+    // Fetch sources sequentially to respect APIDirectio concurrency limits
+    const sourceResults = [];
+    for (const source of SOURCES) {
+      const result = await fetchArticles(org, source, API_KEY).catch(e => {
+        const msg = e.response?.data?.error || e.response?.data?.message || e.message;
+        console.log(`  ⚠ ${source.name}: ${msg}`);
+        return [];
+      });
+      sourceResults.push(result);
+      await new Promise(r => setTimeout(r, 300));
+    }
 
     // Per-source raw count
     const allArticles = sourceResults.flat();
