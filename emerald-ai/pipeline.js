@@ -1094,7 +1094,8 @@ ${txt}`;
       callClaude(
         `Generate 4 actions for EACH of these orgs: ${ORGS.join(", ")} — based on Indian AQ media + AEO + social media intelligence.\n${orgSummary}\nWhite-space gap topics (AQ media conversations tracked orgs are absent from): ${emerging.map((e) => e.topic).join(",") || "none"}\nReturn ONLY JSON array of ${ORGS.length * 4} objects: [{"org":"orgname","priority":"Fix Now|Leverage|Optimise|Invest","area":"Media|Topics|Narrative|AEO|Social","action":"...","rationale":"1-2 sentences with specific data"}]`,
         cfg.CLAUDE_KEY,
-        Math.min(8000, 1200 + ORGS.length * 350),
+        8000,
+        CLAUDE_CLASSIFY_MODEL,
       ),
       new Promise((_, rej) =>
         setTimeout(
