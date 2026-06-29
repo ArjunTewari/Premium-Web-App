@@ -2,13 +2,11 @@
 /**
  * test-articles.js — News coverage intelligence via APIDirectio
  *
- * Sources: Times of India · Hindustan Times · The Hindu · NDTV ·
- *          News18 · India Today · Aaj Tak · India TV · ABP News
  * Auth:    X-API-Key header to https://apidirect.io
  * Pricing: $0.008/request · 50 free/month
  *
- * Flow per org × source:
- *   1. GET /v1/news/articles?query={org AQ terms}&source={domain}&limit=50
+ * Flow per org:
+ *   1. GET /v1/news/articles?query={org AQ terms}&limit=50
  *   2. Client-side date filter to report window
  *   3. Haiku classifies using full title + snippet — rejects passing mentions
  *      where the org is cited for an unrelated reason
@@ -34,21 +32,7 @@ const DATE_FROM = '2026-02-01';
 const DATE_TO   = '2026-05-01';
 const API_BASE  = 'https://apidirect.io';
 
-// News sources — domain used as APIDirectio `source` filter
-const SOURCES = [
-  { name: 'Times of India',  domain: 'timesofindia.com'   },
-  { name: 'Hindustan Times', domain: 'hindustantimes.com' },
-  { name: 'The Hindu',       domain: 'thehindu.com'       },
-  { name: 'NDTV',            domain: 'ndtv.com'           },
-  { name: 'News18',          domain: 'news18.com'         },
-  { name: 'India Today',     domain: 'indiatoday.in'      },
-  { name: 'Aaj Tak',         domain: 'aajtak.in'          },
-  { name: 'India TV',        domain: 'indiatvnews.com'    },
-  { name: 'ABP News',        domain: 'abplive.com'        },
-];
-
 // Query per org — use names journalists write, plus AQ terms.
-// Broader than the acronym alone to catch full-name references.
 const ORG_QUERY = {
   'IIT Delhi':  '"IIT Delhi" air quality pollution AQI',
   'CSE India':  'Centre for Science and Environment air quality pollution',
@@ -68,20 +52,18 @@ function inPeriod(dateStr) {
 
 // ── Fetcher ────────────────────────────────────────────────────────────────
 
-async function fetchArticles(org, source, apiKey) {
+async function fetchArticles(org, apiKey) {
   const query = ORG_QUERY[org] || `${org} air quality`;
   const url   = new URL(API_BASE + '/v1/news/articles');
   url.searchParams.set('query',          query);
-  url.searchParams.set('source',         source.domain);
   url.searchParams.set('limit',          '50');
-  url.searchParams.set('time_published', '1y');   // broad window — date filtered client-side
+  url.searchParams.set('time_published', '1y');
 
   const res = await axios.get(url.toString(), {
     headers: { 'X-API-Key': apiKey },
     timeout: 20000,
   });
 
-  // APIDirectio key may vary across versions
   const raw = res.data.articles || res.data.posts || res.data.results || [];
   return raw
     .filter(a => inPeriod(a.date || a.published_date || a.publishedAt))
@@ -91,13 +73,11 @@ async function fetchArticles(org, source, apiKey) {
       url:    a.url     || a.link  || '',
       date:   a.date    || a.published_date || a.publishedAt || '',
       author: a.author  || '',
-      source: source.name,
+      source: a.source  || '',
     }));
 }
 
 // ── Haiku AQ + context classifier ─────────────────────────────────────────
-// Full title + full snippet passed so Haiku has enough surrounding context
-// to distinguish genuine AQ coverage from incidental org mentions.
 
 async function isAQRelevant(article, org, claudeKey) {
   if (!claudeKey) return true;
@@ -144,7 +124,8 @@ async function filterAQArticles(articles, org, claudeKey) {
 function displayArticles(articles) {
   if (!articles.length) { console.log('    (none)\n'); return; }
   articles.forEach(a => {
-    console.log(`    [${a.source}] ${a.title}`);
+    const src = a.source ? `[${a.source}] ` : '';
+    console.log(`    ${src}${a.title}`);
     if (a.text)   console.log(`    ${a.text.slice(0, 130).trim()}…`);
     if (a.url)    console.log(`    URL  : ${a.url}`);
     if (a.date)   console.log(`    Date : ${a.date}`);
@@ -162,7 +143,6 @@ async function main() {
   console.log('=== News Articles Intelligence — APIDirectio ===');
   console.log(`Orgs    : ${ORGS.join(', ')}`);
   console.log(`Period  : ${DATE_FROM} → ${DATE_TO}`);
-  console.log(`Sources : ${SOURCES.map(s => s.name).join(' · ')}`);
   console.log(`APIDir  : ${API_KEY ? '✓' : '✗ (set APIDIRECT_KEY in .env)'}  Haiku: ${CLAUDE_KEY ? '✓' : '✗'}\n`);
 
   if (!API_KEY) { console.error('APIDIRECT_KEY not set'); process.exit(1); }
@@ -170,30 +150,20 @@ async function main() {
   for (const org of ORGS) {
     console.log(`\n══ ${org} ${'═'.repeat(Math.max(0, 44 - org.length))}`);
 
-    // Fetch sources sequentially to respect APIDirectio concurrency limits
-    const sourceResults = [];
-    for (const source of SOURCES) {
-      const result = await fetchArticles(org, source, API_KEY).catch(e => {
-        const msg = e.response?.data?.error || e.response?.data?.message || e.message;
-        console.log(`  ⚠ ${source.name}: ${msg}`);
-        return [];
-      });
-      sourceResults.push(result);
-      await new Promise(r => setTimeout(r, 300));
+    let allArticles = [];
+    try {
+      allArticles = await fetchArticles(org, API_KEY);
+      console.log(`  Raw (in period) : ${allArticles.length} total`);
+    } catch (e) {
+      const msg = e.response?.data?.error || e.response?.data?.message || e.message;
+      console.log(`  ⚠ APIDirectio error: ${msg}`);
     }
-
-    // Per-source raw count
-    const allArticles = sourceResults.flat();
-    const counts = SOURCES.map((s, i) => `${s.name}:${sourceResults[i].length}`).join('  ');
-    console.log(`  Raw (in period) : ${allArticles.length} total`);
-    console.log(`    ${counts}`);
 
     if (!allArticles.length) {
       console.log('  No articles found for this period.\n');
       continue;
     }
 
-    // Haiku AQ + context filter
     const aqArticles = await filterAQArticles(allArticles, org, CLAUDE_KEY);
     console.log(`  AQ confirmed    : ${aqArticles.length}\n`);
 

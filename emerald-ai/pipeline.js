@@ -30,14 +30,6 @@ const PRINT_OUTLETS = [
 const TV_CHANNELS_ENGLISH = ["NDTV", "News18", "India Today"];
 const TV_CHANNELS_HINDI = ["Aaj Tak", "India TV", "ABP News"];
 const ALL_TV_CHANNELS = [...TV_CHANNELS_ENGLISH, ...TV_CHANNELS_HINDI];
-const TV_CHANNEL_DOMAINS = {
-  "NDTV": "ndtv.com",
-  "News18": "news18.com",
-  "India Today": "indiatoday.in",
-  "Aaj Tak": "aajtak.in",
-  "India TV": "indiatvnews.com",
-  "ABP News": "abplive.com",
-};
 const TOPICS = [
   "NCAP",
   "Policy",
@@ -634,29 +626,6 @@ async function run(cfg, cb) {
       cb(`  APIDirectio error: ${e.message}`, "warn");
     }
     await sleep(300);
-
-    // 1b. TV channel targeted searches — source filter per domain
-    for (const [channel, domain] of Object.entries(TV_CHANNEL_DOMAINS)) {
-      const q = `"${org}" air quality pollution`;
-      try {
-        const results = await apidirNews(q, cfg.APIDIRECT_KEY, { source: domain, limit: 50, time_published: "1y" });
-        let added = 0;
-        for (const r of results) {
-          const k = r.link || r.title;
-          if (seen.has(k)) continue;
-          seen.add(k);
-          if (!inRange(r.date || "")) continue;
-          if (isThirdParty(r.link || "", org)) {
-            arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "" });
-            added++;
-          }
-        }
-        if (added > 0) cb(`  ${channel} · ${org}: +${added}`, "ok");
-      } catch (e) {
-        cb(`  ${channel} error: ${e.message}`, "warn");
-      }
-      await sleep(300);
-    }
     cb(`  ${org}: ${arts[org].length} articles total`, "ok");
   }
 
