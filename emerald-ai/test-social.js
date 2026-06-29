@@ -17,6 +17,7 @@ try {
 } catch {}
 
 const axios = require('axios');
+const { ORG_IG_HANDLES } = require('./instagram-collector');
 
 const ORGS     = ['CEEW', 'CSE India'];
 const DATE_FROM = '2026-02-01';
@@ -24,13 +25,14 @@ const DATE_TO   = '2026-05-01';
 
 const AQ_TERMS = '("air quality" OR "air pollution" OR AQI OR PM2.5 OR NCAP)';
 
-// ── Serper: find Instagram posts ───────────────────────────────────────────
+// ── Serper: find posts from the org's own IG handle ────────────────────────
+// Uses site:instagram.com/{handle} to restrict to that account's posts only
 
-async function serperIGSearch(orgName, serperKey) {
+async function serperIGSearch(handle, serperKey) {
   const [fy, fm, fd] = DATE_FROM.split('-');
   const [ty, tm, td] = DATE_TO.split('-');
   const body = {
-    q:   `"${orgName}" ${AQ_TERMS} site:instagram.com`,
+    q:   `${AQ_TERMS} site:instagram.com/${handle}`,
     num: 10,
     tbs: `cdr:1,cd_min:${fm}/${fd}/${fy},cd_max:${tm}/${td}/${ty}`,
   };
@@ -80,13 +82,16 @@ async function main() {
   if (!SERPER_KEY) { console.error('SERPER_KEY not set'); process.exit(1); }
 
   for (const org of ORGS) {
-    console.log(`\n── ${org} ──────────────────────────────`);
+    const handle = ORG_IG_HANDLES[org];
+    console.log(`\n── ${org} (@${handle || 'unknown'}) ──────────────────────────────`);
 
-    // Step 1: discover via Serper
+    if (!handle) { console.log('  ⚠ No IG handle configured — skipping'); continue; }
+
+    // Step 1: discover via Serper (restricted to org's own handle)
     let posts = [];
     try {
-      posts = await serperIGSearch(org, SERPER_KEY);
-      console.log(`  Serper found ${posts.length} post(s)`);
+      posts = await serperIGSearch(handle, SERPER_KEY);
+      console.log(`  Serper found ${posts.length} post(s) from @${handle}`);
     } catch (e) {
       console.log(`  ⚠ Serper error: ${e.message}`);
     }
