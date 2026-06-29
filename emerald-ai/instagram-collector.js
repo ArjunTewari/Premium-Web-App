@@ -6,8 +6,8 @@
  * for ANY public account — no Meta app review, Business account, or user OAuth needed.
  *
  * Per org:
- *   1. GET /v1/user/by/username → pk (user ID) + follower_count
- *   2. GET /v1/user/medias?user_id=pk&amount=150 → recent posts
+ *   1. GET /v1/user/by/username → pk (user ID) + follower_count (User object, no wrapper)
+ *   2. GET /v1/user/medias/chunk → [items[], end_cursor] — paginate up to 3 pages
  *   3. Date filter (client-side — no server-side date range supported)
  *   4. Claude Haiku classification (captions use hashtags/emoji, not plain keywords)
  *
@@ -16,7 +16,7 @@
 
 const axios = require('axios');
 
-const HIKER_BASE = 'https://api.hikerapi.com/v2';
+const HIKER_BASE = 'https://api.hikerapi.com';
 const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
 
 // Default IG handles for tracked AQ orgs
@@ -71,9 +71,10 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, cla
   const headers = { 'x-access-key': hikerKey };
 
   // ── Step 1: get user info (pk + followers) ────────────────────────────────
+  // /v1/user/by/username returns the User object directly (no wrapper)
   let userId, followers;
   try {
-    const res = await axios.get(`${HIKER_BASE}/user/by/username`, {
+    const res = await axios.get(`${HIKER_BASE}/v1/user/by/username`, {
       params:  { username: igHandle },
       headers,
       timeout: 15000,
@@ -83,7 +84,7 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, cla
       cb?.(`  IG: @${igHandle} — not found or private`, 'warn');
       return { handle: igHandle, followers: 0, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalComments: 0, topPosts: [], ig_not_available: true };
     }
-    userId    = u.pk;
+    userId    = String(u.pk);
     followers = u.follower_count || 0;
   } catch (e) {
     const errMsg = e.response?.data?.detail || e.response?.data?.message || e.message;
@@ -91,24 +92,40 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, cla
     return { handle: igHandle, followers: 0, totalPosts: 0, aqPosts: 0, totalLikes: 0, totalComments: 0, topPosts: [], ig_not_available: true, error: errMsg };
   }
 
-  // ── Step 2: fetch up to 150 recent media ─────────────────────────────────
-  let items = [];
-  try {
-    const res = await axios.get(`${HIKER_BASE}/user/medias`, {
-      params:  { user_id: userId, amount: 150 },
-      headers,
-      timeout: 30000,
-    });
-    // HikerAPI may return { items: [...] } or the array directly
-    const body = res.data;
-    items = Array.isArray(body) ? body : (body?.items || []);
-  } catch (e) {
-    cb?.(`  IG: @${igHandle} media fetch error — ${e.message}`, 'warn');
-  }
+  // ── Step 2: paginate media via /v1/user/medias/chunk ─────────────────────
+  // Returns [mediaItems[], end_cursor | null] — repeat until cursor is null or cap reached
+  let allItems  = [];
+  let endCursor = null;
+  let page      = 0;
+
+  do {
+    try {
+      const params = { user_id: userId };
+      if (endCursor) params.end_cursor = endCursor;
+
+      const res = await axios.get(`${HIKER_BASE}/v1/user/medias/chunk`, {
+        params,
+        headers,
+        timeout: 30000,
+      });
+
+      // Response is [items[], end_cursor]
+      const [items, cursor] = Array.isArray(res.data) ? res.data : [[], null];
+      if (!items?.length) break;
+
+      allItems.push(...items);
+      endCursor = cursor || null;
+      page++;
+      if (endCursor) await sleep(400);
+    } catch (e) {
+      cb?.(`  IG: @${igHandle} media page ${page + 1} error — ${e.message}`, 'warn');
+      break;
+    }
+  } while (endCursor && page < 3); // cap: ~3 pages × ~12 items = ~36 (or more per page)
 
   // ── Step 3: filter by report period ──────────────────────────────────────
   // taken_at is a Unix timestamp in seconds
-  const inPeriod = items.filter(m => {
+  const inPeriod = allItems.filter(m => {
     const takenAt = typeof m.taken_at === 'string' ? parseInt(m.taken_at, 10) : (m.taken_at || 0);
     const ts = takenAt * 1000;
     return ts >= fromTs && ts <= toTs;
