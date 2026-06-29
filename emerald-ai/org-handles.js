@@ -6,13 +6,13 @@
  * Verified entries are marked; others are best-guess and should be confirmed.
  */
 module.exports = {
-  'CEEW': {
+  'Council on Energy, Environment and Water': {
     twitter:   'CEEWIndia',                 // verified
     linkedin:  'https://www.linkedin.com/company/council-on-energy-environment-and-water/', // verified
     instagram: 'ceewindia',                 // verified
     youtube:   'UCNF-vGnm1jdA_jhrIpk84Tg', // verified
   },
-  'CSE India': {
+  'Centre for Science and Environment': {
     twitter:   'cseindia',                  // verified
     linkedin:  'https://www.linkedin.com/company/centre-for-science-and-environment-new-delhi/', // verified
     instagram: 'cseindia',                  // verified
@@ -36,7 +36,7 @@ module.exports = {
     instagram: null,                           // no Instagram
     youtube:   null,                           // no YouTube
   },
-  'Chintan': {
+  'Chintan Environmental Research and Action Group': {
     twitter:   'chintanindia',                 // verified
     linkedin:  'https://www.linkedin.com/company/chintan-environmental-research-and-actian-group/', // verified
     instagram: 'chintan.india',                // verified
