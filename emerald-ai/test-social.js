@@ -40,12 +40,12 @@ const API_BASE  = 'https://apidirect.io';
 const ORG_SOCIAL = {
   'CEEW': {
     twitter:   'CEEWIndia',
-    linkedin:  'https://www.linkedin.com/company/council-on-energy-environment-and-water',
+    linkedin:  'https://www.linkedin.com/company/council-on-energy-environment-and-water/',
     instagram: 'ceewindia',
   },
   'CSE India': {
     twitter:   'CSEINDIA',
-    linkedin:  'https://www.linkedin.com/company/centre-for-science-and-environment',
+    linkedin:  'https://www.linkedin.com/company/centre-for-science-and-environment-new-delhi/',
     instagram: 'cseindia',
   },
   'WRI India': {
