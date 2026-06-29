@@ -1,8 +1,7 @@
 'use strict';
 /**
- * test-social.js — quick smoke test for X + Instagram collectors
- * Usage (in Replit shell):
- *   node test-social.js
+ * test-social.js — smoke test for Instagram: Serper discovery + HikerAPI metrics
+ * Usage: node emerald-ai/test-social.js
  */
 
 // Load .env
@@ -17,50 +16,101 @@ try {
   }
 } catch {}
 
-const XCollector  = require('./x-collector');
-const IgCollector = require('./instagram-collector');
+const axios = require('axios');
 
 const ORGS     = ['CEEW', 'CSE India'];
 const DATE_FROM = '2026-02-01';
 const DATE_TO   = '2026-05-01';
 
-const cb = (msg, level) => {
-  const prefix = level === 'warn' ? '⚠ ' : level === 'ok' ? '✓ ' : '  ';
-  console.log(prefix + msg);
-};
+const AQ_TERMS = '("air quality" OR "air pollution" OR AQI OR PM2.5 OR NCAP)';
+
+// ── Serper: find Instagram posts ───────────────────────────────────────────
+
+async function serperIGSearch(orgName, serperKey) {
+  const [fy, fm, fd] = DATE_FROM.split('-');
+  const [ty, tm, td] = DATE_TO.split('-');
+  const body = {
+    q:   `"${orgName}" ${AQ_TERMS} site:instagram.com`,
+    num: 10,
+    tbs: `cdr:1,cd_min:${fm}/${fd}/${fy},cd_max:${tm}/${td}/${ty}`,
+  };
+  const res = await axios.post('https://google.serper.dev/search', body, {
+    headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' },
+    timeout: 15000,
+  });
+  return (res.data.organic || []).map(r => ({
+    title:   r.title   || '',
+    snippet: r.snippet || '',
+    url:     r.link    || '',
+  }));
+}
+
+// ── HikerAPI: enrich a post URL with metrics ───────────────────────────────
+
+async function hikerEnrich(postUrl, hikerKey) {
+  try {
+    const res = await axios.get('https://api.hikerapi.com/v1/media/by/url', {
+      params:  { url: postUrl },
+      headers: { 'x-access-key': hikerKey },
+      timeout: 15000,
+    });
+    const m = res.data;
+    return {
+      likes:    m.like_count    || 0,
+      comments: m.comment_count || m.comments_count || 0,
+      caption:  (m.caption_text || '').slice(0, 150),
+      taken_at: m.taken_at || null,
+    };
+  } catch (e) {
+    return { error: e.response?.data?.detail || e.message };
+  }
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('=== Social API Smoke Test ===');
-  console.log(`Orgs : ${ORGS.join(', ')}`);
-  console.log(`Period: ${DATE_FROM} → ${DATE_TO}\n`);
+  const SERPER_KEY = process.env.SERPER_KEY;
+  const HIKER_KEY  = process.env.HIKER_API_KEY;
 
-  // ── Instagram API ──────────────────────────────────────────────────────
-  console.log('\n── Instagram ──────────────────────────────');
-  if (!process.env.HIKER_API_KEY) {
-    console.log('⚠  HIKER_API_KEY not set — skipping');
-  } else {
-    const igResults = await IgCollector.run(
-      ORGS, DATE_FROM, DATE_TO,
-      process.env.HIKER_API_KEY,
-      process.env.CLAUDE_KEY,
-      cb
-    );
-    for (const org of ORGS) {
-      const r = igResults[org];
-      if (!r) { console.log(`  ${org}: no result`); continue; }
-      console.log(`\n  ${org} (@${r.handle})`);
-      if (r.ig_not_available) {
-        console.log(`    Not available (not a Business account)`);
-      } else {
-        console.log(`    Followers : ${(r.followers || 0).toLocaleString()}`);
-        console.log(`    Posts in period : ${r.totalPosts}`);
-        console.log(`    AQ posts (Haiku) : ${r.aqPosts}`);
-        if (r.topPosts?.length) {
-          console.log(`    Top post  : ${r.topPosts[0].caption?.slice(0, 100)}…`);
-          console.log(`    Likes     : ${r.topPosts[0].likes}`);
+  console.log('=== Instagram: Serper + HikerAPI Test ===');
+  console.log(`Orgs  : ${ORGS.join(', ')}`);
+  console.log(`Period: ${DATE_FROM} → ${DATE_TO}`);
+  console.log(`Serper: ${SERPER_KEY ? '✓' : '✗ missing'}  |  HikerAPI: ${HIKER_KEY ? '✓' : '✗ missing (metrics skipped)'}\n`);
+
+  if (!SERPER_KEY) { console.error('SERPER_KEY not set'); process.exit(1); }
+
+  for (const org of ORGS) {
+    console.log(`\n── ${org} ──────────────────────────────`);
+
+    // Step 1: discover via Serper
+    let posts = [];
+    try {
+      posts = await serperIGSearch(org, SERPER_KEY);
+      console.log(`  Serper found ${posts.length} post(s)`);
+    } catch (e) {
+      console.log(`  ⚠ Serper error: ${e.message}`);
+    }
+
+    if (!posts.length) { console.log('  No posts found'); continue; }
+
+    // Step 2: enrich each post with HikerAPI metrics
+    for (const post of posts) {
+      console.log(`\n  📄 ${post.title.slice(0, 80)}`);
+      console.log(`     URL    : ${post.url}`);
+
+      if (HIKER_KEY) {
+        const metrics = await hikerEnrich(post.url, HIKER_KEY);
+        if (metrics.error) {
+          console.log(`     Metrics: ⚠ ${metrics.error}`);
+        } else {
+          console.log(`     Likes   : ${metrics.likes}`);
+          console.log(`     Comments: ${metrics.comments}`);
+          if (metrics.taken_at) console.log(`     Date    : ${metrics.taken_at}`);
+          if (metrics.caption)  console.log(`     Caption : ${metrics.caption}…`);
         }
+      } else {
+        console.log(`     Snippet: ${post.snippet.slice(0, 120)}`);
       }
-      if (r.error) console.log(`    Error: ${r.error}`);
     }
   }
 
