@@ -93,10 +93,12 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, cla
   }
 
   // ── Step 2: paginate media via /v1/user/medias/chunk ─────────────────────
-  // Returns [mediaItems[], end_cursor | null] — repeat until cursor is null or cap reached
+  // Returns [mediaItems[], end_cursor | null] — posts are newest-first.
+  // Stop when we've gone back past dateFrom or hit the page cap.
   let allItems  = [];
   let endCursor = null;
   let page      = 0;
+  const MAX_PAGES = 15;
 
   do {
     try {
@@ -116,12 +118,20 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, hikerKey, cla
       allItems.push(...items);
       endCursor = cursor || null;
       page++;
+
+      // Early stop: oldest post on this page is before our window — no point going further
+      const oldestTs = items.reduce((min, m) => {
+        const t = typeof m.taken_at === 'string' ? parseInt(m.taken_at, 10) : (m.taken_at || 0);
+        return t < min ? t : min;
+      }, Infinity) * 1000;
+      if (oldestTs < fromTs) break;
+
       if (endCursor) await sleep(400);
     } catch (e) {
       cb?.(`  IG: @${igHandle} media page ${page + 1} error — ${e.message}`, 'warn');
       break;
     }
-  } while (endCursor && page < 3); // cap: ~3 pages × ~12 items = ~36 (or more per page)
+  } while (endCursor && page < MAX_PAGES);
 
   // ── Step 3: filter by report period ──────────────────────────────────────
   // taken_at is a Unix timestamp in seconds
