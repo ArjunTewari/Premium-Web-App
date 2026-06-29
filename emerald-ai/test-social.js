@@ -48,12 +48,12 @@ function inPeriod(dateStr) {
   }
 }
 
-async function apiFetch(path, params, apiKey) {
+async function apiFetch(path, params, apiKey, timeout = 30000) {
   const url = new URL(API_BASE + path);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(String(k), String(v)));
   const res = await axios.get(url.toString(), {
     headers: { 'X-API-Key': apiKey },
-    timeout: 20000,
+    timeout,
   });
   return res.data;
 }
@@ -105,7 +105,7 @@ async function filterAQPosts(posts, claudeKey, label) {
 
 async function fetchTwitter(org, apiKey) {
   const data = await apiFetch('/v1/twitter/posts', {
-    query:   `"${org}" ${AQ_QUERY}`,
+    query:   `${org} ${AQ_QUERY} -is:retweet lang:en`,
     pages:   2,
     sort_by: 'most_recent',
   }, apiKey);
@@ -128,8 +128,8 @@ async function fetchTwitter(org, apiKey) {
 async function fetchInstagram(handle, apiKey) {
   const data = await apiFetch('/v1/instagram/user/posts', {
     username: handle,
-    pages:    5,
-  }, apiKey);
+    pages:    3,
+  }, apiKey, 60000);
   return (data.posts || [])
     .filter(p => inPeriod(p.date))
     .map(p => ({
@@ -147,7 +147,7 @@ async function fetchInstagram(handle, apiKey) {
 // LinkedIn: searches for posts mentioning the org with AQ context
 async function fetchLinkedIn(org, apiKey) {
   const data = await apiFetch('/v1/linkedin/posts', {
-    query:   `"${org}" ${AQ_QUERY}`,
+    query:   `${org} air quality pollution India`,
     page:    1,
     sort_by: 'most_recent',
   }, apiKey);
@@ -167,7 +167,7 @@ async function fetchLinkedIn(org, apiKey) {
 
 async function fetchYouTube(org, apiKey) {
   const data = await apiFetch('/v1/youtube/posts', {
-    query: `"${org}" air quality India`,
+    query: `${org} air quality India`,
     pages: 2,
   }, apiKey);
   return (data.posts || [])
