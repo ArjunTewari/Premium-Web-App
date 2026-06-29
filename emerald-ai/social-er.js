@@ -213,10 +213,10 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
 
   const statCards = [
     { label: 'Orgs with social AQ posts', value: orgsWithPresence, unit: `of ${erResults.length} tracked`, col: '#4caf74' },
-    { label: 'LinkedIn AQ posts',          value: totalLiIndexed,   unit: 'via APIDirectio',  col: '#4a7fd4' },
-    { label: 'X/Twitter AQ posts',        value: totalXIndexed,    unit: 'via APIDirectio',  col: '#4a9fd4' },
-    { label: 'Instagram AQ posts',        value: totalIgIndexed,   unit: 'via APIDirectio',  col: '#e05c9c' },
-    { label: 'YouTube videos',            value: totalYtVideos,    unit: 'official channel',               col: '#e53935' },
+    { label: 'LinkedIn AQ posts',          value: totalLiIndexed,   unit: 'total in period',  col: '#4a7fd4' },
+    { label: 'X/Twitter AQ posts',        value: totalXIndexed,    unit: 'total in period',  col: '#4a9fd4' },
+    { label: 'Instagram AQ posts',        value: totalIgIndexed,   unit: 'total in period',  col: '#e05c9c' },
+    { label: 'YouTube videos',            value: totalYtVideos,    unit: 'official channel',              col: '#e53935' },
   ].map(c => `
     <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
       <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">${c.label}</div>
@@ -228,11 +228,10 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   const sourceBanner = `
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
     <span style="font-family:monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Data sources:</span>
-    <span style="font-family:monospace;font-size:10px;background:rgba(74,127,212,.12);border:1px solid rgba(74,127,212,.3);color:#4a7fd4;border-radius:4px;padding:2px 8px">LinkedIn · Serper index</span>
-    <span style="font-family:monospace;font-size:10px;background:${useXApi  ? 'rgba(74,159,212,.12)' : 'rgba(94,116,148,.08)'};border:1px solid ${useXApi  ? 'rgba(74,159,212,.3)' : 'rgba(94,116,148,.2)'};color:${useXApi  ? '#4a9fd4' : '#5e7494'};border-radius:4px;padding:2px 8px">X/Twitter · ${useXApi  ? '✓ X API v2' : 'Serper index'}</span>
-    <span style="font-family:monospace;font-size:10px;background:${useIgApi ? 'rgba(224,92,156,.12)' : 'rgba(94,116,148,.08)'};border:1px solid ${useIgApi ? 'rgba(224,92,156,.3)' : 'rgba(94,116,148,.2)'};color:${useIgApi ? '#e05c9c' : '#5e7494'};border-radius:4px;padding:2px 8px">Instagram · ${useIgApi ? '✓ HikerAPI' : 'Serper index'}</span>
+    <span style="font-family:monospace;font-size:10px;background:rgba(74,127,212,.12);border:1px solid rgba(74,127,212,.3);color:#4a7fd4;border-radius:4px;padding:2px 8px">LinkedIn · ✓ APIDirectio</span>
+    <span style="font-family:monospace;font-size:10px;background:rgba(74,159,212,.12);border:1px solid rgba(74,159,212,.3);color:#4a9fd4;border-radius:4px;padding:2px 8px">X/Twitter · ✓ APIDirectio</span>
+    <span style="font-family:monospace;font-size:10px;background:rgba(224,92,156,.12);border:1px solid rgba(224,92,156,.3);color:#e05c9c;border-radius:4px;padding:2px 8px">Instagram · ✓ APIDirectio</span>
     <span style="font-family:monospace;font-size:10px;background:rgba(229,57,53,.12);border:1px solid rgba(229,57,53,.3);color:#e53935;border-radius:4px;padding:2px 8px">YouTube · ✓ Data API v3</span>
-    <span style="font-family:monospace;font-size:10px;background:rgba(94,116,148,.08);border:1px solid rgba(94,116,148,.2);color:#5e7494;border-radius:4px;padding:2px 8px">LinkedIn API · pending</span>
   </div>`;
 
   const ytKeyNotice = !hasYtKey
@@ -311,10 +310,14 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   </table>
 </div>
 <div style="font-family:monospace;font-size:9px;color:#3a4a5e;margin-bottom:16px">
-  ${useXApi || useIgApi
-    ? `✓ = live API data (AQ-filtered). Counts reflect posts about air quality only.${useXApi ? ' X: client-side keyword filter.' : ''}${useIgApi ? ' IG: HikerAPI + Claude Haiku AQ classification.' : ''} LI: Google-indexed posts (Serper). SoV % = org total ÷ cohort total.`
-    : 'Counts = Google-indexed posts / official YouTube channel videos in the report period. LinkedIn · X/Twitter · Instagram via Serper index. SoV % = org total ÷ cohort total.'}
+  ✓ = live API data (AQ-filtered). All platforms via APIDirectio. X: client-side keyword filter. IG: Claude Haiku AQ classification. LI: fetched from company page. SoV % = org total ÷ cohort total.
 </div>`;
+
+  const metricCard = (label, value, col) =>
+    `<div style="background:#181e2e;border:1px solid #252d40;border-radius:6px;padding:10px 12px;min-width:0">
+      <div style="font-family:monospace;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;margin-bottom:5px">${label}</div>
+      <div style="font-family:monospace;font-size:18px;font-weight:700;color:${col};line-height:1">${value}</div>
+    </div>`;
 
   // ── Per-org detail sections ───────────────────────────────────────────────
   const orgDetails = erResults.map(r => {
@@ -331,12 +334,16 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
             <a href="${escHtml(p.url)}" target="_blank" style="font-size:11px;color:#4a9fd4;text-decoration:none;line-height:1.4;display:block;font-weight:600">${escHtml((p.text || '').slice(0, 200))}${(p.text || '').length > 200 ? '…' : ''}</a>
             <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ ${p.likes} &middot; ↩ ${p.replies} &middot; ↻ ${p.reposts}${p.views ? ` &middot; ${p.views.toLocaleString()} views` : ''} &middot; ${p.created_at ? new Date(p.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : ''}</div>
           </div>`).join('');
-        return `<div style="margin-top:6px">
-          <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
-            X/Twitter — <span style="color:#4a9fd4">${xr.aqPosts} AQ tweet${xr.aqPosts === 1 ? '' : 's'}</span> of ${xr.totalPosts} total
-            ${xr.followers ? `&middot; ${xr.followers.toLocaleString()} followers` : ''}
-            ${xr.totalLikes ? `&middot; ${xr.totalLikes.toLocaleString()} total ♥` : ''}
+        return `<div style="margin-top:10px">
+          <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:6px">X Twitter</div>
+          <div style="background:rgba(74,159,212,.08);border:1px solid rgba(74,159,212,.2);border-radius:4px;padding:3px 10px;margin-bottom:8px;font-size:9px;color:#4a9fd4;font-family:monospace">Native API keyword filter — AQ posts only</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
+            ${metricCard('AQ Posts', xr.aqPosts, '#4a9fd4')}
+            ${metricCard('Followers', xr.followers ? xr.followers.toLocaleString() : '—', '#4a9fd4')}
+            ${metricCard('AQ Post Likes', (xr.totalLikes || 0).toLocaleString(), '#4a9fd4')}
+            ${metricCard('Replies', (xr.totalReplies || 0).toLocaleString(), '#4a9fd4')}
           </div>
+          <div style="font-size:9px;color:#3a4a5e;font-family:monospace;margin-bottom:4px">${xr.aqPosts} AQ tweets of ${xr.totalPosts} total in period</div>
           ${topPostsHtml || '<div style="font-size:10px;color:#5e7494">No top posts to display</div>'}
         </div>`;
       }
@@ -362,11 +369,16 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
             <a href="${escHtml(p.permalink)}" target="_blank" style="font-size:11px;color:#e05c9c;text-decoration:none;line-height:1.4;display:block;font-weight:600">${escHtml((p.caption || '').slice(0, 200))}${(p.caption || '').length > 200 ? '…' : ''}</a>
             <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ ${p.likes} &middot; 💬 ${p.comments} &middot; ${p.timestamp ? new Date(p.timestamp).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : ''}</div>
           </div>`).join('');
-        return `<div style="margin-top:6px">
-          <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
-            Instagram — <span style="color:#e05c9c">${ig.aqPosts} AQ post${ig.aqPosts === 1 ? '' : 's'}</span> of ${ig.totalPosts} in period
-            ${ig.followers ? `&middot; ${ig.followers.toLocaleString()} followers` : ''}
+        return `<div style="margin-top:10px">
+          <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:6px">Instagram</div>
+          <div style="background:rgba(224,92,156,.08);border:1px solid rgba(224,92,156,.2);border-radius:4px;padding:3px 10px;margin-bottom:8px;font-size:9px;color:#e05c9c;font-family:monospace">All posts fetched → AQ-classified by Claude Haiku</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
+            ${metricCard('AQ Posts', ig.aqPosts, '#e05c9c')}
+            ${metricCard('Followers', ig.followers ? ig.followers.toLocaleString() : '—', '#e05c9c')}
+            ${metricCard('AQ Post Likes', (ig.totalLikes || 0).toLocaleString(), '#e05c9c')}
+            ${metricCard('Comments', (ig.totalComments || 0).toLocaleString(), '#e05c9c')}
           </div>
+          <div style="font-size:9px;color:#3a4a5e;font-family:monospace;margin-bottom:4px">${ig.aqPosts} AQ posts of ${ig.totalPosts} in period</div>
           ${topPostsHtml || '<div style="font-size:10px;color:#5e7494">No top posts</div>'}
         </div>`;
       }
