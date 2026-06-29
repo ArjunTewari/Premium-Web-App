@@ -26,14 +26,84 @@ try {
 } catch {}
 
 const axios = require('axios');
-const { ORG_IG_HANDLES } = require('./instagram-collector');
 
 const ORGS      = ['CEEW', 'CSE India'];
 const DATE_FROM = '2026-02-01';
 const DATE_TO   = '2026-05-01';
 const API_BASE  = 'https://apidirect.io';
 
-const AQ_QUERY  = '("air quality" OR "air pollution" OR AQI OR PM2.5 OR NCAP OR smog OR emissions)';
+// Official account handles per platform.
+// Twitter  → username without @  (used for /v1/twitter/user/tweets)
+// LinkedIn → full company page URL (used for /v1/linkedin/company/posts)
+// Instagram → username           (used for /v1/instagram/user/posts)
+// Verify / add slugs before running for new orgs.
+const ORG_SOCIAL = {
+  'CEEW': {
+    twitter:   'CEEWIndia',
+    linkedin:  'https://www.linkedin.com/company/council-on-energy-environment-and-water',
+    instagram: 'ceewindia',
+  },
+  'CSE India': {
+    twitter:   'CSEINDIA',
+    linkedin:  'https://www.linkedin.com/company/centre-for-science-and-environment',
+    instagram: 'cseindia',
+  },
+  'WRI India': {
+    twitter:   'WRIIndia',
+    linkedin:  'https://www.linkedin.com/company/wri-india',
+    instagram: 'wriindia',
+  },
+  'CSTEP': {
+    twitter:   'CSTEP_India',
+    linkedin:  'https://www.linkedin.com/company/cstep',
+    instagram: 'cstep_india',
+  },
+  'Air Pollution Action Group': {
+    twitter:   'APAGIndia',
+    linkedin:  'https://www.linkedin.com/company/air-pollution-action-group',
+    instagram: 'apagindia',
+  },
+  'Chintan': {
+    twitter:   'ChintanIndia',
+    linkedin:  'https://www.linkedin.com/company/chintan-environmental-research-and-action-group',
+    instagram: 'chintanindia',
+  },
+  'IIT Delhi': {
+    twitter:   'IITDelhi',
+    linkedin:  'https://www.linkedin.com/school/indian-institute-of-technology-delhi',
+    instagram: 'iitdelhi',
+  },
+  'IIT Kanpur': {
+    twitter:   'IITKanpur',
+    linkedin:  'https://www.linkedin.com/school/indian-institute-of-technology-kanpur',
+    instagram: 'iitkanpur',
+  },
+  'Health Effects Institute': {
+    twitter:   'HealthEffects',
+    linkedin:  'https://www.linkedin.com/company/health-effects-institute',
+    instagram: 'healtheffectsinstitute',
+  },
+  'ICCT': {
+    twitter:   'TheICCT',
+    linkedin:  'https://www.linkedin.com/company/international-council-on-clean-transportation',
+    instagram: 'theicct',
+  },
+  'EPIC India': {
+    twitter:   'EPICIndia',
+    linkedin:  'https://www.linkedin.com/company/epic-india',
+    instagram: 'epic_india',
+  },
+  'Climate Trends': {
+    twitter:   'ClimateHound',
+    linkedin:  'https://www.linkedin.com/company/climate-trends',
+    instagram: 'climatetrendsindia',
+  },
+  'Sustainable Futures Collaborative': {
+    twitter:   'SFCIndia',
+    linkedin:  'https://www.linkedin.com/company/sustainable-futures-collaborative',
+    instagram: 'sfc_india',
+  },
+};
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -103,20 +173,20 @@ async function filterAQPosts(posts, claudeKey, label) {
 
 // ── Platform fetchers ──────────────────────────────────────────────────────
 
-async function fetchTwitter(org, apiKey) {
-  const data = await apiFetch('/v1/twitter/posts', {
-    query:   `${org} ${AQ_QUERY} -is:retweet lang:en`,
-    pages:   2,
-    sort_by: 'most_recent',
+// Fetches tweets FROM the org's own account (not mentions of the org)
+async function fetchTwitter(handle, apiKey) {
+  const data = await apiFetch('/v1/twitter/user/tweets', {
+    username: handle,
+    pages:    3,
   }, apiKey);
-  return (data.posts || [])
+  return (data.tweets || [])
     .filter(p => inPeriod(p.date))
     .map(p => ({
       platform: 'Twitter/X',
       text:     p.snippet || p.title || '',
       url:      p.url     || '',
       date:     p.date    || '',
-      author:   p.author  || '',
+      author:   p.author  || handle,
       likes:    p.likes     || 0,
       retweets: p.retweets  || 0,
       replies:  p.replies   || 0,
@@ -144,21 +214,20 @@ async function fetchInstagram(handle, apiKey) {
     }));
 }
 
-// LinkedIn: searches for posts mentioning the org with AQ context
-async function fetchLinkedIn(org, apiKey) {
-  const data = await apiFetch('/v1/linkedin/posts', {
-    query:   `${org} air quality pollution India`,
-    page:    1,
-    sort_by: 'most_recent',
+// Fetches posts FROM the org's own LinkedIn company page
+async function fetchLinkedIn(companyUrl, apiKey) {
+  const data = await apiFetch('/v1/linkedin/company/posts', {
+    url:  companyUrl,
+    page: 1,
   }, apiKey);
   return (data.posts || [])
     .filter(p => inPeriod(p.date))
     .map(p => ({
       platform: 'LinkedIn',
-      text:     p.snippet || p.title || '',
-      url:      p.url     || '',
-      date:     p.date    || '',
-      author:   p.author  || '',
+      text:     p.text || p.snippet || '',
+      url:      p.url  || '',
+      date:     p.date || '',
+      author:   p.author || '',
       likes:    p.likes    || 0,
       comments: p.comments || 0,
       shares:   p.shares   || 0,
@@ -216,25 +285,33 @@ async function main() {
   if (!API_KEY) { console.error('APIDIRECT_KEY not set'); process.exit(1); }
 
   for (const org of ORGS) {
-    const igHandle = ORG_IG_HANDLES[org];
+    const handles = ORG_SOCIAL[org] || {};
     console.log(`\n══ ${org} ${'═'.repeat(Math.max(0, 44 - org.length))}`);
-    if (igHandle) console.log(`    IG handle: @${igHandle}`);
+    console.log(`    X: @${handles.twitter || '?'}  LI: ${handles.linkedin ? '✓' : '✗'}  IG: @${handles.instagram || '?'}`);
+
+    if (!handles.twitter && !handles.linkedin && !handles.instagram) {
+      console.log('  ⚠ No handles configured — add to ORG_SOCIAL map'); continue;
+    }
 
     // Step 1: fetch all platforms in parallel
     const [tweets, igPosts, liPosts, ytPosts] = await Promise.all([
-      fetchTwitter(org, API_KEY).catch(e => {
-        console.log(`  ⚠ Twitter fetch: ${e.response?.data?.error || e.message}`); return [];
-      }),
-      igHandle
-        ? fetchInstagram(igHandle, API_KEY).catch(e => {
-            console.log(`  ⚠ Instagram fetch: ${e.response?.data?.error || e.message}`); return [];
+      handles.twitter
+        ? fetchTwitter(handles.twitter, API_KEY).catch(e => {
+            console.log(`  ⚠ Twitter: ${e.response?.data?.error || e.message}`); return [];
           })
-        : (console.log('  ⚠ No IG handle configured'), Promise.resolve([])),
-      fetchLinkedIn(org, API_KEY).catch(e => {
-        console.log(`  ⚠ LinkedIn fetch: ${e.response?.data?.error || e.message}`); return [];
-      }),
+        : Promise.resolve([]),
+      handles.instagram
+        ? fetchInstagram(handles.instagram, API_KEY).catch(e => {
+            console.log(`  ⚠ Instagram: ${e.response?.data?.error || e.message}`); return [];
+          })
+        : Promise.resolve([]),
+      handles.linkedin
+        ? fetchLinkedIn(handles.linkedin, API_KEY).catch(e => {
+            console.log(`  ⚠ LinkedIn: ${e.response?.data?.error || e.message}`); return [];
+          })
+        : Promise.resolve([]),
       fetchYouTube(org, API_KEY).catch(e => {
-        console.log(`  ⚠ YouTube fetch: ${e.response?.data?.error || e.message}`); return [];
+        console.log(`  ⚠ YouTube: ${e.response?.data?.error || e.message}`); return [];
       }),
     ]);
 
