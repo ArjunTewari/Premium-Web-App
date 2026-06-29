@@ -24,22 +24,50 @@ const DATE_FROM = '2026-02-01';
 const DATE_TO   = '2026-05-01';
 const AQ_TERMS  = '("air quality" OR "air pollution" OR AQI OR PM2.5 OR NCAP)';
 
-const AQ_KEYWORDS = [
-  'air quality', 'air pollution', 'aqi', 'pm2.5', 'pm10', 'ncap', 'grap',
-  'smog', 'clean air', 'black carbon', 'ozone', 'ammonia', 'nitrogen dioxide',
-  'particulate', 'emission', 'pollut', 'dust', 'haze', 'toxic air',
-];
-
-function isAQPost(caption) {
-  const lower = (caption || '').toLowerCase();
-  return AQ_KEYWORDS.some(kw => lower.includes(kw));
-}
-
 // Extract Instagram shortcode from any Instagram post URL
-// Handles both /p/{code}/ and /{user}/p/{code}/
 function shortcodeFromUrl(url) {
   const m = (url || '').match(/instagram\.com\/(?:[^/]+\/)?p\/([A-Za-z0-9_-]+)/);
   return m ? m[1] : null;
+}
+
+// ── Claude Haiku AQ classifier ─────────────────────────────────────────────
+
+async function classifyPost(text, claudeKey) {
+  if (!text || !claudeKey) return false;
+  try {
+    const res = await axios.post('https://api.anthropic.com/v1/messages', {
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 10,
+      system:     'You classify social media posts. Reply with only YES or NO.',
+      messages: [{
+        role:    'user',
+        content: `Is this post about air quality, air pollution, AQI, PM2.5, smog, clean air, emissions, or environmental air health?\n\nPost: "${text.slice(0, 500)}"\n\nAnswer YES or NO only.`,
+      }],
+    }, {
+      headers: {
+        'x-api-key':         claudeKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type':      'application/json',
+      },
+      timeout: 15000,
+    });
+    return res.data.content?.[0]?.text?.trim().toUpperCase() === 'YES';
+  } catch {
+    return false;
+  }
+}
+
+// Classify an array of posts in batches of 5, return only AQ ones
+async function filterAQPosts(posts, claudeKey) {
+  if (!claudeKey) { console.log('  ⚠ CLAUDE_KEY missing — skipping Haiku classification'); return posts; }
+  const aq = [];
+  for (let i = 0; i < posts.length; i += 5) {
+    const batch = posts.slice(i, i + 5);
+    const flags = await Promise.all(batch.map(p => classifyPost(p.caption || p.title || p.snippet, claudeKey)));
+    flags.forEach((isAQ, j) => { if (isAQ) aq.push(batch[j]); });
+    if (i + 5 < posts.length) await new Promise(r => setTimeout(r, 500));
+  }
+  return aq;
 }
 
 // ── Source 1: Serper ───────────────────────────────────────────────────────
@@ -61,7 +89,7 @@ async function serperIGSearch(handle, serperKey) {
     title:     r.title   || '',
     snippet:   r.snippet || '',
     source:    'serper',
-  })).filter(p => p.shortcode); // drop any non-post URLs (e.g. profile pages)
+  })).filter(p => p.shortcode);
 }
 
 // ── Source 2: HikerAPI direct media fetch ─────────────────────────────────
@@ -71,18 +99,15 @@ async function hikerFetchPosts(handle, hikerKey) {
   const toTs   = new Date(DATE_TO).getTime();
   const headers = { 'x-access-key': hikerKey };
 
-  // Get user pk
   const userRes = await axios.get('https://api.hikerapi.com/v1/user/by/username', {
     params: { username: handle }, headers, timeout: 15000,
   });
   const userId = String(userRes.data?.pk || '');
   if (!userId) return [];
 
-  // Paginate media
   const posts = [];
   let endCursor = null;
   let page = 0;
-  const MAX_PAGES = 15;
 
   do {
     const params = { user_id: userId };
@@ -97,10 +122,11 @@ async function hikerFetchPosts(handle, hikerKey) {
       const ts = m.taken_at_ts
         ? Number(m.taken_at_ts) * 1000
         : (typeof m.taken_at === 'string' ? new Date(m.taken_at).getTime() : Number(m.taken_at) * 1000);
-      if (ts >= fromTs && ts <= toTs && isAQPost(m.caption_text)) {
+      if (ts >= fromTs && ts <= toTs) {
         posts.push({
           shortcode: m.code || m.shortcode || '',
           url:       m.code ? `https://www.instagram.com/p/${m.code}/` : '',
+          caption:   m.caption_text || '',
           title:     (m.caption_text || '').slice(0, 80),
           likes:     m.like_count    || 0,
           comments:  m.comment_count || 0,
@@ -108,19 +134,18 @@ async function hikerFetchPosts(handle, hikerKey) {
           source:    'hiker',
         });
       }
-      // Early stop: gone past window
       if (ts > 0 && ts < fromTs) { endCursor = null; break; }
     }
 
     endCursor = cursor || null;
     page++;
     if (endCursor) await new Promise(r => setTimeout(r, 400));
-  } while (endCursor && page < MAX_PAGES);
+  } while (endCursor && page < 15);
 
   return posts.filter(p => p.shortcode);
 }
 
-// ── HikerAPI: enrich a Serper post URL with real metrics ──────────────────
+// ── HikerAPI: enrich a Serper post URL with metrics + full caption ─────────
 
 async function hikerEnrich(url, hikerKey) {
   try {
@@ -132,7 +157,7 @@ async function hikerEnrich(url, hikerKey) {
       likes:    m.like_count    || 0,
       comments: m.comment_count || 0,
       taken_at: m.taken_at      || null,
-      caption:  (m.caption_text || '').slice(0, 150),
+      caption:  m.caption_text  || '',
     };
   } catch (e) {
     return { error: e.response?.data?.detail || e.message };
@@ -144,11 +169,12 @@ async function hikerEnrich(url, hikerKey) {
 async function main() {
   const SERPER_KEY = process.env.SERPER_KEY;
   const HIKER_KEY  = process.env.HIKER_API_KEY;
+  const CLAUDE_KEY = process.env.CLAUDE_KEY;
 
-  console.log('=== Instagram: Serper + HikerAPI merged ===');
+  console.log('=== Instagram: Serper + HikerAPI + Haiku ===');
   console.log(`Orgs  : ${ORGS.join(', ')}`);
   console.log(`Period: ${DATE_FROM} → ${DATE_TO}`);
-  console.log(`Serper: ${SERPER_KEY ? '✓' : '✗ missing'}  |  HikerAPI: ${HIKER_KEY ? '✓' : '✗ missing'}\n`);
+  console.log(`Serper: ${SERPER_KEY ? '✓' : '✗'}  HikerAPI: ${HIKER_KEY ? '✓' : '✗'}  Claude Haiku: ${CLAUDE_KEY ? '✓' : '✗'}\n`);
 
   if (!SERPER_KEY) { console.error('SERPER_KEY not set'); process.exit(1); }
 
@@ -157,49 +183,44 @@ async function main() {
     console.log(`\n── ${org} (@${handle || 'unknown'}) ────────────────────────`);
     if (!handle) { console.log('  ⚠ No handle configured'); continue; }
 
-    // ── Fetch from both sources in parallel ───────────────────────────────
+    // Step 1: fetch both sources in parallel
     const [serperPosts, hikerPosts] = await Promise.all([
       serperIGSearch(handle, SERPER_KEY).catch(e => { console.log(`  ⚠ Serper: ${e.message}`); return []; }),
       HIKER_KEY
         ? hikerFetchPosts(handle, HIKER_KEY).catch(e => { console.log(`  ⚠ HikerAPI: ${e.message}`); return []; })
         : Promise.resolve([]),
     ]);
+    console.log(`  Serper: ${serperPosts.length}  HikerAPI: ${hikerPosts.length} in period`);
 
-    console.log(`  Serper : ${serperPosts.length} post(s)`);
-    console.log(`  HikerAPI: ${hikerPosts.length} post(s) in period`);
-
-    // ── Merge, deduplicate by shortcode ───────────────────────────────────
-    const seen = new Map(); // shortcode → merged post
-
-    // HikerAPI posts go in first (already have metrics)
+    // Step 2: merge, deduplicate by shortcode
+    const seen = new Map();
     for (const p of hikerPosts) seen.set(p.shortcode, p);
-
-    // Serper posts: add if new, mark as needing enrichment if not already seen
     for (const p of serperPosts) {
       if (!seen.has(p.shortcode)) seen.set(p.shortcode, { ...p, needsEnrich: true });
-      // If seen from HikerAPI already, just attach the title/snippet from Serper
       else seen.get(p.shortcode).title = seen.get(p.shortcode).title || p.title;
     }
-
     const merged = [...seen.values()];
-    console.log(`  Merged  : ${merged.length} unique post(s) (${hikerPosts.length} from HikerAPI, ${merged.length - hikerPosts.length} Serper-only)\n`);
+    console.log(`  Merged: ${merged.length} unique (${merged.filter(p => p.needsEnrich).length} Serper-only need enrichment)`);
 
-    // ── Enrich Serper-only posts with HikerAPI metrics ────────────────────
+    // Step 3: enrich Serper-only posts to get full captions for classification
     if (HIKER_KEY) {
-      for (const post of merged) {
-        if (post.needsEnrich && post.url) {
-          const metrics = await hikerEnrich(post.url, HIKER_KEY);
-          if (!metrics.error) Object.assign(post, metrics);
-          else post.enrichError = metrics.error;
-          await new Promise(r => setTimeout(r, 300));
-        }
+      for (const post of merged.filter(p => p.needsEnrich && p.url)) {
+        const metrics = await hikerEnrich(post.url, HIKER_KEY);
+        if (!metrics.error) Object.assign(post, metrics);
+        else post.enrichError = metrics.error;
+        await new Promise(r => setTimeout(r, 300));
       }
     }
 
-    // ── Display ───────────────────────────────────────────────────────────
-    for (const post of merged) {
+    // Step 4: classify all merged posts with Claude Haiku
+    console.log(`  Classifying ${merged.length} posts with Haiku…`);
+    const aqPosts = await filterAQPosts(merged, CLAUDE_KEY);
+    console.log(`  AQ posts: ${aqPosts.length} / ${merged.length}\n`);
+
+    // Step 5: display
+    for (const post of aqPosts) {
       const src = post.source === 'hiker' ? '[HikerAPI]' : '[Serper]  ';
-      console.log(`  ${src} ${(post.title || post.caption || post.snippet || '').slice(0, 80)}`);
+      console.log(`  ${src} ${(post.caption || post.title || post.snippet || '').slice(0, 80)}`);
       console.log(`           URL      : ${post.url}`);
       if (post.likes    !== undefined) console.log(`           Likes    : ${post.likes}`);
       if (post.comments !== undefined) console.log(`           Comments : ${post.comments}`);
@@ -208,7 +229,7 @@ async function main() {
       console.log();
     }
 
-    if (!merged.length) console.log('  No posts found in period');
+    if (!aqPosts.length) console.log('  No AQ posts found in period');
   }
 
   console.log('=== Done ===');
