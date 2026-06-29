@@ -42,11 +42,13 @@ const ORG_SOCIAL = {
     twitter:   'CEEWIndia',
     linkedin:  'https://www.linkedin.com/company/council-on-energy-environment-and-water/',
     instagram: 'ceewindia',
+    youtube:   'UCNF-vGnm1jdA_jhrIpk84Tg',
   },
   'CSE India': {
-    twitter:   'CSEINDIA',
+    twitter:   'cseindia',
     linkedin:  'https://www.linkedin.com/company/centre-for-science-and-environment-new-delhi/',
     instagram: 'cseindia',
+    youtube:   null,
   },
   'WRI India': {
     twitter:   'WRIIndia',
@@ -234,21 +236,30 @@ async function fetchLinkedIn(companyUrl, apiKey) {
     }));
 }
 
-async function fetchYouTube(org, apiKey) {
-  const data = await apiFetch('/v1/youtube/posts', {
-    query: `${org} air quality India`,
-    pages: 2,
-  }, apiKey);
-  return (data.posts || [])
-    .filter(p => inPeriod(p.date))
-    .map(p => ({
-      platform: 'YouTube',
-      text:     (p.title || '') + ' ' + (p.snippet || ''),
-      url:      p.url    || '',
-      date:     p.date   || '',
-      author:   p.author || '',
-      views:    p.views  || 0,
-    }));
+// Uses YouTube Data API v3 to fetch videos from the org's own channel.
+// Skipped entirely when youtube channel ID is null/undefined.
+async function fetchYouTube(channelId, youtubeKey) {
+  const res = await axios.get('https://www.googleapis.com/youtube/v3/search', {
+    params: {
+      channelId,
+      type:           'video',
+      part:           'snippet',
+      maxResults:     25,
+      order:          'date',
+      publishedAfter:  new Date(DATE_FROM).toISOString(),
+      publishedBefore: new Date(DATE_TO).toISOString(),
+      key:            youtubeKey,
+    },
+    timeout: 15000,
+  });
+  return (res.data.items || []).map(item => ({
+    platform: 'YouTube',
+    text:     (item.snippet?.title || '') + ' ' + (item.snippet?.description || '').slice(0, 200),
+    url:      `https://www.youtube.com/watch?v=${item.id?.videoId}`,
+    date:     item.snippet?.publishedAt || '',
+    author:   item.snippet?.channelTitle || '',
+    views:    0,
+  }));
 }
 
 // ── Display ────────────────────────────────────────────────────────────────
@@ -274,20 +285,21 @@ function displayPosts(posts) {
 // ── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
-  const API_KEY    = process.env.APIDIRECT_KEY;
-  const CLAUDE_KEY = process.env.CLAUDE_KEY;
+  const API_KEY     = process.env.APIDIRECT_KEY;
+  const CLAUDE_KEY  = process.env.CLAUDE_KEY;
+  const YOUTUBE_KEY = process.env.YOUTUBE_KEY;
 
-  console.log('=== Social Intelligence — APIDirectio ===');
-  console.log(`Orgs   : ${ORGS.join(', ')}`);
-  console.log(`Period : ${DATE_FROM} → ${DATE_TO}`);
-  console.log(`APIDir : ${API_KEY ? '✓' : '✗ (set APIDIRECT_KEY in .env)'}  Haiku: ${CLAUDE_KEY ? '✓' : '✗'}\n`);
+  console.log('=== Social Intelligence — APIDirectio + YouTube Data API ===');
+  console.log(`Orgs     : ${ORGS.join(', ')}`);
+  console.log(`Period   : ${DATE_FROM} → ${DATE_TO}`);
+  console.log(`APIDir   : ${API_KEY ? '✓' : '✗ (set APIDIRECT_KEY in .env)'}  YouTube: ${YOUTUBE_KEY ? '✓' : '✗'}  Haiku: ${CLAUDE_KEY ? '✓' : '✗'}\n`);
 
   if (!API_KEY) { console.error('APIDIRECT_KEY not set'); process.exit(1); }
 
   for (const org of ORGS) {
     const handles = ORG_SOCIAL[org] || {};
     console.log(`\n══ ${org} ${'═'.repeat(Math.max(0, 44 - org.length))}`);
-    console.log(`    X: @${handles.twitter || '?'}  LI: ${handles.linkedin ? '✓' : '✗'}  IG: @${handles.instagram || '?'}`);
+    console.log(`    X: @${handles.twitter || '?'}  LI: ${handles.linkedin ? '✓' : '✗'}  IG: @${handles.instagram || '?'}  YT: ${handles.youtube ? '✓' : '—'}`);
 
     if (!handles.twitter && !handles.linkedin && !handles.instagram) {
       console.log('  ⚠ No handles configured — add to ORG_SOCIAL map'); continue;
@@ -310,9 +322,11 @@ async function main() {
             console.log(`  ⚠ LinkedIn: ${e.response?.data?.error || e.message}`); return [];
           })
         : Promise.resolve([]),
-      fetchYouTube(org, API_KEY).catch(e => {
-        console.log(`  ⚠ YouTube: ${e.response?.data?.error || e.message}`); return [];
-      }),
+      handles.youtube && YOUTUBE_KEY
+        ? fetchYouTube(handles.youtube, YOUTUBE_KEY).catch(e => {
+            console.log(`  ⚠ YouTube: ${e.response?.data?.error?.message || e.message}`); return [];
+          })
+        : Promise.resolve([]),
     ]);
 
     console.log(`  Raw in period : X=${tweets.length}  IG=${igPosts.length}  LI=${liPosts.length}  YT=${ytPosts.length}`);
