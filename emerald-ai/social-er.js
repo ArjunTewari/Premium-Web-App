@@ -216,9 +216,13 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI posts</th>
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X posts</th>
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X flw</th>
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG posts</th>
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG flw</th>
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT subs</th>
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap">SoV%</th>
       </tr>
@@ -227,9 +231,13 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4a7fd4">${colTotals.li}</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4a9fd4">${colTotals.x}</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#e05c9c">${colTotals.ig}</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#e53935">${colTotals.yt}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#c9922a">${cohortTotal}</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4caf74">100%</td>
       </tr>
@@ -239,19 +247,34 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         const sov  = cohortTotal > 0 ? ((total / cohortTotal) * 100).toFixed(1) : '0.0';
         const barW = Math.round((total / (unifiedRows[0].total || 1)) * 100);
         const col  = total >= 10 ? '#4caf74' : total >= 5 ? '#c9922a' : total >= 1 ? '#4a9fd4' : '#5e7494';
-        const twFol = r.twData?.followers ? ` <span style="color:#3a4a5e">(${fmtNum(r.twData.followers)})</span>` : '';
-        const igFol = r.igData?.followers ? ` <span style="color:#3a4a5e">(${fmtNum(r.igData.followers)})</span>` : '';
+        const twFollowers = r.twData?.followers || 0;
+        const igFollowers = r.igData?.followers || 0;
+        const ytER   = yt.avgER || yt.avgViewER || 0;
+        const ytSubs = yt.videos?.find(v => v.subscribers > 0)?.subscribers || 0;
         const twER  = r.twitterER  > 0 ? `<span style="color:#4a9fd4">${r.twitterER}%</span>` : '<span style="color:#3a4a5e">—</span>';
-        const igER  = r.instagramER > 0 ? `<span style="color:#e05c9c">${r.instagramER}%</span>` : '<span style="color:#3a4a5e">—</span>';
+        // IG ER: show ~ when followers < 500 (unreliable denominator)
+        const igER  = r.instagramER > 0
+          ? (igFollowers >= 500
+              ? `<span style="color:#e05c9c">${r.instagramER}%</span>`
+              : `<span style="color:#3a4a5e" title="ER unreliable — follower count too low (${igFollowers}) for meaningful ER">~</span>`)
+          : '<span style="color:#3a4a5e">—</span>';
+        const ytERCell = ytER > 0 ? `<span style="color:#e53935">${ytER}%</span>` : '<span style="color:#3a4a5e">—</span>';
+        const twFlwCell = twFollowers > 0 ? `<span style="color:#4a9fd4;font-size:11px">${fmtNum(twFollowers)}</span>` : '<span style="color:#3a4a5e">—</span>';
+        const igFlwCell = igFollowers > 0 ? `<span style="color:#e05c9c;font-size:11px">${fmtNum(igFollowers)}</span>` : '<span style="color:#3a4a5e">—</span>';
+        const ytSubsCell = ytSubs > 0 ? `<span style="color:#e53935;font-size:11px">${fmtNum(ytSubs)}</span>` : '<span style="color:#3a4a5e">—</span>';
         return `<tr style="border-top:1px solid #252d40">
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#2e3a52">#${unifiedRank}</td>
           <td style="padding:8px 12px"><span style="font-family:monospace;font-size:11px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a7fd4">${r.linkedinPosts || 0}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a9fd4">${r.twitterPosts || 0}${twFol}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a9fd4">${r.twitterPosts || 0}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px">${twER}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}${igFol}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace">${twFlwCell}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px">${igER}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace">${igFlwCell}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e53935">${yt.videoCount || 0}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px">${ytERCell}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace">${ytSubsCell}</td>
           <td style="padding:8px 12px;text-align:center">
             <span style="font-family:monospace;font-size:15px;font-weight:700;color:${col}">${total}</span>
             <div style="margin:4px auto;width:70px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:${col};width:${barW}%"></div></div>
@@ -262,8 +285,15 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     </tbody>
   </table>
 </div>
-<div style="font-family:monospace;font-size:9px;color:#3a4a5e;margin-bottom:16px">
-  ✓ Live data via APIdirect.io · LI = AQ keyword filtered posts · X ER = (likes+replies+retweets)/followers×100 · IG ER = (likes+comments)/followers×100 · YT = official channel videos via YouTube Data API v3 · SoV% = org total ÷ cohort total
+<div style="background:#0d1120;border:1px solid #1e2638;border-radius:6px;padding:10px 14px;font-family:monospace;font-size:9px;color:#3a4a5e;line-height:1.9;margin-bottom:16px">
+  <strong style="color:#5e7494;letter-spacing:.06em">LEGEND</strong> &nbsp;·&nbsp;
+  <strong style="color:#4a7fd4">LI</strong> = LinkedIn AQ posts &nbsp;·&nbsp;
+  <strong style="color:#4a9fd4">X</strong> = X/Twitter AQ posts from official handle &nbsp;·&nbsp;
+  <strong style="color:#e05c9c">IG</strong> = Instagram posts from official handle &nbsp;·&nbsp;
+  <strong style="color:#e53935">YT</strong> = YouTube videos via Data API v3 &nbsp;·&nbsp;
+  <span style="color:#5e7494">flw = follower count &nbsp;·&nbsp; subs = subscriber count</span><br>
+  ER% = Engagement Rate — X: (likes+replies+retweets)÷followers×100 &nbsp;·&nbsp; IG: (likes+comments)÷followers×100 (shown as <strong>~</strong> when followers &lt; 500, unreliable) &nbsp;·&nbsp; YT: (likes+comments)÷subscribers×100, falls back to ÷views &nbsp;·&nbsp;
+  SoV% = org total ÷ cohort total &nbsp;·&nbsp; Data: APIdirect.io live API
 </div>`;
 
   // ── Per-org expandable detail sections ───────────────────────────────────
@@ -376,7 +406,6 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
 
   return `
 <!-- SOCIAL PRESENCE SECTION -->
-<div style="font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#5e7494;margin-bottom:12px">§ Social Media AQ Presence</div>
 <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">${statCards}</div>
 ${sourceBanner}
 ${ytKeyNotice}

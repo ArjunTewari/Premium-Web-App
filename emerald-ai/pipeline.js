@@ -24,8 +24,9 @@ const OUTLETS = [
 // Key print/digital outlets shown in the outlet breakdown table
 const PRINT_OUTLETS = [
   "Times of India",
-  "Hindustan Times",
   "The Hindu",
+  "Indian Express",
+  "Deccan Herald",
 ];
 const TV_CHANNELS_ENGLISH = ["NDTV", "News18", "India Today"];
 const TV_CHANNELS_HINDI = ["Aaj Tak", "India TV", "ABP News"];
@@ -180,6 +181,23 @@ function countMentions(text, org) {
   return matches ? matches.length : 0;
 }
 
+/** Citation verification: for every line containing the org name, check ±2 lines
+ *  for AQ keywords. Returns true if any such co-occurrence is found. */
+function verifyCitationByLines(fullText, org, aqKeywords) {
+  if (!fullText) return false;
+  const lines = fullText.split('\n');
+  const orgLower = org.toLowerCase();
+  const kwLower = (aqKeywords || []).map(k => k.toLowerCase());
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].toLowerCase().includes(orgLower)) continue;
+    const start = Math.max(0, i - 2);
+    const end = Math.min(lines.length - 1, i + 2);
+    const windowText = lines.slice(start, end + 1).join(' ').toLowerCase();
+    if (kwLower.some(k => windowText.includes(k))) return true;
+  }
+  return false;
+}
+
 /** Return a ~windowSize window of text centered on the first occurrence of org.
  *  If org is not found, returns first windowSize chars (caller should check countMentions). */
 function extractRelevantWindow(text, org, windowSize = 700) {
@@ -230,6 +248,8 @@ function canonOutlet(src) {
   if (s.includes("hindustan times") || s.includes("hindustantimes"))
     return "Hindustan Times";
   if (s.includes("the hindu") || s.includes("thehindu")) return "The Hindu";
+  if (s.includes("indian express") || s.includes("indianexpress")) return "Indian Express";
+  if (s.includes("deccan herald") || s.includes("deccanherald")) return "Deccan Herald";
   if (s.includes("india today") || s.includes("indiatoday"))
     return "India Today";
   if (s.includes("ndtv")) return "NDTV";
@@ -900,6 +920,18 @@ ${txt}`;
       `  ${org}: ${removed > 0 ? `removed ${removed} unverified/off-topic →` : "all passed →"} ${arts[org].length} articles`,
       removed > 0 ? "warn" : "ok",
     );
+  }
+
+  // ── STEP 2c: Citation verification (±2-line AQ context check) ──────────
+  cb(`\nSTEP 2c/6 — Citation verification (org in AQ context, ±2 lines)...`, "head");
+  for (const org of ORGS) {
+    let verified = 0;
+    arts[org].forEach(a => {
+      const term = a.matchTerm || org;
+      a.citationVerified = verifyCitationByLines(a.fullText || '', term, SCOPE_KEYWORDS);
+      if (a.citationVerified) verified++;
+    });
+    cb(`  ${org}: ${verified}/${arts[org].length} citation-verified`, verified > 0 ? 'ok' : 'warn');
   }
 
   // ── STEP 3: AEO Visibility (via Social Intelligence module) ──
@@ -2743,13 +2775,17 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
           ? `<span style="font-family:monospace;font-size:10px;color:var(--muted)"> +${orgCnts.length - 3} more</span>`
           : "";
 
-      // Advantage: top org vs second org
-      let advantage = `<span style="color:var(--muted)">—</span>`;
-      if (orgCnts.length >= 2) {
-        const ratio = (orgCnts[0].n / orgCnts[1].n).toFixed(1);
-        advantage = `<span style="font-family:monospace;font-size:12px;font-weight:700;color:${orgHex(orgCnts[0].i)}">${ratio}&times;</span><span style="font-size:10px;color:var(--muted);margin-left:4px">${esc(orgCnts[0].o)}</span>`;
-      } else if (orgCnts.length === 1) {
-        advantage = `<span style="font-size:11px;color:var(--muted2)">Sole presence</span>`;
+      // Advantage: ranked list of all orgs for this outlet
+      let advantage;
+      if (!orgCnts.length) {
+        advantage = `<span style="color:var(--muted)">—</span>`;
+      } else {
+        const rankColors = ['#4caf74', '#c9922a', '#5e7494'];
+        const rankBadges = orgCnts.map((x, ri) => {
+          const rc = rankColors[ri] || '#5e7494';
+          return `<div style="display:flex;align-items:center;gap:4px"><span style="font-family:monospace;font-size:9px;font-weight:700;color:${rc};width:18px;flex-shrink:0">#${ri+1}</span><span style="font-size:10px;color:${orgHex(x.i)};font-weight:600">${esc(x.o)}</span><span style="font-family:monospace;font-size:9px;color:var(--muted)">(${x.n})</span></div>`;
+        });
+        advantage = `<div style="display:flex;flex-direction:column;gap:3px">${rankBadges.join('')}</div>`;
       }
 
       const eid = "ot" + outlet.replace(/\W/g, "");
@@ -3040,11 +3076,7 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
     const col = orgHex(i);
     const er  = socialERResults.find((r) => r.org === org);
     const yt  = youtubeERResults.find((r) => r.org === org);
-    const ytER = yt?.avgER || yt?.avgViewER || 0;
     const socialScore = d.social || 0;
-    const ytCell = ytER > 0
-      ? `<span style="font-family:monospace;font-size:12px;color:var(--text)">${ytER}%</span>`
-      : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`;
     const socialCell = socialScore > 0
       ? `<span style="font-family:monospace;font-size:13px;font-weight:600;color:${col}">${socialScore}<span style="font-size:10px;font-weight:400;color:var(--muted)">/10</span></span>`
       : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`;
@@ -3054,7 +3086,6 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       <td>${inlineBar(d.sov, maxSov, col)}</td>
       <td>${inlineBar(d.dataPct, maxCit, col)}</td>
       <td>${d.aeo > 0 ? inlineBar(d.aeo, maxAeo, col) : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`}</td>
-      <td style="text-align:center">${ytCell}</td>
       <td style="text-align:center">${socialCell}</td>
       <td>${inlineBar(d.score, maxScr, col)}</td>
     </tr>`;
@@ -3069,7 +3100,6 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
         <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">AQ Press Analytics</th>
         <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Citation %</th>
         <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">AEO Mentions</th>
-        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">YouTube ER</th>
         <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Social /10</th>
         <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Score</th>
       </tr>
@@ -3094,7 +3124,8 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       .map((a, i) => {
         const c = d.classifications[i] || {};
         const cq = c.citation_quality || "—";
-        return `<tr><td>${i + 1}</td><td>${esc(a.source || "")}</td><td style="font-size:10px">${esc(a.date || "")}</td><td style="max-width:260px">${esc(a.title || "")}</td><td style="font-size:10px;font-family:monospace;color:${cqColor(cq)}">${esc(cq)}</td><td>${a.url ? `<a href="${esc(a.url)}" target="_blank">link</a>` : "—"}</td></tr>`;
+        const citBadge = a.citationVerified ? `<span style="display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:1px 5px;font-size:9px;font-family:monospace;font-weight:700;margin-left:4px" title="Org appears within 2 lines of AQ keyword">✓ cit</span>` : '';
+        return `<tr><td>${i + 1}</td><td>${esc(a.source || "")}</td><td style="font-size:10px">${esc(a.date || "")}</td><td style="max-width:260px">${esc(a.title || "")}${citBadge}</td><td style="font-size:10px;font-family:monospace;color:${cqColor(cq)}">${esc(cq)}</td><td>${a.url ? `<a href="${esc(a.url)}" target="_blank">link</a>` : "—"}</td></tr>`;
       })
       .join("");
     return `<details ${orgIdx === 0 ? 'open' : ''} style="border:1px solid var(--border);border-radius:6px;margin-bottom:8px;overflow:hidden">
@@ -3394,9 +3425,10 @@ ${appendixSections}</section>
 ${emergingCards}</section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS)}
-${socialERHtml}
+<section class="sec" id="social"><div class="sh"><div class="se">Section 08</div><h2 class="st">Social Media AQ Presence</h2><div class="sd">Live social data via APIdirect.io — LinkedIn, X/Twitter, and Instagram posts from official org handles. YouTube engagement data via YouTube Data API v3. ER = Engagement Rate. <strong style="color:var(--good)">✓ cit</strong> in the Citations section indicates the org appeared within 2 lines of an AQ keyword.</div><div class="sdiv"></div></div>
+${socialERHtml}</section>
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social presence. <strong>YouTube ER</strong> = avg engagement rate of YouTube videos <em>mentioning</em> the org (not the org's own channel) — method: (likes+comments) ÷ subscribers × 100; falls back to ÷ views when subscriber count is hidden.</div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social presence. YouTube ER and full social metrics appear in the <a href="#social" style="color:var(--amber);text-decoration:none">Social Media section ↑</a>.</div><div class="sdiv"></div></div>
 ${scorecards}</section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including AEO and social media actions.</div><div class="sdiv"></div></div>

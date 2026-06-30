@@ -145,6 +145,18 @@ async function fetchInstagram(org, igHandle, apiKey, cb) {
     if (postsRes.status === 'fulfilled') posts = postsRes.value?.posts || [];
     if (userRes.status === 'fulfilled' && userRes.value) followers = userRes.value?.user?.follower_count || 0;
 
+    // Filter to posts from the official handle only (avoids posts about the org by others)
+    if (igHandle && posts.length > 0) {
+      const handle = igHandle.replace(/^@/, '').toLowerCase();
+      const filtered = posts.filter(p =>
+        (p.author || '').toLowerCase() === handle ||
+        (p.username || '').toLowerCase() === handle ||
+        (p.author_name || '').toLowerCase() === handle
+      );
+      // Only apply filter if it yields results; otherwise keep all (API may not return author field)
+      if (filtered.length > 0) posts = filtered;
+    }
+
     const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
     const totalComments = posts.reduce((s, p) => s + (p.comments || 0), 0);
     const totalViews    = posts.reduce((s, p) => s + (p.views    || 0), 0);
