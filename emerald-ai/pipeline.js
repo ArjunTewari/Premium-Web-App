@@ -30,6 +30,14 @@ const PRINT_OUTLETS = [
 const TV_CHANNELS_ENGLISH = ["NDTV", "News18", "India Today"];
 const TV_CHANNELS_HINDI = ["Aaj Tak", "India TV", "ABP News"];
 const ALL_TV_CHANNELS = [...TV_CHANNELS_ENGLISH, ...TV_CHANNELS_HINDI];
+const TV_CHANNEL_DOMAINS = {
+  "NDTV": "ndtv.com",
+  "News18": "news18.com",
+  "India Today": "indiatoday.in",
+  "Aaj Tak": "aajtak.in",
+  "India TV": "indiatvnews.com",
+  "ABP News": "abplive.com",
+};
 const TOPICS = [
   "NCAP",
   "Policy",
@@ -52,21 +60,21 @@ const TOPICS = [
   "Wheat Residue Burning",
   "Road Dust",
 ];
-// 13 colours — one per ~27° hue-wheel segment for maximum distinctiveness
+// 13 visually distinct colours — one per org slot
 const ORG_COLORS_HEX = [
-  "ef4444",  // Red       (  0°)
-  "f97316",  // Orange    ( 25°)
-  "eab308",  // Yellow    ( 48°)
-  "84cc16",  // Lime      ( 83°)
-  "22c55e",  // Green     (142°)
-  "10b981",  // Emerald   (160°)
-  "14b8a6",  // Teal      (174°)
-  "06b6d4",  // Cyan      (191°)
-  "3b82f6",  // Blue      (217°)
-  "6366f1",  // Indigo    (239°)
-  "a855f7",  // Purple    (270°)
-  "ec4899",  // Pink      (322°)
-  "f43f5e",  // Rose      (351°)
+  "3d8ef0",
+  "e05c3a",
+  "4caf74",
+  "c9922a",
+  "a371f7",
+  "e05c5c",
+  "14b8a6",
+  "f97316",
+  "8b5cf6",
+  "06b6d4",
+  "84cc16",
+  "ef4444",
+  "ec4899",
 ];
 const orgHex = (i) => "#" + ORG_COLORS_HEX[i % ORG_COLORS_HEX.length];
 const orgPptx = (i) => ORG_COLORS_HEX[i % ORG_COLORS_HEX.length];
@@ -232,28 +240,68 @@ function canonOutlet(src) {
   return null;
 }
 
-// ── APIDirectio news search ────────────────────────────────────────────────
-async function apidirNews(query, apiKey, options = {}) {
-  const url = new URL("https://apidirect.io/v1/news/articles");
-  url.searchParams.set("query",          query);
-  url.searchParams.set("limit",          String(options.limit || 50));
-  url.searchParams.set("time_published", options.time_published || "1y");
-  if (options.source)  url.searchParams.set("source",  options.source);
-  if (options.country) url.searchParams.set("country", options.country);
+// ── API calls ──────────────────────────────────────────────────────────────
+function toSerperDate(s) {
+  if (!s) return "";
+  const [y, m, d] = s.split("-");
+  return `${m}/${d}/${y}`;
+}
 
-  const res = await axios.get(url.toString(), {
-    headers: { "X-API-Key": apiKey },
-    timeout: 20000,
-  });
-  costTracker.apidirQueries++;
-  const raw = res.data.articles || res.data.posts || res.data.results || [];
-  return raw.map(a => ({
-    title:   a.title   || "",
-    snippet: a.snippet || a.description || a.summary || "",
-    link:    a.url     || a.link  || "",
-    source:  a.source  || "",
-    date:    a.date    || a.published_date || a.publishedAt || "",
+async function serperSearch(query, key, dateFrom, dateTo) {
+  const body = { q: query, num: 10 };
+  if (dateFrom && dateTo)
+    body.tbs = `cdr:1,cd_min:${toSerperDate(dateFrom)},cd_max:${toSerperDate(dateTo)}`;
+  const res = await axios.post(
+    "https://google.serper.dev/news",
+    body,
+    {
+      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+      timeout: 15000,
+    },
+  );
+  costTracker.serperQueries++;
+  return res.data.news || res.data.organic || [];
+}
+
+async function serperWebSearch(query, key, dateFrom, dateTo) {
+  const body = { q: query, num: 10 };
+  if (dateFrom && dateTo)
+    body.tbs = `cdr:1,cd_min:${toSerperDate(dateFrom)},cd_max:${toSerperDate(dateTo)}`;
+  const res = await axios.post(
+    "https://google.serper.dev/search",
+    body,
+    {
+      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+      timeout: 15000,
+    },
+  );
+  costTracker.serperQueries++;
+  return (res.data.organic || []).map((r) => ({
+    title: r.title || "",
+    link: r.link || "",
+    snippet: r.snippet || "",
+    source: r.source || dom(r.link || ""),
+    date: r.date || "",
   }));
+}
+
+async function serperScrape(url, key) {
+  try {
+    const res = await axios.post(
+      "https://scrape.serper.dev",
+      { url },
+      {
+        headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+        timeout: 15000,
+      },
+    );
+    costTracker.serperQueries++;
+    return (res.data.text || res.data.content || "")
+      .replace(/\s+/g, " ")
+      .trim();
+  } catch {
+    return "";
+  }
 }
 
 const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
@@ -531,17 +579,17 @@ Return ONLY a JSON array: [{"idx":0,"annotation":"..."},...]`,
 }
 
 // ── Cost accumulator (reset per run) ──────────────────────────────────────
-const costTracker = { apidirQueries: 0, claudeInputTokens: 0, claudeOutputTokens: 0 };
+const costTracker = { serperQueries: 0, claudeInputTokens: 0, claudeOutputTokens: 0 };
 
 // ══════════════════════════════════════════════════════════════════════════
 //  MAIN PIPELINE EXPORT
 // ══════════════════════════════════════════════════════════════════════════
 async function run(cfg, cb) {
-  // cfg: { ORGS[], DATE_FROM, DATE_TO, CLIENT_NAME, APIDIRECT_KEY, CLAUDE_KEY,
-  //         OPENAI_KEY?, PERPLEXITY_KEY?, GEMINI_KEY?, YOUTUBE_KEY?, outDir }
+  // cfg: { ORGS[], DATE_FROM, DATE_TO, CLIENT_NAME, SERPER_KEY, CLAUDE_KEY, CLAUDE_MODEL,
+  //         OPENAI_KEY?, PERPLEXITY_KEY?, GEMINI_KEY?, TWITTER_KEY?, YOUTUBE_KEY?, outDir }
   // cb(message, level) — streams log lines
 
-  costTracker.apidirQueries = 0;
+  costTracker.serperQueries = 0;
   costTracker.claudeInputTokens = 0;
   costTracker.claudeOutputTokens = 0;
 
@@ -592,57 +640,156 @@ async function run(cfg, cb) {
   cb(`\n=== Emerald AI · AQ Intelligence Report ===`, "head");
   cb(`Orgs: ${ORGS.join(", ")} · ${DATE_FROM} to ${DATE_TO}`);
 
-  // ── STEP 1: Fetch articles via APIDirectio ────────────────
-  cb(`\nSTEP 1/6 — Fetching articles via APIDirectio...`, "head");
-  cb(`  APIDirectio key: ${cfg.APIDIRECT_KEY ? cfg.APIDIRECT_KEY.slice(0,6) + '…' : 'MISSING'}`);
+  // ── STEP 1: Fetch articles ─────────────────────────────────
+  cb(`\nSTEP 1/6 — Fetching articles from Serper...`, "head");
   const arts = {};
   for (const o of ORGS) arts[o] = [];
 
-  // Process orgs sequentially to stay within APIDirectio concurrency limits
-  for (const org of ORGS) {
-    const seen = new Set();
-    const abbr = getAbbreviation(org);
-
-    // 1a. General search — all sources
-    const genQuery = abbr
-      ? `("${org}" OR "${abbr}") air quality pollution AQI India`
-      : `"${org}" air quality pollution AQI India`;
-    cb(`  [${org}] general: ${genQuery}`);
-    try {
-      const results = await apidirNews(genQuery, cfg.APIDIRECT_KEY, { limit: 50, time_published: "1y" });
-      let added = 0;
-      for (const r of results) {
-        const k = r.link || r.title;
-        if (seen.has(k)) continue;
-        seen.add(k);
-        if (!inRange(r.date || "")) continue;
-        const outlet = canonOutlet(r.source || dom(r.link || ""));
-        if (outlet !== null && isThirdParty(r.link || "", org)) {
-          arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: outlet, url: r.link || "", date: r.date || "" });
-          added++;
+  {
+    const limit1 = pLimit(4); // 4 orgs in parallel — safe for Serper rate limits
+    await Promise.allSettled(ORGS.map(org => limit1(async () => {
+      const seen = new Set();
+      let skipped = 0;
+      for (const kw of SCOPE_KEYWORDS.slice(0, 8)) {
+        const q = `"${org}" ${kw} India`;
+        cb(`  ${q}`);
+        try {
+          const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+          let added = 0;
+          for (const r of results) {
+            const k = r.link || r.title;
+            if (!seen.has(k)) {
+              seen.add(k);
+              if (!inRange(r.date || "")) { skipped++; continue; }
+              const outlet = canonOutlet(r.source || dom(r.link || ""));
+              if (outlet !== null && isThirdParty(r.link || "", org)) {
+                arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: outlet, url: r.link || "", date: r.date || "" });
+                added++;
+              }
+            }
+          }
+          cb(`  +${added} kept, ${skipped} outside date range`, "ok");
+        } catch (e) {
+          cb(`  Serper error: ${e.message}`, "warn");
+        }
+        await sleep(300);
+      }
+      // Abbreviation fallback — search for e.g. "HEI" if org = "Health Effects Institute"
+      const abbr = getAbbreviation(org);
+      if (abbr) {
+        cb(`  [abbr] searching for "${abbr}" (abbreviation of ${org})...`);
+        for (const kw of SCOPE_KEYWORDS.slice(0, 5)) {
+          const q = `"${abbr}" ${kw} India`;
+          try {
+            const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+            let added = 0;
+            for (const r of results) {
+              const k = r.link || r.title;
+              if (!seen.has(k)) {
+                seen.add(k);
+                if (!inRange(r.date || "")) continue;
+                const outlet = canonOutlet(r.source || dom(r.link || ""));
+                if (outlet !== null && isThirdParty(r.link || "", org)) {
+                  arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: outlet, url: r.link || "", date: r.date || "", matchTerm: abbr });
+                  added++;
+                }
+              }
+            }
+            if (added > 0) cb(`  +${added} via "${abbr}"`, "ok");
+          } catch (e) {
+            cb(`  Abbr search error: ${e.message}`, "warn");
+          }
+          await sleep(300);
         }
       }
-      cb(`  ${org} general: +${added}`, "ok");
-    } catch (e) {
-      cb(`  APIDirectio error: ${e.message}`, "warn");
-    }
-    await sleep(300);
-    cb(`  ${org}: ${arts[org].length} articles total`, "ok");
+      cb(`  ${org}: ${arts[org].length} articles`, "ok");
+    })));
   }
 
-  // ── STEP 1b: Build content window from snippet ─────────────
-  // APIDirectio returns snippets — no scraping needed.
-  // fullText is snippet+title; used for org mention check and Claude context.
-  cb(`\nSTEP 1b/6 — Building content windows from snippets...`, "head");
-  for (const org of ORGS) {
-    for (const a of arts[org]) {
-      a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet || ""}`;
-    }
-    cb(`  ${org}: ${arts[org].length} articles ready`, "ok");
+  // ── STEP 1c: TV channel targeted searches ──────────────────
+  cb(`\nSTEP 1c/6 — Fetching TV channel coverage (site: searches)...`, "head");
+  // Build a broad OR clause from the user's scope keywords (up to 6)
+  const tvKws = SCOPE_KEYWORDS.slice(0, 6);
+  const tvKwClause = tvKws.length === 1
+    ? `"${tvKws[0]}"`
+    : `(${tvKws.map((k) => `"${k}"`).join(" OR ")})`;
+  {
+    const limit1c = pLimit(4); // 4 orgs in parallel
+    await Promise.allSettled(ORGS.map(org => limit1c(async () => {
+      const tvSeen = new Set(arts[org].map((a) => a.url || a.title));
+      const tvAbbr = getAbbreviation(org);
+      for (const [channel, domain] of Object.entries(TV_CHANNEL_DOMAINS)) {
+        const q = `site:${domain} "${org}" ${tvKwClause}`;
+        cb(`  ${q}`);
+        try {
+          const results = await serperWebSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+          let added = 0;
+          for (const r of results) {
+            const k = r.link || r.title;
+            if (!tvSeen.has(k)) {
+              tvSeen.add(k);
+              if (!inRange(r.date || "")) continue;
+              if (isThirdParty(r.link || "", org)) {
+                arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "" });
+                added++;
+              }
+            }
+          }
+          cb(`  ${channel} · ${org}: +${added}`, added > 0 ? "ok" : "warn");
+        } catch (e) {
+          cb(`  TV search error (${channel}): ${e.message}`, "warn");
+        }
+        // Abbreviation TV search
+        if (tvAbbr) {
+          const qAbbr = `site:${domain} "${tvAbbr}" ${tvKwClause}`;
+          try {
+            const results = await serperWebSearch(qAbbr, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+            let added = 0;
+            for (const r of results) {
+              const k = r.link || r.title;
+              if (!tvSeen.has(k)) {
+                tvSeen.add(k);
+                if (!inRange(r.date || "")) continue;
+                if (isThirdParty(r.link || "", org)) {
+                  arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "", matchTerm: tvAbbr });
+                  added++;
+                }
+              }
+            }
+            if (added > 0) cb(`  ${channel} · "${tvAbbr}": +${added}`, "ok");
+          } catch (e) {
+            cb(`  TV abbr search error (${channel}): ${e.message}`, "warn");
+          }
+        }
+        await sleep(300);
+      }
+    })));
   }
 
-  // ── STEP 1c: Drop articles where org not found in snippet ──
-  cb(`\nSTEP 1c/6 — Filtering by org presence in snippet...`, "head");
+  // ── STEP 1b: Scrape article text ───────────────────────────
+  cb(`\nSTEP 1b/6 — Scraping full article text...`, "head");
+  {
+    // Scrape up to 16 per org (matches classification cap) — concurrently, 8 at a time
+    const scrapeLimit = pLimit(8);
+    const scrapeJobs = ORGS.flatMap(org =>
+      arts[org].slice(0, 16).map((a, i) => ({ org, a, i, total: Math.min(arts[org].length, 16) }))
+    );
+    await Promise.allSettled(scrapeJobs.map(({ org, a, i, total }) => scrapeLimit(async () => {
+      if (!a.url) return;
+      const txt = await serperScrape(a.url, cfg.SERPER_KEY);
+      if (txt && txt.length > 300) {
+        a.fullText = txt;
+        cb(`  [${org} ${i + 1}/${total}] scraped ${txt.length} chars`, "ok");
+      } else {
+        // Scrape failed — fall back to snippet so org mention can still be checked
+        a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet || ""}`;
+        cb(`  [${org} ${i + 1}/${total}] snippet fallback`, "warn");
+      }
+    })));
+  }
+
+  // ── STEP 1c: Drop articles where org not found in scraped text ──
+  cb(`\nSTEP 1c/6 — Filtering by org presence in scraped text...`, "head");
   for (const org of ORGS) {
     const before = arts[org].length;
     arts[org] = arts[org].filter(a => {
@@ -652,7 +799,7 @@ async function run(cfg, cb) {
     });
     const dropped = before - arts[org].length;
     cb(
-      `  ${org}: ${dropped > 0 ? `dropped ${dropped} (org absent from snippet) →` : "all present →"} ${arts[org].length} articles`,
+      `  ${org}: ${dropped > 0 ? `dropped ${dropped} (not scraped or org absent) →` : "all present →"} ${arts[org].length} articles`,
       arts[org].length > 0 ? "ok" : "warn",
     );
   }
@@ -843,18 +990,18 @@ ${txt}`;
   try {
     const orgExclusions = ORGS.map((o) => `-"${o}"`).join(" ");
     const generalQueries = [
-      `air quality India`,
-      `air pollution India policy`,
-      `India AQI PM2.5 health`,
-      `India air pollution research study`,
-      `India smog pollution news`,
+      `air quality India ${orgExclusions}`,
+      `air pollution India policy ${orgExclusions}`,
+      `India AQI PM2.5 health ${orgExclusions}`,
+      `India air pollution research study ${orgExclusions}`,
+      `India smog pollution news ${orgExclusions}`,
     ];
     const rawGeneral = [];
     for (const q of generalQueries) {
       try {
-        const res = await apidirNews(q, cfg.APIDIRECT_KEY, { limit: 50, time_published: "1y" });
-        rawGeneral.push(...res.map(a => ({ link: a.link, title: a.title, snippet: a.snippet })));
-        await sleep(300);
+        const res = await serperSearch(q, cfg.SERPER_KEY);
+        rawGeneral.push(...res);
+        await sleep(200);
       } catch (e) {
         cb(`  general query error: ${e.message}`, "warn");
       }
@@ -947,8 +1094,7 @@ ${txt}`;
       callClaude(
         `Generate 4 actions for EACH of these orgs: ${ORGS.join(", ")} — based on Indian AQ media + AEO + social media intelligence.\n${orgSummary}\nWhite-space gap topics (AQ media conversations tracked orgs are absent from): ${emerging.map((e) => e.topic).join(",") || "none"}\nReturn ONLY JSON array of ${ORGS.length * 4} objects: [{"org":"orgname","priority":"Fix Now|Leverage|Optimise|Invest","area":"Media|Topics|Narrative|AEO|Social","action":"...","rationale":"1-2 sentences with specific data"}]`,
         cfg.CLAUDE_KEY,
-        8000,
-        CLAUDE_CLASSIFY_MODEL,
+        Math.min(8000, 1200 + ORGS.length * 350),
       ),
       new Promise((_, rej) =>
         setTimeout(
@@ -1020,24 +1166,24 @@ ${txt}`;
 
   cb(`\n✓ Done — ${base}.html + ${pptxName}`, "ok");
 
-  const APIDIR_NEWS_COST_PER_REQ = 0.008;
-  const CLAUDE_INPUT_COST_PER_M  = 1.0;
+  const SERPER_COST_PER_QUERY = 0.001;
+  const CLAUDE_INPUT_COST_PER_M = 1.0;
   const CLAUDE_OUTPUT_COST_PER_M = 5.0;
   const USD_TO_INR = 84;
-  const apidirCostUSD = costTracker.apidirQueries * APIDIR_NEWS_COST_PER_REQ;
+  const serperCostUSD = costTracker.serperQueries * SERPER_COST_PER_QUERY;
   const claudeCostUSD =
     (costTracker.claudeInputTokens / 1_000_000) * CLAUDE_INPUT_COST_PER_M +
     (costTracker.claudeOutputTokens / 1_000_000) * CLAUDE_OUTPUT_COST_PER_M;
-  const totalUSD = apidirCostUSD + claudeCostUSD;
+  const totalUSD = serperCostUSD + claudeCostUSD;
   const totalINR = totalUSD * USD_TO_INR;
   cb("cost", {
-    apidirQueries:     costTracker.apidirQueries,
-    apidirCostUSD:     apidirCostUSD.toFixed(4),
+    serperQueries: costTracker.serperQueries,
+    serperCostUSD: serperCostUSD.toFixed(4),
     claudeInputTokens: costTracker.claudeInputTokens,
     claudeOutputTokens: costTracker.claudeOutputTokens,
-    claudeCostUSD:     claudeCostUSD.toFixed(4),
-    totalUSD:          totalUSD.toFixed(4),
-    totalINR:          Math.round(totalINR),
+    claudeCostUSD: claudeCostUSD.toFixed(4),
+    totalUSD: totalUSD.toFixed(4),
+    totalINR: Math.round(totalINR),
   });
 
   return { htmlFile, pptxFile, htmlName: `${base}.html`, pptxName };

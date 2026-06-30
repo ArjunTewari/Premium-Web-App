@@ -3,9 +3,12 @@
  * social-er.js — Social AQ Presence
  *
  * Data sources (in priority order):
- *   X/Twitter  → APIDirectio /v1/twitter/user/tweets (x-collector.js)
- *   Instagram  → APIDirectio /v1/instagram/user/posts (instagram-collector.js)
- *   LinkedIn   → APIDirectio /v1/linkedin/company/posts
+ *   X/Twitter  → X API v2 Bearer Token (x-collector.js) when X_BEARER_TOKEN set
+ *                Fallback: Serper Google index
+ *   Instagram  → Meta Graph Business Discovery (instagram-collector.js) when
+ *                META_ACCESS_TOKEN + IG_BUSINESS_ACCOUNT_ID set
+ *                Fallback: Serper Google index
+ *   LinkedIn   → Serper Google index (no public API without user OAuth)
  *   YouTube    → youtube-er.js (unchanged, called separately in pipeline.js)
  *
  * Presence scored 0–10:
@@ -14,11 +17,9 @@
  *   Relevance(0–3): 3 if any platform is API-verified, else keyword density
  */
 
-const axios      = require('axios');
-const ORG_SOCIAL = require('./org-handles');
+const axios = require('axios');
 
-const APIDIR_BASE = 'https://apidirect.io';
-
+const AQ_TERMS = '("air quality" OR "air pollution" OR AQI OR PM2.5 OR NCAP)';
 const AQ_KEYWORDS = [
   'air quality', 'air pollution', 'aqi', 'pm2.5', 'pm10', 'ncap', 'grap',
   'smog', 'clean air', 'pollution', 'black carbon', 'ozone', 'ammonia',
@@ -29,32 +30,24 @@ function escHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+// ── Serper helper (LinkedIn fallback + X/IG fallback) ─────────────────────
 
-// ── APIDirectio LinkedIn company posts ─────────────────────────────────────
-
-async function fetchLinkedIn(companyUrl, apidirKey, dateFrom, dateTo, cb) {
-  if (!companyUrl) return [];
-  const fromMs = dateFrom ? new Date(dateFrom).getTime() : 0;
-  const toMs   = dateTo   ? new Date(dateTo  ).getTime() : Date.now();
+async function serperSearch(query, serperKey, dateFrom, dateTo, cb) {
   try {
-    const res = await axios.get(`${APIDIR_BASE}/v1/linkedin/company/posts`, {
-      params:  { url: companyUrl, page: 1 },
-      headers: { 'X-API-Key': apidirKey },
-      timeout: 20000,
-    });
-    const posts = res.data.posts || [];
-    return posts.filter(p => {
-      if (!p.date) return true;
-      try {
-        const d = new Date(p.date);
-        if (isNaN(d.getTime())) return true;
-        const ms = d.getTime();
-        return ms >= fromMs && ms <= toMs;
-      } catch { return true; }
-    });
+    const body = { q: query, num: 5 };
+    if (dateFrom && dateTo) {
+      const [fy, fm, fd] = dateFrom.split('-');
+      const [ty, tm, td] = dateTo.split('-');
+      body.tbs = `cdr:1,cd_min:${fm}/${fd}/${fy},cd_max:${tm}/${td}/${ty}`;
+    }
+    const res = await axios.post(
+      'https://google.serper.dev/search',
+      body,
+      { headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' }, timeout: 15000 }
+    );
+    return res.data.organic || [];
   } catch (e) {
-    cb?.(`  [SocialPresence] LinkedIn fetch error: ${e.response?.data?.error || e.message}`, 'warn');
+    cb?.(`  [SocialPresence] Serper error: ${e.message}`, 'warn');
     return [];
   }
 }
@@ -101,32 +94,42 @@ function scorePresence(liCount, xCount, igCount, apiVerified, liItems = []) {
 // ── Main run() ─────────────────────────────────────────────────────────────
 
 async function run(cfg, selectedOrgs, cb) {
-  const APIDIR_KEY = cfg.APIDIRECT_KEY;
-  if (!APIDIR_KEY) {
-    cb?.('  [SocialPresence] No APIDIRECT_KEY — skipping', 'warn');
+  const SERPER_KEY = cfg.SERPER_KEY;
+  if (!SERPER_KEY) {
+    cb?.('  [SocialPresence] No SERPER_KEY — skipping', 'warn');
     return [];
   }
 
-  cb?.(`  Social Presence: ${selectedOrgs.length} orgs | X:APIDirectio | IG:APIDirectio | LI:APIDirectio`);
+  const useXApi = !!cfg.X_BEARER_TOKEN;
+  const useIgApi = !!(cfg.META_ACCESS_TOKEN && cfg.IG_BUSINESS_ACCOUNT_ID);
 
-  const extraHandles = cfg.customOrgHandles || {};
+  cb?.(`  Social Presence: ${selectedOrgs.length} orgs` +
+    ` | X:${useXApi ? 'API' : 'Serper'} | IG:${useIgApi ? 'API' : 'Serper'} | LI:Serper`);
 
-  // ── Pre-fetch X data for all orgs ─────────────────────────────────────
+  // ── Pre-fetch X data for all orgs (one pass) ───────────────────────────
   let xApiData = {};
-  try {
-    const XCollector = require('./x-collector');
-    xApiData = await XCollector.run(selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO, APIDIR_KEY, cb, extraHandles);
-  } catch (e) {
-    cb?.(`  X collection error: ${e.message}`, 'warn');
+  if (useXApi) {
+    try {
+      const XCollector = require('./x-collector');
+      xApiData = await XCollector.run(selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO, cfg.X_BEARER_TOKEN, cb);
+    } catch (e) {
+      cb?.(`  X API collection error: ${e.message}`, 'warn');
+    }
   }
 
-  // ── Pre-fetch IG data for all orgs ────────────────────────────────────
+  // ── Pre-fetch IG data for all orgs (one pass) ──────────────────────────
   let igApiData = {};
-  try {
-    const IgCollector = require('./instagram-collector');
-    igApiData = await IgCollector.run(selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO, APIDIR_KEY, cfg.CLAUDE_KEY, cb, extraHandles);
-  } catch (e) {
-    cb?.(`  IG collection error: ${e.message}`, 'warn');
+  if (useIgApi) {
+    try {
+      const IgCollector = require('./instagram-collector');
+      igApiData = await IgCollector.run(
+        selectedOrgs, cfg.DATE_FROM, cfg.DATE_TO,
+        cfg.META_ACCESS_TOKEN, cfg.IG_BUSINESS_ACCOUNT_ID,
+        cfg.CLAUDE_KEY, cb
+      );
+    } catch (e) {
+      cb?.(`  IG API collection error: ${e.message}`, 'warn');
+    }
   }
 
   // ── Per-org assembly ───────────────────────────────────────────────────
@@ -135,27 +138,54 @@ async function run(cfg, selectedOrgs, cb) {
   for (const orgName of selectedOrgs) {
     cb?.(`  [SocialPresence] "${orgName}"…`);
 
-    // LinkedIn: APIDirectio company posts (custom handle takes priority)
-    const liUrl   = extraHandles[orgName]?.linkedin || ORG_SOCIAL[orgName]?.linkedin;
-    const liPosts = await fetchLinkedIn(liUrl, APIDIR_KEY, cfg.DATE_FROM, cfg.DATE_TO, cb);
-    const liCount = liPosts.length;
+    // LinkedIn: always Serper
+    const liItems = await serperSearch(
+      `"${orgName}" ${AQ_TERMS} site:linkedin.com/posts`,
+      SERPER_KEY, cfg.DATE_FROM, cfg.DATE_TO, cb
+    );
 
-    // X: APIDirectio user tweets
-    const xApiResult = xApiData[orgName] || null;
-    const xCount     = xApiResult?.aqPosts || 0;
+    // X: API or Serper
+    let xItems      = [];
+    let xApiResult  = null;
+    let xApiCount   = 0;
+    if (useXApi && xApiData[orgName]) {
+      xApiResult = xApiData[orgName];
+      xApiCount  = xApiResult.aqPosts || 0;
+    } else {
+      xItems = await serperSearch(
+        `"${orgName}" ${AQ_TERMS} (site:x.com OR site:twitter.com)`,
+        SERPER_KEY, cfg.DATE_FROM, cfg.DATE_TO, cb
+      );
+    }
 
-    // Instagram: APIDirectio user posts
-    const igApiResult = igApiData[orgName] || null;
-    const igCount     = igApiResult?.ig_not_available ? 0 : (igApiResult?.aqPosts || 0);
+    // Instagram: API or Serper
+    let igItems     = [];
+    let igApiResult = null;
+    let igApiCount  = 0;
+    if (useIgApi && igApiData[orgName]) {
+      igApiResult = igApiData[orgName];
+      igApiCount  = igApiResult.ig_not_available ? 0 : (igApiResult.aqPosts || 0);
+    } else {
+      igItems = await serperSearch(
+        `"${orgName}" ${AQ_TERMS} site:instagram.com`,
+        SERPER_KEY, cfg.DATE_FROM, cfg.DATE_TO, cb
+      );
+    }
 
-    const { presenceScore, scoreBreakdown } = scorePresence(liCount, xCount, igCount, true, liPosts);
+    // Effective counts for scoring
+    const xCount  = useXApi  ? xApiCount  : xItems.length;
+    const igCount = useIgApi ? igApiCount : igItems.length;
+    const liCount = liItems.length;
+    const apiVerified = useXApi || useIgApi;
+
+    const { presenceScore, scoreBreakdown } = scorePresence(liCount, xCount, igCount, apiVerified, liItems);
     const totalFound = liCount + xCount + igCount;
 
     orgResults.push({
       org:            orgName,
       presenceScore,
       scoreBreakdown,
-      avgER:          presenceScore,
+      avgER:          presenceScore, // pipeline.js compat
       twitterER:      0,
       linkedinER:     0,
       youtubeER:      0,
@@ -165,23 +195,23 @@ async function run(cfg, selectedOrgs, cb) {
       youtubePosts:   0,
       totalPosts:     totalFound,
       insight: totalFound > 0
-        ? `${liCount} LinkedIn · ${xCount} X · ${igCount} Instagram · presence ${presenceScore}/10 (all via APIDirectio)`
-        : 'No AQ social posts found in this period',
-      liResults:  liPosts,
-      xResults:   [],
-      igResults:  [],
+        ? `${liCount} LinkedIn · ${xCount} X${useXApi ? ' (API)' : ''} · ${igCount} Instagram${useIgApi ? ' (API)' : ''} · presence ${presenceScore}/10`
+        : 'No indexed social posts found in this period',
+      // Serper fallback data (used in HTML when API not available)
+      liResults:  liItems,
+      xResults:   xItems,
+      igResults:  igItems,
+      // API enrichment data (used in HTML when API available)
       xApiResult,
       igApiResult,
-      useXApi:  true,
-      useIgApi: true,
+      useXApi,
+      useIgApi,
     });
 
     cb?.(
-      `  [SocialPresence] ${orgName}: LI=${liCount} X=${xCount}(api) IG=${igCount}(api) score=${presenceScore}/10`,
+      `  [SocialPresence] ${orgName}: LI=${liCount} X=${xCount}${useXApi ? '(api)' : ''} IG=${igCount}${useIgApi ? '(api)' : ''} score=${presenceScore}/10`,
       totalFound > 0 ? 'ok' : 'warn'
     );
-
-    await sleep(300);
   }
 
   orgResults.sort((a, b) => b.presenceScore - a.presenceScore);
@@ -213,10 +243,10 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
 
   const statCards = [
     { label: 'Orgs with social AQ posts', value: orgsWithPresence, unit: `of ${erResults.length} tracked`, col: '#4caf74' },
-    { label: 'LinkedIn AQ posts',          value: totalLiIndexed,   unit: 'total in period',  col: '#4a7fd4' },
-    { label: 'X/Twitter AQ posts',        value: totalXIndexed,    unit: 'total in period',  col: '#4a9fd4' },
-    { label: 'Instagram AQ posts',        value: totalIgIndexed,   unit: 'total in period',  col: '#e05c9c' },
-    { label: 'YouTube videos',            value: totalYtVideos,    unit: 'official channel',              col: '#e53935' },
+    { label: 'LinkedIn posts indexed',    value: totalLiIndexed,   unit: 'via Serper',                     col: '#4a7fd4' },
+    { label: 'X/Twitter AQ posts',        value: totalXIndexed,    unit: useXApi  ? 'via X API v2'  : 'via Serper index', col: '#4a9fd4' },
+    { label: 'Instagram AQ posts',        value: totalIgIndexed,   unit: useIgApi ? 'via Meta Graph' : 'via Serper index', col: '#e05c9c' },
+    { label: 'YouTube videos',            value: totalYtVideos,    unit: 'official channel',               col: '#e53935' },
   ].map(c => `
     <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
       <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">${c.label}</div>
@@ -228,10 +258,11 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   const sourceBanner = `
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
     <span style="font-family:monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Data sources:</span>
-    <span style="font-family:monospace;font-size:10px;background:rgba(74,127,212,.12);border:1px solid rgba(74,127,212,.3);color:#4a7fd4;border-radius:4px;padding:2px 8px">LinkedIn · ✓ APIDirectio</span>
-    <span style="font-family:monospace;font-size:10px;background:rgba(74,159,212,.12);border:1px solid rgba(74,159,212,.3);color:#4a9fd4;border-radius:4px;padding:2px 8px">X/Twitter · ✓ APIDirectio</span>
-    <span style="font-family:monospace;font-size:10px;background:rgba(224,92,156,.12);border:1px solid rgba(224,92,156,.3);color:#e05c9c;border-radius:4px;padding:2px 8px">Instagram · ✓ APIDirectio</span>
+    <span style="font-family:monospace;font-size:10px;background:rgba(74,127,212,.12);border:1px solid rgba(74,127,212,.3);color:#4a7fd4;border-radius:4px;padding:2px 8px">LinkedIn · Serper index</span>
+    <span style="font-family:monospace;font-size:10px;background:${useXApi  ? 'rgba(74,159,212,.12)' : 'rgba(94,116,148,.08)'};border:1px solid ${useXApi  ? 'rgba(74,159,212,.3)' : 'rgba(94,116,148,.2)'};color:${useXApi  ? '#4a9fd4' : '#5e7494'};border-radius:4px;padding:2px 8px">X/Twitter · ${useXApi  ? '✓ X API v2' : 'Serper index'}</span>
+    <span style="font-family:monospace;font-size:10px;background:${useIgApi ? 'rgba(224,92,156,.12)' : 'rgba(94,116,148,.08)'};border:1px solid ${useIgApi ? 'rgba(224,92,156,.3)' : 'rgba(94,116,148,.2)'};color:${useIgApi ? '#e05c9c' : '#5e7494'};border-radius:4px;padding:2px 8px">Instagram · ${useIgApi ? '✓ Meta Graph' : 'Serper index'}</span>
     <span style="font-family:monospace;font-size:10px;background:rgba(229,57,53,.12);border:1px solid rgba(229,57,53,.3);color:#e53935;border-radius:4px;padding:2px 8px">YouTube · ✓ Data API v3</span>
+    <span style="font-family:monospace;font-size:10px;background:rgba(94,116,148,.08);border:1px solid rgba(94,116,148,.2);color:#5e7494;border-radius:4px;padding:2px 8px">LinkedIn API · pending</span>
   </div>`;
 
   const ytKeyNotice = !hasYtKey
@@ -290,47 +321,15 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         const sov  = cohortTotal > 0 ? ((total / cohortTotal) * 100).toFixed(1) : '0.0';
         const barW = Math.round((total / (unifiedRows[0].total || 1)) * 100);
         const col  = total >= 10 ? '#4caf74' : total >= 5 ? '#c9922a' : total >= 1 ? '#4a9fd4' : '#5e7494';
-
-        const fmtK = n => n >= 1000 ? (n / 1000).toFixed(1) + 'K' : String(n || 0);
-        const erPct = (eng, posts, fol) => (posts > 0 && fol > 0) ? ((eng / posts / fol) * 100).toFixed(2) + '%' : null;
-
-        // X metrics
-        const xr = r.xApiResult;
-        const xFol = xr?.followers ? fmtK(xr.followers) : null;
-        const xER  = xr ? erPct((xr.totalLikes || 0) + (xr.totalReplies || 0), xr.aqPosts || 0, xr.followers || 0) : null;
-
-        // IG metrics
-        const ig = r.igApiResult && !r.igApiResult.ig_not_available ? r.igApiResult : null;
-        const igFol = ig?.followers ? fmtK(ig.followers) : null;
-        const igER  = ig ? erPct((ig.totalLikes || 0) + (ig.totalComments || 0), ig.aqPosts || 0, ig.followers || 0) : null;
-
-        // YT metrics
-        const ytER = (yt.avgER || yt.avgViewER) > 0 ? (yt.avgER || yt.avgViewER).toFixed(2) + '%' : null;
-        const ytSubs = yt.subscribers ? fmtK(yt.subscribers) : null;
-
-        const subLine = (val, col2) => val ? `<div style="font-family:monospace;font-size:9px;color:${col2};margin-top:2px">${val}</div>` : '';
-
+        const xFol = r.xApiResult?.followers ? ` <span style="color:#3a4a5e">(${(r.xApiResult.followers/1000).toFixed(1)}K)</span>` : '';
+        const igFol = r.igApiResult?.followers && !r.igApiResult.ig_not_available ? ` <span style="color:#3a4a5e">(${(r.igApiResult.followers/1000).toFixed(1)}K)</span>` : '';
         return `<tr style="border-top:1px solid #252d40">
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#2e3a52">#${unifiedRank}</td>
           <td style="padding:8px 12px"><span style="font-family:monospace;font-size:11px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
-          <td style="padding:8px 12px;text-align:center">
-            <div style="font-family:monospace;font-size:13px;font-weight:700;color:#4a7fd4">${r.linkedinPosts}</div>
-          </td>
-          <td style="padding:8px 12px;text-align:center">
-            <div style="font-family:monospace;font-size:13px;font-weight:700;color:#4a9fd4">${r.twitterPosts}</div>
-            ${subLine(xFol ? xFol + ' followers' : null, '#3a4a5e')}
-            ${subLine(xER ? 'ER ' + xER : null, '#4a9fd4')}
-          </td>
-          <td style="padding:8px 12px;text-align:center">
-            <div style="font-family:monospace;font-size:13px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}</div>
-            ${subLine(igFol ? igFol + ' followers' : null, '#3a4a5e')}
-            ${subLine(igER ? 'ER ' + igER : null, '#e05c9c')}
-          </td>
-          <td style="padding:8px 12px;text-align:center">
-            <div style="font-family:monospace;font-size:13px;font-weight:700;color:#e53935">${yt.videoCount || 0}</div>
-            ${subLine(ytSubs ? ytSubs + ' subs' : null, '#3a4a5e')}
-            ${subLine(ytER ? 'ER ' + ytER : null, '#e53935')}
-          </td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a7fd4">${r.linkedinPosts}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a9fd4">${r.twitterPosts}${xFol}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}${igFol}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e53935">${yt.videoCount || 0}</td>
           <td style="padding:8px 12px;text-align:center">
             <span style="font-family:monospace;font-size:15px;font-weight:700;color:${col}">${total}</span>
             <div style="margin:4px auto;width:70px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:${col};width:${barW}%"></div></div>
@@ -342,14 +341,10 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   </table>
 </div>
 <div style="font-family:monospace;font-size:9px;color:#3a4a5e;margin-bottom:16px">
-  ✓ = live API data (AQ-filtered). All platforms via APIDirectio. X: client-side keyword filter. IG: Claude Haiku AQ classification. LI: fetched from company page. SoV % = org total ÷ cohort total.
+  ${useXApi || useIgApi
+    ? `✓ = live API data (AQ-filtered). Counts reflect posts about air quality only.${useXApi ? ' X: client-side keyword filter.' : ''}${useIgApi ? ' IG: Claude Haiku AQ classification.' : ''} LI: Google-indexed posts (Serper). SoV % = org total ÷ cohort total.`
+    : 'Counts = Google-indexed posts / official YouTube channel videos in the report period. LinkedIn · X/Twitter · Instagram via Serper index. SoV % = org total ÷ cohort total.'}
 </div>`;
-
-  const metricCard = (label, value, col) =>
-    `<div style="background:#181e2e;border:1px solid #252d40;border-radius:6px;padding:10px 12px;min-width:0">
-      <div style="font-family:monospace;font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;margin-bottom:5px">${label}</div>
-      <div style="font-family:monospace;font-size:18px;font-weight:700;color:${col};line-height:1">${value}</div>
-    </div>`;
 
   // ── Per-org detail sections ───────────────────────────────────────────────
   const orgDetails = erResults.map(r => {
@@ -366,16 +361,12 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
             <a href="${escHtml(p.url)}" target="_blank" style="font-size:11px;color:#4a9fd4;text-decoration:none;line-height:1.4;display:block;font-weight:600">${escHtml((p.text || '').slice(0, 200))}${(p.text || '').length > 200 ? '…' : ''}</a>
             <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ ${p.likes} &middot; ↩ ${p.replies} &middot; ↻ ${p.reposts}${p.views ? ` &middot; ${p.views.toLocaleString()} views` : ''} &middot; ${p.created_at ? new Date(p.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : ''}</div>
           </div>`).join('');
-        return `<div style="margin-top:10px">
-          <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:6px">X Twitter</div>
-          <div style="background:rgba(74,159,212,.08);border:1px solid rgba(74,159,212,.2);border-radius:4px;padding:3px 10px;margin-bottom:8px;font-size:9px;color:#4a9fd4;font-family:monospace">Native API keyword filter — AQ posts only</div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
-            ${metricCard('AQ Posts', xr.aqPosts, '#4a9fd4')}
-            ${metricCard('Followers', xr.followers ? xr.followers.toLocaleString() : '—', '#4a9fd4')}
-            ${metricCard('AQ Post Likes', (xr.totalLikes || 0).toLocaleString(), '#4a9fd4')}
-            ${metricCard('Replies', (xr.totalReplies || 0).toLocaleString(), '#4a9fd4')}
+        return `<div style="margin-top:6px">
+          <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+            X/Twitter — <span style="color:#4a9fd4">${xr.aqPosts} AQ tweet${xr.aqPosts === 1 ? '' : 's'}</span> of ${xr.totalPosts} total
+            ${xr.followers ? `&middot; ${xr.followers.toLocaleString()} followers` : ''}
+            ${xr.totalLikes ? `&middot; ${xr.totalLikes.toLocaleString()} total ♥` : ''}
           </div>
-          <div style="font-size:9px;color:#3a4a5e;font-family:monospace;margin-bottom:4px">${xr.aqPosts} AQ tweets of ${xr.totalPosts} total in period</div>
           ${topPostsHtml || '<div style="font-size:10px;color:#5e7494">No top posts to display</div>'}
         </div>`;
       }
@@ -401,16 +392,11 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
             <a href="${escHtml(p.permalink)}" target="_blank" style="font-size:11px;color:#e05c9c;text-decoration:none;line-height:1.4;display:block;font-weight:600">${escHtml((p.caption || '').slice(0, 200))}${(p.caption || '').length > 200 ? '…' : ''}</a>
             <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ ${p.likes} &middot; 💬 ${p.comments} &middot; ${p.timestamp ? new Date(p.timestamp).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : ''}</div>
           </div>`).join('');
-        return `<div style="margin-top:10px">
-          <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:6px">Instagram</div>
-          <div style="background:rgba(224,92,156,.08);border:1px solid rgba(224,92,156,.2);border-radius:4px;padding:3px 10px;margin-bottom:8px;font-size:9px;color:#e05c9c;font-family:monospace">All posts fetched → AQ-classified by Claude Haiku</div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
-            ${metricCard('AQ Posts', ig.aqPosts, '#e05c9c')}
-            ${metricCard('Followers', ig.followers ? ig.followers.toLocaleString() : '—', '#e05c9c')}
-            ${metricCard('AQ Post Likes', (ig.totalLikes || 0).toLocaleString(), '#e05c9c')}
-            ${metricCard('Comments', (ig.totalComments || 0).toLocaleString(), '#e05c9c')}
+        return `<div style="margin-top:6px">
+          <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+            Instagram — <span style="color:#e05c9c">${ig.aqPosts} AQ post${ig.aqPosts === 1 ? '' : 's'}</span> of ${ig.totalPosts} in period
+            ${ig.followers ? `&middot; ${ig.followers.toLocaleString()} followers` : ''}
           </div>
-          <div style="font-size:9px;color:#3a4a5e;font-family:monospace;margin-bottom:4px">${ig.aqPosts} AQ posts of ${ig.totalPosts} in period</div>
           ${topPostsHtml || '<div style="font-size:10px;color:#5e7494">No top posts</div>'}
         </div>`;
       }

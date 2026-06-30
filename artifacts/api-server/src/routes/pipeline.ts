@@ -71,7 +71,6 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     GEMINI_KEY: body.geminiKey || process.env.GEMINI_KEY || "",
     YOUTUBE_KEY: process.env.YOUTUBE_KEY || "",
     TWITTER_KEY: process.env.TWITTER_KEY || "",
-    APIDIRECT_KEY: process.env.APIDIRECT_KEY || "",
     ORG_YT_HANDLES: (body.orgYtHandles && typeof body.orgYtHandles === "object" && !Array.isArray(body.orgYtHandles))
       ? body.orgYtHandles
       : {},

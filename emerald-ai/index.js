@@ -48,24 +48,29 @@ app.post('/run', async (req, res) => {
     DATE_TO:       body.dateTo    || '2026-06-08',
     CLIENT_NAME:   body.clientName || 'Chetan Bhattacharji',
     SCOPE_KEYWORDS: Array.isArray(body.scopeKeywords) ? body.scopeKeywords : [],
-    APIDIRECT_KEY: body.apidirectKey || process.env.APIDIRECT_KEY || '',
-    CLAUDE_KEY:    body.claudeKey    || process.env.CLAUDE_KEY    || '',
+    SERPER_KEY:    body.serperKey  || process.env.SERPER_KEY  || '',
+    CLAUDE_KEY:    body.claudeKey  || process.env.CLAUDE_KEY  || '',
+    // Model is hardcoded in pipeline.js to claude-haiku-4-5-20251001
     // Optional — AEO
-    OPENAI_KEY:     body.openaiKey     || process.env.OPENAI_KEY     || '',
-    PERPLEXITY_KEY: body.perplexityKey || process.env.PERPLEXITY_KEY || '',
-    GEMINI_KEY:     body.geminiKey     || process.env.GEMINI_KEY     || '',
+    OPENAI_KEY:    body.openaiKey    || process.env.OPENAI_KEY    || '',
+    PERPLEXITY_KEY:body.perplexityKey|| process.env.PERPLEXITY_KEY|| '',
+    GEMINI_KEY:    body.geminiKey    || process.env.GEMINI_KEY    || '',
     // YouTube ER — optional, from form or server env
-    YOUTUBE_KEY:    body.youtubeKey    || process.env.YOUTUBE_KEY    || '',
-    // Custom org handles from UI — { orgName: { twitter, linkedin, instagram, youtube } }
-    customOrgHandles: (body.customOrgHandles && typeof body.customOrgHandles === 'object') ? body.customOrgHandles : {},
+    YOUTUBE_KEY:    body.youtubeKey   || process.env.YOUTUBE_KEY  || '',
+    // Official YT channel handles per org — map of { orgName: '@handle' }
+    ORG_YT_HANDLES: (body.orgYtHandles && typeof body.orgYtHandles === 'object') ? body.orgYtHandles : {},
+    // Social — always from server secrets (never from form body)
+    X_BEARER_TOKEN:          process.env.X_BEARER_TOKEN          || '',
+    META_ACCESS_TOKEN:       process.env.META_ACCESS_TOKEN       || '',
+    IG_BUSINESS_ACCOUNT_ID:  process.env.IG_BUSINESS_ACCOUNT_ID  || '',
     outDir: OUT_DIR
   };
 
   // Validate required keys
   if (!cfg.ORGS.length) cfg.ORGS = ['CEEW', 'CSTEP'];
   if (cfg.ORGS.length > 13) cfg.ORGS = cfg.ORGS.slice(0, 13); // hard cap
-  if (!cfg.APIDIRECT_KEY) return res.status(400).json({ error: 'APIDirectio API key is required.' });
-  if (!cfg.CLAUDE_KEY)    return res.status(400).json({ error: 'Claude API key is required.' });
+  if (!cfg.SERPER_KEY)  return res.status(400).json({ error: 'Serper API key is required.' });
+  if (!cfg.CLAUDE_KEY)  return res.status(400).json({ error: 'Claude API key is required.' });
 
   // SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
