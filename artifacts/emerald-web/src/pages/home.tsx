@@ -211,17 +211,25 @@ export default function Home() {
   // Unified social handles — pre-populated from hardcoded defaults, user-editable
   const [handlesOpen, setHandlesOpen] = useState(false);
   const [orgHandleOverrides, setOrgHandleOverrides] = useState<Record<string, { twitter: string; instagram: string; youtube: string; linkedin: string }>>(() => {
-    const init: Record<string, { twitter: string; instagram: string; youtube: string; linkedin: string }> = {};
+    const defaults: Record<string, { twitter: string; instagram: string; youtube: string; linkedin: string }> = {};
     for (const org of DEFAULT_ORGS) {
-      init[org] = {
+      defaults[org] = {
         twitter:   ORG_TW_HANDLES[org] || "",
         instagram: ORG_IG_HANDLES[org] || "",
         youtube:   ORG_YT_HANDLES[org] || "",
         linkedin:  ORG_LI_HANDLES[org] || "",
       };
     }
-    return init;
+    try {
+      const saved = localStorage.getItem("emerald_handles");
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<string, { twitter: string; instagram: string; youtube: string; linkedin: string }>;
+        return { ...defaults, ...parsed };
+      }
+    } catch {}
+    return defaults;
   });
+  const [handlesSaved, setHandlesSaved] = useState(false);
 
   const [dateFrom, setDateFrom] = useState("2026-03-08");
   const [dateTo, setDateTo] = useState("2026-06-08");
@@ -289,6 +297,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => { loadPrev(); }, [loadPrev]);
+
+  // Auto-save handles to localStorage whenever they change
+  useEffect(() => {
+    try { localStorage.setItem("emerald_handles", JSON.stringify(orgHandleOverrides)); } catch {}
+  }, [orgHandleOverrides]);
 
   useEffect(() => {
     if (logBoxRef.current) {
@@ -1128,11 +1141,31 @@ export default function Home() {
                 <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: C.gold, marginBottom: 10 }}>
                   Social Handles
                 </div>
-                <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 32, fontWeight: 700, letterSpacing: "-.02em", color: C.textHi, margin: 0 }}>
-                  Organisation Handles
-                </h2>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+                  <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 32, fontWeight: 700, letterSpacing: "-.02em", color: C.textHi, margin: 0 }}>
+                    Organisation Handles
+                  </h2>
+                  <button
+                    onClick={() => {
+                      try { localStorage.setItem("emerald_handles", JSON.stringify(orgHandleOverrides)); } catch {}
+                      setHandlesSaved(true);
+                      setTimeout(() => setHandlesSaved(false), 2200);
+                    }}
+                    style={{
+                      flexShrink: 0,
+                      padding: "10px 22px", borderRadius: 9,
+                      background: handlesSaved ? "rgba(76,175,116,.15)" : "rgba(201,146,42,.15)",
+                      border: `1px solid ${handlesSaved ? "rgba(76,175,116,.4)" : "rgba(201,146,42,.35)"}`,
+                      color: handlesSaved ? C.green : C.gold,
+                      fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, fontWeight: 600,
+                      cursor: "pointer", transition: "all .3s",
+                    }}
+                  >
+                    {handlesSaved ? "✓ Saved" : "Save Handles"}
+                  </button>
+                </div>
                 <p style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>
-                  Edit LinkedIn, 𝕏 Twitter, Instagram, and YouTube handles per org. Changes apply immediately to the next report run.
+                  Changes auto-save in your browser. Click Save Handles to confirm.
                 </p>
               </div>
             </SlideUp>
