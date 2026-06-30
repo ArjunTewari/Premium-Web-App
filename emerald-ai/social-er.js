@@ -49,6 +49,7 @@ async function run(cfg, selectedOrgs, cb) {
       youtube:   (cfg.ORG_YT_HANDLES || {})[org] || '',
       twitter:   (cfg.ORG_TW_HANDLES || {})[org] || '',
       instagram: (cfg.ORG_IG_HANDLES || {})[org] || '',
+      linkedin:  (cfg.ORG_LI_HANDLES || {})[org] || '',
     };
   }
 

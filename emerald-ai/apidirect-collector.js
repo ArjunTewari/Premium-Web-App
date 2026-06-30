@@ -50,11 +50,27 @@ function er(engagement, followers, posts) {
 }
 
 // ── LinkedIn ─────────────────────────────────────────────────────────────────
-async function fetchLinkedIn(org, apiKey, cb) {
-  const q = `"${org}" air quality India`;
+async function fetchLinkedIn(org, liHandle, apiKey, cb) {
+  // When an official LinkedIn company slug/handle is provided, narrow the query
+  // to that company's page and filter by author so only official posts are kept.
+  const handle = liHandle ? liHandle.replace(/^@/, '').trim() : null;
+  const q = handle
+    ? `site:linkedin.com/company/${handle} air quality India`
+    : `"${org}" air quality India`;
   try {
     const r = await apiFetch('linkedin/posts', { query: q, page: 1 }, apiKey);
-    const posts = (r.posts || []).filter(p => isAQ(`${p.title || ''} ${p.snippet || ''}`));
+    let posts = (r.posts || []).filter(p => isAQ(`${p.title || ''} ${p.snippet || ''}`));
+    // If official handle provided, keep only posts authored by the org
+    if (handle && posts.length) {
+      const handleLower = handle.toLowerCase();
+      const orgLower = org.toLowerCase();
+      const filtered = posts.filter(p => {
+        const author = (p.author || p.author_name || p.company || '').toLowerCase();
+        return author.includes(handleLower) || author.includes(orgLower);
+      });
+      // Fall back to unfiltered if author fields are absent from API response
+      if (filtered.length > 0) posts = filtered;
+    }
     const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
     const totalComments = posts.reduce((s, p) => s + (p.comments || 0), 0);
     const totalShares   = posts.reduce((s, p) => s + (p.shares   || 0), 0);
@@ -230,7 +246,7 @@ async function run(cfg, selectedOrgs, orgHandles = {}, cb) {
     const batchResults = await Promise.allSettled(batch.map(async org => {
       const handles = orgHandles[org] || {};
       const [li, tw, ig, yt] = await Promise.allSettled([
-        fetchLinkedIn(org, apiKey, cb),
+        fetchLinkedIn(org, handles.linkedin || null, apiKey, cb),
         fetchTwitter(org, handles.twitter || null, apiKey, cb),
         fetchInstagram(org, handles.instagram || null, apiKey, cb),
         fetchYouTubeChannel(org, handles.youtube || null, apiKey, cb),

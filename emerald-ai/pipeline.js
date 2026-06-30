@@ -24,6 +24,7 @@ const OUTLETS = [
 // Key print/digital outlets shown in the outlet breakdown table
 const PRINT_OUTLETS = [
   "Times of India",
+  "Hindustan Times",
   "The Hindu",
   "Indian Express",
   "Deccan Herald",
@@ -181,22 +182,8 @@ function countMentions(text, org) {
   return matches ? matches.length : 0;
 }
 
-/** Citation verification: for every line containing the org name, check ±2 lines
- *  for AQ keywords. Returns true if any such co-occurrence is found. */
-function verifyCitationByLines(fullText, org, aqKeywords) {
-  if (!fullText) return false;
-  const lines = fullText.split('\n');
-  const orgLower = org.toLowerCase();
-  const kwLower = (aqKeywords || []).map(k => k.toLowerCase());
-  for (let i = 0; i < lines.length; i++) {
-    if (!lines[i].toLowerCase().includes(orgLower)) continue;
-    const start = Math.max(0, i - 2);
-    const end = Math.min(lines.length - 1, i + 2);
-    const windowText = lines.slice(start, end + 1).join(' ').toLowerCase();
-    if (kwLower.some(k => windowText.includes(k))) return true;
-  }
-  return false;
-}
+/** Citation verification model — lighter/cheaper than the classification model */
+const CITATION_HAIKU_MODEL = "claude-haiku-4-5";
 
 /** Return a ~windowSize window of text centered on the first occurrence of org.
  *  If org is not found, returns first windowSize chars (caller should check countMentions). */
@@ -807,6 +794,15 @@ async function run(cfg, cb) {
       }
     })));
   }
+  // Any article not in the scrape slice (e.g. TV articles added after the first 16)
+  // must still get a fallback fullText so they are not silently dropped by the filter below
+  for (const org of ORGS) {
+    arts[org].forEach(a => {
+      if (!a.fullText) {
+        a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet || ""}`;
+      }
+    });
+  }
 
   // ── STEP 1c: Drop articles where org not found in scraped text ──
   cb(`\nSTEP 1c/6 — Filtering by org presence in scraped text...`, "head");
@@ -922,16 +918,55 @@ ${txt}`;
     );
   }
 
-  // ── STEP 2c: Citation verification (±2-line AQ context check) ──────────
-  cb(`\nSTEP 2c/6 — Citation verification (org in AQ context, ±2 lines)...`, "head");
-  for (const org of ORGS) {
-    let verified = 0;
-    arts[org].forEach(a => {
-      const term = a.matchTerm || org;
-      a.citationVerified = verifyCitationByLines(a.fullText || '', term, SCOPE_KEYWORDS);
-      if (a.citationVerified) verified++;
-    });
-    cb(`  ${org}: ${verified}/${arts[org].length} citation-verified`, verified > 0 ? 'ok' : 'warn');
+  // ── STEP 2c: Citation verification (Claude Haiku) ────────────────────────
+  cb(`\nSTEP 2c/6 — Citation verification (Claude Haiku)...`, "head");
+  {
+    const citLimit = pLimit(4);
+    await Promise.allSettled(ORGS.map(org => citLimit(async () => {
+      const al = arts[org];
+      if (!al.length) { cb(`  ${org}: no articles to verify`, 'warn'); return; }
+      const batches = [];
+      for (let i = 0; i < al.length; i += 8) batches.push(al.slice(i, i + 8));
+      let verified = 0;
+      for (const batch of batches) {
+        const batchText = batch.map((a, j) => {
+          const snippet = (a.fullText || '').slice(0, 800);
+          return `[${j}] TITLE: ${a.title}\nCONTENT: ${snippet}`;
+        }).join('\n===\n');
+        const prompt = `You are verifying whether news articles genuinely cite the organisation "${org}" as a source of research or data on air quality in India.
+
+For EACH article below, respond citationVerified=true ONLY if the article:
+- Cites a named report, study, or publication by "${org}"
+- Attributes a specific statistic, number, or finding to "${org}"
+- Quotes a researcher from "${org}" on an air quality topic
+
+Respond citationVerified=false if "${org}" is only mentioned in passing, as an event participant, or without specific attribution of AQ evidence.
+
+Return ONLY a JSON array with no preamble: [{"index":0,"citationVerified":true}, ...]
+
+ARTICLES:
+${batchText}`;
+        try {
+          const raw = await callClaude(prompt, cfg.CLAUDE_KEY, 400, CITATION_HAIKU_MODEL);
+          const parsed = parseJ(raw);
+          if (parsed && Array.isArray(parsed)) {
+            parsed.forEach(r => {
+              if (typeof r.index === 'number' && r.index >= 0 && r.index < batch.length) {
+                batch[r.index].citationVerified = !!r.citationVerified;
+                if (batch[r.index].citationVerified) verified++;
+              }
+            });
+          } else {
+            batch.forEach(a => { a.citationVerified = false; });
+          }
+        } catch (e) {
+          cb(`  Citation Haiku error (${org}): ${e.message}`, 'warn');
+          batch.forEach(a => { a.citationVerified = false; });
+        }
+        await sleep(200);
+      }
+      cb(`  ${org}: ${verified}/${al.length} citation-verified`, verified > 0 ? 'ok' : 'warn');
+    })));
   }
 
   // ── STEP 3: AEO Visibility (via Social Intelligence module) ──
@@ -2883,7 +2918,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
         const [bgCol, borderCol, textCol] = cv >= 5
           ? ["rgba(74,222,128,.10)", "rgba(74,222,128,.30)", "#4ade80"]
           : ["rgba(251,191,36,.10)", "rgba(251,191,36,.30)", "#fbbf24"];
-        if (cv <= 1) {
+        if (cv === 0) {
           return `<td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td>`;
         }
         const uid = `tm${org.replace(/\W/g,"")}${tk.replace(/\W/g,"")}`;
