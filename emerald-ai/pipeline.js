@@ -2884,11 +2884,7 @@ function buildHTML(
   socialERResults = [],
   youtubeERResults = [],
   spikeAnnotations = [],
-<<<<<<< HEAD
   aeoQueriesUsed = null,
-=======
-  aeoQueriesUsed = undefined,
->>>>>>> c0af0ea (Fix report generation by making a variable accessible to the build HTML function)
 ) {
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
   const now = new Date().toUTCString();
