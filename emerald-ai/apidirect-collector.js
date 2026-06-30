@@ -108,12 +108,13 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
     cb?.(`  [APIdirect/LI] ${org}: no official handle — skipped`, 'warn');
     return EMPTY;
   }
-  // Build an OR clause from merged AQ + scope keywords (first 8) so the API query
-  // covers the full user-configured scope, not just "air quality".
+  // Build keyword OR clause. Query format: "OrgName" + AQ keywords.
+  // APIdirect's LinkedIn endpoint is a LinkedIn API wrapper — it does not support
+  // the Google site: operator. Use org name as the subject anchor instead.
   const kwClause = aqKw.slice(0, 8).map(k => `"${k}"`).join(' OR ');
-  const q = `site:linkedin.com/company/${handle} (${kwClause})`;
+  const q = `"${org}" (${kwClause})`;
   try {
-    const r = await apiFetch('linkedin/posts', { query: q, page: 1 }, apiKey);
+    const r = await apiFetch('linkedin/posts', { query: q, page: 1, sort_by: 'most_recent' }, apiKey);
     let posts = r.posts || [];
     const fetched = posts.length;
 

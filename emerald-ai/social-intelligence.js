@@ -132,29 +132,35 @@ async function runAEO(cfg, orgs, cb) {
       }
     })(),
 
-    // Gemini 2.0 Flash (all questions)
-    cfg.GEMINI_KEY && (async () => {
-      cb(`  Probing Gemini 2.0 Flash — ${queriesUsed.length} questions...`);
+    // Google AI Mode via APIdirect (all questions)
+    cfg.APIDIRECT_KEY && (async () => {
+      cb(`  Probing Google AI — ${queriesUsed.length} questions...`);
       const responses = await Promise.allSettled(
         queriesUsed.map(q =>
-          axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${cfg.GEMINI_KEY}`,
-            { contents: [{ parts: [{ text: q }] }], systemInstruction: { parts: [{ text: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }] }, generationConfig: { maxOutputTokens: 300 } },
-            { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
+          axios.get(
+            'https://apidirect.io/v1/web/ai-mode',
+            {
+              params: { prompt: `${q}\n\nReply in 1-2 sentences maximum. List only organisation names, no explanations.`, country: 'in', language: 'en' },
+              headers: { 'X-API-Key': cfg.APIDIRECT_KEY },
+              timeout: 30000,
+            }
           )
         )
       );
-      let geminiErrors = 0;
+      let googleErrors = 0;
       const texts = responses.map((r, i) => {
         if (r.status === 'rejected') {
-          geminiErrors++;
-          if (i === 0) cb(`  Gemini error: ${r.reason?.response?.data?.error?.message || r.reason?.message || 'unknown'}`, 'warn');
+          googleErrors++;
+          if (i === 0) cb(`  Google AI error: ${r.reason?.response?.data?.error || r.reason?.message || 'unknown'}`, 'warn');
           return '';
         }
-        return r.value.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        return (r.value.data?.reply_parts || [])
+          .filter(p => p.type === 'paragraph' || p.type === 'heading')
+          .map(p => p.text || '')
+          .join(' ');
       });
-      if (geminiErrors > 0) cb(`  Gemini API: ${geminiErrors}/${queriesUsed.length} calls failed`, 'warn');
-      else cb(`  Gemini API: all ${queriesUsed.length} calls succeeded`, 'ok');
+      if (googleErrors > 0) cb(`  Google AI: ${googleErrors}/${queriesUsed.length} calls failed`, 'warn');
+      else cb(`  Google AI: all ${queriesUsed.length} calls succeeded`, 'ok');
       for (const org of orgs) {
         let count = 0;
         texts.forEach((text, qi) => {
@@ -163,12 +169,12 @@ async function runAEO(cfg, orgs, cb) {
             count++;
             if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
           }
-          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Gemini 2.0 Flash', cited: mentioned, text });
+          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Google AI', cited: mentioned, text });
         });
-        results[org].llmBreakdown['Gemini 2.0 Flash'] = {
+        results[org].llmBreakdown['Google AI'] = {
           mentions: count, total: queriesUsed.length
         };
-        cb(`  Gemini → ${org}: ${count}/${queriesUsed.length}`, count > 0 ? 'ok' : 'warn');
+        cb(`  Google AI → ${org}: ${count}/${queriesUsed.length}`, count > 0 ? 'ok' : 'warn');
       }
     })()
   ].filter(Boolean));
@@ -177,7 +183,7 @@ async function runAEO(cfg, orgs, cb) {
   for (const org of orgs) {
     results[org].mentions = Object.values(results[org].llmBreakdown)
       .reduce((a, b) => a + b.mentions, 0);
-    const activeLlms = [cfg.OPENAI_KEY, cfg.PERPLEXITY_KEY, cfg.GEMINI_KEY].filter(Boolean).length || 1;
+    const activeLlms = [cfg.OPENAI_KEY, cfg.PERPLEXITY_KEY, cfg.APIDIRECT_KEY].filter(Boolean).length || 1;
     const maxPossible = queriesUsed.length * activeLlms;
     results[org].score = Math.round(results[org].mentions / maxPossible * 100);
     cb(`  AEO total: ${org} = ${results[org].mentions} mentions across all LLMs`, 'ok');
@@ -270,7 +276,7 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
   const llmLinks = {
     'GPT-4o mini':      (q) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`,
     'Perplexity':       (q) => `https://www.perplexity.ai/search?q=${encodeURIComponent(q)}`,
-    'Gemini 2.0 Flash': (q) => `https://gemini.google.com/app?q=${encodeURIComponent(q)}`,
+    'Google AI':        (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
   };
 
   const qMatrixRows = queriesUsed.map((q, qi) => {
