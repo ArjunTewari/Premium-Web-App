@@ -312,9 +312,16 @@ export default function Home() {
   function toggleOrg(org: string) {
     setSelectedOrgs((prev) => {
       if (prev.includes(org)) return prev.filter((o) => o !== org);
-      if (prev.length >= 13) return prev;
       return [...prev, org];
     });
+  }
+
+  function selectAllOrgs() {
+    setSelectedOrgs([...allOrgs]);
+  }
+
+  function deselectAllOrgs() {
+    setSelectedOrgs([]);
   }
 
   function addCustomOrg() {
@@ -324,7 +331,7 @@ export default function Home() {
       setOrgCustomInput(""); setOrgYtHandleInput(""); return;
     }
     setCustomOrgs((prev) => [...prev, { name: val, ytHandle: handle }]);
-    setSelectedOrgs((prev) => (prev.length < 13 ? [...prev, val] : prev));
+    setSelectedOrgs((prev) => [...prev, val]);
     setOrgHandleOverrides(prev => ({ ...prev, [val]: { twitter: "", instagram: "", youtube: handle, linkedin: "" } }));
     setOrgCustomInput(""); setOrgYtHandleInput("");
   }
@@ -335,7 +342,7 @@ export default function Home() {
     const alreadyExists = DEFAULT_ORGS.includes(val) || customOrgs.some(o => o.name === val);
     if (!alreadyExists) {
       setCustomOrgs(prev => [...prev, { name: val, ytHandle: hNewYt.trim() }]);
-      setSelectedOrgs(prev => (prev.length < 13 ? [...prev, val] : prev));
+      setSelectedOrgs(prev => [...prev, val]);
     }
     setOrgHandleOverrides(prev => ({
       ...prev,
@@ -620,7 +627,7 @@ export default function Home() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, margin: "24px 0 0" }}>
             {[
               { label: "Orgs available",  val: allOrgs.length,       suffix: "" },
-              { label: "Orgs selected",   val: orgCount,             suffix: `/ 13` },
+              { label: "Orgs selected",   val: orgCount,             suffix: `/ ${allOrgs.length}` },
               { label: "AEO queries",     val: aeoQueries.length,    suffix: "" },
               { label: "API keys active", val: 6,                    suffix: " / 6" },
             ].map((s) => (
@@ -660,14 +667,27 @@ export default function Home() {
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                 <SectionLabel>Organisations</SectionLabel>
-                <span style={{
-                  fontFamily: "'DM Mono', monospace", fontSize: 15,
-                  padding: "3px 10px", borderRadius: 6,
-                  background: "rgba(201,146,42,.12)", color: C.gold,
-                  border: `1px solid rgba(201,146,42,.2)`,
-                }}>
-                  {orgCount}{orgCount >= 13 ? " — max" : ""} selected
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button
+                    onClick={orgCount === allOrgs.length ? deselectAllOrgs : selectAllOrgs}
+                    style={{
+                      fontFamily: "'DM Mono', monospace", fontSize: 13,
+                      padding: "3px 10px", borderRadius: 6, cursor: "pointer",
+                      background: "rgba(76,175,116,.1)", color: "var(--accent-green)",
+                      border: `1px solid rgba(76,175,116,.25)`,
+                    }}
+                  >
+                    {orgCount === allOrgs.length ? "Deselect All" : "Select All"}
+                  </button>
+                  <span style={{
+                    fontFamily: "'DM Mono', monospace", fontSize: 15,
+                    padding: "3px 10px", borderRadius: 6,
+                    background: "rgba(201,146,42,.12)", color: C.gold,
+                    border: `1px solid rgba(201,146,42,.2)`,
+                  }}>
+                    {orgCount} selected
+                  </span>
+                </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7 }}>
                 {allOrgs.map((org) => {
@@ -745,7 +765,7 @@ export default function Home() {
                 </div>
               </div>
               <div style={{ fontSize: 10, color: "#2a3a4a", marginTop: 5, fontFamily: "'DM Mono', monospace" }}>
-                Select up to 13 · each org adds ~5 Serper queries + ~2 Claude calls
+                Each org adds ~5 Serper queries + ~2 Claude calls
               </div>
             </div>
           </SlideUp>
