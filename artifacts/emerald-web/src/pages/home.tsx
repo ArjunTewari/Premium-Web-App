@@ -22,16 +22,16 @@ const ORG_YT_HANDLES: Record<string, string> = {
   "WRI India":                                        "@WRIIndiaChannel",
   "Air Pollution Action Group":                       "@theconvergencefoundation",
   "Chintan Environmental Research and Action Group":  "@ChintanEnviroGroup",
-  "IIT Kanpur":                                       "@iitkanpur",
-  "CSTEP":                                            "@centerforstudyofsciencetec7663",
+  "IIT Kanpur":                                       "@IITKANPUR_official",
+  "CSTEP":                                            "@cstep20years",
   "IIT Delhi":                                        "@IITDelhiOfficial",
-  "Health Effects Institute":                         "@HEIresearch",
+  "Health Effects Institute":                         "",
   "ICCT":                                             "@ICCT",
   "EPIC India":                                       "@epicindia.uchicago",
   "Council on Energy, Environment and Water":         "@CEEWIndia",
-  "Centre for Science and Environment":               "@cse_india",
+  "Centre for Science and Environment":               "",
   "Climate Trends":                                   "@ClimateTrendsIN",
-  "Sustainable Futures Collaborative":                "@SFC_India",
+  "Sustainable Futures Collaborative":                "",
 };
 
 const ORG_TW_HANDLES: Record<string, string> = {
@@ -611,14 +611,19 @@ export default function Home() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7 }}>
                 {allOrgs.map((org) => {
                   const on = selectedOrgs.includes(org);
-                  const handle = allOrgHandles[org];
+                  const ov = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "" };
+                  const chips: { label: string; val: string; color: string }[] = [
+                    { label: "𝕏", val: ov.twitter  ? `@${ov.twitter}`  : "", color: "#4a9fd4" },
+                    { label: "IG", val: ov.instagram ? `@${ov.instagram}` : "", color: "#e05c9c" },
+                    { label: "YT", val: ov.youtube  || "",                     color: "#e53935" },
+                  ].filter(c => c.val);
                   return (
                     <button
                       key={org}
                       className="mo-org-btn"
                       onClick={() => toggleOrg(org)}
                       style={{
-                        display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 3,
+                        display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4,
                         padding: "9px 11px", borderRadius: 9, cursor: "pointer",
                         background: on ? "rgba(201,146,42,.1)" : "rgba(255,255,255,.03)",
                         border: `1px solid ${on ? "rgba(201,146,42,.3)" : "rgba(255,255,255,.08)"}`,
@@ -636,9 +641,17 @@ export default function Home() {
                         }} />
                         {org}
                       </span>
-                      {handle && (
-                        <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: on ? "rgba(201,146,42,.55)" : "rgba(74,96,112,.7)", paddingLeft: 14 }}>
-                          {handle}
+                      {chips.length > 0 && (
+                        <span style={{ display: "flex", flexWrap: "wrap", gap: "3px 6px", paddingLeft: 14 }}>
+                          {chips.map(c => (
+                            <span key={c.label} style={{
+                              fontSize: 9, fontFamily: "'DM Mono', monospace",
+                              color: on ? c.color : "rgba(74,96,112,.8)",
+                              lineHeight: 1.3,
+                            }}>
+                              <span style={{ opacity: .5, marginRight: 2 }}>{c.label}</span>{c.val}
+                            </span>
+                          ))}
                         </span>
                       )}
                     </button>
