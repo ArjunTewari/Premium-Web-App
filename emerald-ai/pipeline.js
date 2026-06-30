@@ -119,6 +119,26 @@ const dom = (url) => {
   }
 };
 
+function extractJsonArray(raw) {
+  if (!raw) return null;
+  const s = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const start = s.indexOf('[');
+  if (start === -1) return null;
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (esc) { esc = false; continue; }
+    if (c === '\\' && inStr) { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === '[') depth++;
+    else if (c === ']' && --depth === 0) {
+      try { return JSON.parse(s.slice(start, i + 1)); } catch { return null; }
+    }
+  }
+  return null;
+}
+
 function parseJ(raw) {
   if (!raw) return null;
   let s = raw
@@ -584,9 +604,8 @@ ${spikeDescs}
 Return ONLY a JSON array: [{"idx":0,"annotation":"..."},...]`,
       claudeKey, 600
     );
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (!match) return spikes.map((s) => ({ ...s, annotation: "" }));
-    const parsed = JSON.parse(match[0]);
+    const parsed = extractJsonArray(raw);
+    if (!parsed) return spikes.map((s) => ({ ...s, annotation: "" }));
     return spikes.map((s, i) => ({ ...s, annotation: parsed.find((p) => p.idx === i)?.annotation || "" }));
   } catch (e) {
     cb(`  Spike annotation skipped: ${e.message}`, "warn");
@@ -904,9 +923,8 @@ ${batchText}`;
 
         try {
           const raw = await callClaude(prompt, cfg.CLAUDE_KEY, 600, CLAUDE_MODEL);
-          const match = raw.match(/\[[\s\S]*\]/);
-          if (match) {
-            const parsed = JSON.parse(match[0]);
+          const parsed = extractJsonArray(raw);
+          if (parsed) {
             // Build a map from the response; indices absent from the response default to keep=true
             const responseMap = new Map(parsed.map(({ index, keep: k }) => [index, !!k]));
             batch.forEach((a, j) => {
