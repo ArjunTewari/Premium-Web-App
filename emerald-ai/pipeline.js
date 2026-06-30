@@ -279,16 +279,21 @@ async function serperSearch(query, key, dateFrom, dateTo) {
   const body = { q: query, num: 10 };
   if (dateFrom && dateTo)
     body.tbs = `cdr:1,cd_min:${toSerperDate(dateFrom)},cd_max:${toSerperDate(dateTo)}`;
-  const res = await axios.post(
-    "https://google.serper.dev/news",
-    body,
-    {
-      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-      timeout: 15000,
-    },
-  );
-  costTracker.serperQueries++;
-  return res.data.news || res.data.organic || [];
+  try {
+    const res = await axios.post(
+      "https://google.serper.dev/news",
+      body,
+      {
+        headers: { "X-API-KEY": key, "Content-Type": "application/json" },
+        timeout: 15000,
+      },
+    );
+    costTracker.serperQueries++;
+    return res.data.news || res.data.organic || [];
+  } catch (e) {
+    const detail = e.response?.data?.message || e.response?.data?.error || e.message;
+    throw new Error(`Serper ${e.response?.status ?? ''}: ${detail}`);
+  }
 }
 
 async function serperScrape(url, key) {
@@ -1081,6 +1086,7 @@ ${batchText}`;
   // ── STEP 3: AEO Visibility (via Social Intelligence module) ──
   cb(`\nSTEP 3/6 — AEO / LLM Visibility...`, "head");
   let aeoResults = {};
+  let aeoQueriesUsed;
   for (const org of ORGS)
     aeoResults[org] = {
       mentions: 0,
@@ -1090,7 +1096,7 @@ ${batchText}`;
     };
   try {
     aeoResults = await SI.runAEO(cfg, ORGS, cb);
-    const aeoQueriesUsed = aeoResults._queriesUsed;
+    aeoQueriesUsed = aeoResults._queriesUsed;
     delete aeoResults._queriesUsed; // remove metadata key — Object.values() calls later expect only org entries
     for (const org of ORGS)
       cb(

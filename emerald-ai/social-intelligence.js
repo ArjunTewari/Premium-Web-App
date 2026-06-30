@@ -132,13 +132,13 @@ async function runAEO(cfg, orgs, cb) {
       }
     })(),
 
-    // Gemini 1.5 Flash (all questions)
+    // Gemini 2.0 Flash (all questions)
     cfg.GEMINI_KEY && (async () => {
-      cb(`  Probing Gemini 1.5 Flash — ${queriesUsed.length} questions...`);
+      cb(`  Probing Gemini 2.0 Flash — ${queriesUsed.length} questions...`);
       const responses = await Promise.allSettled(
         queriesUsed.map(q =>
           axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cfg.GEMINI_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${cfg.GEMINI_KEY}`,
             { contents: [{ parts: [{ text: q }] }], systemInstruction: { parts: [{ text: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }] }, generationConfig: { maxOutputTokens: 300 } },
             { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
           )
@@ -163,9 +163,9 @@ async function runAEO(cfg, orgs, cb) {
             count++;
             if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
           }
-          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Gemini 1.5 Flash', cited: mentioned, text });
+          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Gemini 2.0 Flash', cited: mentioned, text });
         });
-        results[org].llmBreakdown['Gemini 1.5 Flash'] = {
+        results[org].llmBreakdown['Gemini 2.0 Flash'] = {
           mentions: count, total: queriesUsed.length
         };
         cb(`  Gemini → ${org}: ${count}/${queriesUsed.length}`, count > 0 ? 'ok' : 'warn');
@@ -270,7 +270,7 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
   const llmLinks = {
     'GPT-4o mini':      (q) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`,
     'Perplexity':       (q) => `https://www.perplexity.ai/search?q=${encodeURIComponent(q)}`,
-    'Gemini 1.5 Flash': (q) => `https://gemini.google.com/app?q=${encodeURIComponent(q)}`,
+    'Gemini 2.0 Flash': (q) => `https://gemini.google.com/app?q=${encodeURIComponent(q)}`,
   };
 
   const qMatrixRows = queriesUsed.map((q, qi) => {
