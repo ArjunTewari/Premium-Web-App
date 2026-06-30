@@ -113,6 +113,8 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
 
   try {
     const pipelinePath = path.resolve(__dirname, "../../../emerald-ai/pipeline.js");
+    // Bust require cache so pipeline changes are picked up without server restart
+    delete require.cache[require.resolve(pipelinePath)];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { run } = require(pipelinePath) as any;
     const result = await run(cfg, cb);
