@@ -924,8 +924,8 @@ ${txt}`;
     cb(`  AEO error: ${e.message}`, "err");
   }
 
-  // ── STEP 4: Social Presence (X API / IG API / Serper fallback) ─────────
-  cb(`\nSTEP 4/6 — Social Presence (X API + Instagram API + Serper)...`, "head");
+  // ── STEP 4: Social Presence (APIdirect.io) ─────────────────────────────
+  cb(`\nSTEP 4/6 — Social Presence (APIdirect.io: LI + X + IG)...`, "head");
   const SocialER = require("./social-er");
   let socialERResults = [];
   let socialERHtml = "";
@@ -1094,7 +1094,8 @@ ${txt}`;
       callClaude(
         `Generate 4 actions for EACH of these orgs: ${ORGS.join(", ")} — based on Indian AQ media + AEO + social media intelligence.\n${orgSummary}\nWhite-space gap topics (AQ media conversations tracked orgs are absent from): ${emerging.map((e) => e.topic).join(",") || "none"}\nReturn ONLY JSON array of ${ORGS.length * 4} objects: [{"org":"orgname","priority":"Fix Now|Leverage|Optimise|Invest","area":"Media|Topics|Narrative|AEO|Social","action":"...","rationale":"1-2 sentences with specific data"}]`,
         cfg.CLAUDE_KEY,
-        Math.min(8000, 1200 + ORGS.length * 350),
+        Math.min(16000, 2000 + ORGS.length * 800),
+        CLAUDE_CLASSIFY_MODEL,
       ),
       new Promise((_, rej) =>
         setTimeout(
