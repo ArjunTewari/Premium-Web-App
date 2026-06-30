@@ -1,0 +1,942 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AQ Intelligence &mdash; WRI India</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>:root{--ink:#0a0e17;--surface:#111520;--surface2:#181e2e;--surface3:#1e2638;--border:#252d40;--border2:#2e3a52;--text:#d8e4f0;--muted:#5e7494;--muted2:#8fa3b8;--amber:#c9922a;--amber-dim:rgba(201,146,42,.12);--amber-glow:rgba(201,146,42,.06);--good:#4caf74;--warn:#d4a017;--bad:#e05c5c}
+*{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line-height:1.65;font-size:14px}
+.shell{display:flex;min-height:100vh}
+.sidenav{width:220px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:28px 0;display:flex;flex-direction:column}
+.sidenav-logo{padding:0 20px 24px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.sidenav-logo-name{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+.sidenav-logo-sub{font-size:10px;color:var(--muted);margin-top:2px;font-family:monospace}
+.nav-lbl{font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:12px 20px 6px}
+.nav-a{display:block;padding:7px 20px;font-size:12px;color:var(--muted2);text-decoration:none;border-left:2px solid transparent}
+.nav-a:hover{color:var(--text);background:var(--surface2)}.nav-a.active{color:var(--amber);border-left-color:var(--amber);background:var(--amber-glow)}
+.sidenav-footer{margin-top:auto;padding:16px 20px 0;border-top:1px solid var(--border);font-family:monospace;font-size:10px;color:var(--muted);line-height:1.8}
+.main{flex:1;min-width:0;padding:0 48px 80px}
+.rh{padding:52px 0 44px;border-bottom:1px solid var(--border);margin-bottom:48px}
+.ey{font-family:monospace;font-size:11px;color:var(--amber);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
+.rt{font-family:'DM Serif Display',serif;font-size:42px;line-height:1.15;margin-bottom:10px;font-weight:400}
+.rti{color:var(--amber);font-style:italic}
+.rm{font-size:13px;color:var(--muted2);margin-bottom:28px;font-family:monospace}
+.chips{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:4px;font-size:12px;font-weight:600}
+.dn{background:var(--amber-glow);border:1px solid rgba(201,146,42,.2);border-radius:6px;padding:11px 16px;font-size:12px;color:var(--muted2);font-family:monospace}
+.dn strong{color:var(--amber)}
+.sec{margin-bottom:56px;scroll-margin-top:24px}
+.sh{margin-bottom:24px}
+.se{font-family:monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.st{font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;color:var(--text);line-height:1.2}
+.sd{margin-top:8px;font-size:13px;color:var(--muted2);max-width:680px}
+.sdiv{width:40px;height:2px;background:var(--amber);margin:14px 0 0}
+.mg{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mc{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px}
+.ml{font-family:monospace;font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin-bottom:6px}
+.mt{font-size:12px;color:var(--muted2);line-height:1.6}
+.sb-scope{background:var(--amber-glow);border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:14px 18px;font-size:12px;color:var(--muted2);margin-bottom:20px;line-height:1.7}
+.sb-scope strong{color:var(--amber)}
+.cp{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px}
+.op{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:20px}
+.opn{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+.mch{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+.ch-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+.wbars{display:flex;gap:5px;align-items:flex-end;height:96px;margin-bottom:8px}
+.tg{display:grid;grid-template-columns:175px 1fr;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;font-size:12px}
+.tgh{background:var(--surface3);padding:10px 14px;font-family:monospace;font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+.tc{padding:12px 14px;border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+.tc:nth-child(2n){border-right:none}
+.tn{font-weight:600;color:var(--text);margin-bottom:3px}.cell-hl{font-size:11px;color:var(--muted);line-height:1.4;margin-top:5px}
+.owns{background:rgba(76,175,116,.06)}.con{background:rgba(61,142,240,.04)}
+.ob{display:inline-block;font-family:monospace;font-size:10px;font-weight:600;padding:1px 7px;border-radius:3px;margin-bottom:4px}
+.badge-owns{background:rgba(76,175,116,.15);color:var(--good);border:1px solid rgba(76,175,116,.3)}
+.badge-con{background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.25)}
+.badge-absent{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+.nt,.at,.apt{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}
+.nt th,.at th,.apt th{background:var(--surface3);padding:10px 14px;text-align:left;font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+.nt td,.at td,.apt td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+.nt tr:hover td{background:var(--surface2)}
+.pos-auth{display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600}
+.pos-per{display:inline-block;background:var(--surface3);color:var(--muted2);border:1px solid var(--border2);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600}
+.pos-abs{display:inline-block;background:rgba(224,92,92,.1);color:var(--bad);border:1px solid rgba(224,92,92,.25);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600}
+.ctag{display:inline-flex;font-family:monospace;font-size:10px;color:var(--amber);background:var(--amber-dim);border:1px solid rgba(201,146,42,.25);border-radius:3px;padding:1px 6px;cursor:pointer;text-decoration:none;vertical-align:middle;margin-left:4px}
+.evd{display:none;background:var(--ink);border:1px solid var(--border2);border-radius:5px;padding:12px 14px;margin-top:9px}
+.evd.open{display:block}
+.ei{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start}
+.ei:last-child{border:none;padding-bottom:0}
+.en{font-family:monospace;font-size:10px;color:var(--muted);flex-shrink:0;min-width:40px;padding-top:2px}
+.eq{font-family:monospace;font-size:11px;color:var(--text);line-height:1.6;background:var(--surface3);border-left:2px solid var(--amber);padding:5px 9px;border-radius:0 3px 3px 0;margin-bottom:4px}
+.es{font-family:monospace;font-size:10px;color:var(--muted)}.es a{color:var(--amber);text-decoration:none}
+.lc{font-family:monospace;font-size:10px;color:var(--warn);background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.25);border-radius:3px;padding:2px 6px}
+.cqp{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:18px}
+.cqe{padding:8px 10px;border-radius:4px;margin-bottom:6px;font-size:11px;line-height:1.6}
+.cqd{background:rgba(76,175,116,.07);border-left:2px solid var(--good)}
+.cqv{background:var(--surface3);border-left:2px solid var(--muted)}
+.cqet{font-family:monospace;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px}
+.cqd .cqet{color:var(--good)}.cqv .cqet{color:var(--muted)}.cqetx{color:var(--text);font-family:monospace;font-size:11px}
+.em-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:12px}
+.em-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:12px}
+.em-topic{font-size:14px;font-weight:600;color:var(--text)}
+.em-mom{font-family:monospace;font-size:11px;color:var(--good);background:rgba(76,175,116,.1);border:1px solid rgba(76,175,116,.25);border-radius:3px;padding:2px 8px;flex-shrink:0}
+.em-body{font-size:13px;color:var(--muted2);line-height:1.65;margin-bottom:10px}
+.em-inf{background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.2);border-radius:4px;padding:8px 12px;font-size:11px;color:var(--warn);font-family:monospace}
+.em-inf::before{content:"⚠ INFERENCE — ";font-weight:600}
+.em-src{font-size:11px;color:var(--muted);padding:3px 0;font-family:monospace;display:flex;gap:8px}
+.em-src::before{content:"→";color:var(--amber)}
+.scc{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px}
+.sca{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:22px;text-align:center}
+.scn{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.scg{font-family:'DM Serif Display',serif;font-size:44px;line-height:1;margin:8px 0 4px;font-weight:400}
+#score table tbody tr{border-bottom:1px solid var(--border)}
+#score table tbody tr:hover{background:var(--surface2)}
+#score table td{padding:12px 12px}
+#score table thead th{padding:10px 12px;background:var(--surface3)}
+.scs{font-family:monospace;font-size:13px;color:var(--muted2);margin-bottom:14px}
+.scf{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:12px 16px;font-family:monospace;font-size:11px;color:var(--muted2);margin-top:8px}
+.scf strong{color:var(--amber)}
+.fc{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:20px 22px;display:flex;gap:18px;align-items:flex-start;margin-bottom:14px}
+.fn{font-family:'DM Serif Display',serif;font-size:36px;color:var(--amber);line-height:1;flex-shrink:0;opacity:.45;margin-top:2px}
+.fb{flex:1}.fh{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;line-height:1.4}
+.fd{font-size:13px;color:var(--muted2);line-height:1.65}
+.pri-fix{display:inline-block;background:rgba(212,160,23,.12);color:var(--warn);border:1px solid rgba(212,160,23,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.pri-lev{display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.pri-opt{display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.25);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.pri-inv{display:inline-block;background:rgba(224,92,92,.1);color:var(--bad);border:1px solid rgba(224,92,92,.25);border-radius:3px;padding:2px 7px;font-family:monospace;font-size:10px;font-weight:600;white-space:nowrap}
+.rat{font-size:11px;color:var(--muted);font-family:monospace;line-height:1.55}
+.apt td{font-family:monospace;color:var(--muted2);font-size:11px}.apt td a{color:var(--amber);text-decoration:none}
+.rf{border-top:1px solid var(--border);padding:28px 0 0;font-family:monospace;font-size:10px;color:var(--muted);line-height:2}
+.edit-bar{position:fixed;top:14px;right:18px;z-index:2000;display:flex;gap:8px;align-items:center}
+.edit-btn{background:#1e2638;border:1px solid var(--border2);border-radius:5px;padding:6px 13px;font-family:monospace;font-size:11px;color:var(--muted2);cursor:pointer;transition:all .15s;line-height:1.4}
+.edit-btn:hover,.edit-btn.on{background:rgba(201,146,42,.15);border-color:rgba(201,146,42,.4);color:var(--amber)}
+.edit-dl{color:var(--good)!important;border-color:rgba(76,175,116,.3)!important;background:rgba(76,175,116,.07)!important;display:none}
+body.edit-mode .edit-dl{display:inline-block}
+body.edit-mode [contenteditable="true"]:hover{outline:1.5px dashed rgba(201,146,42,.55);border-radius:2px;cursor:text}
+body.edit-mode [contenteditable="true"]:focus{outline:1.5px solid rgba(201,146,42,.7);border-radius:2px}
+.sec-x{display:none;position:absolute;top:10px;right:14px;width:22px;height:22px;border-radius:4px;background:rgba(224,92,92,.12);border:1px solid rgba(224,92,92,.3);color:var(--bad);font-size:15px;cursor:pointer;align-items:center;justify-content:center;line-height:1;font-weight:700}
+.sec-x:hover{background:rgba(224,92,92,.28)}
+body.edit-mode .sec-x{display:flex}
+.sec.sec-hidden{display:none}
+@media(max-width:900px){
+  .sidenav{display:none}
+  .main{padding:24px 20px 60px;max-width:100%}
+  .rh{padding:32px 0 28px;margin-bottom:32px}
+  .rt{font-size:28px}
+  .st{font-size:22px}
+  .sd{font-size:12px}
+  .cp,.scc,.mg{grid-template-columns:1fr}
+  .tg{grid-template-columns:1fr!important}
+  .ch-hdr{flex-direction:column;gap:8px}
+  .wbars{height:64px}
+  .fc{flex-direction:column;gap:10px}
+  .fn{font-size:26px}
+  .em-hdr{flex-direction:column;gap:6px}
+  .scg{font-size:32px}
+  .edit-bar{top:8px;right:8px;gap:5px}
+  .nt,.at,.apt{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #score table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+@media(max-width:480px){
+  .main{padding:16px 14px 60px}
+  .rt{font-size:20px}
+  .st{font-size:18px}
+  .op{padding:14px 12px}
+  .sec{margin-bottom:36px}
+  .mch{padding:14px 12px}
+  .em-card{padding:14px 16px}
+  .scg{font-size:26px}
+  .ey{font-size:9px;letter-spacing:.08em}
+}</style></head><body>
+<div class="edit-bar" id="edit-bar"><button class="edit-btn" id="edit-btn" onclick="toggleEdit()">&#9998; Edit Mode</button><button class="edit-btn edit-dl" id="dl-btn" onclick="dlEdit()">&#8595; Download Edited</button></div>
+<div class="shell">
+<nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
+<div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a>
+<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">AQ Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social &amp; Digital</div><a href="#social" class="nav-a">Social &amp; YouTube</a>
+<div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a>
+<div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
+<div class="sidenav-footer">Generated: 2026-06-30<br><div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2);padding:3px 20px"><div style="width:8px;height:8px;border-radius:2px;background:#3d8ef0"></div>WRI India: 3 arts</div>CONFIDENTIAL<br><span style="display:inline-block;margin-top:6px;padding:4px 8px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.3);border-radius:4px;color:var(--amber);font-weight:700">&#8377;52/month</span></div></nav>
+<main class="main">
+<header class="rh" id="header"><div class="ey">Air Quality Media Intelligence &middot; India</div>
+<h1 class="rt">Air Quality<br><span class="rti">TRIPLE Media Analytics</span></h1>
+<div class="rm">Period: 2026-03-08 &rarr; 2026-06-08 &middot; 3 AQ articles &middot; Tue, 30 Jun 2026 04:43:47 GMT</div>
+<div class="chips"><span class="chip" style="background:#3d8ef01a;color:#3d8ef0;border:1px solid #3d8ef04d"><span style="width:7px;height:7px;border-radius:50%;display:inline-block;background:#3d8ef0"></span>WRI India</span></div>
+<div class="dn"><strong>Publicly available data</strong> Insight linked to evidence &middot; Tue, 30 Jun 2026 04:43:47 GMT</div>
+<div style="margin-top:16px;display:flex;align-items:center;gap:12px;background:rgba(61,142,240,.08);border:1px solid rgba(61,142,240,.25);border-radius:6px;padding:12px 16px;font-size:13px"><div style="flex:1;color:var(--text)"><strong style="font-weight:600">PowerPoint version available.</strong> Open the <code style="background:var(--surface3);padding:1px 5px;border-radius:3px;font-size:11px">.pptx</code> file in the same folder.</div><div style="font-family:monospace;font-size:11px;color:var(--muted2);flex-shrink:0">📁 aq-report-WRI India-2026-06-30.pptx</div></div>
+</header>
+
+<section class="sec" id="exec"><div class="sh"><div class="se">Section 01</div><h2 class="st">Executive Summary</h2><div class="sd">Headline comparative findings across 1 organisations — media, LLM visibility, and social.</div><div class="sdiv"></div></div>
+<div style="background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.2);border-radius:8px;overflow:hidden;margin-bottom:4px">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;cursor:pointer;user-select:none" onclick="toggleExecDraft()">
+<span style="font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)">Draft Executive Summary <span style="font-weight:400;color:var(--muted2)">(AI-generated &mdash; review before sharing)</span></span>
+<span id="exec-draft-icon" style="font-family:monospace;font-size:12px;color:var(--amber)">&#9660; Show draft</span>
+</div>
+<div id="exec-draft" style="display:none;padding:0 18px 18px"><div class="fc"><div class="fn">1</div><div class="fb"><div class="fh">Article Output: WRI India Published 3 Pieces During Review Period</div><div class="fd">WRI India produced 3 articles on Indian air quality between 2026-03-08 and 2026-06-08. No comparative organization data available to establish relative publication volume. <span style="font-family:monospace;font-size:10px;color:var(--muted)">&rarr; §03 AQ Press Analytics</span></div></div></div><div class="fc"><div class="fn">2</div><div class="fb"><div class="fh">Data-Specific Coverage: Zero Percent of WRI India Output</div><div class="fd">WRI India's air quality coverage contained 0% data-specific articles during the four-month period. Of the 3 total pieces published, none incorporated original datasets or quantitative analysis. <span style="font-family:monospace;font-size:10px;color:var(--muted)">&rarr; §05 Topic Ownership</span></div></div></div><div class="fc"><div class="fn">3</div><div class="fb"><div class="fh">Social Media Presence: WRI India Maintained Active Multi-Platform Distribution</div><div class="fd">WRI India recorded a 10/10 social media presence score with 18 LinkedIn posts, 8 Instagram posts, 3 YouTube videos, and 1 X post. Times of India served as the top outlet for WRI India air quality coverage. <span style="font-family:monospace;font-size:10px;color:var(--muted)">&rarr; §Social Media</span></div></div></div></div>
+</div>
+<div style="margin-top:20px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);font-size:11px;color:var(--muted2);line-height:1.7">
+  <strong style="font-weight:600;letter-spacing:.04em">METHODOLOGY</strong> &mdash;
+  Serper News API for media coverage &middot; Claude Sonnet 4.6 for article classification &middot;
+  LLM probing (GPT-4o, Perplexity Sonar, Gemini 1.5 Flash) for AEO visibility &middot;
+  Serper web search for social AQ presence (LinkedIn + X/Twitter) &middot;
+  Articles filtered to 9 core outlets: TOI, HT, The Hindu, NDTV, News18, India Today, Aaj Tak, India TV, ABP News &middot;
+  Only articles where the organisation is mentioned in scraped body text and classified as AQ-primary by Claude are included.
+</div>
+</section>
+<section class="sec" id="sov"><div class="sh"><div class="se">Section 03</div><h2 class="st">AQ Press Analytics</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
+<div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; 3 articles</div></div>
+<div style="height:28px;background:#1e2638;border-radius:4px;overflow:hidden;display:flex;margin-bottom:12px"><div style="background:#3d8ef0;width:100%;display:flex;align-items:center;padding-left:9px;font-family:monospace;font-size:11px;font-weight:500;color:#fff;min-width:0;overflow:hidden">3</div></div>
+<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px"><div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#3d8ef0;margin-right:5px"></span>WRI India: 3</div></div>
+</div>
+<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Press</div>
+<table class="nt"><thead><tr><th>Org</th><th>Times of India</th></tr></thead><tbody>
+<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:#3d8ef0">WRI India</span></td><td style="font-family:monospace"><strong>3</strong><br><span onclick="td('sov_WRI_India_Times_of_India')" style="font-size:10px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="sov_WRI_India_Times_of_India" style="display:none"><a href="https://timesofindia.indiatimes.com/city/gurgaon/gurgaon-civic-body-to-identify-waste-burning-hotspots/articleshow/129563839.cms" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="Gurgaon civic body to identify waste-burning hotspots">Gurgaon civic body to identify waste-burning hotspots</a><a href="https://timesofindia.indiatimes.com/city/gurgaon/gurgaon-civic-body-signs-mou-to-map-major-pollution-sources/articleshow/129686718.cms" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="Gurgaon civic body signs MoU to map major pollution sources">Gurgaon civic body signs MoU to map major pollution sources</a><a href="https://timesofindia.indiatimes.com/city/bengaluru/electric-vehicle-tax-move-stokes-concern-could-hurt-adoption-rate-in-karnataka/articleshow/129935200.cms" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="Electric vehicle tax move stokes concern, could hurt adoption rate in Karnataka">Electric vehicle tax move stokes concern, could hurt adoption rate in …</a></div></td></tr>
+</tbody></table></section>
+
+<section class="sec" id="tv"><div class="sh"><div class="se">Section 03b</div><h2 class="st">TV Channel Coverage</h2>
+<div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (Aaj Tak, India TV, ABP News) channels.</div><div class="sdiv"></div></div>
+<div style="margin-bottom:16px">
+<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">English TV</div>
+<table class="nt"><thead><tr><th>Org</th><th>NDTV</th><th>News18</th><th>India Today</th></tr></thead><tbody>
+<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:#3d8ef0">WRI India</span></td><td style="font-family:monospace;color:var(--muted)">0</td><td style="font-family:monospace;color:var(--muted)">0</td><td style="font-family:monospace;color:var(--muted)">0</td></tr>
+</tbody></table></div>
+<div>
+<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Hindi TV</div>
+<table class="nt"><thead><tr><th>Org</th><th>Aaj Tak</th><th>India TV</th><th>ABP News</th></tr></thead><tbody>
+<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:#3d8ef0">WRI India</span></td><td style="font-family:monospace;color:var(--muted)">0</td><td style="font-family:monospace;color:var(--muted)">0</td><td style="font-family:monospace;color:var(--muted)">0</td></tr>
+</tbody></table></div></section>
+
+
+<section class="sec" id="momentum"><div class="sh"><div class="se">Section 03c</div><h2 class="st">Coverage Momentum</h2>
+<div class="sd">Weekly AQ article volume per organisation over the report period. Spikes are identified and traced to triggering events.</div><div class="sdiv"></div></div>
+<div class="mch"><div style="margin-bottom:12px"><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:11px;color:var(--muted);margin-bottom:10px">2026-03-08 to 2026-06-08</div><div style="display:flex;gap:12px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:#3d8ef0"></div>WRI India: <strong style="color:var(--text);font-weight:600">3</strong></div></div></div>
+<div class="wbars"><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="WRI India: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">03-02</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:76px" title="WRI India: 1"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">03-09</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:76px" title="WRI India: 1"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">03-16</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="WRI India: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">03-23</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:76px" title="WRI India: 1"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">03-30</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="WRI India: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">04-06</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="WRI India: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">04-13</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="WRI India: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">04-20</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="WRI India: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">04-27</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="WRI India: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">05-04</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="WRI India: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">05-11</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="WRI India: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">05-18</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="WRI India: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">05-25</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="WRI India: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">06-01</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px"><div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#3d8ef0;height:2px" title="WRI India: 0"></div></div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">06-08</div></div></div>
+<div style="font-size:10px;color:var(--muted);margin-top:6px">Bar height = article count that week. Hover for exact count. Spikes annotated below.</div>
+</div></section>
+
+<section class="sec" id="topics"><div class="sh"><div class="se">Section 04</div><h2 class="st">Topic Ownership Map</h2>
+<div class="sd">AQ sub-topics clustered from article headlines and snippets by Claude. Each cell shows article count and representative headlines. Position: <strong style="color:#4ade80">Leader</strong> (&ge;5 articles) &middot; <strong style="color:#fbbf24">Active</strong> (2&ndash;4 articles) &middot; <strong style="color:var(--muted)">Not Present</strong> (0&ndash;1).</div><div class="sdiv"></div></div>
+
+<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--surface2)">
+      <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Org</th>
+      <th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="National Clean Air Programme progress &amp; compliance">NCAP / Policy Targets</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Air quality regulations, standards, government actions">Policy &amp; Regulations</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="City &amp; ward-level exposure data, health burden">PM2.5 Exposure Mapping</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Parali, enforcement, seasonal contribution">Stubble Burning</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Funding flows, investment gaps, municipal budgets">Clean Air Finance</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="EV targets, transport emissions, FAME">Vehicular Pollution</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Mortality, hospital admissions, DALY data">Health Impact</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Factory emissions, cement, steel plants">Industrial Pollution</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Summer heat compounding PM2.5 impacts">Heat-AQI Interaction</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Brick kiln emissions, FCBTK, zig-zag technology">Brick Kilns</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Petrol vehicle tailpipe pollution">Petrol Emissions</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Diesel generators, trucks, buses">Diesel Emissions</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="High-emission point sources, hotspots">Super Emitters</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Coal power plant emissions, FGD">Thermal Power Plants</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Cooking fuel, biomass, LPG substitution">Household Pollution</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Indoor air quality, IAQ monitoring">Indoor Pollution</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Wood, crop residue, biomass burning">Biomass Air Pollution</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Paddy straw burning, Punjab, Haryana">Rice Residue Burning</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Wheat stubble burning, post-harvest">Wheat Residue Burning</th><th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="Resuspended road dust, unpaved roads">Road Dust</th>
+    </tr></thead><tbody><tr>
+        <td style="padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1">
+          <span style="font-family:monospace;font-size:11px;font-weight:700;color:#3d8ef0">WRI India</span>
+        </td>
+        <td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td><td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td>
+      </tr></tbody></table></div></div></section>
+
+<section class="sec" id="appendix"><div class="sh"><div class="se">Section 05</div><h2 class="st">Citations</h2><div class="sd">All indexed articles from tracked outlets. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
+<details open style="border:1px solid var(--border);border-radius:6px;margin-bottom:8px;overflow:hidden">
+<summary style="padding:10px 16px;cursor:pointer;background:var(--surface2);display:flex;align-items:center;justify-content:space-between;list-style:none;user-select:none">
+  <span style="font-size:13px;font-weight:600;color:var(--text)">WRI India <span style="color:var(--muted);font-weight:400">&mdash; 3 articles</span></span>
+  <span style="font-family:monospace;font-size:10px;color:var(--muted)">▾</span>
+</summary>
+<div style="padding:0 0 4px">
+<table class="apt"><thead><tr><th>#</th><th>Outlet</th><th>Date</th><th>Headline</th><th>Classification</th><th>URL</th></tr></thead><tbody><tr><td>1</td><td>Times of India</td><td style="font-size:10px">Mar 14, 2026</td><td style="max-width:260px">Gurgaon civic body to identify waste-burning hotspots</td><td style="font-size:10px;font-family:monospace;color:var(--muted2)">Named Mention</td><td><a href="https://timesofindia.indiatimes.com/city/gurgaon/gurgaon-civic-body-to-identify-waste-burning-hotspots/articleshow/129563839.cms" target="_blank">link</a></td></tr><tr><td>2</td><td>Times of India</td><td style="font-size:10px">Mar 20, 2026</td><td style="max-width:260px">Gurgaon civic body signs MoU to map major pollution sources</td><td style="font-size:10px;font-family:monospace;color:var(--muted2)">Named Mention</td><td><a href="https://timesofindia.indiatimes.com/city/gurgaon/gurgaon-civic-body-signs-mou-to-map-major-pollution-sources/articleshow/129686718.cms" target="_blank">link</a></td></tr><tr><td>3</td><td>Times of India</td><td style="font-size:10px">Apr 1, 2026</td><td style="max-width:260px">Electric vehicle tax move stokes concern, could hurt adoption rate in Karnataka</td><td style="font-size:10px;font-family:monospace;color:var(--muted2)">Named Mention</td><td><a href="https://timesofindia.indiatimes.com/city/bengaluru/electric-vehicle-tax-move-stokes-concern-could-hurt-adoption-rate-in-karnataka/articleshow/129935200.cms" target="_blank">link</a></td></tr></tbody></table>
+</div></details></section>
+
+<section class="sec" id="em"><div class="sh"><div class="se">Section 06</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations are <strong style="color:var(--warn)">not yet part of</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. These are emerging narrative opportunities: the conversation is active but your orgs are absent. <strong>Gap signal</strong> = evidence of the absence. <strong>Opportunity</strong> = a concrete action to enter the conversation.</div><div class="sdiv"></div></div>
+<div class="em-card">
+<div class="em-hdr"><div class="em-topic">EV incentives and transport-based air quality solutions</div></div>
+<div class="em-body">Articles covering vehicle scrapping incentives, EV policies, and transport sector interventions as direct mechanisms to reduce urban air pollution in India.</div>
+<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+  <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Absent:</span>
+  <span style="font-family:monospace;font-size:10px;font-weight:700;padding:1px 7px;border-radius:3px;background:#3d8ef01a;color:#3d8ef0;border:1px solid #3d8ef04d">WRI India</span>
+</div>
+<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+  <div style="font-family:monospace;font-size:10px;color:var(--muted2);margin-bottom:7px;letter-spacing:.04em">4 articles in this narrative</div>
+  <div class="em-src"><a href="https://www.reuters.com/world/india/new-delhi-offers-residents-1000-scrap-old-cars-evs-curb-air-pollution-2026-06-29/" target="_blank" style="color:var(--amber);text-decoration:none">New Delhi offers residents $1,000 to scrap old cars for EVs to curb air pollution</a></div><div class="em-src"><a href="https://phys.org/news/2026-06-delhi-ev-policy-combat-air.html" target="_blank" style="color:var(--amber);text-decoration:none">New Delhi announces EV policy to combat air pollution</a></div><div class="em-src"><a href="https://theicct.org/why-transport-must-sit-at-the-center-of-indias-air-quality-strategy-may26/" target="_blank" style="color:var(--amber);text-decoration:none">Why transport must sit at the center of India's air quality strategy</a></div><div class="em-src"><a href="https://ieefa.org/resources/fomonomics-and-clean-air-what-delhis-new-ev-policy-gets-right" target="_blank" style="color:var(--amber);text-decoration:none">FOMOnomics and clean air: What Delhi's new EV policy gets right</a></div>
+</div>
+</div><div class="em-card">
+<div class="em-hdr"><div class="em-topic">Health impacts and vulnerable populations</div></div>
+<div class="em-body">Research and reporting on specific health outcomes from air pollution including foetal growth disruption, child health impacts, ozone-related mortality, and accelerated aging in exposed populations.</div>
+<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+  <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Absent:</span>
+  <span style="font-family:monospace;font-size:10px;font-weight:700;padding:1px 7px;border-radius:3px;background:#3d8ef01a;color:#3d8ef0;border:1px solid #3d8ef04d">WRI India</span>
+</div>
+<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+  <div style="font-family:monospace;font-size:10px;color:var(--muted2);margin-bottom:7px;letter-spacing:.04em">4 articles in this narrative</div>
+  <div class="em-src"><a href="https://india.mongabay.com/short-article/2026/06/study-reveals-how-air-pollution-disrupts-foetal-growth/" target="_blank" style="color:var(--amber);text-decoration:none">Study reveals how air pollution disrupts foetal growth</a></div><div class="em-src"><a href="https://www2.fundsforngos.org/environment-2/apply-now-child-focused-climate-advocacy-on-heat-and-air-pollution-india/" target="_blank" style="color:var(--amber);text-decoration:none">Apply Now: Child-Focused Climate Advocacy on Heat and Air Pollution (India)</a></div><div class="em-src"><a href="https://www.downtoearth.org.in/climate-change/heatwaves-may-have-driven-ozone-exposure-linked-to-26500-deaths-in-india-in-2024-finds-iit-study" target="_blank" style="color:var(--amber);text-decoration:none">Heatwaves may have driven ozone exposure linked to 26,500 deaths in India in 2024, finds IIT study</a></div><div class="em-src"><a href="https://www.the-scientist.com/how-air-pollution-is-aging-people-faster-73601" target="_blank" style="color:var(--amber);text-decoration:none">How Air Pollution is Aging People Faster</a></div>
+</div>
+</div><div class="em-card">
+<div class="em-hdr"><div class="em-topic">Non-metro air pollution and regional/rural expansion</div></div>
+<div class="em-body">Coverage of air quality degradation in tier-2/3 cities, industrial towns, and rural areas moving beyond traditional metro-city focus, highlighting geographic spread of India's pollution crisis.</div>
+<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+  <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Absent:</span>
+  <span style="font-family:monospace;font-size:10px;font-weight:700;padding:1px 7px;border-radius:3px;background:#3d8ef01a;color:#3d8ef0;border:1px solid #3d8ef04d">WRI India</span>
+</div>
+<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+  <div style="font-family:monospace;font-size:10px;color:var(--muted2);margin-bottom:7px;letter-spacing:.04em">5 articles in this narrative</div>
+  <div class="em-src"><a href="https://www.cnn.com/2026/04/01/india/india-loni-world-most-polluted-city-intl-hnk" target="_blank" style="color:var(--amber);text-decoration:none">India pollution, Loni: A small city outside Delhi has the world's worst air</a></div><div class="em-src"><a href="https://maktoobmedia.com/post?id=115686&amp;slug=air-pollution-is-no-longer-a-metro-city-problem" target="_blank" style="color:var(--amber);text-decoration:none">Air pollution is no longer a metro-city problem</a></div><div class="em-src"><a href="https://www.iqair.com/sg/air-quality/india/punjab" target="_blank" style="color:var(--amber);text-decoration:none">Air quality in Punjab</a></div><div class="em-src"><a href="https://www.iqair.com/air-quality/india/rajasthan" target="_blank" style="color:var(--amber);text-decoration:none">Air quality in Rajasthan</a></div><div class="em-src"><a href="https://energyandcleanair.org/publication/a-satellite-based-pm2-5-assessment-across-indias-airsheds-states-and-districts/" target="_blank" style="color:var(--amber);text-decoration:none">Beyond city limits: A satellite-based PM2.5 assessment across India's airsheds, states, and districts</a></div>
+</div>
+</div></section>
+
+
+<section style="margin-bottom:56px;scroll-margin-top:24px" id="aeo">
+  <div style="margin-bottom:24px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#5e7494;margin-bottom:6px">Section 07 — AEO / LLM Visibility</div>
+    <h2 style="font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;color:#d8e4f0;line-height:1.2">AI Engine Optimisation</h2>
+    <div style="margin-top:8px;font-size:13px;color:#8fa3b8;max-width:680px;line-height:1.65">When someone asks an AI model about Indian air quality, which organisations does it cite? 15 questions sent to 3 LLMs. Each mention = 1. Max possible per org = 45. ✓ = cited · ✗ = not cited · dim rows = zero mentions across all orgs.</div>
+    <div style="width:40px;height:2px;background:#c9922a;margin:14px 0 0"></div>
+  </div>
+  <div style="border:1px solid #252d40;border-radius:8px;margin-bottom:20px;overflow:hidden"><div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead>
+      <tr style="background:#181e2e">
+        <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">Rank</th>
+        <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494">Org</th>
+        <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
+        <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">Gemini 1.5 Flash</th><th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">Perplexity</th><th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">GPT-4o mini</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-top:1px solid #252d40">
+          <td style="padding:10px 14px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#2e3a52">#1</td>
+          <td style="padding:10px 14px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#3d8ef0">WRI India</span></td>
+          <td style="padding:10px 14px;text-align:center">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#3d8ef0">0</span>
+            <div style="margin:4px auto;width:80px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:#3d8ef0;width:0%"></div></div>
+          </td>
+          <td style="padding:10px 14px;text-align:center">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#5e7494">0/15</span>
+              <div style="margin:3px auto;width:60px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:#5e7494;width:0%"></div></div>
+            </td><td style="padding:10px 14px;text-align:center">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#5e7494">0/15</span>
+              <div style="margin:3px auto;width:60px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:#5e7494;width:0%"></div></div>
+            </td><td style="padding:10px 14px;text-align:center">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:#5e7494">0/15</span>
+              <div style="margin:3px auto;width:60px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:#5e7494;width:0%"></div></div>
+            </td>
+        </tr>
+    </tbody>
+  </table>
+</div></div>
+  <details style="border:1px solid #252d40;border-radius:8px;overflow:hidden;margin-bottom:12px">
+    <summary style="padding:10px 16px;cursor:pointer;background:#181e2e;display:flex;align-items:center;justify-content:space-between;list-style:none;user-select:none">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a">Question × Organisation Matrix</span>
+      <span style="font-family:monospace;font-size:10px;color:#5e7494">▾ expand</span>
+    </summary>
+    <div style="padding:12px 0 4px"><div style="border:1px solid #252d40;border-radius:8px;overflow:hidden;margin-bottom:12px"><div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead>
+      <tr style="background:#181e2e">
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">Q#</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494">Question sent to LLMs</th>
+        <th style="padding:10px 12px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3d8ef0;border-left:1px solid #252d40;white-space:nowrap">WRI India</th>
+      </tr>
+    </thead>
+    <tbody><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q1</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">Which Indian research organisations are the most authoritative sources on air quality data and policy in India?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=Which%20Indian%20research%20organisations%20are%20the%20most%20authoritative%20sources%20on%20air%20quality%20data%20and%20policy%20in%20India%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">All India Institute of Medical Sciences (AIIMS-Delhi), Indian Institute of Technology (IIT-Delhi), The Energy and Resources Institute (TERI), Department of Science &amp; Technology (DST), CSIR-NEERI, Indian Institute of Technology Kanpur (IIT-K), Indian Institute of Technology Bombay (IIT Bombay), and Central Pollution Control Board (CPCB) are leading air quality and pollution research in India.</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=Which%20Indian%20research%20organisations%20are%20the%20most%20authoritative%20sources%20on%20air%20quality%20data%20and%20policy%20in%20India%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Indian Institute of Science (IISc), Indian Council of Agricultural Research (ICAR), Centre for Science and Environment (CSE), RESPOND, and TERI (The Energy and Resources Institute).</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q2</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">What organisations publish the most reliable air quality index and PM2.5 data for Indian cities?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=What%20organisations%20publish%20the%20most%20reliable%20air%20quality%20index%20and%20PM2.5%20data%20for%20Indian%20cities%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">The top organizations working on PM2.5 reduction in South Asia include the **World Bank** (which published the *Striving for Clean Air* report), **EIAS** (European Institute for Asian Studies), the **Climate and Clean Air Coalition (CCAC)** convened by **UNEP**, **Washington University in St. Louis** (specifically Randall Martin’s lab), the **Central Pollution Control Board** and **Union Ministry of Environment, Forests, and Climate Change** in India, the **Asian Development Bank**, and country-specific bodies like **NEERI** (India), **AirMac** (Sri Lanka), and the **Lahore High Court** and **Smog Commission** (Pakistan) [1][2][</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=What%20organisations%20publish%20the%20most%20reliable%20air%20quality%20index%20and%20PM2.5%20data%20for%20Indian%20cities%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">World Health Organization (WHO), Clean Air Asia, Centre for Science and Environment (CSE), Energy and Resources Institute (TERI), South Asia Network for Professionalization of Women in Law (SANPWL).</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q3</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">Who are the leading think tanks and research bodies working on clean air policy in India?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=Who%20are%20the%20leading%20think%20tanks%20and%20research%20bodies%20working%20on%20clean%20air%20policy%20in%20India%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">The most active NGOs and think tanks in India’s clean air campaign include **Waatavaran Foundation** (spearheading community-driven air quality initiatives), **Clean Air Asia** (working since 2008 on science-based air quality management), and the **Climate &amp; Clean Air Coalition (CCAC)** (a global partnership supporting short-lived pollutant reduction). Additionally, **Airparif** (an NGO collaborating on challenge-based air quality efforts) and local groups like **Marpu Foundation** (focused on tree-planting to absorb pollutants) contribute significantly. [1][2][3][4][5][9]</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=Who%20are%20the%20leading%20think%20tanks%20and%20research%20bodies%20working%20on%20clean%20air%20policy%20in%20India%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Centre for Science and Environment (CSE), Indian Institute for Human Settlements (IIHS), Clean Air Asia, Urban Emissions, Health Effects Institute (HEI).</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q4</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">Which organisations should journalists cite when writing about India's National Clean Air Programme?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=Which%20organisations%20should%20journalists%20cite%20when%20writing%20about%20India's%20National%20Clean%20Air%20Programme%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">The most reliable air quality data in India is published by the **Central Pollution Control Board (CPCB)**, specifically via its **National Air Quality Index (AQI)** dashboard and data repository [1][4][9]. Additionally, research from the **Indian Institute of Technology Kanpur (IIT-K)** and its **ATMAN Centre of Excellence** provides validated data and monitoring improvements [3]. Data from **US Embassy air quality stations** in Indian cities is also considered highly reliable [1].</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=Which%20organisations%20should%20journalists%20cite%20when%20writing%20about%20India's%20National%20Clean%20Air%20Programme%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Central Pollution Control Board (CPCB), System of Air Quality Weather Forecasting and Research (SAFAR), Indian Institute of Tropical Meteorology (IITM).</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q5</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">What Indian NGOs or research institutes are most influential on air pollution solutions and technology?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=What%20Indian%20NGOs%20or%20research%20institutes%20are%20most%20influential%20on%20air%20pollution%20solutions%20and%20technology%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">The **Government of India**, through its **National Clean Air Program **(NCAP), is the primary entity driving the most important air pollution policy work in India[1][4][8]. This effort is significantly supported and catalyzed by the **World Bank**, which provides over **$600 million** in financing for landmark clean air programs in Uttar Pradesh and Haryana[1][2]. Additionally, research and policy networks like **CAPHER-India **(coordinated by AIIMS-Delhi and IIT-Delhi)[2] and the **Clean Air Fund** (working with IIT-Kanpur)[3] play critical roles in informing and implementing these policies.</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=What%20Indian%20NGOs%20or%20research%20institutes%20are%20most%20influential%20on%20air%20pollution%20solutions%20and%20technology%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Centre for Science and Environment (CSE), Tata Institute of Social Sciences (TISS), and The Energy and Resources Institute (TERI).</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q6</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">What research organisations in India are doing the most credible work on reducing vehicular air pollution?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=What%20research%20organisations%20in%20India%20are%20doing%20the%20most%20credible%20work%20on%20reducing%20vehicular%20air%20pollution%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">The Indian government partners with **multilateral and bilateral international organizations**, **philanthropic foundations**, and **leading technical institutions** on NCAP implementation, alongside domestic bodies like **MoEF&amp;CC**, **CPCB**, **NITI Aayog**, **State Governments**, **Urban Local Bodies**, and **industry/academia experts**[1][2][3].
+
+*(Note: "Global NCAP" referenced in some results pertains to road safety, not air quality NCAP, and is not a partner in this specific programme[4][5].)*</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=What%20research%20organisations%20in%20India%20are%20doing%20the%20most%20credible%20work%20on%20reducing%20vehicular%20air%20pollution%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">The organizations partnering with the Indian government on NCAP implementation include the Global New Car Assessment Program (Global NCAP), the Ministry of Road Transport and Highways (MoRTH), and the Bureau of Indian Standards (BIS).</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q7</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">Which Indian institutes publish peer-reviewed studies on indoor air quality and household pollution?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=Which%20Indian%20institutes%20publish%20peer-reviewed%20studies%20on%20indoor%20air%20quality%20and%20household%20pollution%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">The research groups tracking air quality index (AQI) trends in Indian cities are **Climate Trends**, the **Health Effects Institute (HEI)**, and the academic team led by **Dr. Santu Ghosh** at **St John’s Medical College, Bangalore** (including collaborators from **IIT Delhi**, **Indian Institute of Health Sciences**, and **Banaras Hindu University**).
+
+- **Climate Trends** analyzed AQI data across 11 major Indian cities from 2015 to November 2025, finding no major city achieved safe annual AQI levels[1][4].  
+- **HEI** published a 2025 report evaluating particulate matter trends (PM₂.₅ and PM</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=Which%20Indian%20institutes%20publish%20peer-reviewed%20studies%20on%20indoor%20air%20quality%20and%20household%20pollution%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Centre for Science and Environment (CSE), Urban Emissions, Institute for Human Development (IHD), IIT Kanpur, and the Indian Institute of Remote Sensing (IIRS).</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q8</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">Who are the most cited Indian organisations in international climate and air quality policy discussions?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=Who%20are%20the%20most%20cited%20Indian%20organisations%20in%20international%20climate%20and%20air%20quality%20policy%20discussions%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Organizations that produce peer-reviewed research on indoor and outdoor air pollution in India include:
+
+- Indian Institute of Technology Gandhinagar [3]  
+- Indian Institute of Technology (various campuses, e.g., via PNAS and other studies) [2][5]  
+- Public Health Foundation of India (indirectly through co-authored national burden studies) [5]  
+- BARC (Bhabha Atomic Research Centre) – not explicitly cited but often involved in related environmental health research  
+- Ministry of Environment, Forest and Climate Change (MoEFCC) – supports and commissions studies  
+- National Centre for Disease Control (NCDC)  
+- All India Institute of Medical Sciences (AIIMS)  
+- Tata Institute of Social Sciences</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=Who%20are%20the%20most%20cited%20Indian%20organisations%20in%20international%20climate%20and%20air%20quality%20policy%20discussions%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Indian Institute of Technology (IIT), Central Pollution Control Board (CPCB), The Energy and Resources Institute (TERI), National Institute of Environmental Health Sciences (NIEHS), and Jawaharlal Nehru University (JNU).</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q9</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">What organisations should I follow for the latest data on India's air quality improvement progress?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=What%20organisations%20should%20I%20follow%20for%20the%20latest%20data%20on%20India's%20air%20quality%20improvement%20progress%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">The provided search results do not list specific civil society groups advocating for stricter emission standards in India; they only mention that civil society groups can play an important role in this advocacy and that the **India-California Air Pollution Mitigation Program (ICAMP)** is a joint initiative urging for stricter norms for two and three-wheelers. ICAMP is a collaboration between **The Energy and Resources Institute (TERI)**, the **University of California at San Diego (UCSD)**, and the **California Air Resources Board (CARB)**[5].</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=What%20organisations%20should%20I%20follow%20for%20the%20latest%20data%20on%20India's%20air%20quality%20improvement%20progress%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Centre for Science and Environment, Greenpeace India, and Climate Action Network South Asia.</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q10</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">Which bodies produce the most reliable assessments of India's National Clean Air Programme targets?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=Which%20bodies%20produce%20the%20most%20reliable%20assessments%20of%20India's%20National%20Clean%20Air%20Programme%20targets%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">The organisations monitoring industrial air pollution in India are the **Central Pollution Control Board (CPCB)**, the **State Pollution Control Boards (SPCBs)** (including **DPCC**, **HSPCB**, **GPCB**, **APPCB**, etc.), and the **Commission for Air Quality Management (CAQM)**.
+
+Private and research entities also contribute, including **IIT Kanpur**, **Oizom**, **AirSENCE**, **Airveda**, **Qualitek Labs**, **Aaxis Nano**, **ACE Instruments**, and the **Confederation of Indian Industry (CII)** through its Corporate Air Emissions Reporting Guide.
+
+International supporters include the **World Bank**, the **Clean Air Fund**, and the **ICCT**</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=Which%20bodies%20produce%20the%20most%20reliable%20assessments%20of%20India's%20National%20Clean%20Air%20Programme%20targets%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Central Pollution Control Board (CPCB), Indian Institute of Technology (IIT), Greenpeace India, Center for Science and Environment (CSE), and World Resources Institute (WRI) India.</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q11</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">What Indian think tanks and research centres are leading the conversation on clean air finance and investment?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=What%20Indian%20think%20tanks%20and%20research%20centres%20are%20leading%20the%20conversation%20on%20clean%20air%20finance%20and%20investment%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">The key voices on air quality health impacts in the Indian context include **Joel Schwartz, PhD** from Harvard T.H. Chan School of Public Health (co-author of a major Lancet study) [1], **Dr. Arvind Kumar**, founder trustee of the **Lung Care Foundation** and Chairman of the Institute of Chest Surgery at India's top thoracic institutions [3], and representatives from the **World Bank** supporting India's National Clean Air Program [2]. The **WHO India** office also leads global advocacy, having labeled air pollution a “silent public health emergency” [7][8].</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=What%20Indian%20think%20tanks%20and%20research%20centres%20are%20leading%20the%20conversation%20on%20clean%20air%20finance%20and%20investment%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Centre for Science and Environment (CSE), Greenpeace India, and The Energy and Resources Institute (TERI).</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q12</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">Which organisations have the most credible data on PM2.5 health impacts in major Indian cities?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=Which%20organisations%20have%20the%20most%20credible%20data%20on%20PM2.5%20health%20impacts%20in%20major%20Indian%20cities%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">The institutions involved include **Google** (via its Air View+ system), **Central Pollution Control Board (CPCB)** under the **Ministry of Environment, Forest and Climate Change**, **Indian Institutes of Technology (IIT Delhi, IIT Hyderabad, IIT Kanpur)**, **climate tech firms Aurassure and Respirer Living Sciences**, **research group CSTEP (Centre for Study of Science, Technology and Policy)**, **Airveda** (partnered with **IISER Mohali**, **IGBC**, and **Smart City Networks**), and platforms like **AQI.in** and **IQAir**.
+
+Organizations: Google, Central Pollution Control Board (CPCB), Ministry of Environment, Forest and Climate Change, I</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=Which%20organisations%20have%20the%20most%20credible%20data%20on%20PM2.5%20health%20impacts%20in%20major%20Indian%20cities%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Central Pollution Control Board (CPCB), Indian Meteorological Department (IMD), State Pollution Control Boards (SPCBs), and various environmental NGOs.</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q13</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">Who are the key institutional voices on stubble burning and crop residue burning policy in India?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=Who%20are%20the%20key%20institutional%20voices%20on%20stubble%20burning%20and%20crop%20residue%20burning%20policy%20in%20India%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">The **Council on Energy, Environment and Water (CEEW)** is a key Delhi-based think tank influencing air quality regulation and policy in India[6]. Other influential organizations include the **National Council of Applied Economic Research (NCAER)**, which has published major empirical studies on air pollution challenges in India[9], and the **Shakti Foundation**, which has analyzed legal and institutional frameworks for air quality management[2]. International bodies like the **World Bank** also significantly shape policy through programs like the National Clean Air Program (NCAP) and the Commission for Air Quality Management (CAQM)[1]. Research institutes such as the **Indian Institute of Technology-Delhi (IIT-Delhi)** and **IIT-Kanpur**</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=Who%20are%20the%20key%20institutional%20voices%20on%20stubble%20burning%20and%20crop%20residue%20burning%20policy%20in%20India%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Centre for Science and Environment (CSE), Energy and Resources Institute (TERI), and Indian Institute for Human Settlements (IIHS).</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q14</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">What research organisations in India are tracking the health burden of air pollution most rigorously?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=What%20research%20organisations%20in%20India%20are%20tracking%20the%20health%20burden%20of%20air%20pollution%20most%20rigorously%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">**Kanishka Kacker** (an EfD India researcher) and **Dainik Bhaskar** (a major Indian newspaper) are leading awareness campaigns on air pollution in northern India, including smog and vehicular sources, through a collaborative project titled *Clearing the Air* [1]. Additionally, the **New Delhi government** (Ministry of Environment, Forest and Climate Change, Central Pollution Control Board) launched a two-week clean air campaign to sensitize the public on pollution mitigation [4].</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=What%20research%20organisations%20in%20India%20are%20tracking%20the%20health%20burden%20of%20air%20pollution%20most%20rigorously%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">Centre for Science and Environment (CSE), Greenpeace India, and the Energy and Resources Institute (TERI).</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr><tr style="border-top:1px solid #252d40;opacity:.5">
+      <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#5e7494;white-space:nowrap;vertical-align:top">Q15</td>
+      <td style="padding:8px 12px;font-size:11px;color:#8fa3b8;line-height:1.5;vertical-align:top;max-width:360px">Which Indian organisations are most frequently cited in government air quality policy consultations?<details style="margin-top:4px"><summary style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5e7494;cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="color:#c9922a">▶</span> responses</summary><div style="margin-top:6px;border-left:2px solid #252d40;padding-left:10px"><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Perplexity</span>
+          <a href="https://www.perplexity.ai/search?q=Which%20Indian%20organisations%20are%20most%20frequently%20cited%20in%20government%20air%20quality%20policy%20consultations%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">No single organization exclusively collaborates on South Asian air quality, but key international collaborators include the **World Health Organization**, **United Nations Environmental Programme**, **Health Effects Institute (HEI)**, **Energy and Resource Institute (TERI, India)**, and the **World Bank** (specifically World Bank South Asia) [3][6][1][8].
+
+Additionally, the **Climate Action Network South Asia (CANSA)**, **IQAir**, and **Ricardo Energy &amp; Environment** (partnering with TERI) play significant roles in regional research and advocacy [3][5].
+
+The **International Centre for Integrated Mountain Development (ICIMOD)** also collaborates with HEI on air pollution health effects in the Hindu Kush Himalaya region [</div>
+      </div><div style="margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">GPT-4o</span>
+          <a href="https://chatgpt.com/?q=Which%20Indian%20organisations%20are%20most%20frequently%20cited%20in%20government%20air%20quality%20policy%20consultations%3F" target="_blank" rel="noopener" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#3d8ef0;text-decoration:none">↗ open</a>
+        </div>
+        <div style="font-size:11px;color:#8fa3b8;line-height:1.6;background:#0a0e17;border:1px solid #252d40;border-radius:4px;padding:8px 10px;white-space:pre-wrap">South Asian Association for Regional Cooperation (SAARC), World Health Organization (WHO), United Nations Environment Programme (UNEP), South Asia Network for Professionalization of Palliative Care (SANPPC), and Clean Air Asia.</div>
+      </div></div></details></td>
+      <td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#5e7494">✗ 0/3</span>
+      </td>
+    </tr></tbody>
+  </table>
+</div></div></div>
+  </details>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5e7494">Gemini 1.5 Flash · Perplexity · GPT-4o mini · 15 questions</div>
+</section>
+
+<!-- SOCIAL PRESENCE SECTION -->
+<div style="font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#5e7494;margin-bottom:12px">§ Social Media AQ Presence</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+    <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
+      <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">Orgs with AQ social posts</div>
+      <div style="font-family:monospace;font-size:22px;font-weight:700;color:#4caf74;line-height:1">1</div>
+      <div style="font-size:11px;color:#5e7494;margin-top:5px">of 1 tracked</div>
+    </div>
+    <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
+      <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">LinkedIn AQ posts</div>
+      <div style="font-family:monospace;font-size:22px;font-weight:700;color:#4a7fd4;line-height:1">18</div>
+      <div style="font-size:11px;color:#5e7494;margin-top:5px">via APIdirect</div>
+    </div>
+    <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
+      <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">X/Twitter AQ tweets</div>
+      <div style="font-family:monospace;font-size:22px;font-weight:700;color:#4a9fd4;line-height:1">1</div>
+      <div style="font-size:11px;color:#5e7494;margin-top:5px">via APIdirect</div>
+    </div>
+    <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
+      <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">Instagram AQ posts</div>
+      <div style="font-family:monospace;font-size:22px;font-weight:700;color:#e05c9c;line-height:1">8</div>
+      <div style="font-size:11px;color:#5e7494;margin-top:5px">via APIdirect</div>
+    </div>
+    <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
+      <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">YouTube videos</div>
+      <div style="font-family:monospace;font-size:22px;font-weight:700;color:#e53935;line-height:1">3</div>
+      <div style="font-size:11px;color:#5e7494;margin-top:5px">official channel</div>
+    </div></div>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+    <span style="font-family:monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Data sources:</span>
+    <span style="font-family:monospace;font-size:10px;background:rgba(74,127,212,.14);border:1px solid rgba(74,127,212,.35);color:#4a7fd4;border-radius:4px;padding:2px 8px">LinkedIn · ✓ APIdirect</span>
+    <span style="font-family:monospace;font-size:10px;background:rgba(74,159,212,.14);border:1px solid rgba(74,159,212,.35);color:#4a9fd4;border-radius:4px;padding:2px 8px">X/Twitter · ✓ APIdirect</span>
+    <span style="font-family:monospace;font-size:10px;background:rgba(224,92,156,.14);border:1px solid rgba(224,92,156,.35);color:#e05c9c;border-radius:4px;padding:2px 8px">Instagram · ✓ APIdirect</span>
+    <span style="font-family:monospace;font-size:10px;background:rgba(229,57,53,.12);border:1px solid rgba(229,57,53,.3);color:#e53935;border-radius:4px;padding:2px 8px">YouTube · ✓ Data API v3</span>
+  </div>
+
+<div style="overflow-x:auto;border:1px solid #252d40;border-radius:8px;margin-bottom:16px;overflow:hidden">
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead>
+      <tr style="background:#181e2e">
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">#</th>
+        <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494">Org</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI posts</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X posts</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG posts</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap">SoV%</th>
+      </tr>
+      <tr style="background:#0f1422;border-top:1px solid #252d40">
+        <td colspan="2" style="padding:5px 12px;font-family:monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3a4a5e">COHORT</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4a7fd4">18</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4a9fd4">1</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#e05c9c">8</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#e53935">3</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#c9922a">30</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4caf74">100%</td>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="border-top:1px solid #252d40">
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#2e3a52">#1</td>
+          <td style="padding:8px 12px"><span style="font-family:monospace;font-size:11px;font-weight:700;color:#4caf74">WRI India</span></td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a7fd4">18</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a9fd4">1 <span style="color:#3a4a5e">(16.5K)</span></td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px"><span style="color:#4a9fd4">0.043%</span></td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e05c9c">8 <span style="color:#3a4a5e">(10.3K)</span></td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px"><span style="color:#e05c9c">237.237%</span></td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e53935">3</td>
+          <td style="padding:8px 12px;text-align:center">
+            <span style="font-family:monospace;font-size:15px;font-weight:700;color:#4caf74">30</span>
+            <div style="margin:4px auto;width:70px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:#4caf74;width:100%"></div></div>
+          </td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:600;color:#4caf74">100.0%</td>
+        </tr>
+    </tbody>
+  </table>
+</div>
+<div style="font-family:monospace;font-size:9px;color:#3a4a5e;margin-bottom:16px">
+  ✓ Live data via APIdirect.io · LI = AQ keyword filtered posts · X ER = (likes+replies+retweets)/followers×100 · IG ER = (likes+comments)/followers×100 · YT = official channel videos via YouTube Data API v3 · SoV% = org total ÷ cohort total
+</div>
+<details style="border:1px solid #252d40;border-radius:6px;margin-bottom:6px">
+      <summary style="padding:10px 14px;cursor:pointer;background:#181e2e;border-radius:6px;list-style:none;display:flex;align-items:center;gap:12px;user-select:none">
+        <span style="font-family:monospace;font-size:10px;font-weight:700;color:#2e3a52">#1</span>
+        <span style="font-family:monospace;font-size:11px;font-weight:700;color:#4caf74">WRI India</span>
+        <span style="font-family:monospace;font-size:12px;font-weight:700;color:#4caf74">10/10</span>
+        <span style="font-size:10px;color:#5e7494;margin-left:4px">
+          <span style="color:#4a7fd4">18 LI</span> &middot;
+          <span style="color:#4a9fd4">1 X</span> &middot;
+          <span style="color:#e05c9c">8 IG</span> &middot;
+          <span style="color:#e53935">3 YT</span>
+        </span>
+        <span style="font-size:10px;color:#5e7494">
+          <span style="color:#4a9fd4">X 0.043%</span>
+           · 
+          <span style="color:#e05c9c">IG 237.237%</span>
+        </span>
+        <span style="color:#c9922a;font-size:11px;margin-left:auto">▾</span>
+      </summary>
+      <div style="padding:12px 14px;background:#0e1420">
+        
+        
+      <div style="margin-top:8px">
+        <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+          LinkedIn — <span style="color:#4a7fd4">18 AQ posts</span>
+          &middot; ♥ 860 &middot; 💬 34 &middot; ↗ 0
+        </div>
+        <div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #4a7fd4;border-radius:0 4px 4px 0;margin-bottom:4px">
+      <a href="https://www.linkedin.com/posts/priya-singh-49a96212_premiumbus-mmrda-best-activity-7471073080124157952-1_-C" target="_blank" rel="noopener" style="font-size:11px;color:#4a7fd4;text-decoration:none;line-height:1.4;display:block;font-weight:600">Mumbai is showing how sustainable cities are built. 🏆❤️
+
+I always say that the challenges that matter to millions can only be solved through collaboration with government leadership, independent expe…</a>
+      <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ 152 · 💬 5 · ↗ 0 · 2026-06-12</div>
+    </div><div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #1e2638;border-radius:0 4px 4px 0;margin-bottom:4px">
+      <a href="https://www.linkedin.com/posts/manoranjan1_airquality-airpollution-sensors-activity-7468679048441786368-gu3n" target="_blank" rel="noopener" style="font-size:11px;color:#4a7fd4;text-decoration:none;line-height:1.4;display:block;font-weight:600">We are pleased to announce that we have finalized an outstanding lineup of keynote and invited speakers for the 3rd Symposium on "Advances in Air Quality Sensing and Emerging Control Technologies". WR…</a>
+      <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ 128 · 💬 0 · ↗ 0 · 2026-06-05</div>
+    </div><div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #1e2638;border-radius:0 4px 4px 0;margin-bottom:4px">
+      <a href="https://www.linkedin.com/posts/pawanmulukutla_worldbicycleday-activity-7467971791198552065-R-eP" target="_blank" rel="noopener" style="font-size:11px;color:#4a7fd4;text-decoration:none;line-height:1.4;display:block;font-weight:600">Celebrating World Bicycle Day today ! 
+
+This #WorldBicycleDay, we are reminded that active mobility is one of the most effective ways to create healthier, cleaner and more liveable cities.
+
+Cycling is…</a>
+      <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ 116 · 💬 0 · ↗ 0 · 2026-06-03</div>
+    </div><div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #1e2638;border-radius:0 4px 4px 0;margin-bottom:4px">
+      <a href="https://www.linkedin.com/posts/bhavay-sharma-aa253417_last-week-i-visited-the-international-centre-activity-7475868439526391808-yaK6" target="_blank" rel="noopener" style="font-size:11px;color:#4a7fd4;text-decoration:none;line-height:1.4;display:block;font-weight:600">Last week, I visited the International Centre for Environment Audit and Sustainable Development, Comptroller and Auditor General of India (C&amp;AG), to present WRI India’s air quality project, ACAAS (Acc…</a>
+      <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ 82 · 💬 1 · ↗ 0 · 2026-06-25</div>
+    </div><div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #1e2638;border-radius:0 4px 4px 0;margin-bottom:4px">
+      <a href="https://www.linkedin.com/posts/shehzi-hussain-449a55326_wriindia-internship-airquality-activity-7467132544178688000-UbPU" target="_blank" rel="noopener" style="font-size:11px;color:#4a7fd4;text-decoration:none;line-height:1.4;display:block;font-weight:600">I’m happy to share that I have joined WRI India  as an Air Quality Intern under the Sustainable Cities &amp; Transport Program.
+
+I would like to express my heartfelt gratitude to Umar Farooq  Bhai for his…</a>
+      <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ 50 · 💬 24 · ↗ 0 · 2026-06-01</div>
+    </div>
+      </div>
+        
+      <div style="margin-top:8px">
+        <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+          X/Twitter — <span style="color:#4a9fd4">1 tweet</span>
+          &middot; 16.5K followers
+          &middot; <span style="color:#4a9fd4;background:rgba(74,159,212,.1);border:1px solid rgba(74,159,212,.25);border-radius:3px;padding:1px 5px">ER 0.043%</span>
+          &middot; ♥ 4 &middot; ↩ 1 &middot; ↻ 2 &middot; 👁 348
+        </div>
+        <div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #4a9fd4;border-radius:0 4px 4px 0;margin-bottom:4px">
+      <a href="https://twitter.com/WRIIndia/status/2071579599923015787" target="_blank" rel="noopener" style="font-size:11px;color:#4a9fd4;text-decoration:none;line-height:1.4;display:block;font-weight:600">(1/2) Join us for the 3rd webinar in our Transport Learning Series, 'Zero- Emission Freight: Test Deployments to Scaled Operations'.
+
+ 📅 Date: 2 July 
+🕓 Time: 4:00–5:00 PM 
+🔗 Register here: https:/…</a>
+      <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ 4 · ↩ 1 · ↻ 2 · 👁 348 · 2026-06-29</div>
+    </div>
+      </div>
+        
+      <div style="margin-top:8px">
+        <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+          Instagram — <span style="color:#e05c9c">8 posts</span>
+          &middot; 10.3K followers
+          &middot; <span style="color:#e05c9c;background:rgba(224,92,156,.1);border:1px solid rgba(224,92,156,.25);border-radius:3px;padding:1px 5px">ER 237.237%</span>
+          &middot; ♥ 23858 &middot; 💬 575 
+        </div>
+        <div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #e05c9c;border-radius:0 4px 4px 0;margin-bottom:4px">
+      <a href="https://instagram.com/p/DXdhCSDEuCf" target="_blank" rel="noopener" style="font-size:11px;color:#e05c9c;text-decoration:none;line-height:1.4;display:block;font-weight:600">Air Quality of Kathmandu valley &amp; major city is highly unhealthy right now as per IQAir. 😷 #WearMask</a>
+      <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ 9.5K · 💬 27 · 👁 0 · 2026-04-23</div>
+    </div><div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #1e2638;border-radius:0 4px 4px 0;margin-bottom:4px">
+      <a href="https://instagram.com/p/DWQnXYHCGyy" target="_blank" rel="noopener" style="font-size:11px;color:#e05c9c;text-decoration:none;line-height:1.4;display:block;font-weight:600">It seems that the aviation woes continues. Recently, an Air India flight operating from Bengaluru to London was diverted mid-air to Jeddah, Saudi Arabia. This was after the said flight experienced a s…</a>
+      <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ 8.8K · 💬 59 · 👁 0 · 2026-03-24</div>
+    </div><div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #1e2638;border-radius:0 4px 4px 0;margin-bottom:4px">
+      <a href="https://instagram.com/p/DQjK7fSkwN5" target="_blank" rel="noopener" style="font-size:11px;color:#e05c9c;text-decoration:none;line-height:1.4;display:block;font-weight:600">The Indian government clarified that Indian immigration authorities had no role in stopping Nepali citizen Adhikari at Delhi’s Indira Gandhi International Airport while she was transiting to Berlin. 
+…</a>
+      <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ 2.9K · 💬 416 · 👁 0 · 2025-11-02</div>
+    </div><div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #1e2638;border-radius:0 4px 4px 0;margin-bottom:4px">
+      <a href="https://instagram.com/p/DU2JiVCkwLn" target="_blank" rel="noopener" style="font-size:11px;color:#e05c9c;text-decoration:none;line-height:1.4;display:block;font-weight:600">Indira Gandhi International (IGI) Airport has installed 120 mist spray systems across the airport to reduce air pollution and create a cleaner environment for passengers, staff, and nearby residents.
+…</a>
+      <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ 1.7K · 💬 3 · 👁 0 · 2026-02-17</div>
+    </div><div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #1e2638;border-radius:0 4px 4px 0;margin-bottom:4px">
+      <a href="https://instagram.com/p/DXKEvulDChv" target="_blank" rel="noopener" style="font-size:11px;color:#e05c9c;text-decoration:none;line-height:1.4;display:block;font-weight:600">Sky-shot of the Sky Tower (Mumbai Airport)
+.
+.
+@csmia_official 
+.
+.
+#atc #airtrafficcontrol #aviation #mumbai #mumbaiairport 
+.
+.
+(csmia, mumbai, atc tower, sky, mumbai, india, air traffic control)</a>
+      <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">♥ 498 · 💬 19 · 👁 0 · 2026-04-15</div>
+    </div>
+      </div>
+        
+      <div style="margin-top:10px">
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:5px">
+          <span style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700">YouTube — <span style="color:#e53935">3 videos</span> &middot; 121 total views</span>
+          <span style="font-family:monospace;font-size:10px;color:#e53935;background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.2);border-radius:4px;padding:1px 7px">avg ER 0.033%</span>
+          <span style="font-family:monospace;font-size:9px;color:#3a4a5e">ER = (likes+comments) ÷ subscribers × 100</span>
+        </div>
+        <div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #e53935;border-radius:0 4px 4px 0;margin-bottom:4px">
+            <div style="display:flex;align-items:flex-start;gap:8px">
+              <span style="font-family:monospace;font-size:9px;color:#3a4a5e;flex-shrink:0;margin-top:2px">#1</span>
+              <div style="flex:1;min-width:0">
+                <a href="https://www.youtube.com/watch?v=i89sSbhMKTY" target="_blank" style="font-size:11px;color:#e53935;text-decoration:none;line-height:1.4;display:block;font-weight:600;margin-bottom:2px">Taking Clean Air Conversations on Ground | Gurugram Chapter</a>
+                <div style="font-family:monospace;font-size:9px;color:#5e7494">76 views &middot; 4 likes &middot; 0 comments &middot; <span style="color:#e53935">ER 0.079% (sub)</span></div>
+              </div>
+            </div>
+          </div><div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #1e2638;border-radius:0 4px 4px 0;margin-bottom:4px">
+            <div style="display:flex;align-items:flex-start;gap:8px">
+              <span style="font-family:monospace;font-size:9px;color:#3a4a5e;flex-shrink:0;margin-top:2px">#2</span>
+              <div style="flex:1;min-width:0">
+                <a href="https://www.youtube.com/watch?v=7Wk63osvmYY" target="_blank" style="font-size:11px;color:#e53935;text-decoration:none;line-height:1.4;display:block;font-weight:600;margin-bottom:2px">Webinar | Electric Mobility in India: Creating a Policy Architecture of Leadership</a>
+                <div style="font-family:monospace;font-size:9px;color:#5e7494">32 views &middot; 1 likes &middot; 0 comments &middot; <span style="color:#e53935">ER 0.02% (sub)</span></div>
+              </div>
+            </div>
+          </div><div style="padding:6px 10px;background:#0a0e17;border-left:2px solid #1e2638;border-radius:0 4px 4px 0;margin-bottom:4px">
+            <div style="display:flex;align-items:flex-start;gap:8px">
+              <span style="font-family:monospace;font-size:9px;color:#3a4a5e;flex-shrink:0;margin-top:2px">#3</span>
+              <div style="flex:1;min-width:0">
+                <a href="https://www.youtube.com/watch?v=eoAQ5GcBkFk" target="_blank" style="font-size:11px;color:#e53935;text-decoration:none;line-height:1.4;display:block;font-weight:600;margin-bottom:2px">Moving towards data-based Management of Air Quality</a>
+                <div style="font-family:monospace;font-size:9px;color:#5e7494">13 views &middot; 0 likes &middot; 0 comments &middot; <span style="color:#e53935">ER 0% (sub)</span></div>
+              </div>
+            </div>
+          </div>
+      </div>
+      </div>
+    </details>
+
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social presence. <strong>YouTube ER</strong> = avg engagement rate of YouTube videos <em>mentioning</em> the org (not the org's own channel) — method: (likes+comments) ÷ subscribers × 100; falls back to ÷ views when subscriber count is hidden.</div><div class="sdiv"></div></div>
+<div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead>
+      <tr style="border-bottom:2px solid var(--border)">
+        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Rank</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Organisation</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">AQ Press Analytics</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Citation %</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">AEO Mentions</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">YouTube ER</th>
+        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Social /10</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Score</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+      <td style="text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:var(--good)">1st</td>
+      <td><span style="font-size:12px;font-weight:700;color:#3d8ef0;letter-spacing:.04em">WRI India</span></td>
+      <td><div style="display:flex;align-items:center;gap:6px">
+      <div style="width:60px;height:5px;background:var(--surface3);border-radius:3px;flex-shrink:0;overflow:hidden">
+        <div style="height:100%;width:100%;background:#3d8ef0;border-radius:3px"></div>
+      </div>
+      <span style="font-family:monospace;font-size:12px;font-weight:600;color:#3d8ef0">8</span>
+    </div></td>
+      <td><div style="display:flex;align-items:center;gap:6px">
+      <div style="width:60px;height:5px;background:var(--surface3);border-radius:3px;flex-shrink:0;overflow:hidden">
+        <div style="height:100%;width:0%;background:#3d8ef0;border-radius:3px"></div>
+      </div>
+      <span style="font-family:monospace;font-size:12px;font-weight:600;color:#3d8ef0">0</span>
+    </div></td>
+      <td><span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span></td>
+      <td style="text-align:center"><span style="font-family:monospace;font-size:12px;color:var(--text)">0.033%</span></td>
+      <td style="text-align:center"><span style="font-family:monospace;font-size:13px;font-weight:600;color:#3d8ef0">10<span style="font-size:10px;font-weight:400;color:var(--muted)">/10</span></span></td>
+      <td><div style="display:flex;align-items:center;gap:6px">
+      <div style="width:60px;height:5px;background:var(--surface3);border-radius:3px;flex-shrink:0;overflow:hidden">
+        <div style="height:100%;width:100%;background:#3d8ef0;border-radius:3px"></div>
+      </div>
+      <span style="font-family:monospace;font-size:12px;font-weight:600;color:#3d8ef0">22</span>
+    </div></td>
+    </tr>
+    </tbody>
+  </table>
+</div></section>
+
+<section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including AEO and social media actions.</div><div class="sdiv"></div></div>
+<table class="at"><thead><tr><th>Org</th><th>Priority</th><th>Area</th><th>Action</th><th>Data rationale</th></tr></thead><tbody><tr><td style="font-weight:600;color:#3d8ef0">WRI India</td><td><span class="pri-fix">Fix Now</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">AEO</td><td>Publish structured, citation-ready explainer content on EV incentives and transport-based air quality solutions — including policy briefs, FAQs, and data snapshots — optimised for AI engine retrieval with clear headings, stats, and attributable quotes from WRI India experts.</td><td class="rat">WRI India has 0 AEO mentions despite a 10/10 social presence, meaning its expertise is invisible to AI-generated answers. The EV incentives and transport AQ white-space gap is an uncontested topic where WRI India's research credibility could quickly establish authority.</td></tr><tr><td style="font-weight:600;color:#3d8ef0">WRI India</td><td><span class="pri-fix">Fix Now</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">Topics</td><td>Launch a dedicated content series on health impacts of air pollution and vulnerable populations — targeting Times of India and regional outlets with data-led op-eds, spokesperson quotes, and shareable infographics — to claim ownership of this tracked white-space gap.</td><td class="rat">WRI India has zero topic concentration (no topics at 2+ mentions) and is absent from health-impact AQ conversations despite Times of India being its top outlet, a publication with mass reach to health-conscious urban audiences.</td></tr><tr><td style="font-weight:600;color:#3d8ef0">WRI India</td><td><span class="pri-inv">Invest</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">Media</td><td>Develop a non-metro and rural air pollution media outreach programme, pitching regional-language publications and vernacular digital outlets with localised data on district-level AQ, to fill the non-metro white-space gap and diversify beyond the current single top outlet.</td><td class="rat">WRI India's media footprint is concentrated in Times of India with only 3 articles total, and non-metro air pollution is an uncontested white-space gap offering significant differentiation from metro-focused competitors.</td></tr><tr><td style="font-weight:600;color:#3d8ef0">WRI India</td><td><span class="pri-lev">Leverage</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">Social</td><td>Convert WRI India's strong social infrastructure (LI=18, IG=8, YT=3 videos) into a systematic cross-platform amplification engine — repurposing each new research output into platform-native formats (LinkedIn carousels, Instagram reels, YouTube explainers) to drive media pick-up and AEO citation signals.</td><td class="rat">With a 10/10 social presence score, WRI India has an audience distribution advantage that is not converting into media coverage (only 3 articles) or AEO mentions (0), indicating a content-to-amplification pipeline gap that can be fixed without new audience building.</td></tr></tbody></table></section>
+
+<footer class="rf">Generated by Emerald AI &middot; AQ Intelligence Platform v7 &middot; Tue, 30 Jun 2026 04:43:47 GMT<br>
+Data: Serper News API &middot; Claude Haiku 4.5 &middot; LLM AEO probing &middot; 3 articles &middot; 2026-03-08 to 2026-06-08 &middot; Orgs: WRI India<br>
+<strong style="color:var(--text)">CONFIDENTIAL</strong> &mdash; prepared for Chetan Bhattacharji</footer>
+</main></div>
+<script>
+function td(id){var e=document.getElementById(id);if(!e)return;if(e.classList.contains('evd')){e.classList.toggle('open');}else{e.style.display=e.style.display==='none'?'block':'none';}}
+var secs=document.querySelectorAll('.sec[id],header[id]');
+var nis=document.querySelectorAll('.nav-a');
+secs.forEach(function(s){new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){nis.forEach(function(n){n.classList.remove('active');});var a=document.querySelector('.nav-a[href="#'+e.target.id+'"]');if(a)a.classList.add('active');}});},{threshold:0.25,rootMargin:'-10% 0px -60% 0px'}).observe(s);});
+function toggleExecDraft(){var d=document.getElementById('exec-draft');var ic=document.getElementById('exec-draft-icon');if(!d)return;var open=d.style.display!=='none';d.style.display=open?'none':'block';if(ic)ic.textContent=open?'\u25bc Show draft':'\u25b2 Hide draft';}
+function toggleEdit(){
+  var on=!document.body.classList.contains('edit-mode');
+  document.body.classList.toggle('edit-mode',on);
+  var btn=document.getElementById('edit-btn');
+  if(btn){btn.textContent=on?'\u2715 Exit Edit':'\u9998 Edit Mode';btn.classList.toggle('on',on);}
+  document.querySelectorAll('.sd,.fd,.rat,.em-body,.em-inf,.eq,.cqetx').forEach(function(el){el.contentEditable=on?'true':'false';});
+  if(on)addHideButtons();
+}
+function addHideButtons(){
+  document.querySelectorAll('.sec[id],.rh[id]').forEach(function(s){
+    if(s.querySelector('.sec-x'))return;
+    var btn=document.createElement('button');
+    btn.className='sec-x';btn.title='Hide section';btn.innerHTML='&times;';
+    btn.onclick=function(){s.classList.add('sec-hidden');};
+    s.style.position='relative';
+    s.appendChild(btn);
+  });
+}
+function dlEdit(){
+  var bar=document.getElementById('edit-bar');
+  var oldMode=document.body.classList.contains('edit-mode');
+  document.body.classList.remove('edit-mode');
+  document.querySelectorAll('.sd,.fd,.rat,.em-body,.em-inf,.eq,.cqetx').forEach(function(el){el.contentEditable='false';});
+  if(bar)bar.style.display='none';
+  var html='<!DOCTYPE html>'+document.documentElement.outerHTML;
+  if(bar)bar.style.display='';
+  if(oldMode)document.body.classList.add('edit-mode');
+  var b=new Blob([html],{type:'text/html'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download='aq-report-edited.html';a.click();URL.revokeObjectURL(a.href);
+}
+</script></body></html>
