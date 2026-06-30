@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+﻿import { useState, useRef } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 
@@ -101,7 +101,7 @@ export default function Login() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#0a0e17",
+        background: "var(--bg-app)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -110,8 +110,8 @@ export default function Login() {
     >
       <div
         style={{
-          background: "#111827",
-          border: "1px solid #1e293b",
+          background: "var(--bg-card)",
+          border: "1px solid var(--border-col)",
           borderRadius: 12,
           padding: "2.5rem",
           width: "100%",
@@ -120,11 +120,11 @@ export default function Login() {
         }}
       >
         <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🌿</div>
-          <h1 style={{ color: "#f8fafc", fontSize: 22, fontWeight: 700, margin: 0 }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>🌿</div>
+          <h1 style={{ color: "var(--text-main)", fontSize: 28, fontWeight: 700, margin: 0 }}>
             Emerald AI
           </h1>
-          <p style={{ color: "#64748b", fontSize: 13, marginTop: 4 }}>
+          <p style={{ color: "var(--text-muted)", fontSize: 15, marginTop: 4 }}>
             AQ Intelligence Platform
           </p>
         </div>
@@ -157,12 +157,12 @@ export default function Login() {
             <button type="submit" style={btnStyle} disabled={loading}>
               {loading ? "Signing in…" : "Sign In"}
             </button>
-            <p style={{ textAlign: "center", marginTop: 16, color: "#64748b", fontSize: 13 }}>
+            <p style={{ textAlign: "center", marginTop: 16, color: "var(--text-muted)", fontSize: 15 }}>
               Don't have an account?{" "}
               <a
                 href="/signup"
                 onClick={(e) => { e.preventDefault(); navigate("/signup"); }}
-                style={{ color: "#c9922a", textDecoration: "none" }}
+                style={{ color: "var(--accent-amber)", textDecoration: "none" }}
               >
                 Sign up
               </a>
@@ -174,7 +174,7 @@ export default function Login() {
           <form onSubmit={handleVerifyTotp}>
             <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
               <div style={{ fontSize: 40, marginBottom: 8 }}>🔐</div>
-              <p style={{ color: "#94a3b8", fontSize: 14, margin: 0 }}>
+              <p style={{ color: "var(--text-sub)", fontSize: 18, margin: 0 }}>
                 Enter the 6-digit code from your authenticator app
               </p>
             </div>
@@ -185,7 +185,7 @@ export default function Login() {
             </button>
             <button
               type="button"
-              style={{ ...btnStyle, background: "transparent", border: "1px solid #334155", marginTop: 8 }}
+              style={{ ...btnStyle, background: "transparent", border: "1px solid var(--text-mid)", marginTop: 8 }}
               onClick={() => { setStage("password"); setOtp(""); setError(""); }}
             >
               ← Back
@@ -196,10 +196,10 @@ export default function Login() {
         {stage === "2fa_setup" && (
           <form onSubmit={handleConfirmSetup}>
             <div style={{ marginBottom: "1.25rem" }}>
-              <p style={{ color: "#c9922a", fontWeight: 600, fontSize: 14, margin: "0 0 12px 0" }}>
+              <p style={{ color: "var(--accent-amber)", fontWeight: 600, fontSize: 18, margin: "0 0 12px 0" }}>
                 Set up Two-Factor Authentication
               </p>
-              <p style={{ color: "#94a3b8", fontSize: 13, margin: "0 0 16px 0", lineHeight: 1.6 }}>
+              <p style={{ color: "var(--text-sub)", fontSize: 15, margin: "0 0 16px 0", lineHeight: 1.6 }}>
                 Scan this QR code with Google Authenticator, Authy, or any TOTP app:
               </p>
               {qrDataUrl && (
@@ -208,13 +208,13 @@ export default function Login() {
                 </div>
               )}
               {totpSecret && (
-                <div style={{ background: "#0a0e17", border: "1px solid #1e293b", borderRadius: 6, padding: "8px 12px", marginTop: 12 }}>
-                  <p style={{ color: "#64748b", fontSize: 11, margin: "0 0 4px 0" }}>Manual entry key:</p>
-                  <code style={{ color: "#4caf74", fontSize: 12, letterSpacing: 2 }}>{totpSecret}</code>
+                <div style={{ background: "var(--bg-app)", border: "1px solid var(--border-col)", borderRadius: 6, padding: "8px 12px", marginTop: 12 }}>
+                  <p style={{ color: "var(--text-muted)", fontSize: 15, margin: "0 0 4px 0" }}>Manual entry key:</p>
+                  <code style={{ color: "var(--accent-green)", fontSize: 18, letterSpacing: 2 }}>{totpSecret}</code>
                 </div>
               )}
             </div>
-            <p style={{ color: "#94a3b8", fontSize: 13, margin: "0 0 12px 0" }}>
+            <p style={{ color: "var(--text-sub)", fontSize: 15, margin: "0 0 12px 0" }}>
               Then enter the 6-digit code to confirm:
             </p>
             <OtpInput value={otp} onChange={setOtp} />
@@ -251,14 +251,14 @@ function OtpInput({
           style={{
             width: 44,
             height: 52,
-            background: "#0a0e17",
-            border: `2px solid ${d.trim() ? "#c9922a" : "#1e293b"}`,
+            background: "var(--bg-app)",
+            border: `2px solid ${d.trim() ? "var(--accent-amber)" : "var(--border-col)"}`,
             borderRadius: 8,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "#f8fafc",
-            fontSize: 22,
+            color: "var(--text-main)",
+            fontSize: 28,
             fontWeight: 700,
             fontFamily: "monospace",
           }}
@@ -291,32 +291,32 @@ function OtpInput({
 
 const labelStyle: React.CSSProperties = {
   display: "block",
-  color: "#94a3b8",
-  fontSize: 13,
+  color: "var(--text-sub)",
+  fontSize: 15,
   marginBottom: 6,
   fontWeight: 500,
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  background: "#0a0e17",
-  border: "1px solid #1e293b",
+  background: "var(--bg-app)",
+  border: "1px solid var(--border-col)",
   borderRadius: 8,
   padding: "10px 14px",
-  color: "#f8fafc",
-  fontSize: 14,
+  color: "var(--text-main)",
+  fontSize: 18,
   outline: "none",
   boxSizing: "border-box",
 };
 
 const btnStyle: React.CSSProperties = {
   width: "100%",
-  background: "#c9922a",
+  background: "var(--accent-amber)",
   border: "none",
   borderRadius: 8,
   padding: "11px 0",
   color: "#fff",
-  fontSize: 15,
+  fontSize: 17,
   fontWeight: 600,
   cursor: "pointer",
   display: "block",
@@ -324,7 +324,7 @@ const btnStyle: React.CSSProperties = {
 
 const errorStyle: React.CSSProperties = {
   color: "#f87171",
-  fontSize: 13,
+  fontSize: 15,
   marginBottom: 12,
   textAlign: "center",
 };

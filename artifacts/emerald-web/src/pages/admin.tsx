@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 
@@ -93,15 +93,15 @@ export default function Admin() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0e17", fontFamily: "'Inter', sans-serif", color: "#f8fafc" }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg-app)", fontFamily: "'Inter', sans-serif", color: "var(--text-main)" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "2rem 1.5rem" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "2rem" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 24 }}>🌿</span>
+            <span style={{ fontSize: 28 }}>🌿</span>
             <div>
-              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Admin Panel</h1>
-              <p style={{ margin: 0, fontSize: 12, color: "#64748b" }}>Emerald AI — AQ Intelligence Platform</p>
+              <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700 }}>Admin Panel</h1>
+              <p style={{ margin: 0, fontSize: 18, color: "var(--text-muted)" }}>Emerald AI — AQ Intelligence Platform</p>
             </div>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
@@ -115,7 +115,7 @@ export default function Admin() {
         </div>
 
         {loading ? (
-          <div style={{ textAlign: "center", padding: "4rem", color: "#64748b" }}>Loading…</div>
+          <div style={{ textAlign: "center", padding: "4rem", color: "var(--text-muted)" }}>Loading…</div>
         ) : (
           <>
             {/* Summary Cards */}
@@ -124,13 +124,13 @@ export default function Admin() {
                 label="Reports This Month"
                 value={String(thisMonth?.count ?? 0)}
                 sub="generated"
-                accent="#4caf74"
+                accent="var(--accent-green)"
               />
               <StatCard
                 label="Customer Revenue"
                 value={thisMonth ? fmt(thisMonth.totalCostInr) : "₹0"}
                 sub="this month"
-                accent="#c9922a"
+                accent="var(--accent-amber)"
               />
               <StatCard
                 label="Infra Spend"
@@ -175,7 +175,7 @@ export default function Admin() {
                         const totalInfra =
                           m.totalSerper + m.totalLlmAeo + m.totalClaude + (m.totalYoutube || 0) + m.totalStorage + m.totalDeployment;
                         return (
-                          <tr key={m.month} style={{ borderBottom: "1px solid #1e293b" }}>
+                          <tr key={m.month} style={{ borderBottom: "1px solid var(--border-col)" }}>
                             <td style={tdStyle}>{monthLabel(m.month)}</td>
                             <td style={{ ...tdStyle, textAlign: "center" }}>{m.count}</td>
                             <td style={tdStyle}>{fmt(m.totalSerper)}</td>
@@ -185,7 +185,7 @@ export default function Admin() {
                             <td style={tdStyle}>{fmt(m.totalStorage)}</td>
                             <td style={tdStyle}>{fmt(m.totalDeployment)}</td>
                             <td style={{ ...tdStyle, color: "#818cf8", fontWeight: 600 }}>{fmt(totalInfra)}</td>
-                            <td style={{ ...tdStyle, color: "#c9922a", fontWeight: 600 }}>{fmt(m.totalCostInr)}</td>
+                            <td style={{ ...tdStyle, color: "var(--accent-amber)", fontWeight: 600 }}>{fmt(m.totalCostInr)}</td>
                           </tr>
                         );
                       })}
@@ -203,12 +203,12 @@ export default function Admin() {
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   style={{
-                    background: "#0a0e17",
-                    border: "1px solid #1e293b",
+                    background: "var(--bg-app)",
+                    border: "1px solid var(--border-col)",
                     borderRadius: 6,
-                    color: "#f8fafc",
+                    color: "var(--text-main)",
                     padding: "6px 10px",
-                    fontSize: 13,
+                    fontSize: 15,
                   }}
                 >
                   <option value="all">All months</option>
@@ -221,7 +221,7 @@ export default function Admin() {
               </div>
 
               {filtered.length === 0 ? (
-                <p style={{ color: "#64748b", textAlign: "center", padding: "2rem" }}>
+                <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "2rem" }}>
                   No reports found.
                 </p>
               ) : (
@@ -237,18 +237,18 @@ export default function Admin() {
                     <tbody>
                       {filtered.map((r) => (
                         <>
-                          <tr key={r.id} style={{ borderBottom: expanded === r.id ? "none" : "1px solid #1e293b" }}>
-                            <td style={{ ...tdStyle, color: "#64748b" }}>{r.id}</td>
+                          <tr key={r.id} style={{ borderBottom: expanded === r.id ? "none" : "1px solid var(--border-col)" }}>
+                            <td style={{ ...tdStyle, color: "var(--text-muted)" }}>{r.id}</td>
                             <td style={tdStyle}>{new Date(r.createdAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</td>
                             <td style={tdStyle}>{r.clientName ?? "—"}</td>
                             <td style={tdStyle}>
-                              <span style={{ color: "#4caf74", fontWeight: 600 }}>{r.organizations.length}</span>
-                              <span style={{ color: "#64748b", fontSize: 11 }}> orgs</span>
+                              <span style={{ color: "var(--accent-green)", fontWeight: 600 }}>{r.organizations.length}</span>
+                              <span style={{ color: "var(--text-muted)", fontSize: 15 }}> orgs</span>
                             </td>
-                            <td style={{ ...tdStyle, fontSize: 12 }}>
+                            <td style={{ ...tdStyle, fontSize: 18 }}>
                               {r.dateFrom} → {r.dateTo}
                             </td>
-                            <td style={{ ...tdStyle, color: "#c9922a", fontWeight: 600 }}>
+                            <td style={{ ...tdStyle, color: "var(--accent-amber)", fontWeight: 600 }}>
                               {fmt(r.costInr)}
                             </td>
                             <td style={{ ...tdStyle, color: "#818cf8" }}>
@@ -260,24 +260,24 @@ export default function Admin() {
                                   <a href={`/api/download/${r.htmlName}`} style={filePill("#1e3a5f", "#38bdf8")}>HTML</a>
                                 )}
                                 {r.pptxName && (
-                                  <a href={`/api/download/${r.pptxName}`} style={filePill("#1e3a2f", "#4caf74")}>PPTX</a>
+                                  <a href={`/api/download/${r.pptxName}`} style={filePill("#1e3a2f", "var(--accent-green)")}>PPTX</a>
                                 )}
                               </div>
                             </td>
                             <td style={tdStyle}>
                               <button
                                 onClick={() => setExpanded(expanded === r.id ? null : r.id)}
-                                style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: 16 }}
+                                style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 18 }}
                               >
                                 {expanded === r.id ? "▲" : "▼"}
                               </button>
                             </td>
                           </tr>
                           {expanded === r.id && (
-                            <tr key={`${r.id}-exp`} style={{ borderBottom: "1px solid #1e293b" }}>
+                            <tr key={`${r.id}-exp`} style={{ borderBottom: "1px solid var(--border-col)" }}>
                               <td colSpan={9} style={{ padding: "0 12px 16px 12px" }}>
-                                <div style={{ background: "#0a0e17", borderRadius: 8, padding: "1rem", border: "1px solid #1e293b" }}>
-                                  <p style={{ color: "#94a3b8", fontSize: 12, margin: "0 0 10px 0", fontWeight: 600 }}>
+                                <div style={{ background: "var(--bg-app)", borderRadius: 8, padding: "1rem", border: "1px solid var(--border-col)" }}>
+                                  <p style={{ color: "var(--text-sub)", fontSize: 18, margin: "0 0 10px 0", fontWeight: 600 }}>
                                     Organizations: {r.organizations.join(", ")}
                                   </p>
                                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
@@ -288,7 +288,7 @@ export default function Admin() {
                                     <CostBadge label="Storage" value={r.costStorageInr} color="#34d399" />
                                     <CostBadge label="Deployment" value={r.costDeploymentInr} color="#38bdf8" />
                                     <CostBadge label="Total Infra" value={infraTotal(r).toFixed(2)} color="#818cf8" bold />
-                                    <CostBadge label="Customer Cost" value={r.costInr} color="#c9922a" bold />
+                                    <CostBadge label="Customer Cost" value={r.costInr} color="var(--accent-amber)" bold />
                                   </div>
                                 </div>
                               </td>
@@ -311,15 +311,15 @@ export default function Admin() {
 function StatCard({ label, value, sub, accent }: { label: string; value: string; sub: string; accent: string }) {
   return (
     <div style={{
-      background: "#111827",
-      border: "1px solid #1e293b",
+      background: "var(--bg-card)",
+      border: "1px solid var(--border-col)",
       borderRadius: 10,
       padding: "1.25rem",
       borderTop: `3px solid ${accent}`,
     }}>
-      <p style={{ margin: "0 0 6px 0", color: "#64748b", fontSize: 12, textTransform: "uppercase", letterSpacing: 1 }}>{label}</p>
-      <p style={{ margin: "0 0 2px 0", color: accent, fontSize: 26, fontWeight: 700 }}>{value}</p>
-      <p style={{ margin: 0, color: "#475569", fontSize: 12 }}>{sub}</p>
+      <p style={{ margin: "0 0 6px 0", color: "var(--text-muted)", fontSize: 18, textTransform: "uppercase", letterSpacing: 1 }}>{label}</p>
+      <p style={{ margin: "0 0 2px 0", color: accent, fontSize: 28, fontWeight: 700 }}>{value}</p>
+      <p style={{ margin: 0, color: "var(--text-dim)", fontSize: 18 }}>{sub}</p>
     </div>
   );
 }
@@ -327,13 +327,13 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string;
 function CostBadge({ label, value, color, bold }: { label: string; value: string | number; color: string; bold?: boolean }) {
   return (
     <div style={{
-      background: "#111827",
+      background: "var(--bg-card)",
       border: `1px solid ${color}33`,
       borderRadius: 6,
       padding: "8px 12px",
     }}>
-      <p style={{ margin: "0 0 2px 0", color: "#64748b", fontSize: 11 }}>{label}</p>
-      <p style={{ margin: 0, color, fontSize: 15, fontWeight: bold ? 700 : 600 }}>₹{Number(value).toFixed(2)}</p>
+      <p style={{ margin: "0 0 2px 0", color: "var(--text-muted)", fontSize: 15 }}>{label}</p>
+      <p style={{ margin: 0, color, fontSize: 17, fontWeight: bold ? 700 : 600 }}>₹{Number(value).toFixed(2)}</p>
     </div>
   );
 }
@@ -345,15 +345,15 @@ function filePill(bg: string, color: string): React.CSSProperties {
     color,
     borderRadius: 4,
     padding: "2px 7px",
-    fontSize: 11,
+    fontSize: 15,
     fontWeight: 600,
     textDecoration: "none",
   };
 }
 
 const card: React.CSSProperties = {
-  background: "#111827",
-  border: "1px solid #1e293b",
+  background: "var(--bg-card)",
+  border: "1px solid var(--border-col)",
   borderRadius: 10,
   padding: "1.5rem",
   marginBottom: "1.5rem",
@@ -361,9 +361,9 @@ const card: React.CSSProperties = {
 
 const sectionTitle: React.CSSProperties = {
   margin: "0 0 16px 0",
-  fontSize: 15,
+  fontSize: 17,
   fontWeight: 600,
-  color: "#94a3b8",
+  color: "var(--text-sub)",
   textTransform: "uppercase",
   letterSpacing: 1,
 };
@@ -371,33 +371,33 @@ const sectionTitle: React.CSSProperties = {
 const tableStyle: React.CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
-  fontSize: 13,
+  fontSize: 15,
 };
 
 const thStyle: React.CSSProperties = {
   textAlign: "left",
   padding: "8px 10px",
-  color: "#475569",
-  fontSize: 11,
+  color: "var(--text-dim)",
+  fontSize: 15,
   fontWeight: 600,
   textTransform: "uppercase",
   letterSpacing: 0.8,
-  borderBottom: "1px solid #1e293b",
+  borderBottom: "1px solid var(--border-col)",
   whiteSpace: "nowrap",
 };
 
 const tdStyle: React.CSSProperties = {
   padding: "10px 10px",
-  color: "#cbd5e1",
+  color: "var(--text-mid)",
   verticalAlign: "middle",
 };
 
 const ghostBtn: React.CSSProperties = {
   background: "transparent",
-  border: "1px solid #1e293b",
+  border: "1px solid var(--border-col)",
   borderRadius: 6,
-  color: "#94a3b8",
+  color: "var(--text-sub)",
   padding: "7px 14px",
-  fontSize: 13,
+  fontSize: 15,
   cursor: "pointer",
 };

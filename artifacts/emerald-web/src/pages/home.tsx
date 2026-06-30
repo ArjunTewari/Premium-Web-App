@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+﻿import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 
@@ -175,9 +175,9 @@ const C = {
   bg:        "#060a10",
   surface:   "rgba(255,255,255,.035)",
   border:    "rgba(255,255,255,.07)",
-  gold:      "#c9922a",
+  gold:      "var(--accent-amber)",
   goldLight: "#e8d5a0",
-  green:     "#4caf74",
+  green:     "var(--accent-green)",
   muted:     "#4a6070",
   text:      "#c8d8e8",
   textHi:    "#e8f0f8",
@@ -191,7 +191,7 @@ const inputStyle: React.CSSProperties = {
   padding: "8px 12px",
   color: C.text,
   fontFamily: "'DM Mono', monospace",
-  fontSize: 12,
+  fontSize: 18,
   outline: "none",
   width: "100%",
   boxSizing: "border-box",
@@ -530,7 +530,7 @@ export default function Home() {
         .mo-nav-link:hover { color: #e8d5a0 !important; background: rgba(255,255,255,.06) !important; }
         .mo-icon-btn:hover { background: rgba(255,255,255,.06) !important; color: #c8d8e8 !important; }
         .mo-stat:hover { transform: translateY(-3px); border-color: rgba(201,146,42,.2) !important; }
-        .mo-collapse-btn:hover { color: #c9922a !important; }
+        .mo-collapse-btn:hover { color: var(--accent-amber) !important; }
         input[type=date] { color-scheme: dark; }
       `}</style>
 
@@ -555,7 +555,7 @@ export default function Home() {
               borderRadius: "50%", background: `rgba(201,146,42,.2)`,
             }} />
           </div>
-          <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-.01em", color: C.goldLight }}>emerald</span>
+          <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-.01em", color: C.goldLight }}>emerald</span>
           <span style={{
             fontSize: 10, fontWeight: 700, letterSpacing: ".1em",
             background: "rgba(201,146,42,.18)", color: C.gold,
@@ -565,11 +565,11 @@ export default function Home() {
 
         {/* Nav */}
         <nav style={{ display: "flex", gap: 4 }}>
-          <a onClick={() => setActiveTab("dashboard")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "dashboard" ? C.goldLight : C.muted, background: activeTab === "dashboard" ? "rgba(255,255,255,.06)" : "transparent" }}>Dashboard</a>
-          <a onClick={() => setActiveTab("reports")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "reports" ? C.goldLight : C.muted, background: activeTab === "reports" ? "rgba(255,255,255,.06)" : "transparent" }}>Reports</a>
-          <a onClick={() => setActiveTab("handles")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "handles" ? C.goldLight : C.muted, background: activeTab === "handles" ? "rgba(255,255,255,.06)" : "transparent" }}>Handles</a>
+          <a onClick={() => setActiveTab("dashboard")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "dashboard" ? C.goldLight : C.muted, background: activeTab === "dashboard" ? "rgba(255,255,255,.06)" : "transparent" }}>Dashboard</a>
+          <a onClick={() => setActiveTab("reports")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "reports" ? C.goldLight : C.muted, background: activeTab === "reports" ? "rgba(255,255,255,.06)" : "transparent" }}>Reports</a>
+          <a onClick={() => setActiveTab("handles")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "handles" ? C.goldLight : C.muted, background: activeTab === "handles" ? "rgba(255,255,255,.06)" : "transparent" }}>Handles</a>
           {user?.role === "admin" && (
-            <a onClick={() => navigate("/admin")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, color: C.muted, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s" }}>Admin</a>
+            <a onClick={() => navigate("/admin")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, color: C.muted, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s" }}>Admin</a>
           )}
         </nav>
 
@@ -578,12 +578,12 @@ export default function Home() {
           <button
             onClick={async () => { await logout(); navigate("/login"); }}
             className="mo-icon-btn"
-            style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: 7, color: C.muted, padding: "5px 12px", fontSize: 12, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif", transition: "background .2s, color .2s" }}
+            style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: 7, color: C.muted, padding: "5px 12px", fontSize: 18, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif", transition: "background .2s, color .2s" }}
           >Logout</button>
           <div style={{
             width: 34, height: 34, borderRadius: 10,
-            background: "linear-gradient(135deg, #c9922a 0%, #6f4e10 100%)",
-            color: "#fff", fontSize: 12, fontWeight: 700,
+            background: "linear-gradient(135deg, var(--accent-amber) 0%, #6f4e10 100%)",
+            color: "#fff", fontSize: 18, fontWeight: 700,
             display: "flex", alignItems: "center", justifyContent: "center",
             flexShrink: 0,
           }}>
@@ -599,18 +599,18 @@ export default function Home() {
 
         {/* Hero */}
         <SlideUp delay={60} style={{ padding: "48px 0 8px" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: C.gold, marginBottom: 14 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: C.gold, marginBottom: 14 }}>
             AQ Intelligence Platform
           </div>
           <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 46, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-.02em", margin: "0 0 8px", color: C.textHi }}>
             Air Quality<br />
             <span style={{
-              background: "linear-gradient(90deg, #c9922a 0%, #4caf74 100%)",
+              background: "linear-gradient(90deg, var(--accent-amber) 0%, var(--accent-green) 100%)",
               WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
               backgroundClip: "text",
             }}>Intelligence Report</span>
           </h1>
-          <p style={{ fontSize: 14, color: C.muted, marginTop: 8 }}>
+          <p style={{ fontSize: 18, color: C.muted, marginTop: 8 }}>
             Generate comparative air quality media intelligence reports with LLM visibility and social media analysis.
           </p>
         </SlideUp>
@@ -629,10 +629,10 @@ export default function Home() {
                 borderRadius: 12, padding: "16px 18px",
                 transition: "transform .2s, border-color .2s",
               }}>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 26, fontWeight: 500, color: C.gold, lineHeight: 1 }}>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 28, fontWeight: 500, color: C.gold, lineHeight: 1 }}>
                   <CountUp target={s.val} suffix={s.suffix} />
                 </div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 6, fontWeight: 500 }}>{s.label}</div>
+                <div style={{ fontSize: 15, color: C.muted, marginTop: 6, fontWeight: 500 }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -642,7 +642,7 @@ export default function Home() {
         <SlideUp delay={190}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16, padding: "9px 16px", background: "rgba(76,175,116,.07)", border: "1px solid rgba(76,175,116,.2)", borderRadius: 100, width: "fit-content" }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.green, animation: "pulse-dot 1.8s ease-in-out infinite", flexShrink: 0, display: "inline-block" }} />
-            <span style={{ fontSize: 12, color: C.green }}>
+            <span style={{ fontSize: 18, color: C.green }}>
               <strong>API keys pre-loaded</strong> — Serper, Claude, OpenAI, Perplexity, Gemini &amp; social keys are active
             </span>
           </div>
@@ -661,7 +661,7 @@ export default function Home() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                 <SectionLabel>Organisations</SectionLabel>
                 <span style={{
-                  fontFamily: "'DM Mono', monospace", fontSize: 11,
+                  fontFamily: "'DM Mono', monospace", fontSize: 15,
                   padding: "3px 10px", borderRadius: 6,
                   background: "rgba(201,146,42,.12)", color: C.gold,
                   border: `1px solid rgba(201,146,42,.2)`,
@@ -690,7 +690,7 @@ export default function Home() {
                         background: on ? "rgba(201,146,42,.1)" : "rgba(255,255,255,.03)",
                         border: `1px solid ${on ? "rgba(201,146,42,.3)" : "rgba(255,255,255,.08)"}`,
                         color: on ? C.gold : C.muted,
-                        fontSize: 12, fontFamily: "'Space Grotesk', sans-serif",
+                        fontSize: 18, fontFamily: "'Space Grotesk', sans-serif",
                         textAlign: "left", transition: "all .2s",
                       }}
                     >
@@ -739,7 +739,7 @@ export default function Home() {
                   />
                   <button onClick={addCustomOrg} style={{
                     background: "rgba(255,255,255,.07)", color: C.text, border: `1px solid ${C.border}`,
-                    borderRadius: 8, padding: "8px 14px", fontSize: 12, cursor: "pointer",
+                    borderRadius: 8, padding: "8px 14px", fontSize: 18, cursor: "pointer",
                     fontFamily: "'Space Grotesk', sans-serif", whiteSpace: "nowrap",
                   }}>+ Add</button>
                 </div>
@@ -762,7 +762,7 @@ export default function Home() {
                     <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#2a3a4a", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>FROM</div>
                     <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
                   </div>
-                  <span style={{ color: C.muted, fontSize: 16, paddingTop: 20 }}>→</span>
+                  <span style={{ color: C.muted, fontSize: 18, paddingTop: 20 }}>→</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#2a3a4a", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>TO</div>
                     <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
@@ -787,7 +787,7 @@ export default function Home() {
                     Scope Keywords
                     <span style={{ marginLeft: 8, background: "rgba(255,255,255,.06)", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 7px", fontSize: 9, fontWeight: 600, verticalAlign: "middle", fontFamily: "'DM Mono', monospace" }}>optional</span>
                   </span>
-                  <span style={{ fontSize: 11, color: C.muted }}>{scopeOpen ? "▲" : "▼"}</span>
+                  <span style={{ fontSize: 15, color: C.muted }}>{scopeOpen ? "▲" : "▼"}</span>
                 </button>
                 {scopeOpen && (
                   <div style={{ marginTop: 14 }}>
@@ -797,7 +797,7 @@ export default function Home() {
                           display: "inline-flex", alignItems: "center", gap: 4,
                           background: "rgba(76,175,116,.08)", color: C.green,
                           border: "1px solid rgba(76,175,116,.2)", borderRadius: 100,
-                          padding: "3px 10px", fontSize: 11, fontFamily: "'DM Mono', monospace",
+                          padding: "3px 10px", fontSize: 15, fontFamily: "'DM Mono', monospace",
                         }}>
                           {kw}
                           <span onClick={() => removeScope(kw)} style={{ cursor: "pointer", opacity: 0.6 }}>×</span>
@@ -806,8 +806,8 @@ export default function Home() {
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
                       <input value={scopeInput} onChange={(e) => setScopeInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addScope(); } }} placeholder="Add keyword…" style={{ ...inputStyle, flex: 1, width: "auto" }} />
-                      <button onClick={addScope} style={{ background: "rgba(255,255,255,.06)", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>+ Add</button>
-                      <button onClick={() => setScopeKeywords([...DEFAULT_SCOPE])} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>Reset</button>
+                      <button onClick={addScope} style={{ background: "rgba(255,255,255,.06)", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>+ Add</button>
+                      <button onClick={() => setScopeKeywords([...DEFAULT_SCOPE])} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>Reset</button>
                     </div>
                   </div>
                 )}
@@ -828,11 +828,11 @@ export default function Home() {
                       {aeoQueries.length} queries
                     </span>
                   </span>
-                  <span style={{ fontSize: 11, color: C.muted }}>{aeoOpen ? "▲" : "▼"}</span>
+                  <span style={{ fontSize: 15, color: C.muted }}>{aeoOpen ? "▲" : "▼"}</span>
                 </button>
                 {aeoOpen && (
                   <div style={{ marginTop: 14 }}>
-                    <p style={{ fontSize: 11, color: C.muted, marginBottom: 12, lineHeight: 1.7, fontFamily: "'DM Mono', monospace" }}>
+                    <p style={{ fontSize: 15, color: C.muted, marginBottom: 12, lineHeight: 1.7, fontFamily: "'DM Mono', monospace" }}>
                       Sent to GPT-4o mini, Perplexity Sonar &amp; Gemini 1.5 Flash. Each response naming a tracked org = <strong style={{ color: C.gold }}>10 pts</strong> (max 100). Click to edit inline.
                     </p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10, maxHeight: 300, overflowY: "auto" }}>
@@ -846,15 +846,15 @@ export default function Home() {
                                 value={aeoEditVal}
                                 onChange={(e) => setAeoEditVal(e.target.value)}
                                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEditAeo(); } if (e.key === "Escape") setAeoEditIdx(null); }}
-                                style={{ flex: 1, background: "rgba(255,255,255,.04)", border: `1px solid ${C.gold}`, borderRadius: 6, padding: "5px 8px", color: C.text, fontSize: 11, fontFamily: "'DM Mono', monospace", outline: "none", resize: "vertical", minHeight: 40 }}
+                                style={{ flex: 1, background: "rgba(255,255,255,.04)", border: `1px solid ${C.gold}`, borderRadius: 6, padding: "5px 8px", color: C.text, fontSize: 15, fontFamily: "'DM Mono', monospace", outline: "none", resize: "vertical", minHeight: 40 }}
                               />
                               <button onClick={saveEditAeo} style={{ background: C.gold, color: C.bg, border: "none", borderRadius: 5, padding: "4px 10px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>✓</button>
                               <button onClick={() => setAeoEditIdx(null)} style={{ background: "rgba(255,255,255,.07)", color: C.muted, border: "none", borderRadius: 5, padding: "4px 10px", fontSize: 10, cursor: "pointer" }}>✕</button>
                             </div>
                           ) : (
                             <>
-                              <span onClick={() => startEditAeo(i)} style={{ flex: 1, fontSize: 11, color: C.muted, lineHeight: 1.55, cursor: "text", paddingTop: 2, fontFamily: "'DM Mono', monospace" }}>{q}</span>
-                              <button onClick={() => removeAeoQuery(i)} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "0 2px", opacity: 0.6 }}>×</button>
+                              <span onClick={() => startEditAeo(i)} style={{ flex: 1, fontSize: 15, color: C.muted, lineHeight: 1.55, cursor: "text", paddingTop: 2, fontFamily: "'DM Mono', monospace" }}>{q}</span>
+                              <button onClick={() => removeAeoQuery(i)} style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 2px", opacity: 0.6 }}>×</button>
                             </>
                           )}
                         </div>
@@ -862,8 +862,8 @@ export default function Home() {
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
                       <input value={aeoInput} onChange={(e) => setAeoInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addAeoQuery(); } }} placeholder="Add custom query…" style={{ ...inputStyle, flex: 1, width: "auto" }} />
-                      <button onClick={addAeoQuery} style={{ background: "rgba(255,255,255,.06)", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>+ Add</button>
-                      <button onClick={() => setAeoQueries([...DEFAULT_AEO_QUERIES])} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 11, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>Reset</button>
+                      <button onClick={addAeoQuery} style={{ background: "rgba(255,255,255,.06)", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>+ Add</button>
+                      <button onClick={() => setAeoQueries([...DEFAULT_AEO_QUERIES])} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>Reset</button>
                     </div>
                   </div>
                 )}
@@ -950,9 +950,9 @@ export default function Home() {
             style={{
               width: "100%", marginTop: 20,
               padding: "16px 0", borderRadius: 12,
-              background: "linear-gradient(135deg, #c9922a 0%, #8b5e15 100%)",
+              background: "linear-gradient(135deg, var(--accent-amber) 0%, #8b5e15 100%)",
               color: "#fff", fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: 16, fontWeight: 600, letterSpacing: "-.01em",
+              fontSize: 18, fontWeight: 600, letterSpacing: "-.01em",
               border: "none", cursor: running ? "not-allowed" : "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
               position: "relative", overflow: "hidden",
@@ -979,7 +979,7 @@ export default function Home() {
 
         {/* Trend status */}
         {trendStatus && (
-          <div style={{ marginTop: 10, fontFamily: "'DM Mono', monospace", fontSize: 11, padding: "7px 14px", background: "rgba(255,255,255,.03)", border: `1px solid ${trendStatus.ok ? "rgba(76,175,116,.3)" : C.border}`, borderRadius: 8, color: trendStatus.ok ? C.green : C.muted }}>
+          <div style={{ marginTop: 10, fontFamily: "'DM Mono', monospace", fontSize: 15, padding: "7px 14px", background: "rgba(255,255,255,.03)", border: `1px solid ${trendStatus.ok ? "rgba(76,175,116,.3)" : C.border}`, borderRadius: 8, color: trendStatus.ok ? C.green : C.muted }}>
             {trendStatus.text}
           </div>
         )}
@@ -989,7 +989,7 @@ export default function Home() {
           <div style={{ marginTop: 18 }}>
             {/* Progress bar */}
             <div style={{ height: 3, background: "rgba(255,255,255,.08)", borderRadius: 2, marginBottom: 4, overflow: "hidden", position: "relative" }}>
-              <div style={{ height: "100%", background: "linear-gradient(90deg, #c9922a, #4caf74)", borderRadius: 2, width: `${progress}%`, transition: "width .5s cubic-bezier(.22,1,.36,1)" }} />
+              <div style={{ height: "100%", background: "linear-gradient(90deg, var(--accent-amber), var(--accent-green))", borderRadius: 2, width: `${progress}%`, transition: "width .5s cubic-bezier(.22,1,.36,1)" }} />
             </div>
             <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: C.gold, textAlign: "right", marginBottom: 10 }}>{progress}%</div>
             {/* Log box */}
@@ -999,7 +999,7 @@ export default function Home() {
                 background: "rgba(255,255,255,.025)", border: `1px solid ${C.border}`,
                 borderRadius: 12, padding: "14px 18px",
                 maxHeight: 300, overflowY: "auto",
-                fontFamily: "'DM Mono', monospace", fontSize: 11, lineHeight: 1.9,
+                fontFamily: "'DM Mono', monospace", fontSize: 15, lineHeight: 1.9,
                 display: "flex", flexDirection: "column", gap: 2,
               }}
             >
@@ -1016,29 +1016,29 @@ export default function Home() {
         {/* ── Results ─────────────────────────────────────────────────── */}
         {result && (
           <div style={{ background: "rgba(76,175,116,.06)", border: "1px solid rgba(76,175,116,.25)", borderRadius: 12, padding: 20, marginTop: 18 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: C.green, marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 18, fontWeight: 600, color: C.green, marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span>✓ Report ready</span>
               {result.costInr != null && (
-                <span style={{ fontSize: 12, fontWeight: 500, fontFamily: "'DM Mono', monospace", color: C.gold }}>₹{result.costInr.toFixed(2)}</span>
+                <span style={{ fontSize: 18, fontWeight: 500, fontFamily: "'DM Mono', monospace", color: C.gold }}>₹{result.costInr.toFixed(2)}</span>
               )}
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
               {/* Shareable report (strips Action Matrix) */}
               <button
                 onClick={() => downloadClientReport(result.htmlName)}
-                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.green, color: C.bg, fontFamily: "'Space Grotesk', sans-serif", border: "none" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.green, color: C.bg, fontFamily: "'Space Grotesk', sans-serif", border: "none" }}
               >⬇ Shareable Report</button>
               {/* Full report (includes Action Matrix) */}
               <a
                 href={`/api/download/${encodeURIComponent(result.htmlName)}`}
                 download={result.htmlName}
-                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: "rgba(76,175,116,.15)", color: C.green, border: `1px solid rgba(76,175,116,.35)`, fontFamily: "'Space Grotesk', sans-serif" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: "rgba(76,175,116,.15)", color: C.green, border: `1px solid rgba(76,175,116,.35)`, fontFamily: "'Space Grotesk', sans-serif" }}
               >⬇ Full Report</a>
               {/* PowerPoint */}
               <a
                 href={`/api/download/${encodeURIComponent(result.pptxName)}`}
                 download={result.pptxName}
-                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.gold, color: C.bg, fontFamily: "'Space Grotesk', sans-serif" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.gold, color: C.bg, fontFamily: "'Space Grotesk', sans-serif" }}
               >⬇ PowerPoint</a>
             </div>
             <div style={{ fontSize: 10, color: C.muted, marginTop: 8, fontFamily: "'DM Mono', monospace" }}>
@@ -1054,13 +1054,13 @@ export default function Home() {
           <div style={{ paddingTop: 40 }}>
             <SlideUp delay={40}>
               <div style={{ marginBottom: 28 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: C.gold, marginBottom: 10 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: C.gold, marginBottom: 10 }}>
                   Reports
                 </div>
-                <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 32, fontWeight: 700, letterSpacing: "-.02em", color: C.textHi, margin: 0 }}>
+                <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: "-.02em", color: C.textHi, margin: 0 }}>
                   Previous Reports
                 </h2>
-                <p style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>
+                <p style={{ fontSize: 15, color: C.muted, marginTop: 6 }}>
                   All generated HTML and PowerPoint reports, most recent first.
                 </p>
               </div>
@@ -1074,7 +1074,7 @@ export default function Home() {
                   borderRadius: 14,
                 }}>
                   <div style={{ fontSize: 36, marginBottom: 12 }}>📭</div>
-                  <div style={{ fontSize: 14, color: C.muted }}>No reports yet — generate one from the Dashboard tab.</div>
+                  <div style={{ fontSize: 18, color: C.muted }}>No reports yet — generate one from the Dashboard tab.</div>
                 </div>
               </SlideUp>
             ) : (
@@ -1085,14 +1085,14 @@ export default function Home() {
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       padding: "14px 18px",
                       background: C.surface, border: `1px solid ${C.border}`,
-                      borderRadius: 12, fontSize: 13,
+                      borderRadius: 12, fontSize: 15,
                       transition: "border-color .2s",
                       animationDelay: `${i * 40}ms`,
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
-                        <span style={{ fontSize: 20, flexShrink: 0 }}>{extIcon(f.name)}</span>
+                        <span style={{ fontSize: 28, flexShrink: 0 }}>{extIcon(f.name)}</span>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ color: C.text, fontFamily: "'DM Mono', monospace", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <div style={{ color: C.text, fontFamily: "'DM Mono', monospace", fontSize: 18, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {f.name}
                           </div>
                           <div style={{ color: C.muted, fontFamily: "'DM Mono', monospace", fontSize: 10, marginTop: 3 }}>
@@ -1108,7 +1108,7 @@ export default function Home() {
                               padding: "7px 14px", borderRadius: 8,
                               background: "rgba(76,175,116,.12)", color: C.green,
                               border: `1px solid rgba(76,175,116,.25)`,
-                              fontSize: 12, fontWeight: 600, cursor: "pointer",
+                              fontSize: 18, fontWeight: 600, cursor: "pointer",
                               fontFamily: "'Space Grotesk', sans-serif",
                             }}
                           >⬇ Shareable</button>
@@ -1120,7 +1120,7 @@ export default function Home() {
                             padding: "7px 14px", borderRadius: 8,
                             background: "rgba(201,146,42,.12)", color: C.gold,
                             border: `1px solid rgba(201,146,42,.25)`,
-                            fontSize: 12, fontWeight: 600, textDecoration: "none",
+                            fontSize: 18, fontWeight: 600, textDecoration: "none",
                             fontFamily: "'Space Grotesk', sans-serif",
                           }}
                         >{f.name.endsWith(".html") ? "⬇ Full" : "⬇ Download"}</a>

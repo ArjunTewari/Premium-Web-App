@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+﻿import { useState, useRef } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 
@@ -76,15 +76,15 @@ export default function Signup() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#0a0e17",
+      background: "var(--bg-app)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       fontFamily: "'Inter', sans-serif",
     }}>
       <div style={{
-        background: "#111827",
-        border: "1px solid #1e293b",
+        background: "var(--bg-card)",
+        border: "1px solid var(--border-col)",
         borderRadius: 12,
         padding: "2.5rem",
         width: "100%",
@@ -92,11 +92,11 @@ export default function Signup() {
         boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
       }}>
         <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🌿</div>
-          <h1 style={{ color: "#f8fafc", fontSize: 22, fontWeight: 700, margin: 0 }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>🌿</div>
+          <h1 style={{ color: "var(--text-main)", fontSize: 28, fontWeight: 700, margin: 0 }}>
             Emerald AI
           </h1>
-          <p style={{ color: "#64748b", fontSize: 13, marginTop: 4 }}>
+          <p style={{ color: "var(--text-muted)", fontSize: 15, marginTop: 4 }}>
             Create your account
           </p>
         </div>
@@ -142,12 +142,12 @@ export default function Signup() {
             <button type="submit" style={btnStyle} disabled={loading}>
               {loading ? "Creating account…" : "Create Account"}
             </button>
-            <p style={{ textAlign: "center", marginTop: 16, color: "#64748b", fontSize: 13 }}>
+            <p style={{ textAlign: "center", marginTop: 16, color: "var(--text-muted)", fontSize: 15 }}>
               Already have an account?{" "}
               <a
                 href="/login"
                 onClick={(e) => { e.preventDefault(); navigate("/login"); }}
-                style={{ color: "#c9922a", textDecoration: "none" }}
+                style={{ color: "var(--accent-amber)", textDecoration: "none" }}
               >
                 Sign in
               </a>
@@ -158,10 +158,10 @@ export default function Signup() {
         {stage === "2fa_setup" && (
           <form onSubmit={handleConfirmSetup}>
             <div style={{ marginBottom: "1.25rem" }}>
-              <p style={{ color: "#c9922a", fontWeight: 600, fontSize: 14, margin: "0 0 12px 0" }}>
+              <p style={{ color: "var(--accent-amber)", fontWeight: 600, fontSize: 18, margin: "0 0 12px 0" }}>
                 Set up Two-Factor Authentication
               </p>
-              <p style={{ color: "#94a3b8", fontSize: 13, margin: "0 0 16px 0", lineHeight: 1.6 }}>
+              <p style={{ color: "var(--text-sub)", fontSize: 15, margin: "0 0 16px 0", lineHeight: 1.6 }}>
                 Scan this QR code with Google Authenticator, Authy, or any TOTP app:
               </p>
               {qrDataUrl && (
@@ -172,13 +172,13 @@ export default function Signup() {
                 </div>
               )}
               {totpSecret && (
-                <div style={{ background: "#0a0e17", border: "1px solid #1e293b", borderRadius: 6, padding: "8px 12px", marginBottom: 16 }}>
-                  <p style={{ color: "#64748b", fontSize: 11, margin: "0 0 4px 0" }}>Manual entry key:</p>
-                  <code style={{ color: "#4caf74", fontSize: 12, letterSpacing: 2, wordBreak: "break-all" }}>{totpSecret}</code>
+                <div style={{ background: "var(--bg-app)", border: "1px solid var(--border-col)", borderRadius: 6, padding: "8px 12px", marginBottom: 16 }}>
+                  <p style={{ color: "var(--text-muted)", fontSize: 15, margin: "0 0 4px 0" }}>Manual entry key:</p>
+                  <code style={{ color: "var(--accent-green)", fontSize: 18, letterSpacing: 2, wordBreak: "break-all" }}>{totpSecret}</code>
                 </div>
               )}
             </div>
-            <p style={{ color: "#94a3b8", fontSize: 13, margin: "0 0 12px 0" }}>
+            <p style={{ color: "var(--text-sub)", fontSize: 15, margin: "0 0 12px 0" }}>
               Enter the 6-digit code from your app to confirm:
             </p>
             <OtpInput value={otp} onChange={setOtp} inputRef={otpRef} />
@@ -215,14 +215,14 @@ function OtpInput({
           style={{
             width: 44,
             height: 52,
-            background: "#0a0e17",
-            border: `2px solid ${d.trim() ? "#c9922a" : "#1e293b"}`,
+            background: "var(--bg-app)",
+            border: `2px solid ${d.trim() ? "var(--accent-amber)" : "var(--border-col)"}`,
             borderRadius: 8,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "#f8fafc",
-            fontSize: 22,
+            color: "var(--text-main)",
+            fontSize: 28,
             fontWeight: 700,
             fontFamily: "monospace",
           }}
@@ -255,32 +255,32 @@ function OtpInput({
 
 const labelStyle: React.CSSProperties = {
   display: "block",
-  color: "#94a3b8",
-  fontSize: 13,
+  color: "var(--text-sub)",
+  fontSize: 15,
   marginBottom: 6,
   fontWeight: 500,
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  background: "#0a0e17",
-  border: "1px solid #1e293b",
+  background: "var(--bg-app)",
+  border: "1px solid var(--border-col)",
   borderRadius: 8,
   padding: "10px 14px",
-  color: "#f8fafc",
-  fontSize: 14,
+  color: "var(--text-main)",
+  fontSize: 18,
   outline: "none",
   boxSizing: "border-box",
 };
 
 const btnStyle: React.CSSProperties = {
   width: "100%",
-  background: "#c9922a",
+  background: "var(--accent-amber)",
   border: "none",
   borderRadius: 8,
   padding: "11px 0",
   color: "#fff",
-  fontSize: 15,
+  fontSize: 17,
   fontWeight: 600,
   cursor: "pointer",
   display: "block",
@@ -288,7 +288,7 @@ const btnStyle: React.CSSProperties = {
 
 const errorStyle: React.CSSProperties = {
   color: "#f87171",
-  fontSize: 13,
+  fontSize: 15,
   marginBottom: 12,
   textAlign: "center",
 };

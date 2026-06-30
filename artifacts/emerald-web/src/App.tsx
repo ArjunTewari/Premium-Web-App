@@ -1,7 +1,9 @@
-import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
+﻿import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
@@ -29,13 +31,13 @@ function FullScreenLoader() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#0a0e17",
+      background: "var(--bg-app)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      color: "#64748b",
+      color: "var(--text-muted)",
       fontFamily: "'Inter', sans-serif",
-      fontSize: 14,
+      fontSize: 16,
     }}>
       Loading…
     </div>
@@ -67,14 +69,17 @@ function AppRoutes() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+          <Toaster />
+          <ThemeToggle />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 
