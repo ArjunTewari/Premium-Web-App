@@ -81,6 +81,9 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     ORG_IG_HANDLES: (body.orgIgHandles && typeof body.orgIgHandles === "object" && !Array.isArray(body.orgIgHandles))
       ? body.orgIgHandles
       : {},
+    ORG_LI_HANDLES: (body.orgLiHandles && typeof body.orgLiHandles === "object" && !Array.isArray(body.orgLiHandles))
+      ? body.orgLiHandles
+      : {},
     outDir: OUT_DIR,
   };
 

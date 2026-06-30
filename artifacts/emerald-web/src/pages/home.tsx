@@ -66,6 +66,22 @@ const ORG_IG_HANDLES: Record<string, string> = {
   "Sustainable Futures Collaborative":                "sustainablefuturescollab",
 };
 
+const ORG_LI_HANDLES: Record<string, string> = {
+  "Council on Energy, Environment and Water":         "ceew-council-on-energy-environment-and-water",
+  "Centre for Science and Environment":               "centre-for-science-and-environment",
+  "WRI India":                                        "wri-india",
+  "CSTEP":                                            "",
+  "Air Pollution Action Group":                       "",
+  "Chintan Environmental Research and Action Group":  "chintan-environmental-research-and-action-group",
+  "IIT Delhi":                                        "indian-institute-of-technology-delhi",
+  "IIT Kanpur":                                       "iit-kanpur",
+  "Health Effects Institute":                         "health-effects-institute",
+  "ICCT":                                             "international-council-on-clean-transportation",
+  "EPIC India":                                       "",
+  "Climate Trends":                                   "",
+  "Sustainable Futures Collaborative":                "",
+};
+
 const DEFAULT_SCOPE = [
   "AQI", "PM2.5", "PM10", "air pollution", "air quality", "smog",
   "clean air", "NCAP", "GRAP", "Black Carbon", "Ozone", "Ammonia",
@@ -194,13 +210,14 @@ export default function Home() {
 
   // Unified social handles — pre-populated from hardcoded defaults, user-editable
   const [handlesOpen, setHandlesOpen] = useState(false);
-  const [orgHandleOverrides, setOrgHandleOverrides] = useState<Record<string, { twitter: string; instagram: string; youtube: string }>>(() => {
-    const init: Record<string, { twitter: string; instagram: string; youtube: string }> = {};
+  const [orgHandleOverrides, setOrgHandleOverrides] = useState<Record<string, { twitter: string; instagram: string; youtube: string; linkedin: string }>>(() => {
+    const init: Record<string, { twitter: string; instagram: string; youtube: string; linkedin: string }> = {};
     for (const org of DEFAULT_ORGS) {
       init[org] = {
         twitter:   ORG_TW_HANDLES[org] || "",
         instagram: ORG_IG_HANDLES[org] || "",
         youtube:   ORG_YT_HANDLES[org] || "",
+        linkedin:  ORG_LI_HANDLES[org] || "",
       };
     }
     return init;
@@ -227,6 +244,7 @@ export default function Home() {
   const [hNewTw,  setHNewTw]    = useState("");
   const [hNewIg,  setHNewIg]    = useState("");
   const [hNewYt,  setHNewYt]    = useState("");
+  const [hNewLi,  setHNewLi]    = useState("");
 
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -251,11 +269,14 @@ export default function Home() {
   const allIgHandles: Record<string, string> = Object.fromEntries(
     Object.entries(orgHandleOverrides).map(([org, h]) => [org, h.instagram]).filter(([, v]) => v)
   );
+  const allLiHandles: Record<string, string> = Object.fromEntries(
+    Object.entries(orgHandleOverrides).map(([org, h]) => [org, h.linkedin]).filter(([, v]) => v)
+  );
 
-  function setHandle(org: string, platform: "twitter" | "instagram" | "youtube", value: string) {
+  function setHandle(org: string, platform: "twitter" | "instagram" | "youtube" | "linkedin", value: string) {
     setOrgHandleOverrides(prev => ({
       ...prev,
-      [org]: { ...(prev[org] || { twitter: "", instagram: "", youtube: "" }), [platform]: value },
+      [org]: { ...(prev[org] || { twitter: "", instagram: "", youtube: "", linkedin: "" }), [platform]: value },
     }));
   }
 
@@ -291,7 +312,7 @@ export default function Home() {
     }
     setCustomOrgs((prev) => [...prev, { name: val, ytHandle: handle }]);
     setSelectedOrgs((prev) => (prev.length < 13 ? [...prev, val] : prev));
-    setOrgHandleOverrides(prev => ({ ...prev, [val]: { twitter: "", instagram: "", youtube: handle } }));
+    setOrgHandleOverrides(prev => ({ ...prev, [val]: { twitter: "", instagram: "", youtube: handle, linkedin: "" } }));
     setOrgCustomInput(""); setOrgYtHandleInput("");
   }
 
@@ -309,9 +330,10 @@ export default function Home() {
         twitter:   hNewTw.trim().replace(/^@/, ""),
         instagram: hNewIg.trim().replace(/^@/, ""),
         youtube:   hNewYt.trim(),
+        linkedin:  hNewLi.trim().replace(/^\/company\//i, ""),
       },
     }));
-    setHNewOrg(""); setHNewTw(""); setHNewIg(""); setHNewYt("");
+    setHNewOrg(""); setHNewTw(""); setHNewIg(""); setHNewYt(""); setHNewLi("");
   }
 
   function addScope() {
@@ -365,7 +387,7 @@ export default function Home() {
     if (!selectedOrgs.length) { alert("Select at least one organisation."); return; }
     setRunning(true); setLogs([]); setProgress(0); setResult(null); setTrendStatus(null);
 
-    const payload = { orgs: selectedOrgs, orgYtHandles: allOrgHandles, orgTwHandles: allTwHandles, orgIgHandles: allIgHandles, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries };
+    const payload = { orgs: selectedOrgs, orgYtHandles: allOrgHandles, orgTwHandles: allTwHandles, orgIgHandles: allIgHandles, orgLiHandles: allLiHandles, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries };
     const TOTAL_STEPS = 60;
     let stepCount = 0;
 
@@ -637,11 +659,12 @@ export default function Home() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7 }}>
                 {allOrgs.map((org) => {
                   const on = selectedOrgs.includes(org);
-                  const ov = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "" };
+                  const ov = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "", linkedin: "" };
                   const chips: { label: string; val: string; color: string }[] = [
-                    { label: "𝕏", val: ov.twitter  ? `@${ov.twitter}`  : "", color: "#4a9fd4" },
-                    { label: "IG", val: ov.instagram ? `@${ov.instagram}` : "", color: "#e05c9c" },
-                    { label: "YT", val: ov.youtube  || "",                     color: "#e53935" },
+                    { label: "in", val: ov.linkedin  || "",                      color: "#0a8fd4" },
+                    { label: "𝕏",  val: ov.twitter   ? `@${ov.twitter}`  : "", color: "#4a9fd4" },
+                    { label: "IG", val: ov.instagram  ? `@${ov.instagram}` : "", color: "#e05c9c" },
+                    { label: "YT", val: ov.youtube   || "",                      color: "#e53935" },
                   ].filter(c => c.val);
                   return (
                     <button
@@ -847,7 +870,7 @@ export default function Home() {
               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase" }}>
                 Social Handles
                 <span style={{ marginLeft: 8, background: "rgba(255,255,255,.06)", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 7px", fontSize: 9, fontWeight: 600, verticalAlign: "middle", fontFamily: "'DM Mono', monospace" }}>
-                  X · IG · YT per org
+                  LI · X · IG · YT per org
                 </span>
               </span>
               <span style={{ fontSize: 11, color: C.muted }}>{handlesOpen ? "▲" : "▼"}</span>
@@ -858,6 +881,7 @@ export default function Home() {
                   <thead>
                     <tr>
                       <th style={{ textAlign: "left", fontFamily: "'DM Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, padding: "0 10px 8px 0", whiteSpace: "nowrap" }}>Org</th>
+                      <th style={{ textAlign: "left", fontFamily: "'DM Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "#0a8fd4", padding: "0 10px 8px", whiteSpace: "nowrap" }}>LinkedIn</th>
                       <th style={{ textAlign: "left", fontFamily: "'DM Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "#4a9fd4", padding: "0 10px 8px", whiteSpace: "nowrap" }}>𝕏 Twitter</th>
                       <th style={{ textAlign: "left", fontFamily: "'DM Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "#e05c9c", padding: "0 10px 8px", whiteSpace: "nowrap" }}>Instagram</th>
                       <th style={{ textAlign: "left", fontFamily: "'DM Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "#e53935", padding: "0 0 8px 10px", whiteSpace: "nowrap" }}>YouTube</th>
@@ -865,9 +889,9 @@ export default function Home() {
                   </thead>
                   <tbody>
                     {selectedOrgs.map((org, i) => {
-                      const handles = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "" };
+                      const handles = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "", linkedin: "" };
                       const rowBg = i % 2 === 0 ? "rgba(255,255,255,.02)" : "transparent";
-                      const cellInput = (platform: "twitter" | "instagram" | "youtube", color: string) => (
+                      const cellInput = (platform: "twitter" | "instagram" | "youtube" | "linkedin", color: string) => (
                         <input
                           value={handles[platform]}
                           onChange={e => setHandle(org, platform, e.target.value)}
@@ -887,6 +911,7 @@ export default function Home() {
                           <td style={{ padding: "5px 10px 5px 0", fontFamily: "'Space Grotesk', sans-serif", fontSize: 11, color: C.text, whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>
                             {org.length > 30 ? org.slice(0, 28) + "…" : org}
                           </td>
+                          <td style={{ padding: "5px 10px" }}>{cellInput("linkedin", "#0a8fd4")}</td>
                           <td style={{ padding: "5px 10px" }}>{cellInput("twitter", "#4a9fd4")}</td>
                           <td style={{ padding: "5px 10px" }}>{cellInput("instagram", "#e05c9c")}</td>
                           <td style={{ padding: "5px 0 5px 10px" }}>{cellInput("youtube", "#e53935")}</td>
@@ -896,7 +921,7 @@ export default function Home() {
                   </tbody>
                 </table>
                 <div style={{ marginTop: 10, fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#2a3a4a" }}>
-                  Handles without @ · used by APIdirect.io for X ER · Instagram ER · YouTube subscriber count
+                  Handles without @ · used by APIdirect.io for LinkedIn ER · X ER · Instagram ER · YouTube subscriber count
                 </div>
               </div>
             )}
@@ -1107,7 +1132,7 @@ export default function Home() {
                   Organisation Handles
                 </h2>
                 <p style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>
-                  Edit 𝕏 Twitter, Instagram, and YouTube handles per org. Changes apply immediately to the next report run.
+                  Edit LinkedIn, 𝕏 Twitter, Instagram, and YouTube handles per org. Changes apply immediately to the next report run.
                 </p>
               </div>
             </SlideUp>
@@ -1115,12 +1140,13 @@ export default function Home() {
             <SlideUp delay={80}>
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
                 {/* Table header */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 0, borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr 1fr", gap: 0, borderBottom: `1px solid ${C.border}` }}>
                   {[
                     { label: "Organisation", color: C.muted },
-                    { label: "𝕏 Twitter", color: "#4a9fd4" },
-                    { label: "Instagram", color: "#e05c9c" },
-                    { label: "YouTube", color: "#e53935" },
+                    { label: "LinkedIn",     color: "#0a8fd4" },
+                    { label: "𝕏 Twitter",   color: "#4a9fd4" },
+                    { label: "Instagram",    color: "#e05c9c" },
+                    { label: "YouTube",      color: "#e53935" },
                   ].map(col => (
                     <div key={col.label} style={{
                       padding: "12px 16px",
@@ -1132,7 +1158,7 @@ export default function Home() {
 
                 {/* Rows — all orgs */}
                 {[...DEFAULT_ORGS, ...customOrgs.map(o => o.name)].map((org, i) => {
-                  const ov = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "" };
+                  const ov = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "", linkedin: "" };
                   const rowBg = i % 2 === 0 ? "transparent" : "rgba(255,255,255,.018)";
                   const cellSty: React.CSSProperties = {
                     background: "rgba(255,255,255,.04)",
@@ -1144,10 +1170,19 @@ export default function Home() {
                     transition: "border-color .2s",
                   };
                   return (
-                    <div key={org} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 0, background: rowBg, borderBottom: `1px solid rgba(255,255,255,.04)` }}>
+                    <div key={org} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr 1fr", gap: 0, background: rowBg, borderBottom: `1px solid rgba(255,255,255,.04)` }}>
                       {/* Org name */}
                       <div style={{ padding: "10px 16px", display: "flex", alignItems: "center" }}>
                         <span style={{ fontSize: 12, fontFamily: "'Space Grotesk', sans-serif", color: C.text }}>{org}</span>
+                      </div>
+                      {/* LinkedIn */}
+                      <div style={{ padding: "10px 10px" }}>
+                        <input
+                          value={ov.linkedin}
+                          onChange={e => setHandle(org, "linkedin", e.target.value)}
+                          placeholder="company-slug"
+                          style={{ ...cellSty, color: ov.linkedin ? "#0a8fd4" : C.muted, borderColor: ov.linkedin ? "rgba(10,143,212,.3)" : "rgba(255,255,255,.08)" }}
+                        />
                       </div>
                       {/* Twitter */}
                       <div style={{ padding: "10px 10px" }}>
@@ -1182,7 +1217,7 @@ export default function Home() {
 
                 {/* Add new org row */}
                 <div style={{ borderTop: `1px solid ${C.border}`, background: "rgba(201,146,42,.04)" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 0 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr 1fr", gap: 0 }}>
                     <div style={{ padding: "10px 10px" }}>
                       <input
                         value={hNewOrg}
@@ -1196,6 +1231,9 @@ export default function Home() {
                           outline: "none", width: "100%", boxSizing: "border-box",
                         }}
                       />
+                    </div>
+                    <div style={{ padding: "10px 10px" }}>
+                      <input value={hNewLi} onChange={e => setHNewLi(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addHandleOrg(); }} placeholder="company-slug" style={{ background: "rgba(10,143,212,.06)", border: "1px solid rgba(10,143,212,.2)", borderRadius: 6, padding: "6px 10px", color: "#0a8fd4", fontFamily: "'DM Mono', monospace", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box" }} />
                     </div>
                     <div style={{ padding: "10px 10px" }}>
                       <input value={hNewTw} onChange={e => setHNewTw(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addHandleOrg(); }} placeholder="twitter_handle" style={{ background: "rgba(74,159,212,.06)", border: "1px solid rgba(74,159,212,.2)", borderRadius: 6, padding: "6px 10px", color: "#4a9fd4", fontFamily: "'DM Mono', monospace", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box" }} />
