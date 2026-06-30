@@ -846,6 +846,76 @@ async function run(cfg, cb) {
     );
   }
 
+  // ── STEP 1d: Haiku citation filter — drop incidental mentions ─
+  cb(`\nSTEP 1d/6 — Haiku citation filter (contributor mentions only)...`, "head");
+  if (cfg.CLAUDE_KEY) {
+    const limit1d = pLimit(4);
+    await Promise.allSettled(ORGS.map(org => limit1d(async () => {
+      const before = arts[org].length;
+      if (!before) return;
+
+      const batches = [];
+      for (let i = 0; i < arts[org].length; i += 10) batches.push(arts[org].slice(i, i + 10));
+
+      const keep = new Set();
+
+      for (const batch of batches) {
+        const batchText = batch.map((a, j) => {
+          const term = a.matchTerm || org;
+          const window = extractRelevantWindow(a.fullText || "", term, 800);
+          return `[${j}] TITLE: ${a.title}\nSOURCE: ${a.source}\nCONTENT: ${window}`;
+        }).join("\n===\n");
+
+        const prompt = `You are filtering news articles for the organisation "${org}" (air quality / environment sector).
+
+For each article decide: is "${org}" cited as a CONTRIBUTOR OF INFORMATION — i.e. the article uses "${org}"'s research, report, statistic, data point, or expert quote as a source?
+
+Return true (keep) if:
+- A specific report, study, finding, or dataset FROM "${org}" is cited
+- A spokesperson, researcher, or expert from "${org}" is quoted or attributed
+- Data / statistics are explicitly attributed to "${org}"
+
+Return false (drop) if:
+- "${org}" is only part of a list (e.g. monitoring stations, award recipients, university rankings)
+- "${org}" is mentioned only as a location, venue, or event host
+- "${org}" appears in a disclaimer, footer, or wire-copy credit line
+- The article is about the org's internal affairs (admissions, sports, finance) unrelated to AQ
+
+Return ONLY a JSON array with one entry per article:
+[{"index":0,"keep":true},{"index":1,"keep":false},...]
+
+Articles:
+${batchText}`;
+
+        try {
+          const raw = await callClaude(prompt, cfg.CLAUDE_KEY, 300, CLAUDE_MODEL);
+          const match = raw.match(/\[[\s\S]*\]/);
+          if (match) {
+            const parsed = JSON.parse(match[0]);
+            parsed.forEach(({ index, keep: k }) => {
+              if (k && batch[index]) keep.add(batch[index].url || batch[index].title);
+            });
+          } else {
+            // Malformed response — fail open (keep all)
+            batch.forEach(a => keep.add(a.url || a.title));
+          }
+        } catch (e) {
+          // API error — fail open (keep all)
+          batch.forEach(a => keep.add(a.url || a.title));
+          cb(`  Haiku filter error (${org}): ${e.message}`, "warn");
+        }
+        await sleep(200);
+      }
+
+      arts[org] = arts[org].filter(a => keep.has(a.url || a.title));
+      const dropped = before - arts[org].length;
+      cb(
+        `  ${org}: ${dropped > 0 ? `dropped ${dropped} incidental →` : "all substantive →"} ${arts[org].length} articles`,
+        arts[org].length > 0 ? "ok" : "warn",
+      );
+    })));
+  }
+
   // ── STEP 2: Classify with Claude ──────────────────────────
   cb(`\nSTEP 2/6 — Classifying with Claude (batches of 8)...`, "head");
   const cls = {};
