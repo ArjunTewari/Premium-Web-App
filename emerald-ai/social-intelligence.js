@@ -27,7 +27,7 @@ const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
 // Word-boundary org mention check — prevents "IIT" matching inside "IITM" etc.
 function orgMentioned(text, org) {
   const escaped = org.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?<![A-Za-z])${escaped}(?![A-Za-z])`, 'i').test(text);
+  return new RegExp(`\\b${escaped}\\b`, 'i').test(text);
 }
 
 // The 5 AEO discovery questions asked to each LLM
@@ -76,7 +76,7 @@ async function runAEO(cfg, orgs, cb) {
       const responses = await Promise.allSettled(
         queriesUsed.map(q =>
           axios.post('https://api.openai.com/v1/chat/completions',
-            { model: 'gpt-4o-mini', max_tokens: 150, messages: [{ role: 'system', content: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }, { role: 'user', content: q }] },
+            { model: 'gpt-4o-mini', max_tokens: 300, messages: [{ role: 'system', content: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }, { role: 'user', content: q }] },
             { headers: { 'Authorization': `Bearer ${cfg.OPENAI_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000 }
           )
         )
@@ -92,7 +92,7 @@ async function runAEO(cfg, orgs, cb) {
             count++;
             if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
           }
-          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'GPT-4o', cited: mentioned, text });
+          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'GPT-4o mini', cited: mentioned, text });
         });
         results[org].llmBreakdown['GPT-4o mini'] = {
           mentions: count, total: queriesUsed.length
@@ -107,7 +107,7 @@ async function runAEO(cfg, orgs, cb) {
       const responses = await Promise.allSettled(
         queriesUsed.map(q =>
           axios.post('https://api.perplexity.ai/chat/completions',
-            { model: 'sonar', max_tokens: 150, messages: [{ role: 'system', content: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }, { role: 'user', content: q }] },
+            { model: 'sonar', max_tokens: 300, messages: [{ role: 'system', content: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }, { role: 'user', content: q }] },
             { headers: { 'Authorization': `Bearer ${cfg.PERPLEXITY_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000 }
           )
         )
@@ -139,7 +139,7 @@ async function runAEO(cfg, orgs, cb) {
         queriesUsed.map(q =>
           axios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${cfg.GEMINI_KEY}`,
-            { contents: [{ parts: [{ text: q }] }], generationConfig: { maxOutputTokens: 300 } },
+            { contents: [{ parts: [{ text: q }] }], systemInstruction: { parts: [{ text: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }] }, generationConfig: { maxOutputTokens: 300 } },
             { headers: { 'Content-Type': 'application/json' }, timeout: 30000 }
           )
         )
@@ -163,7 +163,7 @@ async function runAEO(cfg, orgs, cb) {
             count++;
             if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
           }
-          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Gemini', cited: mentioned, text });
+          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Gemini 1.5 Flash', cited: mentioned, text });
         });
         results[org].llmBreakdown['Gemini 1.5 Flash'] = {
           mentions: count, total: queriesUsed.length
@@ -177,7 +177,8 @@ async function runAEO(cfg, orgs, cb) {
   for (const org of orgs) {
     results[org].mentions = Object.values(results[org].llmBreakdown)
       .reduce((a, b) => a + b.mentions, 0);
-    const maxPossible = queriesUsed.length * 3;
+    const activeLlms = [cfg.OPENAI_KEY, cfg.PERPLEXITY_KEY, cfg.GEMINI_KEY].filter(Boolean).length || 1;
+    const maxPossible = queriesUsed.length * activeLlms;
     results[org].score = Math.round(results[org].mentions / maxPossible * 100);
     cb(`  AEO total: ${org} = ${results[org].mentions} mentions across all LLMs`, 'ok');
   }
@@ -201,7 +202,7 @@ function escHtml(s) {
 /** Build the location mini-bars for a single org on a platform */
 /** Build a 2-row table (one row per org) for a platform */
 /** AEO section HTML */
-function buildAEOHtml(aeoResults, orgs) {
+function buildAEOHtml(aeoResults, orgs, queriesOverride) {
   const orgColorList = ['#3d8ef0','#e05c3a','#4caf74','#c9922a','#a371f7','#e05c5c','#14b8a6','#f97316','#8b5cf6','#06b6d4','#84cc16','#ef4444','#ec4899'];
 
   const maxMentions = Math.max(...orgs.map(o => (aeoResults[o]?.mentions || 0)), 1);
@@ -221,7 +222,7 @@ function buildAEOHtml(aeoResults, orgs) {
     }
   });
 
-  const queriesUsed = aeoResults._queriesUsed || AEO_QUESTIONS;
+  const queriesUsed = queriesOverride || aeoResults._queriesUsed || AEO_QUESTIONS;
 
   // ── Summary table: orgs as rows, LLMs as columns ─────────────────────────
   const allLlms = [...new Set(
@@ -244,7 +245,7 @@ function buildAEOHtml(aeoResults, orgs) {
         const d = aeoResults[org] || { llmBreakdown: {} };
         const maxQ = queriesUsed ? queriesUsed.length : 1;
         return `<tr style="border-top:1px solid #252d40">
-          <td style="padding:10px 14px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#2e3a52">#${rank}</td>
+          <td style="padding:10px 14px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${m > 0 ? '#2e3a52' : '#5e7494'}">${m > 0 ? `#${rank}` : '—'}</td>
           <td style="padding:10px 14px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${col}">${escHtml(org)}</span></td>
           <td style="padding:10px 14px;text-align:center">
             <span style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:${col}">${m}</span>
@@ -267,9 +268,9 @@ function buildAEOHtml(aeoResults, orgs) {
 
   // ── Q×Org matrix table ────────────────────────────────────────────────────
   const llmLinks = {
-    'GPT-4o':     (q) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`,
-    'Perplexity': (q) => `https://www.perplexity.ai/search?q=${encodeURIComponent(q)}`,
-    'Gemini':     (q) => `https://gemini.google.com/app?q=${encodeURIComponent(q)}`,
+    'GPT-4o mini':      (q) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`,
+    'Perplexity':       (q) => `https://www.perplexity.ai/search?q=${encodeURIComponent(q)}`,
+    'Gemini 1.5 Flash': (q) => `https://gemini.google.com/app?q=${encodeURIComponent(q)}`,
   };
 
   const qMatrixRows = queriesUsed.map((q, qi) => {

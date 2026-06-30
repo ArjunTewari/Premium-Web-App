@@ -1112,6 +1112,7 @@ ${batchText}`;
     };
   try {
     aeoResults = await SI.runAEO(cfg, ORGS, cb);
+    const aeoQueriesUsed = aeoResults._queriesUsed;
     delete aeoResults._queriesUsed; // remove metadata key — Object.values() calls later expect only org entries
     for (const org of ORGS)
       cb(
@@ -3590,7 +3591,7 @@ ${appendixSections}</section>
 <section class="sec" id="em"><div class="sh"><div class="se">Section 06</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations are <strong style="color:var(--warn)">not yet part of</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. These are emerging narrative opportunities: the conversation is active but your orgs are absent. <strong>Gap signal</strong> = evidence of the absence. <strong>Opportunity</strong> = a concrete action to enter the conversation.</div><div class="sdiv"></div></div>
 ${emergingCards}</section>
 
-${SI.buildAEOHtml(aeoResults, ORGS)}
+${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
 <section class="sec" id="social"><div class="sh"><div class="se">Section 08</div><h2 class="st">Social Media AQ Presence</h2><div class="sd">Live social data from official org handles — LinkedIn (LinkedIn API), X/Twitter (X API v2), Instagram (Graph API), and YouTube (Data API v3). ER = Engagement Rate. <strong style="color:var(--good)">✓ cit</strong> in the Citations section indicates the org appeared within 2 lines of an AQ keyword.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
