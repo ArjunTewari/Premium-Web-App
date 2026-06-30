@@ -567,6 +567,10 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
 
   lib/db:
     dependencies:
@@ -592,6 +596,9 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
 
   scripts:
     devDependencies:
