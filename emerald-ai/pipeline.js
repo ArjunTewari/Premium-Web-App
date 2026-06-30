@@ -682,8 +682,8 @@ async function run(cfg, cb) {
     const limit1 = pLimit(4); // 4 orgs in parallel — safe for Serper rate limits
     await Promise.allSettled(ORGS.map(org => limit1(async () => {
       const seen = new Set();
-      let skipped = 0;
       for (const kw of SCOPE_KEYWORDS.slice(0, 8)) {
+        let skipped = 0;
         const q = `"${org}" ${kw} India`;
         cb(`  ${q}`);
         try {
@@ -739,8 +739,12 @@ async function run(cfg, cb) {
     })));
   }
 
-  // ── STEP 1c: TV channel targeted searches ──────────────────
-  cb(`\nSTEP 1c/6 — Fetching TV channel coverage (site: searches)...`, "head");
+  // Snapshot before TV so we know which articles are TV-only (for targeted scrape later)
+  const tvStartIdx = {};
+  for (const org of ORGS) tvStartIdx[org] = arts[org].length;
+
+  // ── STEP 1b: TV channel targeted searches ──────────────────
+  cb(`\nSTEP 1b/6 — Fetching TV channel coverage (site: searches)...`, "head");
   // Build a broad OR clause from the user's scope keywords (up to 6)
   const tvKws = SCOPE_KEYWORDS.slice(0, 6);
   const tvKwClause = tvKws.length === 1
@@ -762,10 +766,8 @@ async function run(cfg, cb) {
             if (!tvSeen.has(k)) {
               tvSeen.add(k);
               if (!inRange(r.date || "")) continue;
-              if (isThirdParty(r.link || "", org)) {
-                arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "" });
-                added++;
-              }
+              arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "" });
+              added++;
             }
           }
           cb(`  ${channel} · ${org}: +${added}`, added > 0 ? "ok" : "warn");
@@ -783,10 +785,8 @@ async function run(cfg, cb) {
               if (!tvSeen.has(k)) {
                 tvSeen.add(k);
                 if (!inRange(r.date || "")) continue;
-                if (isThirdParty(r.link || "", org)) {
-                  arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "", matchTerm: tvAbbr });
-                  added++;
-                }
+                arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "", matchTerm: tvAbbr });
+                added++;
               }
             }
             if (added > 0) cb(`  ${channel} · "${tvAbbr}": +${added}`, "ok");
@@ -799,8 +799,38 @@ async function run(cfg, cb) {
     })));
   }
 
-  // ── STEP 1b: Scrape article text ───────────────────────────
-  cb(`\nSTEP 1b/6 — Scraping full article text...`, "head");
+  // ── STEP 1b (TV scrape): Scrape TV articles separately ─────
+  // TV articles were appended after the print search so they fall beyond the
+  // main 16-article scrape window. Scrape up to 8 TV articles per org here.
+  {
+    const tvScrapeLimit = pLimit(8);
+    const tvScrapeJobs = ORGS.flatMap(org =>
+      arts[org].slice(tvStartIdx[org]).filter(a => !a.fullText).slice(0, 8)
+        .map((a, i) => ({ org, a, i }))
+    );
+    if (tvScrapeJobs.length) {
+      cb(`  Scraping ${tvScrapeJobs.length} TV article(s)...`);
+      await Promise.allSettled(tvScrapeJobs.map(({ org, a, i }) => tvScrapeLimit(async () => {
+        if (!a.url) {
+          a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet || ""}`;
+          a.snippetOnly = true;
+          return;
+        }
+        const txt = await serperScrape(a.url, cfg.SERPER_KEY);
+        if (txt && txt.length > 300) {
+          a.fullText = txt;
+          cb(`  [TV ${org} ${i + 1}] scraped ${txt.length} chars`, "ok");
+        } else {
+          a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet || ""}`;
+          a.snippetOnly = true;
+          cb(`  [TV ${org} ${i + 1}] snippet fallback`, "warn");
+        }
+      })));
+    }
+  }
+
+  // ── STEP 1c: Scrape print/news article text ─────────────────
+  cb(`\nSTEP 1c/6 — Scraping full article text (print/news)...`, "head");
   {
     // Scrape up to 16 per org (matches classification cap) — concurrently, 8 at a time
     const scrapeLimit = pLimit(8);
@@ -830,8 +860,8 @@ async function run(cfg, cb) {
     });
   }
 
-  // ── STEP 1c: Drop articles where org not found in scraped text ──
-  cb(`\nSTEP 1c/6 — Filtering by org presence in scraped text...`, "head");
+  // ── STEP 1d: Drop articles where org not found in scraped text ──
+  cb(`\nSTEP 1d/6 — Filtering by org presence in scraped text...`, "head");
   for (const org of ORGS) {
     const before = arts[org].length;
     arts[org] = arts[org].filter(a => {
@@ -846,24 +876,25 @@ async function run(cfg, cb) {
     );
   }
 
-  // ── STEP 1d: Haiku citation filter — drop incidental mentions ─
-  cb(`\nSTEP 1d/6 — Haiku citation filter (contributor mentions only)...`, "head");
+  // ── STEP 1e: Haiku citation filter — drop incidental mentions ─
+  cb(`\nSTEP 1e/6 — Haiku citation filter (contributor mentions only)...`, "head");
   if (cfg.CLAUDE_KEY) {
-    const limit1d = pLimit(4);
-    await Promise.allSettled(ORGS.map(org => limit1d(async () => {
+    const limit1e = pLimit(2); // 2 orgs in parallel — Haiku RPM is tight under concurrent load
+    await Promise.allSettled(ORGS.map(org => limit1e(async () => {
       const before = arts[org].length;
       if (!before) return;
 
       const batches = [];
       for (let i = 0; i < arts[org].length; i += 10) batches.push(arts[org].slice(i, i + 10));
 
-      const keep = new Set();
+      const toKeep = new Set();
 
       for (const batch of batches) {
         const batchText = batch.map((a, j) => {
           const term = a.matchTerm || org;
-          const window = extractRelevantWindow(a.fullText || "", term, 800);
-          return `[${j}] TITLE: ${a.title}\nSOURCE: ${a.source}\nCONTENT: ${window}`;
+          const textWindow = extractRelevantWindow(a.fullText || "", term, 800);
+          const note = a.snippetOnly ? " [snippet only — no full text available]" : "";
+          return `[${j}] TITLE: ${a.title}\nSOURCE: ${a.source}${note}\nCONTENT: ${textWindow}`;
         }).join("\n===\n");
 
         const prompt = `You are filtering news articles for the organisation "${org}" (air quality / environment sector).
@@ -880,6 +911,7 @@ Return false (drop) if:
 - "${org}" is mentioned only as a location, venue, or event host
 - "${org}" appears in a disclaimer, footer, or wire-copy credit line
 - The article is about the org's internal affairs (admissions, sports, finance) unrelated to AQ
+- You only have a snippet and cannot determine substantive contribution — err on the side of keeping
 
 Return ONLY a JSON array with one entry per article:
 [{"index":0,"keep":true},{"index":1,"keep":false},...]
@@ -888,26 +920,28 @@ Articles:
 ${batchText}`;
 
         try {
-          const raw = await callClaude(prompt, cfg.CLAUDE_KEY, 300, CLAUDE_MODEL);
+          const raw = await callClaude(prompt, cfg.CLAUDE_KEY, 600, CLAUDE_MODEL);
           const match = raw.match(/\[[\s\S]*\]/);
           if (match) {
             const parsed = JSON.parse(match[0]);
-            parsed.forEach(({ index, keep: k }) => {
-              if (k && batch[index]) keep.add(batch[index].url || batch[index].title);
+            // Build a map from the response; indices absent from the response default to keep=true
+            const responseMap = new Map(parsed.map(({ index, keep: k }) => [index, !!k]));
+            batch.forEach((a, j) => {
+              if (responseMap.get(j) !== false) toKeep.add(a.url || a.title);
             });
           } else {
-            // Malformed response — fail open (keep all)
-            batch.forEach(a => keep.add(a.url || a.title));
+            // Malformed response — fail open (keep all in batch)
+            batch.forEach(a => toKeep.add(a.url || a.title));
           }
         } catch (e) {
-          // API error — fail open (keep all)
-          batch.forEach(a => keep.add(a.url || a.title));
+          // API error — fail open (keep all in batch)
+          batch.forEach(a => toKeep.add(a.url || a.title));
           cb(`  Haiku filter error (${org}): ${e.message}`, "warn");
         }
-        await sleep(200);
+        await sleep(400);
       }
 
-      arts[org] = arts[org].filter(a => keep.has(a.url || a.title));
+      arts[org] = arts[org].filter(a => toKeep.has(a.url || a.title));
       const dropped = before - arts[org].length;
       cb(
         `  ${org}: ${dropped > 0 ? `dropped ${dropped} incidental →` : "all substantive →"} ${arts[org].length} articles`,
