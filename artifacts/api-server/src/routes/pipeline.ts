@@ -75,6 +75,12 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     ORG_YT_HANDLES: (body.orgYtHandles && typeof body.orgYtHandles === "object" && !Array.isArray(body.orgYtHandles))
       ? body.orgYtHandles
       : {},
+    ORG_TW_HANDLES: (body.orgTwHandles && typeof body.orgTwHandles === "object" && !Array.isArray(body.orgTwHandles))
+      ? body.orgTwHandles
+      : {},
+    ORG_IG_HANDLES: (body.orgIgHandles && typeof body.orgIgHandles === "object" && !Array.isArray(body.orgIgHandles))
+      ? body.orgIgHandles
+      : {},
     outDir: OUT_DIR,
   };
 

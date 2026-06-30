@@ -34,6 +34,38 @@ const ORG_YT_HANDLES: Record<string, string> = {
   "Sustainable Futures Collaborative":                "@SFC_India",
 };
 
+const ORG_TW_HANDLES: Record<string, string> = {
+  "Council on Energy, Environment and Water":         "CEEWIndia",
+  "Centre for Science and Environment":               "cseindia",
+  "WRI India":                                        "wriindia",
+  "CSTEP":                                            "CSTEP_India",
+  "Air Pollution Action Group":                       "APAGIndia",
+  "Chintan Environmental Research and Action Group":  "chintanindia",
+  "IIT Delhi":                                        "iitdelhi",
+  "IIT Kanpur":                                       "IITKanpur",
+  "Health Effects Institute":                         "",
+  "ICCT":                                             "theicct",
+  "EPIC India":                                       "epiccampglobal",
+  "Climate Trends":                                   "ClimateTrendsIN",
+  "Sustainable Futures Collaborative":                "SFC_India",
+};
+
+const ORG_IG_HANDLES: Record<string, string> = {
+  "Council on Energy, Environment and Water":         "ceewindia",
+  "Centre for Science and Environment":               "cseindia",
+  "WRI India":                                        "wri_india",
+  "CSTEP":                                            "cstep_ind",
+  "Air Pollution Action Group":                       "",
+  "Chintan Environmental Research and Action Group":  "chintan.india",
+  "IIT Delhi":                                        "iitdelhi",
+  "IIT Kanpur":                                       "iit.kanpur",
+  "Health Effects Institute":                         "",
+  "ICCT":                                             "",
+  "EPIC India":                                       "campepicglobal",
+  "Climate Trends":                                   "climatrendsin",
+  "Sustainable Futures Collaborative":                "sustainablefuturescollab",
+};
+
 const DEFAULT_SCOPE = [
   "AQI", "PM2.5", "PM10", "air pollution", "air quality", "smog",
   "clean air", "NCAP", "GRAP", "Black Carbon", "Ozone", "Ammonia",
@@ -160,6 +192,20 @@ export default function Home() {
   const [orgCustomInput, setOrgCustomInput] = useState("");
   const [orgYtHandleInput, setOrgYtHandleInput] = useState("");
 
+  // Unified social handles — pre-populated from hardcoded defaults, user-editable
+  const [handlesOpen, setHandlesOpen] = useState(false);
+  const [orgHandleOverrides, setOrgHandleOverrides] = useState<Record<string, { twitter: string; instagram: string; youtube: string }>>(() => {
+    const init: Record<string, { twitter: string; instagram: string; youtube: string }> = {};
+    for (const org of DEFAULT_ORGS) {
+      init[org] = {
+        twitter:   ORG_TW_HANDLES[org] || "",
+        instagram: ORG_IG_HANDLES[org] || "",
+        youtube:   ORG_YT_HANDLES[org] || "",
+      };
+    }
+    return init;
+  });
+
   const [dateFrom, setDateFrom] = useState("2026-03-08");
   const [dateTo, setDateTo] = useState("2026-06-08");
   const [clientName, setClientName] = useState("Chetan Bhattacharji");
@@ -189,10 +235,23 @@ export default function Home() {
   const allOrgs = [...DEFAULT_ORGS, ...customOrgs.map(o => o.name)];
   const orgCount = selectedOrgs.length;
 
-  const allOrgHandles: Record<string, string> = {
-    ...ORG_YT_HANDLES,
-    ...Object.fromEntries(customOrgs.map(o => [o.name, o.ytHandle])),
-  };
+  // Derived handle maps — read from orgHandleOverrides (user-editable)
+  const allOrgHandles: Record<string, string> = Object.fromEntries(
+    Object.entries(orgHandleOverrides).map(([org, h]) => [org, h.youtube]).filter(([, v]) => v)
+  );
+  const allTwHandles: Record<string, string> = Object.fromEntries(
+    Object.entries(orgHandleOverrides).map(([org, h]) => [org, h.twitter]).filter(([, v]) => v)
+  );
+  const allIgHandles: Record<string, string> = Object.fromEntries(
+    Object.entries(orgHandleOverrides).map(([org, h]) => [org, h.instagram]).filter(([, v]) => v)
+  );
+
+  function setHandle(org: string, platform: "twitter" | "instagram" | "youtube", value: string) {
+    setOrgHandleOverrides(prev => ({
+      ...prev,
+      [org]: { ...(prev[org] || { twitter: "", instagram: "", youtube: "" }), [platform]: value },
+    }));
+  }
 
   const loadPrev = useCallback(async () => {
     try {
@@ -226,6 +285,7 @@ export default function Home() {
     }
     setCustomOrgs((prev) => [...prev, { name: val, ytHandle: handle }]);
     setSelectedOrgs((prev) => (prev.length < 13 ? [...prev, val] : prev));
+    setOrgHandleOverrides(prev => ({ ...prev, [val]: { twitter: "", instagram: "", youtube: handle } }));
     setOrgCustomInput(""); setOrgYtHandleInput("");
   }
 
@@ -280,7 +340,7 @@ export default function Home() {
     if (!selectedOrgs.length) { alert("Select at least one organisation."); return; }
     setRunning(true); setLogs([]); setProgress(0); setResult(null); setTrendStatus(null);
 
-    const payload = { orgs: selectedOrgs, orgYtHandles: allOrgHandles, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries };
+    const payload = { orgs: selectedOrgs, orgYtHandles: allOrgHandles, orgTwHandles: allTwHandles, orgIgHandles: allIgHandles, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries };
     const TOTAL_STEPS = 60;
     let stepCount = 0;
 
@@ -736,6 +796,73 @@ export default function Home() {
             </SlideUp>
           </div>
         </div>
+
+        {/* ── Social Handles ──────────────────────────────────────────── */}
+        <SlideUp delay={400}>
+          <Card style={{ marginTop: 16 }}>
+            <button
+              onClick={() => setHandlesOpen(!handlesOpen)}
+              className="mo-collapse-btn"
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, color: C.gold, transition: "color .2s" }}
+            >
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase" }}>
+                Social Handles
+                <span style={{ marginLeft: 8, background: "rgba(255,255,255,.06)", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 7px", fontSize: 9, fontWeight: 600, verticalAlign: "middle", fontFamily: "'DM Mono', monospace" }}>
+                  X · IG · YT per org
+                </span>
+              </span>
+              <span style={{ fontSize: 11, color: C.muted }}>{handlesOpen ? "▲" : "▼"}</span>
+            </button>
+            {handlesOpen && (
+              <div style={{ marginTop: 14, overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", fontFamily: "'DM Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: C.muted, padding: "0 10px 8px 0", whiteSpace: "nowrap" }}>Org</th>
+                      <th style={{ textAlign: "left", fontFamily: "'DM Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "#4a9fd4", padding: "0 10px 8px", whiteSpace: "nowrap" }}>𝕏 Twitter</th>
+                      <th style={{ textAlign: "left", fontFamily: "'DM Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "#e05c9c", padding: "0 10px 8px", whiteSpace: "nowrap" }}>Instagram</th>
+                      <th style={{ textAlign: "left", fontFamily: "'DM Mono', monospace", fontSize: 9, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "#e53935", padding: "0 0 8px 10px", whiteSpace: "nowrap" }}>YouTube</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedOrgs.map((org, i) => {
+                      const handles = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "" };
+                      const rowBg = i % 2 === 0 ? "rgba(255,255,255,.02)" : "transparent";
+                      const cellInput = (platform: "twitter" | "instagram" | "youtube", color: string) => (
+                        <input
+                          value={handles[platform]}
+                          onChange={e => setHandle(org, platform, e.target.value)}
+                          placeholder="—"
+                          style={{
+                            background: "rgba(255,255,255,.04)",
+                            border: `1px solid ${handles[platform] ? `${color}44` : "rgba(255,255,255,.08)"}`,
+                            borderRadius: 6, padding: "5px 9px",
+                            color: handles[platform] ? color : C.muted,
+                            fontFamily: "'DM Mono', monospace", fontSize: 11,
+                            outline: "none", width: "100%", minWidth: 120, boxSizing: "border-box",
+                          }}
+                        />
+                      );
+                      return (
+                        <tr key={org} style={{ background: rowBg }}>
+                          <td style={{ padding: "5px 10px 5px 0", fontFamily: "'Space Grotesk', sans-serif", fontSize: 11, color: C.text, whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {org.length > 30 ? org.slice(0, 28) + "…" : org}
+                          </td>
+                          <td style={{ padding: "5px 10px" }}>{cellInput("twitter", "#4a9fd4")}</td>
+                          <td style={{ padding: "5px 10px" }}>{cellInput("instagram", "#e05c9c")}</td>
+                          <td style={{ padding: "5px 0 5px 10px" }}>{cellInput("youtube", "#e53935")}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: 10, fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#2a3a4a" }}>
+                  Handles without @ · used by APIdirect.io for X ER · Instagram ER · YouTube subscriber count
+                </div>
+              </div>
+            )}
+          </Card>
+        </SlideUp>
 
         {/* ── Generate button ─────────────────────────────────────────── */}
         <SlideUp delay={430}>

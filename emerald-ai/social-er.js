@@ -42,10 +42,14 @@ function scorePresence(liCount, xCount, igCount) {
 async function run(cfg, selectedOrgs, cb) {
   const APIdirect = require('./apidirect-collector');
 
-  // Build orgHandles from ORG_YT_HANDLES (YouTube) — Twitter/Instagram resolved by keyword search
+  // Build orgHandles from all three platform handle maps (user-editable in UI)
   const orgHandles = {};
-  for (const [org, ytHandle] of Object.entries(cfg.ORG_YT_HANDLES || {})) {
-    orgHandles[org] = { youtube: ytHandle };
+  for (const org of selectedOrgs) {
+    orgHandles[org] = {
+      youtube:   (cfg.ORG_YT_HANDLES || {})[org] || '',
+      twitter:   (cfg.ORG_TW_HANDLES || {})[org] || '',
+      instagram: (cfg.ORG_IG_HANDLES || {})[org] || '',
+    };
   }
 
   cb?.(`\n  Social Presence (APIdirect.io): ${selectedOrgs.length} orgs → LI + X + IG + YT channel…`);
