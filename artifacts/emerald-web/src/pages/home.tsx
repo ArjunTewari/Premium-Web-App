@@ -220,7 +220,13 @@ export default function Home() {
   const [aeoEditIdx, setAeoEditIdx] = useState<number | null>(null);
   const [aeoEditVal, setAeoEditVal] = useState("");
 
-  const [activeTab, setActiveTab] = useState<"dashboard" | "reports">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "reports" | "handles">("dashboard");
+
+  // Handles tab — new org add form
+  const [hNewOrg, setHNewOrg]   = useState("");
+  const [hNewTw,  setHNewTw]    = useState("");
+  const [hNewIg,  setHNewIg]    = useState("");
+  const [hNewYt,  setHNewYt]    = useState("");
 
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -287,6 +293,25 @@ export default function Home() {
     setSelectedOrgs((prev) => (prev.length < 13 ? [...prev, val] : prev));
     setOrgHandleOverrides(prev => ({ ...prev, [val]: { twitter: "", instagram: "", youtube: handle } }));
     setOrgCustomInput(""); setOrgYtHandleInput("");
+  }
+
+  function addHandleOrg() {
+    const val = hNewOrg.trim();
+    if (!val) return;
+    const alreadyExists = DEFAULT_ORGS.includes(val) || customOrgs.some(o => o.name === val);
+    if (!alreadyExists) {
+      setCustomOrgs(prev => [...prev, { name: val, ytHandle: hNewYt.trim() }]);
+      setSelectedOrgs(prev => (prev.length < 13 ? [...prev, val] : prev));
+    }
+    setOrgHandleOverrides(prev => ({
+      ...prev,
+      [val]: {
+        twitter:   hNewTw.trim().replace(/^@/, ""),
+        instagram: hNewIg.trim().replace(/^@/, ""),
+        youtube:   hNewYt.trim(),
+      },
+    }));
+    setHNewOrg(""); setHNewTw(""); setHNewIg(""); setHNewYt("");
   }
 
   function addScope() {
@@ -507,6 +532,7 @@ export default function Home() {
         <nav style={{ display: "flex", gap: 4 }}>
           <a onClick={() => setActiveTab("dashboard")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "dashboard" ? C.goldLight : C.muted, background: activeTab === "dashboard" ? "rgba(255,255,255,.06)" : "transparent" }}>Dashboard</a>
           <a onClick={() => setActiveTab("reports")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "reports" ? C.goldLight : C.muted, background: activeTab === "reports" ? "rgba(255,255,255,.06)" : "transparent" }}>Reports</a>
+          <a onClick={() => setActiveTab("handles")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "handles" ? C.goldLight : C.muted, background: activeTab === "handles" ? "rgba(255,255,255,.06)" : "transparent" }}>Handles</a>
           {user?.role === "admin" && (
             <a onClick={() => navigate("/admin")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, color: C.muted, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s" }}>Admin</a>
           )}
@@ -1066,6 +1092,131 @@ export default function Home() {
                 </div>
               </SlideUp>
             )}
+          </div>
+        )}
+
+        {/* ── Handles tab ─────────────────────────────────────────────── */}
+        {activeTab === "handles" && (
+          <div style={{ paddingTop: 40 }}>
+            <SlideUp delay={40}>
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: C.gold, marginBottom: 10 }}>
+                  Social Handles
+                </div>
+                <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 32, fontWeight: 700, letterSpacing: "-.02em", color: C.textHi, margin: 0 }}>
+                  Organisation Handles
+                </h2>
+                <p style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>
+                  Edit 𝕏 Twitter, Instagram, and YouTube handles per org. Changes apply immediately to the next report run.
+                </p>
+              </div>
+            </SlideUp>
+
+            <SlideUp delay={80}>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
+                {/* Table header */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 0, borderBottom: `1px solid ${C.border}` }}>
+                  {[
+                    { label: "Organisation", color: C.muted },
+                    { label: "𝕏 Twitter", color: "#4a9fd4" },
+                    { label: "Instagram", color: "#e05c9c" },
+                    { label: "YouTube", color: "#e53935" },
+                  ].map(col => (
+                    <div key={col.label} style={{
+                      padding: "12px 16px",
+                      fontFamily: "'DM Mono', monospace", fontSize: 9, fontWeight: 700,
+                      letterSpacing: ".15em", textTransform: "uppercase", color: col.color,
+                    }}>{col.label}</div>
+                  ))}
+                </div>
+
+                {/* Rows — all orgs */}
+                {[...DEFAULT_ORGS, ...customOrgs.map(o => o.name)].map((org, i) => {
+                  const ov = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "" };
+                  const rowBg = i % 2 === 0 ? "transparent" : "rgba(255,255,255,.018)";
+                  const cellSty: React.CSSProperties = {
+                    background: "rgba(255,255,255,.04)",
+                    border: `1px solid rgba(255,255,255,.08)`,
+                    borderRadius: 6, padding: "6px 10px",
+                    color: C.text,
+                    fontFamily: "'DM Mono', monospace", fontSize: 12,
+                    outline: "none", width: "100%", boxSizing: "border-box",
+                    transition: "border-color .2s",
+                  };
+                  return (
+                    <div key={org} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 0, background: rowBg, borderBottom: `1px solid rgba(255,255,255,.04)` }}>
+                      {/* Org name */}
+                      <div style={{ padding: "10px 16px", display: "flex", alignItems: "center" }}>
+                        <span style={{ fontSize: 12, fontFamily: "'Space Grotesk', sans-serif", color: C.text }}>{org}</span>
+                      </div>
+                      {/* Twitter */}
+                      <div style={{ padding: "10px 10px" }}>
+                        <input
+                          value={ov.twitter}
+                          onChange={e => setHandle(org, "twitter", e.target.value)}
+                          placeholder="handle (no @)"
+                          style={{ ...cellSty, color: ov.twitter ? "#4a9fd4" : C.muted, borderColor: ov.twitter ? "rgba(74,159,212,.3)" : "rgba(255,255,255,.08)" }}
+                        />
+                      </div>
+                      {/* Instagram */}
+                      <div style={{ padding: "10px 10px" }}>
+                        <input
+                          value={ov.instagram}
+                          onChange={e => setHandle(org, "instagram", e.target.value)}
+                          placeholder="handle (no @)"
+                          style={{ ...cellSty, color: ov.instagram ? "#e05c9c" : C.muted, borderColor: ov.instagram ? "rgba(224,92,156,.3)" : "rgba(255,255,255,.08)" }}
+                        />
+                      </div>
+                      {/* YouTube */}
+                      <div style={{ padding: "10px 10px" }}>
+                        <input
+                          value={ov.youtube}
+                          onChange={e => setHandle(org, "youtube", e.target.value)}
+                          placeholder="@channel"
+                          style={{ ...cellSty, color: ov.youtube ? "#e53935" : C.muted, borderColor: ov.youtube ? "rgba(229,57,53,.3)" : "rgba(255,255,255,.08)" }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Add new org row */}
+                <div style={{ borderTop: `1px solid ${C.border}`, background: "rgba(201,146,42,.04)" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 0 }}>
+                    <div style={{ padding: "10px 10px" }}>
+                      <input
+                        value={hNewOrg}
+                        onChange={e => setHNewOrg(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") addHandleOrg(); }}
+                        placeholder="New organisation name…"
+                        style={{
+                          background: "rgba(201,146,42,.06)", border: `1px solid rgba(201,146,42,.2)`,
+                          borderRadius: 6, padding: "6px 10px", color: C.goldLight,
+                          fontFamily: "'Space Grotesk', sans-serif", fontSize: 12,
+                          outline: "none", width: "100%", boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+                    <div style={{ padding: "10px 10px" }}>
+                      <input value={hNewTw} onChange={e => setHNewTw(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addHandleOrg(); }} placeholder="twitter_handle" style={{ background: "rgba(74,159,212,.06)", border: "1px solid rgba(74,159,212,.2)", borderRadius: 6, padding: "6px 10px", color: "#4a9fd4", fontFamily: "'DM Mono', monospace", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box" }} />
+                    </div>
+                    <div style={{ padding: "10px 10px" }}>
+                      <input value={hNewIg} onChange={e => setHNewIg(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addHandleOrg(); }} placeholder="instagram_handle" style={{ background: "rgba(224,92,156,.06)", border: "1px solid rgba(224,92,156,.2)", borderRadius: 6, padding: "6px 10px", color: "#e05c9c", fontFamily: "'DM Mono', monospace", fontSize: 12, outline: "none", width: "100%", boxSizing: "border-box" }} />
+                    </div>
+                    <div style={{ padding: "10px 10px", display: "flex", gap: 6 }}>
+                      <input value={hNewYt} onChange={e => setHNewYt(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addHandleOrg(); }} placeholder="@youtube_channel" style={{ background: "rgba(229,57,53,.06)", border: "1px solid rgba(229,57,53,.2)", borderRadius: 6, padding: "6px 10px", color: "#e53935", fontFamily: "'DM Mono', monospace", fontSize: 12, outline: "none", flex: 1, boxSizing: "border-box" }} />
+                      <button
+                        onClick={addHandleOrg}
+                        style={{ background: "rgba(201,146,42,.18)", border: `1px solid rgba(201,146,42,.35)`, borderRadius: 6, color: C.gold, fontSize: 16, fontWeight: 700, cursor: "pointer", padding: "0 12px", flexShrink: 0 }}
+                      >+</button>
+                    </div>
+                  </div>
+                  <div style={{ padding: "0 16px 10px", fontSize: 10, color: C.muted, fontFamily: "'DM Mono', monospace" }}>
+                    Press Enter or + to add · new orgs also appear in the Dashboard org selector
+                  </div>
+                </div>
+              </div>
+            </SlideUp>
           </div>
         )}
 
