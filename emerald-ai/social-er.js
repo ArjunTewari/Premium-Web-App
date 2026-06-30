@@ -156,10 +156,10 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   // Stat cards
   const statCards = [
     { label: 'Orgs with AQ social posts', value: orgsWithPresence,                  unit: `of ${erResults.length} tracked`,  col: '#4caf74' },
-    { label: 'LinkedIn AQ posts',          value: totalLi,                            unit: 'via APIdirect',                   col: '#4a7fd4' },
-    { label: 'X/Twitter AQ tweets',        value: totalX,                             unit: 'via APIdirect',                   col: '#4a9fd4' },
-    { label: 'Instagram AQ posts',         value: totalIg,                            unit: 'via APIdirect',                   col: '#e05c9c' },
-    { label: 'YouTube videos',             value: totalYt,                            unit: 'official channel',                col: '#e53935' },
+    { label: 'LinkedIn AQ posts',          value: totalLi,                            unit: 'LinkedIn API',                    col: '#4a7fd4' },
+    { label: 'X/Twitter AQ tweets',        value: totalX,                             unit: 'X API v2',                        col: '#4a9fd4' },
+    { label: 'Instagram AQ posts',         value: totalIg,                            unit: 'Instagram Graph API',             col: '#e05c9c' },
+    { label: 'YouTube videos',             value: totalYt,                            unit: 'YouTube Data API v3',             col: '#e53935' },
   ].map(c => `
     <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
       <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">${c.label}</div>
@@ -171,9 +171,9 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   const sourceBanner = `
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
     <span style="font-family:monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Data sources:</span>
-    <span style="font-family:monospace;font-size:10px;background:rgba(74,127,212,.14);border:1px solid rgba(74,127,212,.35);color:#4a7fd4;border-radius:4px;padding:2px 8px">LinkedIn · ✓ APIdirect</span>
-    <span style="font-family:monospace;font-size:10px;background:rgba(74,159,212,.14);border:1px solid rgba(74,159,212,.35);color:#4a9fd4;border-radius:4px;padding:2px 8px">X/Twitter · ✓ APIdirect</span>
-    <span style="font-family:monospace;font-size:10px;background:rgba(224,92,156,.14);border:1px solid rgba(224,92,156,.35);color:#e05c9c;border-radius:4px;padding:2px 8px">Instagram · ✓ APIdirect</span>
+    <span style="font-family:monospace;font-size:10px;background:rgba(74,127,212,.14);border:1px solid rgba(74,127,212,.35);color:#4a7fd4;border-radius:4px;padding:2px 8px">LinkedIn · ✓ LinkedIn API</span>
+    <span style="font-family:monospace;font-size:10px;background:rgba(74,159,212,.14);border:1px solid rgba(74,159,212,.35);color:#4a9fd4;border-radius:4px;padding:2px 8px">X/Twitter · ✓ X API v2</span>
+    <span style="font-family:monospace;font-size:10px;background:rgba(224,92,156,.14);border:1px solid rgba(224,92,156,.35);color:#e05c9c;border-radius:4px;padding:2px 8px">Instagram · ✓ Graph API</span>
     <span style="font-family:monospace;font-size:10px;background:rgba(229,57,53,.12);border:1px solid rgba(229,57,53,.3);color:#e53935;border-radius:4px;padding:2px 8px">YouTube · ✓ Data API v3</span>
   </div>`;
 
@@ -294,7 +294,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   <strong style="color:#e53935">YT</strong> = YouTube videos via Data API v3 &nbsp;·&nbsp;
   <span style="color:#5e7494">flw = follower count &nbsp;·&nbsp; subs = subscriber count</span><br>
   ER% = Engagement Rate — X: (likes+replies+retweets)÷followers×100 &nbsp;·&nbsp; IG: (likes+comments)÷followers×100 (shown as <strong>~</strong> when followers &lt; 500, unreliable) &nbsp;·&nbsp; YT: (likes+comments)÷subscribers×100, falls back to ÷views &nbsp;·&nbsp;
-  SoV% = org total ÷ cohort total &nbsp;·&nbsp; Data: APIdirect.io live API
+  SoV% = org total ÷ cohort total &nbsp;·&nbsp; Data: LinkedIn API · X API v2 · Instagram Graph API · YouTube Data API v3
 </div>`;
 
   // ── Per-org expandable detail sections ───────────────────────────────────

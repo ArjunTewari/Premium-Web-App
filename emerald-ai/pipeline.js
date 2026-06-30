@@ -3591,7 +3591,7 @@ ${appendixSections}</section>
 ${emergingCards}</section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS)}
-<section class="sec" id="social"><div class="sh"><div class="se">Section 08</div><h2 class="st">Social Media AQ Presence</h2><div class="sd">Live social data via APIdirect.io — LinkedIn, X/Twitter, and Instagram posts from official org handles. YouTube engagement data via YouTube Data API v3. ER = Engagement Rate. <strong style="color:var(--good)">✓ cit</strong> in the Citations section indicates the org appeared within 2 lines of an AQ keyword.</div><div class="sdiv"></div></div>
+<section class="sec" id="social"><div class="sh"><div class="se">Section 08</div><h2 class="st">Social Media AQ Presence</h2><div class="sd">Live social data from official org handles — LinkedIn (LinkedIn API), X/Twitter (X API v2), Instagram (Graph API), and YouTube (Data API v3). ER = Engagement Rate. <strong style="color:var(--good)">✓ cit</strong> in the Citations section indicates the org appeared within 2 lines of an AQ keyword.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
 <section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social presence. YouTube ER and full social metrics appear in the <a href="#social" style="color:var(--amber);text-decoration:none">Social Media section ↑</a>.</div><div class="sdiv"></div></div>
