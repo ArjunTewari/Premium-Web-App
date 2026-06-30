@@ -862,18 +862,16 @@ async function run(cfg, cb) {
     });
   }
 
-  // ── STEP 1d: Drop articles where org not found in scraped text ──
+  // ── STEP 1d: Drop articles that completely failed to scrape ──
+  // Org-name presence is NOT required here — Haiku (1e) makes the substantive-
+  // mention judgement. Only drop articles where scraping returned nothing.
   cb(`\nSTEP 1d/6 — Filtering by org presence in scraped text...`, "head");
   for (const org of ORGS) {
     const before = arts[org].length;
-    arts[org] = arts[org].filter(a => {
-      if (!a.fullText) return false;
-      if (a.matchTerm) return countAbbrMentions(a.fullText, a.matchTerm) > 0;
-      return countMentions(a.fullText, org) > 0;
-    });
+    arts[org] = arts[org].filter(a => a.fullText && a.fullText.length > 100);
     const dropped = before - arts[org].length;
     cb(
-      `  ${org}: ${dropped > 0 ? `dropped ${dropped} (not scraped or org absent) →` : "all present →"} ${arts[org].length} articles`,
+      `  ${org}: ${dropped > 0 ? `dropped ${dropped} (scrape failed) →` : "all scraped →"} ${arts[org].length} articles`,
       arts[org].length > 0 ? "ok" : "warn",
     );
   }
@@ -1362,6 +1360,7 @@ ${batchText}`;
     socialERResults,
     youtubeERResults,
     spikeAnnotations,
+    aeoQueriesUsed,
   );
   fs.writeFileSync(htmlFile, html, "utf8");
   cb(`  HTML: ${base}.html (${Math.round(html.length / 1024)}KB)`, "ok");
@@ -2885,6 +2884,7 @@ function buildHTML(
   socialERResults = [],
   youtubeERResults = [],
   spikeAnnotations = [],
+  aeoQueriesUsed = null,
 ) {
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
   const now = new Date().toUTCString();
