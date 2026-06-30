@@ -146,53 +146,7 @@ async function runAEO(cfg, orgs, cb) {
       }
     })(),
 
-    // Google AI Mode via APIdirect (all questions, sequential — endpoint has tight concurrency limits)
-    cfg.APIDIRECT_KEY && (async () => {
-      cb(`  Probing Google AI — ${queriesUsed.length} questions...`);
-      let googleErrors = 0;
-      const texts = [];
-      for (let i = 0; i < queriesUsed.length; i++) {
-        const q = queriesUsed[i];
-        try {
-          const res = await axios.get(
-            'https://apidirect.io/v1/web/ai-mode',
-            {
-              params: { prompt: `${q}\n\nReply in 1-2 sentences maximum. List only organisation names, no explanations.`, country: 'in', language: 'en' },
-              headers: { 'X-API-Key': cfg.APIDIRECT_KEY },
-              timeout: 30000,
-            }
-          );
-          texts.push(
-            (res.data?.reply_parts || [])
-              .filter(p => p.type === 'paragraph' || p.type === 'heading')
-              .map(p => p.text || '')
-              .join(' ')
-          );
-        } catch (e) {
-          googleErrors++;
-          if (googleErrors === 1) cb(`  Google AI error: ${e.response?.data?.error || e.message || 'unknown'}`, 'warn');
-          texts.push('');
-        }
-        if (i < queriesUsed.length - 1) await new Promise(r => setTimeout(r, 500));
-      }
-      if (googleErrors > 0) cb(`  Google AI: ${googleErrors}/${queriesUsed.length} calls failed`, 'warn');
-      else cb(`  Google AI: all ${queriesUsed.length} calls succeeded`, 'ok');
-      for (const org of orgs) {
-        let count = 0;
-        texts.forEach((text, qi) => {
-          const mentioned = orgMentioned(text, org);
-          if (mentioned) {
-            count++;
-            if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
-          }
-          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Google AI', cited: mentioned, text });
-        });
-        results[org].llmBreakdown['Google AI'] = {
-          mentions: count, total: queriesUsed.length
-        };
-        cb(`  Google AI → ${org}: ${count}/${queriesUsed.length}`, count > 0 ? 'ok' : 'warn');
-      }
-    })()
+    // Google AI (APIdirect ai-mode) skipped — endpoint times out consistently
   ].filter(Boolean));
 
   // Aggregate total mentions across all LLMs; keep score for scorecard formula
