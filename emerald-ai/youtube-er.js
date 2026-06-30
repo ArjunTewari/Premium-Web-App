@@ -12,7 +12,15 @@
 
 const axios = require('axios');
 
-const AQ_TERMS = '("air quality" OR "air pollution" OR AQI OR PM2.5 OR NCAP)';
+const YT_AQ_BASE = ['air quality', 'air pollution', 'AQI', 'PM2.5', 'NCAP'];
+
+// Build a Serper/Google OR clause from base AQ terms + user SCOPE_KEYWORDS.
+// Caps at 15 terms to stay within Serper query length limits.
+function buildYtAqTerms(scopeKeywords) {
+  const extra = Array.isArray(scopeKeywords) ? scopeKeywords.slice(0, 10) : [];
+  const all = [...new Set([...YT_AQ_BASE, ...extra])].slice(0, 15);
+  return `(${all.map(k => `"${k}"`).join(' OR ')})`;
+}
 const YT_VIDEOS_URL  = 'https://www.googleapis.com/youtube/v3/videos';
 const YT_CHANNELS_URL = 'https://www.googleapis.com/youtube/v3/channels';
 
@@ -100,8 +108,9 @@ async function fetchChannelStats(channelIds, apiKey) {
 }
 
 // ─── Serper YouTube search ──────────────────────────────────────────────────
-async function searchYouTube(orgName, serperKey, dateFrom, dateTo) {
-  const body = { q: `"${orgName}" ${AQ_TERMS} site:youtube.com`, num: 10 };
+async function searchYouTube(orgName, serperKey, dateFrom, dateTo, scopeKeywords) {
+  const aqTerms = buildYtAqTerms(scopeKeywords);
+  const body = { q: `"${orgName}" ${aqTerms} site:youtube.com`, num: 10 };
   if (dateFrom && dateTo) {
     const [fy, fm, fd] = dateFrom.split('-');
     const [ty, tm, td] = dateTo.split('-');
@@ -185,7 +194,7 @@ async function run(cfg, selectedOrgs, cb) {
     // ── Step 1: find YouTube video URLs via Serper ────────────────────────
     let serperItems = [];
     try {
-      serperItems = await searchYouTube(orgName, SERPER_KEY, cfg.DATE_FROM, cfg.DATE_TO);
+      serperItems = await searchYouTube(orgName, SERPER_KEY, cfg.DATE_FROM, cfg.DATE_TO, cfg.SCOPE_KEYWORDS);
     } catch (e) {
       cb?.(`  [YouTubeER] Serper error (${orgName}): ${e.message}`, 'warn');
     }
@@ -361,7 +370,7 @@ function buildYoutubeERHtml(results, hasApiKey) {
         <strong>&#9432; YOUTUBE_KEY not configured</strong> — videos discovered via Serper but engagement metrics unavailable. Add <code style="background:#1e2638;padding:1px 5px;border-radius:3px">YOUTUBE_KEY</code> (Google API key with YouTube Data API v3 enabled) to unlock views, likes, comments, and ER scores.
       </div>`
     : `<div style="background:rgba(76,175,116,.06);border:1px solid rgba(76,175,116,.2);border-radius:8px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:#8fa3b8;line-height:1.7">
-        <strong style="color:#4caf74">Methodology:</strong> Serper discovers AQ-related videos via <code style="background:#1e2638;padding:1px 5px;border-radius:3px">"Org" ${AQ_TERMS} site:youtube.com</code>. YouTube Data API v3 fetches live statistics. <strong>Subscriber ER</strong> = (likes + comments) / subscribers × 100. <strong>View ER</strong> used as fallback when subscriber count is hidden.
+        <strong style="color:#4caf74">Methodology:</strong> Serper discovers AQ-related videos via <code style="background:#1e2638;padding:1px 5px;border-radius:3px">"Org" (AQ keywords + scope) site:youtube.com</code>. YouTube Data API v3 fetches live statistics. <strong>Subscriber ER</strong> = (likes + comments) / subscribers × 100. <strong>View ER</strong> used as fallback when subscriber count is hidden.
       </div>`;
 
   const statCards = [
