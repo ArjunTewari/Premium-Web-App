@@ -291,28 +291,6 @@ async function serperSearch(query, key, dateFrom, dateTo) {
   return res.data.news || res.data.organic || [];
 }
 
-async function serperWebSearch(query, key, dateFrom, dateTo) {
-  const body = { q: query, num: 10 };
-  if (dateFrom && dateTo)
-    body.tbs = `cdr:1,cd_min:${toSerperDate(dateFrom)},cd_max:${toSerperDate(dateTo)}`;
-  const res = await axios.post(
-    "https://google.serper.dev/search",
-    body,
-    {
-      headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-      timeout: 15000,
-    },
-  );
-  costTracker.serperQueries++;
-  return (res.data.organic || []).map((r) => ({
-    title: r.title || "",
-    link: r.link || "",
-    snippet: r.snippet || "",
-    source: r.source || dom(r.link || ""),
-    date: r.date || "",
-  }));
-}
-
 async function serperScrape(url, key) {
   try {
     const res = await axios.post(
