@@ -899,19 +899,19 @@ async function run(cfg, cb) {
 
         const prompt = `You are filtering news articles for the organisation "${org}" (air quality / environment sector).
 
-For each article decide: is "${org}" cited as a CONTRIBUTOR OF INFORMATION — i.e. the article uses "${org}"'s research, report, statistic, data point, or expert quote as a source?
+DEFAULT: keep=true. Only set keep=false when you are CERTAIN the mention is trivial. When in doubt, return keep=true.
 
-Return true (keep) if:
-- A specific report, study, finding, or dataset FROM "${org}" is cited
+Set keep=true if ANY of these apply:
+- "${org}"'s research, report, study, data, or statistic is cited or referenced
 - A spokesperson, researcher, or expert from "${org}" is quoted or attributed
-- Data / statistics are explicitly attributed to "${org}"
+- The article discusses work, findings, or positions associated with "${org}"
+- You have only a snippet and cannot fully assess the article's content
 
-Return false (drop) if:
-- "${org}" is only part of a list (e.g. monitoring stations, award recipients, university rankings)
-- "${org}" is mentioned only as a location, venue, or event host
-- "${org}" appears in a disclaimer, footer, or wire-copy credit line
-- The article is about the org's internal affairs (admissions, sports, finance) unrelated to AQ
-- You only have a snippet and cannot determine substantive contribution — err on the side of keeping
+Set keep=false ONLY if you are certain that:
+- "${org}" appears solely in a list (e.g. monitoring stations, award recipients, rankings) with no contribution described
+- "${org}" is mentioned only as a venue, event host, or location
+- "${org}" appears only in a footer, disclaimer, or boilerplate credit line
+- The article is exclusively about the org's internal affairs (admissions, sports, HR) with zero AQ relevance
 
 Return ONLY a JSON array with one entry per article:
 [{"index":0,"keep":true},{"index":1,"keep":false},...]
