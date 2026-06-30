@@ -14,6 +14,8 @@ const OUTLETS = [
   "Times of India",
   "Hindustan Times",
   "The Hindu",
+  "Indian Express",
+  "Deccan Herald",
   "India Today",
   "News18",
   "NDTV",
@@ -185,6 +187,25 @@ function countMentions(text, org) {
 /** Citation verification model — lighter/cheaper than the classification model */
 const CITATION_HAIKU_MODEL = "claude-haiku-4-5";
 
+/** Extract the ±N lines surrounding every mention of `term` in the text, so the
+ *  citation verifier sees the actual context around the org mention rather than
+ *  an arbitrary first-N-chars slice. Falls back to a head slice if no line matches. */
+function extractCitationContext(fullText, term, linesAround = 2, maxChars = 1400) {
+  if (!fullText) return "";
+  const lines = fullText.split("\n");
+  const termLower = (term || "").toLowerCase();
+  const keep = new Set();
+  for (let i = 0; i < lines.length; i++) {
+    if (!termLower || !lines[i].toLowerCase().includes(termLower)) continue;
+    const start = Math.max(0, i - linesAround);
+    const end = Math.min(lines.length - 1, i + linesAround);
+    for (let k = start; k <= end; k++) keep.add(k);
+  }
+  if (!keep.size) return fullText.slice(0, maxChars);
+  const ctx = [...keep].sort((a, b) => a - b).map(k => lines[k]).join("\n").trim();
+  return ctx.slice(0, maxChars);
+}
+
 /** Return a ~windowSize window of text centered on the first occurrence of org.
  *  If org is not found, returns first windowSize chars (caller should check countMentions). */
 function extractRelevantWindow(text, org, windowSize = 700) {
@@ -303,8 +324,13 @@ async function serperScrape(url, key) {
       },
     );
     costTracker.serperQueries++;
+    // Collapse spaces/tabs but PRESERVE newlines so downstream line-window logic
+    // (extractCitationContext ±N lines) can locate context around mentions.
     return (res.data.text || res.data.content || "")
-      .replace(/\s+/g, " ")
+      .replace(/\r\n?/g, "\n")
+      .replace(/[ \t\f\v]+/g, " ")
+      .replace(/ *\n */g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
       .trim();
   } catch {
     return "";
@@ -930,8 +956,9 @@ ${txt}`;
       let verified = 0;
       for (const batch of batches) {
         const batchText = batch.map((a, j) => {
-          const snippet = (a.fullText || '').slice(0, 800);
-          return `[${j}] TITLE: ${a.title}\nCONTENT: ${snippet}`;
+          const term = a.matchTerm || org;
+          const ctx = extractCitationContext(a.fullText || '', term, 2);
+          return `[${j}] TITLE: ${a.title}\nCONTEXT (±2 lines around each "${term}" mention):\n${ctx}`;
         }).join('\n===\n');
         const prompt = `You are verifying whether news articles genuinely cite the organisation "${org}" as a source of research or data on air quality in India.
 
