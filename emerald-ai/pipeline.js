@@ -759,7 +759,7 @@ async function run(cfg, cb) {
         const q = `site:${domain} "${org}" ${tvKwClause}`;
         cb(`  ${q}`);
         try {
-          const results = await serperWebSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+          const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
           let added = 0;
           for (const r of results) {
             const k = r.link || r.title;
@@ -778,7 +778,7 @@ async function run(cfg, cb) {
         if (tvAbbr) {
           const qAbbr = `site:${domain} "${tvAbbr}" ${tvKwClause}`;
           try {
-            const results = await serperWebSearch(qAbbr, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+            const results = await serperSearch(qAbbr, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
             let added = 0;
             for (const r of results) {
               const k = r.link || r.title;
