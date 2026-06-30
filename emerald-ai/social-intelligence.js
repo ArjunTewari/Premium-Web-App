@@ -62,7 +62,7 @@ async function runAEO(cfg, orgs, cb) {
     });
   }
 
-  const hasAEO = cfg.OPENAI_KEY || cfg.PERPLEXITY_KEY || cfg.GEMINI_KEY;
+  const hasAEO = cfg.OPENAI_KEY || cfg.PERPLEXITY_KEY || cfg.APIDIRECT_KEY;
   if (!hasAEO) {
     cb('  No LLM API keys provided — AEO score = 0', 'warn');
     return results;
@@ -81,9 +81,16 @@ async function runAEO(cfg, orgs, cb) {
           )
         )
       );
-      const texts = responses.map(r =>
-        r.status === 'fulfilled' ? r.value.data.choices[0].message.content : ''
-      );
+      let gptErrors = 0;
+      const texts = responses.map((r, i) => {
+        if (r.status === 'rejected') {
+          gptErrors++;
+          if (i === 0) cb(`  GPT-4o error: ${r.reason?.response?.data?.error?.message || r.reason?.message || 'unknown'}`, 'warn');
+          return '';
+        }
+        return r.value.data.choices[0].message.content || '';
+      });
+      if (gptErrors > 0) cb(`  GPT-4o mini: ${gptErrors}/${queriesUsed.length} calls failed`, 'warn');
       for (const org of orgs) {
         let count = 0;
         texts.forEach((text, qi) => {
@@ -112,9 +119,16 @@ async function runAEO(cfg, orgs, cb) {
           )
         )
       );
-      const texts = responses.map(r =>
-        r.status === 'fulfilled' ? r.value.data.choices[0].message.content : ''
-      );
+      let pplxErrors = 0;
+      const texts = responses.map((r, i) => {
+        if (r.status === 'rejected') {
+          pplxErrors++;
+          if (i === 0) cb(`  Perplexity error: ${r.reason?.response?.data?.error?.message || r.reason?.message || 'unknown'}`, 'warn');
+          return '';
+        }
+        return r.value.data.choices[0].message.content || '';
+      });
+      if (pplxErrors > 0) cb(`  Perplexity: ${pplxErrors}/${queriesUsed.length} calls failed`, 'warn');
       for (const org of orgs) {
         let count = 0;
         texts.forEach((text, qi) => {
