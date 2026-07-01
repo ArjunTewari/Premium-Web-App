@@ -3500,6 +3500,30 @@ body.edit-mode .sec-x{display:flex}
   .em-card{padding:14px 16px}
   .scg{font-size:26px}
   .ey{font-size:9px;letter-spacing:.08em}
+}
+@media(max-width:380px){
+  .main{padding:12px 10px 60px}
+  .rt{font-size:17px}
+  .st{font-size:16px}
+  .chip{font-size:10px;padding:4px 8px}
+  .rm,.sd{font-size:9px}
+}
+.mob-nav{display:none}
+@media(max-width:900px){
+  body{overflow-x:hidden}
+  .shell{display:block!important}
+  .mob-nav{display:flex;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;padding:0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .mob-nav::-webkit-scrollbar{display:none}
+  .mob-nav a{padding:11px 14px;font-size:11px;font-weight:600;color:var(--muted2);text-decoration:none;white-space:nowrap;letter-spacing:.04em;flex-shrink:0;border-bottom:2px solid transparent}
+  .mob-nav a:active{color:var(--amber);border-bottom-color:var(--amber)}
+}
+@media print{
+  .sidenav,.edit-bar,.mob-nav{display:none!important}
+  .main{padding:16px!important}
+  .shell{display:block!important}
+  body{overflow-x:visible!important}
+  .sec{page-break-inside:avoid}
+  a[href]:after{content:""}
 }`;
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -3514,6 +3538,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>${navOrgs}CONFIDENTIAL<br><span style="display:inline-block;margin-top:6px;padding:4px 8px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.3);border-radius:4px;color:var(--amber);font-weight:700">&#8377;${52 * ORGS.length}/month</span></div></nav>
+<div class="mob-nav"><a href="#exec">Summary</a><a href="#sov">Press</a><a href="#tv">TV</a><a href="#momentum">Momentum</a><a href="#social">Social</a><a href="#aeo">AEO</a><a href="#score">Score</a><a href="#actions">Actions</a></div>
 <main class="main">
 <header class="rh" id="header"><div class="ey">Air Quality Media Intelligence &middot; India</div>
 <h1 class="rt">Air Quality<br><span class="rti">TRIPLE Media Analytics</span></h1>

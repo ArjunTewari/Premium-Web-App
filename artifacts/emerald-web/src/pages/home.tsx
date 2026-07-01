@@ -403,6 +403,15 @@ export default function Home() {
     }
   }
 
+  function downloadPdf(htmlName: string) {
+    const a = document.createElement("a");
+    a.href = `/api/pdf/${encodeURIComponent(htmlName)}`;
+    a.download = htmlName.replace(/\.html$/i, ".pdf");
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
   async function startRun() {
     if (!selectedOrgs.length) { alert("Select at least one organisation."); return; }
     setRunning(true); setLogs([]); setProgress(0); setResult(null); setTrendStatus(null);
@@ -1052,9 +1061,14 @@ export default function Home() {
                 download={result.htmlName}
                 style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: "rgba(76,175,116,.15)", color: C.green, border: `1px solid rgba(76,175,116,.35)`, fontFamily: "'Space Grotesk', sans-serif" }}
               >⬇ Personal</a>
+              {/* PDF (phone-friendly) */}
+              <button
+                onClick={() => downloadPdf(result.htmlName)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: "rgba(201,146,42,.15)", color: C.gold, border: `1px solid rgba(201,146,42,.35)`, fontFamily: "'Space Grotesk', sans-serif" }}
+              >⬇ PDF</button>
             </div>
             <div style={{ fontSize: 10, color: C.muted, marginTop: 8, fontFamily: "'DM Mono', monospace" }}>
-              Commercial excludes Action Matrix · Personal includes everything
+              Commercial excludes Action Matrix · Personal includes everything · PDF opens on any device
             </div>
           </div>
         )}
@@ -1136,6 +1150,18 @@ export default function Home() {
                             fontFamily: "'Space Grotesk', sans-serif",
                           }}
                         >⬇ Personal</a>
+                        {f.name.endsWith(".html") && (
+                          <button
+                            onClick={() => downloadPdf(f.name)}
+                            style={{
+                              padding: "7px 14px", borderRadius: 8,
+                              background: "var(--elevate-1)", color: C.muted,
+                              border: `1px solid var(--border-col)`,
+                              fontSize: 18, fontWeight: 600, cursor: "pointer",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >⬇ PDF</button>
+                        )}
                       </div>
                     </div>
                   ))}
