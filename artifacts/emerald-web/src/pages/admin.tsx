@@ -259,9 +259,6 @@ export default function Admin() {
                                 {r.htmlName && (
                                   <a href={`/api/download/${r.htmlName}`} style={filePill("#1e3a5f", "#38bdf8")}>HTML</a>
                                 )}
-                                {r.pptxName && (
-                                  <a href={`/api/download/${r.pptxName}`} style={filePill("#1e3a2f", "var(--accent-green)")}>PPTX</a>
-                                )}
                               </div>
                             </td>
                             <td style={tdStyle}>

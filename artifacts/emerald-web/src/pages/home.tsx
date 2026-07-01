@@ -259,7 +259,7 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [trendStatus, setTrendStatus] = useState<{ text: string; ok: boolean } | null>(null);
 
-  const [result, setResult] = useState<{ htmlName: string; pptxName: string; costInr?: number } | null>(null);
+  const [result, setResult] = useState<{ htmlName: string; costInr?: number } | null>(null);
   const [prevReports, setPrevReports] = useState<ReportFile[]>([]);
 
   const logBoxRef = useRef<HTMLDivElement>(null);
@@ -292,7 +292,7 @@ export default function Home() {
     try {
       const res = await fetch("/api/outputs", { credentials: "include" });
       const files: ReportFile[] = await res.json();
-      setPrevReports(files.slice(0, 10));
+      setPrevReports(files.filter(f => !f.name.endsWith(".pptx")).slice(0, 10));
     } catch {}
   }, []);
 
@@ -440,7 +440,7 @@ export default function Home() {
             if (line.startsWith("data:")) data = line.slice(5).trim();
           }
           if (!data) continue;
-          let parsed: { msg?: string; level?: string; htmlName?: string; pptxName?: string; costInr?: number };
+          let parsed: { msg?: string; level?: string; htmlName?: string; costInr?: number };
           try { parsed = JSON.parse(data); } catch { continue; }
 
           if (event === "log") {
@@ -460,7 +460,7 @@ export default function Home() {
             }
           } else if (event === "done") {
             setProgress(100);
-            setResult({ htmlName: parsed.htmlName!, pptxName: parsed.pptxName!, costInr: parsed.costInr });
+            setResult({ htmlName: parsed.htmlName!, costInr: parsed.costInr });
             await loadPrev();
           } else if (event === "error") {
             setLogs((prev) => [...prev, { msg: "✗ Fatal error: " + parsed.msg, level: "err" }]);
@@ -480,8 +480,6 @@ export default function Home() {
     if (level === "err")  return "#e05353";
     return C.muted;
   }
-
-  const extIcon = (name: string) => (name.endsWith(".pptx") ? "📊" : "📄");
 
   /* ── Card wrapper ─────────────────────────────────────────────────────── */
   const Card = ({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) => (
@@ -1043,26 +1041,20 @@ export default function Home() {
               )}
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              {/* Shareable report (strips Action Matrix) */}
+              {/* Commercial report (strips Action Matrix) */}
               <button
                 onClick={() => downloadClientReport(result.htmlName)}
                 style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.green, color: C.bg, fontFamily: "'Space Grotesk', sans-serif", border: "none" }}
-              >⬇ Shareable Report</button>
-              {/* Full report (includes Action Matrix) */}
+              >⬇ Commercial</button>
+              {/* Personal report (includes Action Matrix) */}
               <a
                 href={`/api/download/${encodeURIComponent(result.htmlName)}`}
                 download={result.htmlName}
                 style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: "rgba(76,175,116,.15)", color: C.green, border: `1px solid rgba(76,175,116,.35)`, fontFamily: "'Space Grotesk', sans-serif" }}
-              >⬇ Full Report</a>
-              {/* PowerPoint */}
-              <a
-                href={`/api/download/${encodeURIComponent(result.pptxName)}`}
-                download={result.pptxName}
-                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.gold, color: C.bg, fontFamily: "'Space Grotesk', sans-serif" }}
-              >⬇ PowerPoint</a>
+              >⬇ Personal</a>
             </div>
             <div style={{ fontSize: 10, color: C.muted, marginTop: 8, fontFamily: "'DM Mono', monospace" }}>
-              Shareable Report excludes Action Matrix · Full Report includes everything
+              Commercial excludes Action Matrix · Personal includes everything
             </div>
           </div>
         )}
@@ -1081,7 +1073,7 @@ export default function Home() {
                   Previous Reports
                 </h2>
                 <p style={{ fontSize: 15, color: C.muted, marginTop: 6 }}>
-                  All generated HTML and PowerPoint reports, most recent first.
+                  All generated reports, most recent first.
                 </p>
               </div>
             </SlideUp>
@@ -1110,7 +1102,7 @@ export default function Home() {
                       animationDelay: `${i * 40}ms`,
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
-                        <span style={{ fontSize: 28, flexShrink: 0 }}>{extIcon(f.name)}</span>
+                        <span style={{ fontSize: 28, flexShrink: 0 }}>📄</span>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ color: C.text, fontFamily: "'DM Mono', monospace", fontSize: 18, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {f.name}
@@ -1131,7 +1123,7 @@ export default function Home() {
                               fontSize: 18, fontWeight: 600, cursor: "pointer",
                               fontFamily: "'Space Grotesk', sans-serif",
                             }}
-                          >⬇ Shareable</button>
+                          >⬇ Commercial</button>
                         )}
                         <a
                           href={`/api/download/${encodeURIComponent(f.name)}`}
@@ -1143,7 +1135,7 @@ export default function Home() {
                             fontSize: 18, fontWeight: 600, textDecoration: "none",
                             fontFamily: "'Space Grotesk', sans-serif",
                           }}
-                        >{f.name.endsWith(".html") ? "⬇ Full" : "⬇ Download"}</a>
+                        >⬇ Personal</a>
                       </div>
                     </div>
                   ))}

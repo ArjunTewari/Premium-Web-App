@@ -7,7 +7,6 @@
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
-const PptxGen = require("pptxgenjs");
 const SI = require("./social-intelligence");
 
 const OUTLETS = [
@@ -1328,24 +1327,6 @@ ${batchText}`;
       : ORGS.slice(0, 3).join("-vs-") + `-and-${ORGS.length - 3}-more`;
   const base = `aq-report-${orgLabel}-${stamp}`;
   const htmlFile = path.join(cfg.outDir, `${base}.html`);
-  const pptxFile = path.join(cfg.outDir, `${base}.pptx`);
-  const pptxName = `${base}.pptx`;
-
-  await buildPPTX(
-    data,
-    {},
-    emerging,
-    execF,
-    actions,
-    arts,
-    aeoResults,
-    socialERResults,
-    youtubeERResults,
-    pptxFile,
-    cfg,
-  );
-  cb(`  PPTX: ${pptxName}`, "ok");
-
   const html = buildHTML(
     data,
     {},
@@ -1354,7 +1335,7 @@ ${batchText}`;
     actions,
     arts,
     aeoResults,
-    pptxName,
+    null,
     cfg,
     socialERHtml,
     socialERResults,
@@ -1365,7 +1346,7 @@ ${batchText}`;
   fs.writeFileSync(htmlFile, html, "utf8");
   cb(`  HTML: ${base}.html (${Math.round(html.length / 1024)}KB)`, "ok");
 
-  cb(`\n✓ Done — ${base}.html + ${pptxName}`, "ok");
+  cb(`\n✓ Done — ${base}.html`, "ok");
 
   const SERPER_COST_PER_QUERY = 0.001;
   const CLAUDE_INPUT_COST_PER_M = 1.0;
@@ -1387,7 +1368,7 @@ ${batchText}`;
     totalINR: Math.round(totalINR),
   });
 
-  return { htmlFile, pptxFile, htmlName: `${base}.html`, pptxName };
+  return { htmlFile, htmlName: `${base}.html` };
 }
 
 // ══════════════════════════════════════════════════════════════════════════
