@@ -34,6 +34,7 @@ export const reportLogsTable = pgTable("report_logs", {
   htmlName: text("html_name"),
   pptxName: text("pptx_name"),
   clientName: text("client_name"),
+  generatedBy: text("generated_by"),
   costInr: numeric("cost_inr", { precision: 10, scale: 2 }).notNull(),
   costSerperInr: numeric("cost_serper_inr", { precision: 10, scale: 2 }).notNull(),
   costLlmAeoInr: numeric("cost_llm_aeo_inr", { precision: 10, scale: 2 }).notNull(),

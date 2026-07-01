@@ -128,6 +128,7 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
       htmlName: result.htmlName ?? null,
       pptxName: result.pptxName ?? null,
       clientName: cfg.CLIENT_NAME,
+      generatedBy: req.user?.username ?? null,
       costInr: costs.costInr.toFixed(2),
       costSerperInr: costs.costSerperInr.toFixed(2),
       costLlmAeoInr: costs.costLlmAeoInr.toFixed(2),

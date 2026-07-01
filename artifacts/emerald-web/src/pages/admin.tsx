@@ -10,6 +10,7 @@ interface ReportLog {
   htmlName: string | null;
   pptxName: string | null;
   clientName: string | null;
+  generatedBy: string | null;
   costInr: string;
   costSerperInr: string;
   costLlmAeoInr: string;
@@ -229,7 +230,7 @@ export default function Admin() {
                   <table style={tableStyle}>
                     <thead>
                       <tr>
-                        {["#", "Generated", "Client", "Orgs", "Date Range", "Customer Cost", "Infra Cost", "Files", "Details"].map((h) => (
+                        {["#", "Generated", "Account", "Client", "Orgs", "Date Range", "Customer Cost", "Infra Cost", "Files", "Details"].map((h) => (
                           <th key={h} style={thStyle}>{h}</th>
                         ))}
                       </tr>
@@ -240,6 +241,7 @@ export default function Admin() {
                           <tr key={r.id} style={{ borderBottom: expanded === r.id ? "none" : "1px solid var(--border-col)" }}>
                             <td style={{ ...tdStyle, color: "var(--text-muted)" }}>{r.id}</td>
                             <td style={tdStyle}>{new Date(r.createdAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</td>
+                            <td style={{ ...tdStyle, fontWeight: 600, color: "var(--accent-amber)" }}>{r.generatedBy ?? "—"}</td>
                             <td style={tdStyle}>{r.clientName ?? "—"}</td>
                             <td style={tdStyle}>
                               <span style={{ color: "var(--accent-green)", fontWeight: 600 }}>{r.organizations.length}</span>
@@ -272,7 +274,7 @@ export default function Admin() {
                           </tr>
                           {expanded === r.id && (
                             <tr key={`${r.id}-exp`} style={{ borderBottom: "1px solid var(--border-col)" }}>
-                              <td colSpan={9} style={{ padding: "0 12px 16px 12px" }}>
+                              <td colSpan={10} style={{ padding: "0 12px 16px 12px" }}>
                                 <div style={{ background: "var(--bg-app)", borderRadius: 8, padding: "1rem", border: "1px solid var(--border-col)" }}>
                                   <p style={{ color: "var(--text-sub)", fontSize: 18, margin: "0 0 10px 0", fontWeight: 600 }}>
                                     Organizations: {r.organizations.join(", ")}
