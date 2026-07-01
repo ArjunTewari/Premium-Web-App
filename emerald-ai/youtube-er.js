@@ -293,15 +293,20 @@ async function run(cfg, selectedOrgs, cb) {
     });
 
     // ── Filter to official channel only ──────────────────────────────────
-    // If we resolved a channelId, drop any video not from that channel.
-    // If we have a handle but couldn't resolve it (no API key or API error),
-    // drop all videos — we can't confirm they're from the official channel.
+    // If we resolved a channelId, keep only videos from that channel.
+    // If we had a YOUTUBE_KEY but resolution failed, drop all (can't verify).
+    // If there's no YOUTUBE_KEY at all, keep Serper-found videos as an
+    // unverified count — stats will be null but at least videoCount > 0.
     const filteredVideos = officialChannelId
       ? videos.filter(v => v.channelId === officialChannelId)
-      : [];
+      : YOUTUBE_KEY
+        ? []       // had key but handle resolution failed — can't confirm channel
+        : videos;  // no key — show Serper count only, channel unverified
 
     if (videos.length && !filteredVideos.length) {
-      cb?.(`  [YouTubeER] ${orgName}: ${videos.length} videos found but none from official channel (${orgHandle})`, 'warn');
+      cb?.(`  [YouTubeER] ${orgName}: ${videos.length} videos found but handle unresolvable (${orgHandle}) — add YOUTUBE_KEY to unlock`, 'warn');
+    } else if (!YOUTUBE_KEY && filteredVideos.length) {
+      cb?.(`  [YouTubeER] ${orgName}: ${filteredVideos.length} videos (Serper, unverified channel — add YOUTUBE_KEY for ER stats)`, 'warn');
     } else if (filteredVideos.length < videos.length) {
       cb?.(`  [YouTubeER] ${orgName}: kept ${filteredVideos.length}/${videos.length} videos from official channel`);
     }

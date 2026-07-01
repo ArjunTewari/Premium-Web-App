@@ -6,6 +6,21 @@ import { requireAuth } from "../middleware/require-auth.js";
 const router: IRouter = Router();
 const OUT_DIR = path.join(process.cwd(), "outputs");
 
+// Find a usable Chrome/Chromium binary on Replit / Linux
+function findChrome(): string | undefined {
+  const candidates = [
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/nix/var/nix/profiles/default/bin/chromium",
+  ];
+  for (const p of candidates) {
+    try { fs.accessSync(p, fs.constants.X_OK); return p; } catch {}
+  }
+  return undefined;
+}
+
 router.get("/pdf/:file", requireAuth, async (req: Request, res: Response) => {
   const fname = path.basename(req.params.file);
   if (!fname.endsWith(".html")) {
@@ -18,21 +33,29 @@ router.get("/pdf/:file", requireAuth, async (req: Request, res: Response) => {
   let browser: any = null;
   try {
     const puppeteer = await import("puppeteer");
+    const executablePath = findChrome();
     browser = await puppeteer.default.launch({
       headless: true,
+      ...(executablePath ? { executablePath } : {}),
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
-        "--single-process",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--no-first-run",
       ],
     });
     const page = await browser.newPage();
     await page.emulateMediaType("screen");
 
     const html = fs.readFileSync(fpath, "utf8");
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 });
+    // domcontentloaded is fast and reliable — avoids waiting on external
+    // Google Fonts / CDN resources that may never resolve in Replit's network
+    await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 60000 });
+    // Brief settle so CSS layout stabilises after fonts swap in
+    await new Promise(r => setTimeout(r, 1500));
 
     const pdf = await page.pdf({
       format: "A4",
