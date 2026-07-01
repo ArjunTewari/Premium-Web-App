@@ -2,6 +2,21 @@
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 
+const LOADING_QUOTES = [
+  { text: "Clean air is not a privilege — it is a right.", author: "UN Environment Programme" },
+  { text: "Every data point tells a story of the air we share.", author: "Emerald AI" },
+  { text: "Awareness precedes action. Intelligence precedes awareness.", author: "Emerald AI" },
+  { text: "The quality of our air reflects the quality of our decisions.", author: "WHO" },
+  { text: "Media intelligence reveals who is shaping the conversation.", author: "Emerald AI" },
+  { text: "PM2.5 is invisible. Its impact is not.", author: "Health Effects Institute" },
+  { text: "Tracking who speaks about clean air is the first step to changing it.", author: "Emerald AI" },
+  { text: "The atmosphere has no political boundaries.", author: "Emerald AI" },
+  { text: "Good journalism begins with reliable data.", author: "Emerald AI" },
+  { text: "Information is the oxygen of the modern age.", author: "Ronald Reagan" },
+  { text: "Science is the key to our future, and if you don't believe in science, then you're holding everyone back.", author: "Bill Nye" },
+  { text: "What gets measured gets managed.", author: "Peter Drucker" },
+];
+
 const DEFAULT_ORGS = [
   "WRI India",
   "Air Pollution Action Group",
@@ -263,6 +278,28 @@ export default function Home() {
   const [prevReports, setPrevReports] = useState<ReportFile[]>([]);
 
   const logBoxRef = useRef<HTMLDivElement>(null);
+  const [quoteIdx, setQuoteIdx] = useState(0);
+
+  useEffect(() => {
+    if (!running) return;
+    const iv = setInterval(() => setQuoteIdx(i => (i + 1) % LOADING_QUOTES.length), 4200);
+    return () => clearInterval(iv);
+  }, [running]);
+
+  function detectPhase(entries: LogEntry[]): string {
+    const last = [...entries].reverse().find(l => l.msg?.trim());
+    if (!last) return "Initialising…";
+    const m = last.msg.toLowerCase();
+    if (m.includes("done") || m.includes("✓")) return "Finalising report…";
+    if (m.includes("html") || m.includes("build") || m.includes("render")) return "Compiling intelligence report…";
+    if (m.includes("social") || m.includes("twitter") || m.includes("instagram") || m.includes("linkedin")) return "Measuring social engagement…";
+    if (m.includes("youtube")) return "Analysing YouTube presence…";
+    if (m.includes("aeo") || m.includes("claude") || m.includes("haiku") || m.includes("gpt") || m.includes("perplexity") || m.includes("gemini") || m.includes("sonar")) return "Running AI visibility probes…";
+    if (m.includes("tv") || m.includes("television") || m.includes("broadcast")) return "Scanning TV broadcast coverage…";
+    if (m.includes("scrape") || m.includes("article")) return "Reading article content…";
+    if (m.includes("serper") || m.includes("search") || m.includes("site:")) return "Searching news archives…";
+    return "Processing data…";
+  }
 
   const allOrgs = [...DEFAULT_ORGS, ...customOrgs.map(o => o.name)];
   const orgCount = selectedOrgs.length;
@@ -546,6 +583,10 @@ export default function Home() {
         .mo-stat:hover { transform: translateY(-3px); border-color: rgba(201,146,42,.2) !important; }
         .mo-collapse-btn:hover { color: var(--accent-amber) !important; }
         input[type=date] { color-scheme: light dark; }
+        @keyframes quote-fade { 0%,100%{opacity:0;transform:translateY(10px)} 12%,88%{opacity:1;transform:translateY(0)} }
+        @keyframes phase-pulse { 0%,100%{opacity:.45} 50%{opacity:1} }
+        @keyframes loader-orbit { to{transform:rotate(360deg)} }
+        @keyframes loader-inner { to{transform:rotate(-360deg)} }
       `}</style>
 
       {/* ── Sticky topbar ───────────────────────────────────────────────── */}
@@ -1011,34 +1052,102 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── Progress + logs ─────────────────────────────────────────── */}
-        {(running || logs.length > 0) && (
+        {/* ── Progress + animated loading screen ─────────────────────── */}
+        {running && (
           <div style={{ marginTop: 18 }}>
             {/* Progress bar */}
-            <div style={{ height: 3, background: "var(--border-col)", borderRadius: 2, marginBottom: 4, overflow: "hidden", position: "relative" }}>
+            <div style={{ height: 3, background: "var(--border-col)", borderRadius: 2, marginBottom: 4, overflow: "hidden" }}>
               <div style={{ height: "100%", background: "linear-gradient(90deg, var(--accent-amber), var(--accent-green))", borderRadius: 2, width: `${progress}%`, transition: "width .5s cubic-bezier(.22,1,.36,1)" }} />
             </div>
             <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: C.gold, textAlign: "right", marginBottom: 10 }}>{progress}%</div>
-            {/* Log box */}
-            <div
-              ref={logBoxRef}
-              style={{
-                background: "var(--elevate-1)", border: `1px solid ${C.border}`,
-                borderRadius: 12, padding: "14px 18px",
-                maxHeight: 300, overflowY: "auto",
-                fontFamily: "'DM Mono', monospace", fontSize: 15, lineHeight: 1.9,
-                display: "flex", flexDirection: "column", gap: 2,
-              }}
-            >
-              {logs.map((l, i) => (
-                <div key={i} style={{ color: logColor(l.level), display: "flex", gap: 8, alignItems: "baseline" }}>
-                  <span style={{ color: "rgba(201,146,42,.4)", flexShrink: 0 }}>›</span>
-                  {l.msg}
-                </div>
-              ))}
+
+            {/* Loading card */}
+            <div style={{
+              background: "var(--elevate-1)", border: `1px solid ${C.border}`,
+              borderRadius: 16, padding: "44px 40px 36px",
+              display: "flex", flexDirection: "column", alignItems: "center",
+              gap: 28, minHeight: 260, position: "relative", overflow: "hidden",
+            }}>
+              {/* Subtle background glow */}
+              <div style={{
+                position: "absolute", width: 320, height: 320, borderRadius: "50%", pointerEvents: "none",
+                background: "radial-gradient(circle, rgba(201,146,42,.06) 0%, transparent 70%)",
+                filter: "blur(40px)", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+              }} />
+
+              {/* Orbital loader */}
+              <div style={{ position: "relative", width: 56, height: 56, flexShrink: 0 }}>
+                <div style={{
+                  position: "absolute", inset: 0, borderRadius: "50%",
+                  border: "2px solid transparent",
+                  borderTopColor: "var(--accent-amber)",
+                  borderRightColor: "rgba(201,146,42,.3)",
+                  animation: "loader-orbit 1.4s linear infinite",
+                }} />
+                <div style={{
+                  position: "absolute", inset: 8, borderRadius: "50%",
+                  border: "1.5px solid transparent",
+                  borderTopColor: "var(--accent-green)",
+                  borderLeftColor: "rgba(76,175,116,.3)",
+                  animation: "loader-inner 1.8s linear infinite",
+                }} />
+                <div style={{
+                  position: "absolute", inset: "50%", transform: "translate(-50%,-50%)",
+                  width: 8, height: 8, borderRadius: "50%",
+                  background: "var(--accent-amber)",
+                  boxShadow: "0 0 10px var(--accent-amber)",
+                }} />
+              </div>
+
+              {/* Phase label */}
+              <div style={{
+                fontFamily: "'DM Mono', monospace", fontSize: 11,
+                fontWeight: 600, letterSpacing: ".18em", textTransform: "uppercase",
+                color: "var(--accent-amber)", opacity: 0.85,
+                animation: "phase-pulse 2s ease-in-out infinite",
+              }}>
+                {detectPhase(logs)}
+              </div>
+
+              {/* Quote */}
+              <div style={{
+                textAlign: "center", maxWidth: 520,
+                animation: "quote-fade 4.2s ease-in-out infinite",
+                key: quoteIdx,
+              } as React.CSSProperties} key={quoteIdx}>
+                <p style={{
+                  fontSize: 20, fontWeight: 600, lineHeight: 1.5,
+                  color: "var(--text-main)", margin: "0 0 10px",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  letterSpacing: "-.01em",
+                }}>
+                  "{LOADING_QUOTES[quoteIdx].text}"
+                </p>
+                <p style={{
+                  fontSize: 12, color: "var(--text-muted)",
+                  fontFamily: "'DM Mono', monospace",
+                  margin: 0, letterSpacing: ".06em",
+                }}>
+                  — {LOADING_QUOTES[quoteIdx].author}
+                </p>
+              </div>
+
+              {/* Dot trail */}
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {LOADING_QUOTES.map((_, i) => (
+                  <div key={i} style={{
+                    width: i === quoteIdx ? 18 : 5,
+                    height: 4, borderRadius: 2,
+                    background: i === quoteIdx ? "var(--accent-amber)" : "var(--border-col)",
+                    transition: "all .4s cubic-bezier(.22,1,.36,1)",
+                  }} />
+                ))}
+              </div>
             </div>
           </div>
         )}
+        {/* Hidden log ref for auto-scroll (logs still accumulate in state) */}
+        <div ref={logBoxRef} style={{ display: "none" }} />
 
         {/* ── Results ─────────────────────────────────────────────────── */}
         {result && (
