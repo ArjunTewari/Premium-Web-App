@@ -172,21 +172,21 @@ function CountUp({ target, suffix = "" }: { target: number; suffix?: string }) {
 
 /* ── Token colours ───────────────────────────────────────────────────────── */
 const C = {
-  bg:        "#060a10",
-  surface:   "rgba(255,255,255,.035)",
-  border:    "rgba(255,255,255,.07)",
+  bg:        "var(--bg-app)",
+  surface:   "var(--elevate-1)",
+  border:    "var(--border-col)",
   gold:      "var(--accent-amber)",
-  goldLight: "#e8d5a0",
+  goldLight: "var(--accent-amber)",
   green:     "var(--accent-green)",
-  muted:     "#4a6070",
-  text:      "#c8d8e8",
-  textHi:    "#e8f0f8",
+  muted:     "var(--text-sub)",
+  text:      "var(--text-main)",
+  textHi:    "var(--text-main)",
 };
 
 /* ── Shared input style ──────────────────────────────────────────────────── */
 const inputStyle: React.CSSProperties = {
-  background: "rgba(255,255,255,.05)",
-  border: `1px solid rgba(255,255,255,.12)`,
+  background: "var(--elevate-1)",
+  border: `1px solid var(--border-col)`,
   borderRadius: 8,
   padding: "8px 12px",
   color: C.text,
@@ -195,7 +195,7 @@ const inputStyle: React.CSSProperties = {
   outline: "none",
   width: "100%",
   boxSizing: "border-box",
-  colorScheme: "dark",
+  colorScheme: "light dark",
   transition: "border-color .2s",
 };
 
@@ -529,22 +529,22 @@ export default function Home() {
         @keyframes ring-spin { to { transform: rotate(360deg); } }
         @keyframes shine-sweep { from { left: -60%; } to { left: 120%; } }
         @keyframes pulse-dot { 0%,100% { box-shadow: 0 0 0 0 rgba(76,175,116,.5); } 60% { box-shadow: 0 0 0 7px rgba(76,175,116,0); } }
-        .mo-org-btn:hover { border-color: rgba(201,146,42,.3) !important; background: rgba(255,255,255,.06) !important; color: #c8d8e8 !important; }
+        .mo-org-btn:hover { border-color: rgba(201,146,42,.3) !important; background: var(--elevate-2) !important; color: var(--text-main) !important; }
         .mo-org-btn:hover .mo-org-dot { background: rgba(201,146,42,.5) !important; }
         .mo-gen-btn:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(201,146,42,.45) !important; }
         .mo-gen-btn:not(:disabled):hover .mo-shine { animation: shine-sweep .6s ease forwards; }
         .mo-card:hover { border-color: rgba(201,146,42,.18) !important; }
-        .mo-nav-link:hover { color: #e8d5a0 !important; background: rgba(255,255,255,.06) !important; }
-        .mo-icon-btn:hover { background: rgba(255,255,255,.06) !important; color: #c8d8e8 !important; }
+        .mo-nav-link:hover { color: var(--accent-amber) !important; background: var(--elevate-2) !important; }
+        .mo-icon-btn:hover { background: var(--elevate-2) !important; color: var(--text-main) !important; }
         .mo-stat:hover { transform: translateY(-3px); border-color: rgba(201,146,42,.2) !important; }
         .mo-collapse-btn:hover { color: var(--accent-amber) !important; }
-        input[type=date] { color-scheme: dark; }
+        input[type=date] { color-scheme: light dark; }
       `}</style>
 
       {/* ── Sticky topbar ───────────────────────────────────────────────── */}
       <header style={{
         position: "sticky", top: 0, zIndex: 20,
-        background: "rgba(6,10,16,.85)", backdropFilter: "blur(16px)",
+        background: "color-mix(in srgb, var(--bg-app) 85%, transparent)", backdropFilter: "blur(16px)",
         borderBottom: `1px solid ${C.border}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "14px 40px",
@@ -572,9 +572,9 @@ export default function Home() {
 
         {/* Nav */}
         <nav style={{ display: "flex", gap: 4 }}>
-          <a onClick={() => setActiveTab("dashboard")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "dashboard" ? C.goldLight : C.muted, background: activeTab === "dashboard" ? "rgba(255,255,255,.06)" : "transparent" }}>Dashboard</a>
-          <a onClick={() => setActiveTab("reports")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "reports" ? C.goldLight : C.muted, background: activeTab === "reports" ? "rgba(255,255,255,.06)" : "transparent" }}>Reports</a>
-          <a onClick={() => setActiveTab("handles")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "handles" ? C.goldLight : C.muted, background: activeTab === "handles" ? "rgba(255,255,255,.06)" : "transparent" }}>Handles</a>
+          <a onClick={() => setActiveTab("dashboard")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "dashboard" ? C.goldLight : C.muted, background: activeTab === "dashboard" ? "var(--elevate-2)" : "transparent" }}>Dashboard</a>
+          <a onClick={() => setActiveTab("reports")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "reports" ? C.goldLight : C.muted, background: activeTab === "reports" ? "var(--elevate-2)" : "transparent" }}>Reports</a>
+          <a onClick={() => setActiveTab("handles")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "handles" ? C.goldLight : C.muted, background: activeTab === "handles" ? "var(--elevate-2)" : "transparent" }}>Handles</a>
           {user?.role === "admin" && (
             <a onClick={() => navigate("/admin")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, color: C.muted, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s" }}>Admin</a>
           )}
@@ -707,8 +707,8 @@ export default function Home() {
                       style={{
                         display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4,
                         padding: "9px 11px", borderRadius: 9, cursor: "pointer",
-                        background: on ? "rgba(201,146,42,.1)" : "rgba(255,255,255,.03)",
-                        border: `1px solid ${on ? "rgba(201,146,42,.3)" : "rgba(255,255,255,.08)"}`,
+                        background: on ? "rgba(201,146,42,.1)" : "var(--elevate-1)",
+                        border: `1px solid ${on ? "rgba(201,146,42,.3)" : "var(--border-col)"}`,
                         color: on ? C.gold : C.muted,
                         fontSize: 18, fontFamily: "'Space Grotesk', sans-serif",
                         textAlign: "left", transition: "all .2s",
@@ -717,7 +717,7 @@ export default function Home() {
                       <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span className="mo-org-dot" style={{
                           width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
-                          background: on ? C.gold : "#2a3a4a",
+                          background: on ? C.gold : "var(--text-muted)",
                           boxShadow: on ? `0 0 6px ${C.gold}` : "none",
                           transition: "background .2s, box-shadow .2s",
                         }} />
@@ -758,13 +758,13 @@ export default function Home() {
                     style={{ ...inputStyle, flex: 1 }}
                   />
                   <button onClick={addCustomOrg} style={{
-                    background: "rgba(255,255,255,.07)", color: C.text, border: `1px solid ${C.border}`,
+                    background: "var(--elevate-2)", color: C.text, border: `1px solid ${C.border}`,
                     borderRadius: 8, padding: "8px 14px", fontSize: 18, cursor: "pointer",
                     fontFamily: "'Space Grotesk', sans-serif", whiteSpace: "nowrap",
                   }}>+ Add</button>
                 </div>
               </div>
-              <div style={{ fontSize: 10, color: "#2a3a4a", marginTop: 5, fontFamily: "'DM Mono', monospace" }}>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 5, fontFamily: "'DM Mono', monospace" }}>
                 Each org adds ~5 Serper queries + ~2 Claude calls
               </div>
             </div>
@@ -779,17 +779,17 @@ export default function Home() {
                 <SectionLabel>Date Range</SectionLabel>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#2a3a4a", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>FROM</div>
+                    <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>FROM</div>
                     <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={inputStyle} />
                   </div>
                   <span style={{ color: C.muted, fontSize: 18, paddingTop: 20 }}>→</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#2a3a4a", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>TO</div>
+                    <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>TO</div>
                     <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={inputStyle} />
                   </div>
                 </div>
                 <div style={{ marginTop: 14 }}>
-                  <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "#2a3a4a", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>CLIENT NAME</div>
+                  <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>CLIENT NAME</div>
                   <input value={clientName} onChange={(e) => setClientName(e.target.value)} style={inputStyle} placeholder="Client name (appears in footer)" />
                 </div>
               </Card>
@@ -805,7 +805,7 @@ export default function Home() {
                 >
                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase" }}>
                     Scope Keywords
-                    <span style={{ marginLeft: 8, background: "rgba(255,255,255,.06)", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 7px", fontSize: 9, fontWeight: 600, verticalAlign: "middle", fontFamily: "'DM Mono', monospace" }}>optional</span>
+                    <span style={{ marginLeft: 8, background: "var(--elevate-2)", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 7px", fontSize: 9, fontWeight: 600, verticalAlign: "middle", fontFamily: "'DM Mono', monospace" }}>optional</span>
                   </span>
                   <span style={{ fontSize: 15, color: C.muted }}>{scopeOpen ? "▲" : "▼"}</span>
                 </button>
@@ -826,7 +826,7 @@ export default function Home() {
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
                       <input value={scopeInput} onChange={(e) => setScopeInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addScope(); } }} placeholder="Add keyword…" style={{ ...inputStyle, flex: 1, width: "auto" }} />
-                      <button onClick={addScope} style={{ background: "rgba(255,255,255,.06)", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>+ Add</button>
+                      <button onClick={addScope} style={{ background: "var(--elevate-2)", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>+ Add</button>
                       <button onClick={() => setScopeKeywords([...DEFAULT_SCOPE])} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>Reset</button>
                     </div>
                   </div>
@@ -844,7 +844,7 @@ export default function Home() {
                 >
                   <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase" }}>
                     AEO Discovery Queries
-                    <span style={{ marginLeft: 8, background: "rgba(255,255,255,.06)", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 7px", fontSize: 9, fontWeight: 600, verticalAlign: "middle", fontFamily: "'DM Mono', monospace" }}>
+                    <span style={{ marginLeft: 8, background: "var(--elevate-2)", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 7px", fontSize: 9, fontWeight: 600, verticalAlign: "middle", fontFamily: "'DM Mono', monospace" }}>
                       {aeoQueries.length} queries
                     </span>
                   </span>
@@ -857,7 +857,7 @@ export default function Home() {
                     </p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10, maxHeight: 300, overflowY: "auto" }}>
                       {aeoQueries.map((q, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 7, background: "rgba(255,255,255,.03)", border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px" }}>
+                        <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 7, background: "var(--elevate-1)", border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px" }}>
                           <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: C.gold, paddingTop: 3, minWidth: 22, flexShrink: 0 }}>Q{i + 1}</span>
                           {aeoEditIdx === i ? (
                             <div style={{ flex: 1, display: "flex", gap: 5, alignItems: "flex-start" }}>
@@ -866,10 +866,10 @@ export default function Home() {
                                 value={aeoEditVal}
                                 onChange={(e) => setAeoEditVal(e.target.value)}
                                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEditAeo(); } if (e.key === "Escape") setAeoEditIdx(null); }}
-                                style={{ flex: 1, background: "rgba(255,255,255,.04)", border: `1px solid ${C.gold}`, borderRadius: 6, padding: "5px 8px", color: C.text, fontSize: 15, fontFamily: "'DM Mono', monospace", outline: "none", resize: "vertical", minHeight: 40 }}
+                                style={{ flex: 1, background: "var(--elevate-1)", border: `1px solid ${C.gold}`, borderRadius: 6, padding: "5px 8px", color: C.text, fontSize: 15, fontFamily: "'DM Mono', monospace", outline: "none", resize: "vertical", minHeight: 40 }}
                               />
                               <button onClick={saveEditAeo} style={{ background: C.gold, color: C.bg, border: "none", borderRadius: 5, padding: "4px 10px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>✓</button>
-                              <button onClick={() => setAeoEditIdx(null)} style={{ background: "rgba(255,255,255,.07)", color: C.muted, border: "none", borderRadius: 5, padding: "4px 10px", fontSize: 10, cursor: "pointer" }}>✕</button>
+                              <button onClick={() => setAeoEditIdx(null)} style={{ background: "var(--elevate-2)", color: C.muted, border: "none", borderRadius: 5, padding: "4px 10px", fontSize: 10, cursor: "pointer" }}>✕</button>
                             </div>
                           ) : (
                             <>
@@ -882,7 +882,7 @@ export default function Home() {
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
                       <input value={aeoInput} onChange={(e) => setAeoInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addAeoQuery(); } }} placeholder="Add custom query…" style={{ ...inputStyle, flex: 1, width: "auto" }} />
-                      <button onClick={addAeoQuery} style={{ background: "rgba(255,255,255,.06)", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>+ Add</button>
+                      <button onClick={addAeoQuery} style={{ background: "var(--elevate-2)", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>+ Add</button>
                       <button onClick={() => setAeoQueries([...DEFAULT_AEO_QUERIES])} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>Reset</button>
                     </div>
                   </div>
@@ -902,7 +902,7 @@ export default function Home() {
             >
               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase" }}>
                 Social Handles
-                <span style={{ marginLeft: 8, background: "rgba(255,255,255,.06)", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 7px", fontSize: 9, fontWeight: 600, verticalAlign: "middle", fontFamily: "'DM Mono', monospace" }}>
+                <span style={{ marginLeft: 8, background: "var(--elevate-2)", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 7px", fontSize: 9, fontWeight: 600, verticalAlign: "middle", fontFamily: "'DM Mono', monospace" }}>
                   LI · X · IG · YT per org
                 </span>
               </span>
@@ -923,15 +923,15 @@ export default function Home() {
                   <tbody>
                     {selectedOrgs.map((org, i) => {
                       const handles = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "", linkedin: "" };
-                      const rowBg = i % 2 === 0 ? "rgba(255,255,255,.02)" : "transparent";
+                      const rowBg = i % 2 === 0 ? "var(--elevate-1)" : "transparent";
                       const cellInput = (platform: "twitter" | "instagram" | "youtube" | "linkedin", color: string) => (
                         <input
                           value={handles[platform]}
                           onChange={e => setHandle(org, platform, e.target.value)}
                           placeholder="—"
                           style={{
-                            background: "rgba(255,255,255,.04)",
-                            border: `1px solid ${handles[platform] ? `${color}44` : "rgba(255,255,255,.08)"}`,
+                            background: "var(--elevate-1)",
+                            border: `1px solid ${handles[platform] ? `${color}44` : "var(--border-col)"}`,
                             borderRadius: 6, padding: "5px 9px",
                             color: handles[platform] ? color : C.muted,
                             fontFamily: "'DM Mono', monospace", fontSize: 11,
@@ -953,7 +953,7 @@ export default function Home() {
                     })}
                   </tbody>
                 </table>
-                <div style={{ marginTop: 10, fontFamily: "'DM Mono', monospace", fontSize: 9, color: "#2a3a4a" }}>
+                <div style={{ marginTop: 10, fontFamily: "'DM Mono', monospace", fontSize: 9, color: "var(--text-muted)" }}>
                   Handles without @ · used by APIdirect.io for LinkedIn ER · X ER · Instagram ER · YouTube subscriber count
                 </div>
               </div>
@@ -999,7 +999,7 @@ export default function Home() {
 
         {/* Trend status */}
         {trendStatus && (
-          <div style={{ marginTop: 10, fontFamily: "'DM Mono', monospace", fontSize: 15, padding: "7px 14px", background: "rgba(255,255,255,.03)", border: `1px solid ${trendStatus.ok ? "rgba(76,175,116,.3)" : C.border}`, borderRadius: 8, color: trendStatus.ok ? C.green : C.muted }}>
+          <div style={{ marginTop: 10, fontFamily: "'DM Mono', monospace", fontSize: 15, padding: "7px 14px", background: "var(--elevate-1)", border: `1px solid ${trendStatus.ok ? "rgba(76,175,116,.3)" : C.border}`, borderRadius: 8, color: trendStatus.ok ? C.green : C.muted }}>
             {trendStatus.text}
           </div>
         )}
@@ -1008,7 +1008,7 @@ export default function Home() {
         {(running || logs.length > 0) && (
           <div style={{ marginTop: 18 }}>
             {/* Progress bar */}
-            <div style={{ height: 3, background: "rgba(255,255,255,.08)", borderRadius: 2, marginBottom: 4, overflow: "hidden", position: "relative" }}>
+            <div style={{ height: 3, background: "var(--border-col)", borderRadius: 2, marginBottom: 4, overflow: "hidden", position: "relative" }}>
               <div style={{ height: "100%", background: "linear-gradient(90deg, var(--accent-amber), var(--accent-green))", borderRadius: 2, width: `${progress}%`, transition: "width .5s cubic-bezier(.22,1,.36,1)" }} />
             </div>
             <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: C.gold, textAlign: "right", marginBottom: 10 }}>{progress}%</div>
@@ -1016,7 +1016,7 @@ export default function Home() {
             <div
               ref={logBoxRef}
               style={{
-                background: "rgba(255,255,255,.025)", border: `1px solid ${C.border}`,
+                background: "var(--elevate-1)", border: `1px solid ${C.border}`,
                 borderRadius: 12, padding: "14px 18px",
                 maxHeight: 300, overflowY: "auto",
                 fontFamily: "'DM Mono', monospace", fontSize: 15, lineHeight: 1.9,
@@ -1212,10 +1212,10 @@ export default function Home() {
                 {/* Rows — all orgs */}
                 {[...DEFAULT_ORGS, ...customOrgs.map(o => o.name)].map((org, i) => {
                   const ov = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "", linkedin: "" };
-                  const rowBg = i % 2 === 0 ? "transparent" : "rgba(255,255,255,.018)";
+                  const rowBg = i % 2 === 0 ? "transparent" : "var(--elevate-1)";
                   const cellSty: React.CSSProperties = {
-                    background: "rgba(255,255,255,.04)",
-                    border: `1px solid rgba(255,255,255,.08)`,
+                    background: "var(--elevate-1)",
+                    border: `1px solid var(--border-col)`,
                     borderRadius: 6, padding: "6px 10px",
                     color: C.text,
                     fontFamily: "'DM Mono', monospace", fontSize: 12,
@@ -1223,7 +1223,7 @@ export default function Home() {
                     transition: "border-color .2s",
                   };
                   return (
-                    <div key={org} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr 1fr", gap: 0, background: rowBg, borderBottom: `1px solid rgba(255,255,255,.04)` }}>
+                    <div key={org} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr 1fr", gap: 0, background: rowBg, borderBottom: `1px solid var(--border-col)` }}>
                       {/* Org name */}
                       <div style={{ padding: "10px 16px", display: "flex", alignItems: "center" }}>
                         <span style={{ fontSize: 12, fontFamily: "'Space Grotesk', sans-serif", color: C.text }}>{org}</span>
@@ -1234,7 +1234,7 @@ export default function Home() {
                           value={ov.linkedin}
                           onChange={e => setHandle(org, "linkedin", e.target.value)}
                           placeholder="company-slug"
-                          style={{ ...cellSty, color: ov.linkedin ? "#0a8fd4" : C.muted, borderColor: ov.linkedin ? "rgba(10,143,212,.3)" : "rgba(255,255,255,.08)" }}
+                          style={{ ...cellSty, color: ov.linkedin ? "#0a8fd4" : C.muted, borderColor: ov.linkedin ? "rgba(10,143,212,.3)" : "var(--border-col)" }}
                         />
                       </div>
                       {/* Twitter */}
@@ -1243,7 +1243,7 @@ export default function Home() {
                           value={ov.twitter}
                           onChange={e => setHandle(org, "twitter", e.target.value)}
                           placeholder="handle (no @)"
-                          style={{ ...cellSty, color: ov.twitter ? "#4a9fd4" : C.muted, borderColor: ov.twitter ? "rgba(74,159,212,.3)" : "rgba(255,255,255,.08)" }}
+                          style={{ ...cellSty, color: ov.twitter ? "#4a9fd4" : C.muted, borderColor: ov.twitter ? "rgba(74,159,212,.3)" : "var(--border-col)" }}
                         />
                       </div>
                       {/* Instagram */}
@@ -1252,7 +1252,7 @@ export default function Home() {
                           value={ov.instagram}
                           onChange={e => setHandle(org, "instagram", e.target.value)}
                           placeholder="handle (no @)"
-                          style={{ ...cellSty, color: ov.instagram ? "#e05c9c" : C.muted, borderColor: ov.instagram ? "rgba(224,92,156,.3)" : "rgba(255,255,255,.08)" }}
+                          style={{ ...cellSty, color: ov.instagram ? "#e05c9c" : C.muted, borderColor: ov.instagram ? "rgba(224,92,156,.3)" : "var(--border-col)" }}
                         />
                       </div>
                       {/* YouTube */}
@@ -1261,7 +1261,7 @@ export default function Home() {
                           value={ov.youtube}
                           onChange={e => setHandle(org, "youtube", e.target.value)}
                           placeholder="@channel"
-                          style={{ ...cellSty, color: ov.youtube ? "#e53935" : C.muted, borderColor: ov.youtube ? "rgba(229,57,53,.3)" : "rgba(255,255,255,.08)" }}
+                          style={{ ...cellSty, color: ov.youtube ? "#e53935" : C.muted, borderColor: ov.youtube ? "rgba(229,57,53,.3)" : "var(--border-col)" }}
                         />
                       </div>
                     </div>
