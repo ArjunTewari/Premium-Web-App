@@ -62,7 +62,7 @@ async function runAEO(cfg, orgs, cb) {
     });
   }
 
-  const hasAEO = cfg.OPENAI_KEY || cfg.PERPLEXITY_KEY || cfg.APIDIRECT_KEY;
+  const hasAEO = cfg.OPENAI_KEY || cfg.PERPLEXITY_KEY || cfg.APIDIRECT_KEY || cfg.CLAUDE_KEY;
   if (!hasAEO) {
     cb('  No LLM API keys provided — AEO score = 0', 'warn');
     return results;
@@ -146,7 +146,41 @@ async function runAEO(cfg, orgs, cb) {
       }
     })(),
 
-    // Google AI (APIdirect ai-mode) skipped — endpoint times out consistently
+    // Claude Haiku
+    cfg.CLAUDE_KEY && (async () => {
+      cb(`  Probing Claude Haiku — ${queriesUsed.length} questions...`);
+      const responses = await Promise.allSettled(
+        queriesUsed.map(q =>
+          axios.post('https://api.anthropic.com/v1/messages',
+            { model: 'claude-haiku-4-5-20251001', max_tokens: 300, system: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.', messages: [{ role: 'user', content: q }] },
+            { headers: { 'x-api-key': cfg.CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, timeout: 30000 }
+          )
+        )
+      );
+      let claudeErrors = 0;
+      const texts = responses.map((r, i) => {
+        if (r.status === 'rejected') {
+          claudeErrors++;
+          if (i === 0) cb(`  Claude error: ${r.reason?.response?.data?.error?.message || r.reason?.message || 'unknown'}`, 'warn');
+          return '';
+        }
+        return r.value.data.content?.[0]?.text || '';
+      });
+      if (claudeErrors > 0) cb(`  Claude Haiku: ${claudeErrors}/${queriesUsed.length} calls failed`, 'warn');
+      for (const org of orgs) {
+        let count = 0;
+        texts.forEach((text, qi) => {
+          const mentioned = orgMentioned(text, org);
+          if (mentioned) {
+            count++;
+            if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
+          }
+          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'Claude', cited: mentioned, text });
+        });
+        results[org].llmBreakdown['Claude'] = { mentions: count, total: queriesUsed.length };
+        cb(`  Claude → ${org}: ${count}/${queriesUsed.length}`, count > 0 ? 'ok' : 'warn');
+      }
+    })(),
   ].filter(Boolean));
 
   // Aggregate total mentions across all LLMs; keep score for scorecard formula
@@ -246,7 +280,7 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
   const llmLinks = {
     'GPT-4o mini':      (q) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`,
     'Perplexity':       (q) => `https://www.perplexity.ai/search?q=${encodeURIComponent(q)}`,
-    'Google AI':        (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+    'Claude':           (q) => `https://claude.ai/new?q=${encodeURIComponent(q)}`,
   };
 
   const qMatrixRows = queriesUsed.map((q, qi) => {
