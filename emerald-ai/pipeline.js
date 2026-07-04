@@ -3674,7 +3674,11 @@ ${topicCards()}</section>
 ${appendixSections}</section>
 
 <section class="sec" id="em"><div class="sh"><div class="se">Section 06</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations had <strong style="color:var(--warn)">no coverage in during this report period</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. <strong>Gap signal</strong> = evidence of the absence.</div><div class="sdiv"></div></div>
-${emergingCards}</section>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 14px;cursor:pointer;user-select:none" onclick="toggleEm()">
+<span style="font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber)">${emerging.length} narrative gap${emerging.length !== 1 ? "s" : ""} identified</span>
+<span id="em-icon" style="font-family:monospace;font-size:12px;color:var(--amber)">&#9650; Collapse</span>
+</div>
+<div id="em-body">${emergingCards}</div></section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
 <section class="sec" id="social"><div class="sh"><div class="se">Section 08</div><h2 class="st">Social Media Presence</h2><div class="sd">Live social data from official org handles — LinkedIn (LinkedIn API), X/Twitter (X API v2), Instagram (Graph API), and YouTube (Data API v3). ER = Engagement Rate. <strong style="color:var(--good)">✓ cit</strong> in the Citations section indicates the org appeared within 2 lines of an AQ keyword.</div><div class="sdiv"></div></div>
@@ -3696,6 +3700,7 @@ var secs=document.querySelectorAll('.sec[id],header[id]');
 var nis=document.querySelectorAll('.nav-a');
 secs.forEach(function(s){new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){nis.forEach(function(n){n.classList.remove('active');});var a=document.querySelector('.nav-a[href="#'+e.target.id+'"]');if(a)a.classList.add('active');}});},{threshold:0.25,rootMargin:'-10% 0px -60% 0px'}).observe(s);});
 function toggleExecDraft(){var d=document.getElementById('exec-draft');var ic=document.getElementById('exec-draft-icon');if(!d)return;var open=d.style.display!=='none';d.style.display=open?'none':'block';if(ic)ic.textContent=open?'\\u25bc Show draft':'\\u25b2 Hide draft';}
+function toggleEm(){var b=document.getElementById('em-body');var ic=document.getElementById('em-icon');if(!b)return;var open=b.style.display!=='none';b.style.display=open?'none':'';if(ic)ic.innerHTML=open?'&#9660; Expand':'&#9650; Collapse';}
 function toggleEdit(){
   var on=!document.body.classList.contains('edit-mode');
   document.body.classList.toggle('edit-mode',on);
