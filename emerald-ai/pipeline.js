@@ -861,16 +861,34 @@ async function run(cfg, cb) {
     });
   }
 
-  // ── STEP 1d: Drop articles that completely failed to scrape ──
-  // Org-name presence is NOT required here — Haiku (1e) makes the substantive-
-  // mention judgement. Only drop articles where scraping returned nothing.
+  // ── STEP 1d: Require org name in scraped body text ───────────
+  // Serper can return articles where the org name appears in page metadata,
+  // sidebar, or related-links — not in the article body itself. This filter
+  // drops those without an API call. Snippet-only articles (scrape failed)
+  // bypass and proceed to Haiku which can handle partial context.
   cb(`\nSTEP 1d/6 — Filtering by org presence in scraped text...`, "head");
   for (const org of ORGS) {
     const before = arts[org].length;
-    arts[org] = arts[org].filter(a => a.fullText && a.fullText.length > 100);
+    const orgLower = org.toLowerCase();
+    const abbr = getAbbreviation(org);
+    const abbrRe = abbr
+      ? new RegExp(`\\b${abbr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i")
+      : null;
+
+    arts[org] = arts[org].filter(a => {
+      if (!a.fullText || a.fullText.length < 100) return false;
+      // Snippet-only: can't verify body text — pass to Haiku
+      if (a.snippetOnly) return true;
+      const text = a.fullText.toLowerCase();
+      if (text.includes(orgLower)) return true;
+      // Word-boundary abbreviation match for abbr-search results
+      if (abbrRe && abbrRe.test(a.fullText)) return true;
+      return false;
+    });
+
     const dropped = before - arts[org].length;
     cb(
-      `  ${org}: ${dropped > 0 ? `dropped ${dropped} (scrape failed) →` : "all scraped →"} ${arts[org].length} articles`,
+      `  ${org}: ${dropped > 0 ? `dropped ${dropped} (no org mention) →` : "all have org mention →"} ${arts[org].length} articles`,
       arts[org].length > 0 ? "ok" : "warn",
     );
   }
@@ -899,6 +917,7 @@ async function run(cfg, cb) {
         const prompt = `You are filtering news articles for the organisation "${org}" (air quality / environment sector).
 
 DEFAULT: keep=true. Only set keep=false when you are CERTAIN the mention is trivial. When in doubt, return keep=true.
+IMPORTANT: If "${org}" does not appear anywhere in the CONTENT text, set keep=false — the article was fetched by mistake.
 
 Set keep=true if ANY of these apply:
 - "${org}"'s research, report, study, data, or statistic is cited or referenced
