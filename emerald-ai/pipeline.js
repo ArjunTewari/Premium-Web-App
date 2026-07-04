@@ -1663,7 +1663,7 @@ async function buildPPTX(
   {
     const sl = pres.addSlide();
     darkBg(sl);
-    eyebrow(sl, "Section 03");
+    eyebrow(sl, "Section 02a");
     stitle(sl, "Press Analytics");
     const tot = ORGS.reduce((s, o) => s + (data[o]?.total || 0), 0);
     const chartData = [
@@ -2819,21 +2819,46 @@ function momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations = []) 
     });
   });
 
-  const maxCount = Math.max(...buckets.flat(), 1);
+  // Deduplicated "Press" total — unique articles across all orgs
+  const pressSeenKeys = new Set();
+  const pressBuckets = weeks.map(() => 0);
+  let pressTotal = 0;
+  Object.values(arts).flat().forEach(art => {
+    const k = art.url || art.title;
+    if (pressSeenKeys.has(k)) return;
+    pressSeenKeys.add(k);
+    pressTotal++;
+    const d = parseDateStr(art.date || "");
+    if (!d) return;
+    for (let wi = 0; wi < weeks.length; wi++) {
+      const wEnd = new Date(weeks[wi]);
+      wEnd.setDate(wEnd.getDate() + 7);
+      if (d >= weeks[wi] && d < wEnd) { pressBuckets[wi]++; break; }
+    }
+  });
+  const PRESS_COLOR = "8492a6";
+
+  const maxCount = Math.max(...buckets.flat(), ...pressBuckets, 1);
   const orgColors = ORGS.map((_, i) => ORG_COLORS_HEX[i % ORG_COLORS_HEX.length]);
   const totalPerOrg = ORGS.map((o) => (arts[o] || []).length);
 
-  const legend = ORGS.map((o, i) =>
-    `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:#${orgColors[i]}"></div>${esc(o)}: <strong style="color:var(--text);font-weight:600">${totalPerOrg[i]}</strong></div>`
-  ).join("");
+  const legend = [
+    `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:#${PRESS_COLOR};opacity:0.7"></div>Press total: <strong style="color:var(--text);font-weight:600">${pressTotal}</strong></div>`,
+    ...ORGS.map((o, i) =>
+      `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:#${orgColors[i]}"></div>${esc(o)}: <strong style="color:var(--text);font-weight:600">${totalPerOrg[i]}</strong></div>`
+    )
+  ].join("");
 
   const weekBars = weeks.map((w, wi) => {
     const label = `${String(w.getMonth() + 1).padStart(2, "0")}-${String(w.getDate()).padStart(2, "0")}`;
-    const bars = ORGS.map((org, oi) => {
+    const pressCount = pressBuckets[wi];
+    const pressH = pressCount > 0 ? Math.max(2, Math.round((pressCount / maxCount) * 76)) : 2;
+    const pressBar = `<div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#${PRESS_COLOR};height:${pressH}px;opacity:0.55" title="Press total: ${pressCount}"></div>`;
+    const bars = [pressBar, ...ORGS.map((org, oi) => {
       const count = buckets[wi][oi];
       const h = count > 0 ? Math.max(2, Math.round((count / maxCount) * 76)) : 2;
       return `<div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#${orgColors[oi]};height:${h}px" title="${esc(org)}: ${count}"></div>`;
-    }).join("");
+    })].join("");
     const isLast = wi === weeks.length - 1;
     return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px${isLast ? "" : ";border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"}"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px">${bars}</div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">${label}</div></div>`;
   }).join("");
@@ -3606,7 +3631,7 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
   Only articles where the organisation is mentioned in scraped body text and classified as AQ-primary by Claude are included.
 </div>
 </section>
-<section class="sec" id="sov"><div class="sh"><div class="se">Section 02</div><h2 class="st">Press Analytics</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
+<section class="sec" id="sov"><div class="sh"><div class="se">Section 02a</div><h2 class="st">Press Analytics</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
 <div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div><div style="font-size:11px;color:var(--muted2);margin-top:3px">${printTot} Print / Online &middot; ${tvTot} TV News</div></div>
 ${sovBar()}
 <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o, i) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join("")}</div>
