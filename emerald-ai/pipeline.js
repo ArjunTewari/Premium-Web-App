@@ -2588,7 +2588,7 @@ async function buildPPTX(
           ? `Section 08 — Part ${gIdx + 1} of ${SCORE_GROUPS.length}`
           : "Section 08",
       );
-      stitle(sl, "Competitive Scorecard");
+      stitle(sl, "Scorecard");
       const cw = Math.min(3.7, 12.3 / orgGroup.length - 0.15);
       orgGroup.forEach((entry, i) => {
         const org = entry.org;
@@ -3286,15 +3286,8 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
   const maxAeo  = Math.max(...ORGS.map((o) => data[o].aeo     || 0), 1);
   const maxScr  = Math.max(...ORGS.map((o) => data[o].score   || 0), 1);
 
-  const inlineBar = (val, max, col) => {
-    const pct = Math.round((val / max) * 100);
-    return `<div style="display:flex;align-items:center;gap:6px">
-      <div style="width:60px;height:5px;background:var(--surface3);border-radius:3px;flex-shrink:0;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${col};border-radius:3px"></div>
-      </div>
-      <span style="font-family:monospace;font-size:12px;font-weight:600;color:${col}">${val}</span>
-    </div>`;
-  };
+  const inlineBar = (val, _max, col) =>
+    `<span style="font-family:monospace;font-size:13px;font-weight:600;color:${col}">${val}</span>`;
 
   const scorecardRows = rankedOrgs.map(({ org, i, rank }) => {
     const d   = data[org];
@@ -3684,7 +3677,7 @@ ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
 <section class="sec" id="social"><div class="sh"><div class="se">Section 08 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Live social data from official org handles — LinkedIn (LinkedIn API), X/Twitter (X API v2), Instagram (Graph API), and YouTube (Data API v3). ER = Engagement Rate. <strong style="color:var(--good)">✓ cit</strong> in the Citations section indicates the org appeared within 2 lines of an AQ keyword.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: Press · LLM · Social Media. YouTube ER and full social metrics appear in the <a href="#social" style="color:var(--amber);text-decoration:none">Social Media section ↑</a>.</div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd">Organisations ranked by weighted composite: Press · LLM · Social Media. YouTube ER and full social metrics appear in the <a href="#social" style="color:var(--amber);text-decoration:none">Social Media section ↑</a>.</div><div class="sdiv"></div></div>
 ${scorecards}</section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
