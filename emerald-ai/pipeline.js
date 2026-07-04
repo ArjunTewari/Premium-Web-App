@@ -41,6 +41,15 @@ const TV_CHANNEL_DOMAINS = {
   "India TV": "indiatvnews.com",
   "ABP News": "abplive.com",
 };
+// ── Topic taxonomy ────────────────────────────────────────────────────────
+// CANONICAL AQ sub-topic list used for press article classification.
+// Each entry maps to a known Indian AQ policy or pollution-source category.
+//
+// ⚠  DO NOT MODIFY without deliberate review. These topics are not the same
+// as the LLM visibility questions — they are fixed classification labels.
+// Adding a topic means Claude must find it in scraped article text.
+// Removing one silently drops that coverage dimension from every report.
+// Renaming breaks backward consistency across report runs.
 const TOPICS = [
   "NCAP",
   "Policy",
@@ -3656,8 +3665,8 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
 
 ${momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations)}
 
-<section class="sec" id="topics"><div class="sh"><div class="se">Section 03</div><h2 class="st">Topic Ownership Map</h2>
-<div class="sd">AQ sub-topics clustered from article headlines and snippets by Claude. Each cell shows article count and representative headlines. Position: <strong style="color:#4ade80">Leader</strong> (&ge;5 articles) &middot; <strong style="color:#fbbf24">Active</strong> (2&ndash;4 articles) &middot; <strong style="color:var(--muted)">Not Present</strong> (0&ndash;1).</div><div class="sdiv"></div></div>
+<section class="sec" id="topics"><div class="sh"><div class="se">Section 03 &mdash; ${TOPICS.length} topics</div><h2 class="st">Topic Ownership Map</h2>
+<div class="sd">Each article is classified into one of ${TOPICS.length} fixed AQ sub-topics by Claude Sonnet — used here because its larger context window and instruction-following accuracy consistently outperforms smaller models (GPT-4o mini, Gemini Flash) on nuanced Indian AQ sub-topic distinctions. Each cell shows article count and representative headlines. Position: <strong style="color:#4ade80">Leader</strong> (&ge;5 articles) &middot; <strong style="color:#fbbf24">Active</strong> (2&ndash;4 articles) &middot; <strong style="color:var(--muted)">Not Present</strong> (0&ndash;1).</div><div class="sdiv"></div></div>
 ${clsNotice}
 ${topicCards()}</section>
 
