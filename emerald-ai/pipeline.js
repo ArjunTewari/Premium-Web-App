@@ -1645,7 +1645,7 @@ async function buildPPTX(
     const sl = pres.addSlide();
     darkBg(sl);
     eyebrow(sl, "Section 03");
-    stitle(sl, "AQ Press Analytics");
+    stitle(sl, "Press Analytics");
     const tot = ORGS.reduce((s, o) => s + (data[o]?.total || 0), 0);
     const chartData = [
       {
@@ -2066,8 +2066,8 @@ async function buildPPTX(
   {
     const sl = pres.addSlide();
     darkBg(sl);
-    eyebrow(sl, "AEO — LLM VISIBILITY");
-    stitle(sl, "AI Engine Optimisation");
+    eyebrow(sl, "LLM VISIBILITY");
+    stitle(sl, "LLM Visibility");
     sl.addText(
       "How often is each organisation cited when AI models answer AQ questions? Metric = raw LLM mentions.",
       {
@@ -2610,10 +2610,10 @@ async function buildPPTX(
           align: "center",
         });
         const bars = [
-          { l: "AQ Press Analytics", v: d.sov },
+          { l: "Press", v: d.sov },
           { l: "Narrative", v: d.authPct },
           { l: "Citation", v: d.dataPct },
-          { l: "AEO", v: d.aeo },
+          { l: "LLM", v: d.aeo },
         ];
         bars.forEach((b, bi) => {
           const by = 3.14 + bi * 0.62;
@@ -2644,7 +2644,7 @@ async function buildPPTX(
               line: { color: orgPptx(entry.idx), width: 0 },
             });
           sl.addText(
-            b.v > 0 ? String(b.v) : b.l === "AEO" ? "N/A" : String(b.v),
+            b.v > 0 ? String(b.v) : b.l === "LLM" ? "N/A" : String(b.v),
             {
               x: x + cw - 0.55,
               y: by,
@@ -3147,7 +3147,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
         ? `display:grid;grid-template-columns:repeat(${ORGS.length},1fr);gap:16px;margin-bottom:20px`
         : `display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px`;
     return `
-<section class="sec" id="aeo"><div class="sh"><div class="se">AEO — LLM Visibility</div><h2 class="st">AI Engine Optimisation</h2>
+<section class="sec" id="aeo"><div class="sh"><div class="se">LLM Visibility</div><h2 class="st">LLM Visibility</h2>
 <div class="sd">How often is each organisation cited when AI models (GPT-4o, Perplexity, Gemini) are asked about Indian air quality? ${hasAEO ? "Probed with " + AEO_QUESTIONS.length + " standard questions per LLM." : "No LLM API keys provided — add keys to enable."}</div><div class="sdiv"></div></div>
 ${!hasAEO ? `<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:13px;color:var(--muted2)"><strong style="color:var(--warn)">⚠ AEO data not available</strong> — Add OpenAI, Perplexity, or Gemini API keys and re-run to populate this section.</div>` : ""}
 ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px"><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px">LLM Mention Ranking</div>${aeoRankBar}</div>` : ""}
@@ -3247,9 +3247,9 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       <tr style="border-bottom:2px solid var(--border)">
         <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Rank</th>
         <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Organisation</th>
-        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">AQ Press Analytics</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Press</th>
         <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Citation %</th>
-        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">AEO Mentions</th>
+        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">LLM Mentions</th>
         <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Social /10</th>
         <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Score</th>
       </tr>
@@ -3534,11 +3534,11 @@ body.edit-mode .sec-x{display:flex}
 <div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a>
-<div class="nav-lbl">Media Analysis</div><a href="#sov" class="nav-a">AQ Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social &amp; Digital</div><a href="#social" class="nav-a">Social &amp; YouTube</a>
-<div class="nav-lbl">Digital Presence</div><a href="#aeo" class="nav-a">AEO / LLM Visibility</a>
+<div class="nav-lbl">Press</div><a href="#sov" class="nav-a">Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social Media</div><a href="#social" class="nav-a">Social Media</a>
+<div class="nav-lbl">LLM</div><a href="#aeo" class="nav-a">LLM Visibility</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>${navOrgs}CONFIDENTIAL<br><span style="display:inline-block;margin-top:6px;padding:4px 8px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.3);border-radius:4px;color:var(--amber);font-weight:700">&#8377;${52 * ORGS.length}/month</span></div></nav>
-<div class="mob-nav"><a href="#exec">Summary</a><a href="#sov">Press</a><a href="#tv">TV</a><a href="#momentum">Momentum</a><a href="#social">Social</a><a href="#aeo">AEO</a><a href="#score">Score</a><a href="#actions">Actions</a></div>
+<div class="mob-nav"><a href="#exec">Summary</a><a href="#sov">Press</a><a href="#tv">TV</a><a href="#momentum">Momentum</a><a href="#social">Social</a><a href="#aeo">LLM</a><a href="#score">Score</a><a href="#actions">Actions</a></div>
 <main class="main">
 <header class="rh" id="header"><div class="ey">Air Quality Media Intelligence &middot; India</div>
 <h1 class="rt">Air Quality<br><span class="rti">Triple Media Analytics</span></h1>
@@ -3548,7 +3548,7 @@ body.edit-mode .sec-x{display:flex}
 ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;gap:12px;background:rgba(61,142,240,.08);border:1px solid rgba(61,142,240,.25);border-radius:6px;padding:12px 16px;font-size:13px"><div style="flex:1;color:var(--text)"><strong style="font-weight:600">PowerPoint version available.</strong> Open the <code style="background:var(--surface3);padding:1px 5px;border-radius:3px;font-size:11px">.pptx</code> file in the same folder.</div><div style="font-family:monospace;font-size:11px;color:var(--muted2);flex-shrink:0">📁 ${esc(pptxFilename)}</div></div>` : ""}
 </header>
 
-<section class="sec" id="exec"><div class="sh"><div class="se">Section 01</div><h2 class="st">Executive Summary</h2><div class="sd">Headline comparative findings across ${ORGS.length} organisations — media, LLM visibility, and social.</div><div class="sdiv"></div></div>
+<section class="sec" id="exec"><div class="sh"><div class="se">Section 01</div><h2 class="st">Executive Summary</h2><div class="sd">Headline comparative findings across ${ORGS.length} organisations — Press, LLM, and Social Media.</div><div class="sdiv"></div></div>
 <div style="background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.2);border-radius:8px;overflow:hidden;margin-bottom:4px">
 <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;cursor:pointer;user-select:none" onclick="toggleExecDraft()">
 <span style="font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)">Draft Executive Summary <span style="font-weight:400;color:var(--muted2)">(AI-generated &mdash; review before sharing)</span></span>
@@ -3560,12 +3560,12 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
   <strong style="font-weight:600;letter-spacing:.04em">METHODOLOGY</strong> &mdash;
   Serper News API for media coverage &middot; Claude Sonnet 4.6 for article classification &middot;
   LLM probing (GPT-4o, Perplexity Sonar, Gemini 1.5 Flash) for AEO visibility &middot;
-  Serper web search for social AQ presence (LinkedIn + X/Twitter) &middot;
+  Serper web search for Social Media presence (LinkedIn + X/Twitter) &middot;
   Articles filtered to 9 core outlets: TOI, HT, The Hindu, NDTV, News18, India Today, Aaj Tak, India TV, ABP News &middot;
   Only articles where the organisation is mentioned in scraped body text and classified as AQ-primary by Claude are included.
 </div>
 </section>
-<section class="sec" id="sov"><div class="sh"><div class="se">Section 02</div><h2 class="st">AQ Press Analytics</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
+<section class="sec" id="sov"><div class="sh"><div class="se">Section 02</div><h2 class="st">Press Analytics</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
 <div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div></div>
 ${sovBar()}
 <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o, i) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join("")}</div>
@@ -3600,17 +3600,17 @@ ${appendixSections}</section>
 ${emergingCards}</section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
-<section class="sec" id="social"><div class="sh"><div class="se">Section 08</div><h2 class="st">Social Media AQ Presence</h2><div class="sd">Live social data from official org handles — LinkedIn (LinkedIn API), X/Twitter (X API v2), Instagram (Graph API), and YouTube (Data API v3). ER = Engagement Rate. <strong style="color:var(--good)">✓ cit</strong> in the Citations section indicates the org appeared within 2 lines of an AQ keyword.</div><div class="sdiv"></div></div>
+<section class="sec" id="social"><div class="sh"><div class="se">Section 08</div><h2 class="st">Social Media Presence</h2><div class="sd">Live social data from official org handles — LinkedIn (LinkedIn API), X/Twitter (X API v2), Instagram (Graph API), and YouTube (Data API v3). ER = Engagement Rate. <strong style="color:var(--good)">✓ cit</strong> in the Citations section indicates the org appeared within 2 lines of an AQ keyword.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: media · LLM visibility · social presence. YouTube ER and full social metrics appear in the <a href="#social" style="color:var(--amber);text-decoration:none">Social Media section ↑</a>.</div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Competitive Scorecard</h2><div class="sd">Organisations ranked by weighted composite: Press · LLM · Social Media. YouTube ER and full social metrics appear in the <a href="#social" style="color:var(--amber);text-decoration:none">Social Media section ↑</a>.</div><div class="sdiv"></div></div>
 ${scorecards}</section>
 
-<section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including AEO and social media actions.</div><div class="sdiv"></div></div>
+<section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
 <table class="at"><thead><tr><th>Org</th><th>Priority</th><th>Area</th><th>Action</th><th>Data rationale</th></tr></thead><tbody>${actionRows}</tbody></table></section>
 
 <footer class="rf">Generated by Emerald AI &middot; AQ Intelligence Platform v7 &middot; ${now}<br>
-Data: Serper News API &middot; Claude Haiku 4.5 &middot; LLM AEO probing &middot; ${tot} articles &middot; ${esc(DATE_FROM)} to ${esc(DATE_TO)} &middot; Orgs: ${esc(ORGS.join(", "))}<br>
+Data: Serper News API &middot; Claude Haiku 4.5 &middot; LLM probing &middot; ${tot} articles &middot; ${esc(DATE_FROM)} to ${esc(DATE_TO)} &middot; Orgs: ${esc(ORGS.join(", "))}<br>
 <strong style="color:var(--text)">CONFIDENTIAL</strong> &mdash; prepared for ${esc(CLIENT_NAME || "client")}</footer>
 </main></div>
 <script>
