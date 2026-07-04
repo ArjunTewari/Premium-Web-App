@@ -3138,6 +3138,85 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
     </tr></thead><tbody>${tbodyRows}</tbody></table></div></div>`;
   }
 
+  function dynamicTopicTable() {
+    // Build dynamic topic → org → articles index for topics outside the fixed TOPICS list
+    const dynArts = {};
+    ORGS.forEach((org) => {
+      (data[org]?.classifications || []).forEach((c) => {
+        const t = (c.aq_subtopic || "").trim();
+        if (!t) return;
+        const matchesFixed = TOPICS.some(
+          (tp) =>
+            tp.toLowerCase() === t.toLowerCase() ||
+            t.toLowerCase().includes(tp.toLowerCase().split(" ")[0].toLowerCase()),
+        );
+        if (matchesFixed) return;
+        if (!dynArts[t]) dynArts[t] = {};
+        if (!dynArts[t][org]) dynArts[t][org] = [];
+        const art = arts[org]?.[c.index] || {};
+        dynArts[t][org].push({ ...c, title: art.title || "", url: art.url || "" });
+      });
+    });
+
+    const dynTopics = Object.entries(dynArts)
+      .map(([topic, orgData]) => ({
+        topic,
+        total: ORGS.reduce((s, o) => s + (orgData[o]?.length || 0), 0),
+        orgData,
+      }))
+      .filter((d) => d.total > 0)
+      .sort((a, b) => b.total - a.total);
+
+    if (!dynTopics.length) return '';
+
+    const theadDyn = dynTopics.map(({ topic }) =>
+      `<th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)">${esc(topic)}</th>`
+    ).join("");
+
+    const tbodyDyn = ORGS.map((org, i) => {
+      const orgCells = dynTopics.map(({ topic, orgData }) => {
+        const artList = orgData[org] || [];
+        const cv = artList.length;
+        if (cv === 0) {
+          return `<td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td>`;
+        }
+        const label = cv >= 5 ? "Leader" : "Active";
+        const [bgCol, borderCol, textCol] = cv >= 5
+          ? ["rgba(74,222,128,.10)", "rgba(74,222,128,.30)", "#4ade80"]
+          : ["rgba(251,191,36,.10)", "rgba(251,191,36,.30)", "#fbbf24"];
+        const uid = `dyn${org.replace(/\W/g, "")}${topic.replace(/\W/g, "")}`;
+        const srcLinks = artList.map((a) =>
+          a.url
+            ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.title || a.url)}</a>`
+            : `<div style="font-size:10px;color:var(--muted);padding:2px 0">${esc(a.title || "")}</div>`
+        ).join("");
+        return `<td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top">
+          <div style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:3px;background:${bgCol};border:1px solid ${borderCol};margin-bottom:5px;white-space:nowrap">
+            <span style="font-family:monospace;font-size:10px;font-weight:700;color:${textCol}">${label} &middot; ${cv}</span>
+          </div>
+          <div><a class="ctag" onclick="td('${uid}')" style="cursor:pointer;font-size:10px;padding:2px 6px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.25);border-radius:3px;color:var(--amber);font-weight:700;text-decoration:none">&#8599; sources</a><div class="evd" id="${uid}" style="padding:4px 0;border:none;max-height:200px;overflow-y:auto">${srcLinks}</div></div>
+        </td>`;
+      }).join("");
+      return `<tr>
+        <td style="padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1">
+          <span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span>
+        </td>
+        ${orgCells}
+      </tr>`;
+    }).join("");
+
+    return `<div style="margin-top:28px">
+      <div style="font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2);margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span>Dynamic Coverage — ${dynTopics.length} additional topic${dynTopics.length === 1 ? "" : "s"} detected this period</span>
+        <span style="font-size:9px;color:var(--muted);font-weight:400">Topics Claude identified outside the fixed taxonomy above &middot; topics with zero mentions across all orgs are excluded (see Emerging Narratives)</span>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--surface2)">
+        <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Org</th>
+        ${theadDyn}
+      </tr></thead><tbody>${tbodyDyn}</tbody></table></div></div>
+    </div>`;
+  }
+
   function narrTable() {
     const rows = ORGS.map((org, i) => {
       const cls = data[org]?.classifications || [];
@@ -3661,7 +3740,8 @@ ${momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations)}
 <section class="sec" id="topics"><div class="sh"><div class="se">Section 03 &mdash; ${TOPICS.length} topics</div><h2 class="st">Topic Ownership Map</h2>
 <div class="sd">Each article is classified into one of ${TOPICS.length} fixed AQ sub-topics by Claude Sonnet — used here because its larger context window and instruction-following accuracy consistently outperforms smaller models (GPT-4o mini, Gemini Flash) on nuanced Indian AQ sub-topic distinctions. Each cell shows article count and representative headlines. Position: <strong style="color:#4ade80">Leader</strong> (&ge;5 articles) &middot; <strong style="color:#fbbf24">Active</strong> (2&ndash;4 articles) &middot; <strong style="color:var(--muted)">Not Present</strong> (0&ndash;1).</div><div class="sdiv"></div></div>
 ${clsNotice}
-${topicCards()}</section>
+${topicCards()}
+${dynamicTopicTable()}</section>
 
 <section class="sec" id="appendix"><div class="sh"><div class="se">Section 05</div><h2 class="st">Citations</h2><div class="sd">All indexed articles from tracked outlets. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
 ${appendixSections}</section>
