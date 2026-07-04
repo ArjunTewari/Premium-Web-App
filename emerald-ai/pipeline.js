@@ -2870,6 +2870,8 @@ function buildHTML(
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
   const now = new Date().toUTCString();
   const tot = ORGS.reduce((s, o) => s + (data[o]?.total || 0), 0);
+  const printTot = ORGS.reduce((s, o) => s + PRINT_OUTLETS.reduce((ps, outlet) => ps + (data[o]?.outletCounts[outlet] || 0), 0), 0);
+  const tvTot = ORGS.reduce((s, o) => s + ALL_TV_CHANNELS.reduce((ts, ch) => ts + (data[o]?.outletCounts[ch] || 0), 0), 0);
 
   function sovBar() {
     const bars = ORGS.map((org, i) => {
@@ -2892,6 +2894,26 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
       const n = evArts.length;
       if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`;
       const uid = `sov_${org}_${outlet}`.replace(/\W/g, "_");
+      const links = evArts.slice(0, 5).map((a) =>
+        `<a href="${esc(a.url || "#")}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || "").length > 70 ? (a.title || "").slice(0, 70) + "…" : (a.title || ""))}</a>`
+      ).join("");
+      return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:10px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`;
+    }).join("")}</tr>`).join("\n")}
+</tbody></table>`;
+  }
+
+  function sovByOrgTVTable() {
+    const activeChs = ALL_TV_CHANNELS.filter((ch) =>
+      ORGS.some((o) => (data[o]?.outletCounts[ch] || 0) > 0)
+    );
+    if (!activeChs.length)
+      return `<p style="color:var(--muted);font-size:12px">No TV channel coverage indexed in this period.</p>`;
+    return `<table class="nt"><thead><tr><th>Org</th>${activeChs.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
+${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${activeChs.map((ch) => {
+      const evArts = (arts[org] || []).filter((a) => canonOutlet(a.source || "") === ch);
+      const n = evArts.length;
+      if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`;
+      const uid = `sov2_${org}_${ch}`.replace(/\W/g, "_");
       const links = evArts.slice(0, 5).map((a) =>
         `<a href="${esc(a.url || "#")}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || "").length > 70 ? (a.title || "").slice(0, 70) + "…" : (a.title || ""))}</a>`
       ).join("");
@@ -3566,12 +3588,14 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
 </div>
 </section>
 <section class="sec" id="sov"><div class="sh"><div class="se">Section 02</div><h2 class="st">Press Analytics</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
-<div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div></div>
+<div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div><div style="font-size:11px;color:var(--muted2);margin-top:3px">${printTot} Print / Online &middot; ${tvTot} TV News</div></div>
 ${sovBar()}
 <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o, i) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join("")}</div>
 </div>
-<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Press</div>
-${sovByOrgTable()}</section>
+<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Print / Online</div>
+${sovByOrgTable()}
+<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-top:24px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">TV News</div>
+${sovByOrgTVTable()}</section>
 
 <section class="sec" id="tv"><div class="sh"><div class="se">Section 02b</div><h2 class="st">TV Channel Coverage</h2>
 <div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (Aaj Tak, India TV, ABP News) channels.</div><div class="sdiv"></div></div>
