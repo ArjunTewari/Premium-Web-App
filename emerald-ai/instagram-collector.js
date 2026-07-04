@@ -148,11 +148,12 @@ async function fetchOrgIGData(orgName, igHandle, dateFrom, dateTo, accessToken, 
     .sort((a, b) => (b.like_count || 0) - (a.like_count || 0))
     .slice(0, 3)
     .map(m => ({
-      caption:   (m.caption || '').slice(0, 300),
+      snippet:   (m.caption || '').slice(0, 300),
+      url:       m.permalink || '',
       likes:     m.like_count     || 0,
       comments:  m.comments_count || 0,
-      timestamp: m.timestamp,
-      permalink: m.permalink,
+      views:     0,
+      date:      m.timestamp ? m.timestamp.slice(0, 10) : '',
     }));
 
   return {

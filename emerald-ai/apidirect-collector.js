@@ -152,7 +152,7 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
       .slice(0, 5)
       .map(p => ({
         url:      p.url || '',
-        snippet:  (p.snippet || p.title || '').slice(0, 250),
+        snippet:  (p.snippet || p.title || p.text || p.body || p.content || '').slice(0, 250),
         author:   p.author || '',
         likes:    p.likes    || 0,
         comments: p.comments || 0,
