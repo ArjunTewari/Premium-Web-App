@@ -2840,7 +2840,7 @@ ${spikeAnnotations.sort((a, b) => b.count - a.count).map((s) => {
     : "";
 
   return `
-<section class="sec" id="momentum"><div class="sh"><div class="se">Section 03c</div><h2 class="st">Coverage Momentum</h2>
+<section class="sec" id="momentum"><div class="sh"><div class="se">Section 02c</div><h2 class="st">Coverage Momentum</h2>
 <div class="sd">Weekly AQ article volume per organisation over the report period. Spikes are identified and traced to triggering events.</div><div class="sdiv"></div></div>
 <div class="mch"><div style="margin-bottom:12px"><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:11px;color:var(--muted);margin-bottom:10px">${esc(DATE_FROM)} to ${esc(DATE_TO)}</div><div style="display:flex;gap:12px;flex-wrap:wrap">${legend}</div></div>
 <div class="wbars">${weekBars}</div>
@@ -3541,8 +3541,8 @@ body.edit-mode .sec-x{display:flex}
 <div class="mob-nav"><a href="#exec">Summary</a><a href="#sov">Press</a><a href="#tv">TV</a><a href="#momentum">Momentum</a><a href="#social">Social</a><a href="#aeo">AEO</a><a href="#score">Score</a><a href="#actions">Actions</a></div>
 <main class="main">
 <header class="rh" id="header"><div class="ey">Air Quality Media Intelligence &middot; India</div>
-<h1 class="rt">Air Quality<br><span class="rti">TRIPLE Media Analytics</span></h1>
-<div class="rm">Period: ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)} &middot; ${tot} AQ articles &middot; ${now}</div>
+<h1 class="rt">Air Quality<br><span class="rti">Triple Media Analytics</span></h1>
+<div class="rm">Period: ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)} &middot; ${now}</div>
 <div class="chips">${orgChips}</div>
 <div class="dn"><strong>Publicly available data</strong> Insight linked to evidence &middot; ${now}</div>
 ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;gap:12px;background:rgba(61,142,240,.08);border:1px solid rgba(61,142,240,.25);border-radius:6px;padding:12px 16px;font-size:13px"><div style="flex:1;color:var(--text)"><strong style="font-weight:600">PowerPoint version available.</strong> Open the <code style="background:var(--surface3);padding:1px 5px;border-radius:3px;font-size:11px">.pptx</code> file in the same folder.</div><div style="font-family:monospace;font-size:11px;color:var(--muted2);flex-shrink:0">📁 ${esc(pptxFilename)}</div></div>` : ""}
@@ -3565,7 +3565,7 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
   Only articles where the organisation is mentioned in scraped body text and classified as AQ-primary by Claude are included.
 </div>
 </section>
-<section class="sec" id="sov"><div class="sh"><div class="se">Section 03</div><h2 class="st">AQ Press Analytics</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
+<section class="sec" id="sov"><div class="sh"><div class="se">Section 02</div><h2 class="st">AQ Press Analytics</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
 <div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div></div>
 ${sovBar()}
 <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o, i) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join("")}</div>
@@ -3573,7 +3573,7 @@ ${sovBar()}
 <div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Press</div>
 ${sovByOrgTable()}</section>
 
-<section class="sec" id="tv"><div class="sh"><div class="se">Section 03b</div><h2 class="st">TV Channel Coverage</h2>
+<section class="sec" id="tv"><div class="sh"><div class="se">Section 02b</div><h2 class="st">TV Channel Coverage</h2>
 <div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (Aaj Tak, India TV, ABP News) channels.</div><div class="sdiv"></div></div>
 <div style="margin-bottom:16px">
 <div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">English TV</div>
@@ -3588,7 +3588,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
 
 ${momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations)}
 
-<section class="sec" id="topics"><div class="sh"><div class="se">Section 04</div><h2 class="st">Topic Ownership Map</h2>
+<section class="sec" id="topics"><div class="sh"><div class="se">Section 03</div><h2 class="st">Topic Ownership Map</h2>
 <div class="sd">AQ sub-topics clustered from article headlines and snippets by Claude. Each cell shows article count and representative headlines. Position: <strong style="color:#4ade80">Leader</strong> (&ge;5 articles) &middot; <strong style="color:#fbbf24">Active</strong> (2&ndash;4 articles) &middot; <strong style="color:var(--muted)">Not Present</strong> (0&ndash;1).</div><div class="sdiv"></div></div>
 ${clsNotice}
 ${topicCards()}</section>
