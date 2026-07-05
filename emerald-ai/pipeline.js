@@ -2851,28 +2851,77 @@ function momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations = []) 
   const orgColors = ORGS.map((_, i) => ORG_COLORS_HEX[i % ORG_COLORS_HEX.length]);
   const totalPerOrg = ORGS.map((o) => (arts[o] || []).length);
 
-  const legend = [
-    `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:#${PRESS_COLOR};opacity:0.7"></div>Press total: <strong style="color:var(--text);font-weight:600">${pressTotal}</strong></div>`,
-    ...ORGS.map((o, i) =>
-      `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted2)"><div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:#${orgColors[i]}"></div>${esc(o)}: <strong style="color:var(--text);font-weight:600">${totalPerOrg[i]}</strong></div>`
-    )
-  ].join("");
+  // Build artIndex[wi][oi] = [{title, url}] for clickable heat map cells
+  const artIndex = weeks.map(() => ORGS.map(() => []));
+  ORGS.forEach((org, oi) => {
+    (arts[org] || []).forEach((art) => {
+      const d = parseDateStr(art.date || "");
+      if (!d) return;
+      for (let wi = 0; wi < weeks.length; wi++) {
+        const wEnd = new Date(weeks[wi]);
+        wEnd.setDate(wEnd.getDate() + 7);
+        if (d >= weeks[wi] && d < wEnd) { artIndex[wi][oi].push({ title: art.title || "", url: art.url || "" }); break; }
+      }
+    });
+  });
 
-  const weekBars = weeks.map((w, wi) => {
-    const label = `${String(w.getMonth() + 1).padStart(2, "0")}-${String(w.getDate()).padStart(2, "0")}`;
-    const pressCount = pressBuckets[wi];
-    const pressH = pressCount > 0 ? Math.max(2, Math.round((pressCount / maxCount) * 76)) : 2;
-    const pressBar = `<div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#${PRESS_COLOR};height:${pressH}px;opacity:0.55" title="Press total: ${pressCount}"></div>`;
-    const bars = [pressBar, ...ORGS.map((org, oi) => {
-      const count = buckets[wi][oi];
-      const h = count > 0 ? Math.max(2, Math.round((count / maxCount) * 76)) : 2;
-      return `<div style="flex:1;border-radius:2px 2px 0 0;min-height:2px;background:#${orgColors[oi]};height:${h}px" title="${esc(org)}: ${count}"></div>`;
-    })].join("");
-    const isLast = wi === weeks.length - 1;
-    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px${isLast ? "" : ";border-right:1px solid rgba(94,116,148,0.18);padding-right:3px;margin-right:1px"}"><div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:76px">${bars}</div><div style="font-family:monospace;font-size:9px;color:#5e7494;text-align:center">${label}</div></div>`;
+  // Cell colour scale: 0 = none, low = amber, high = green
+  const hmColor = (val) => {
+    if (val === 0) return "transparent";
+    const pct = val / maxCount;
+    if (pct <= 0.3)  return `rgba(201,146,42,${(0.18 + pct * 0.9).toFixed(2)})`;
+    if (pct <= 0.65) return `rgba(187,128,9,${(0.35 + pct * 0.35).toFixed(2)})`;
+    return `rgba(74,222,128,${(0.28 + pct * 0.42).toFixed(2)})`;
+  };
+
+  // Org rows sorted by total coverage descending
+  const orgOrder = ORGS
+    .map((o, i) => ({ o, i, total: totalPerOrg[i] }))
+    .sort((a, b) => b.total - a.total);
+
+  const wkHeaders = weeks.map(w =>
+    `<th style="padding:6px 8px;text-align:center;font-family:monospace;font-size:9px;font-weight:600;color:var(--muted);white-space:nowrap;min-width:42px;border-left:1px solid var(--border)">${String(w.getMonth()+1).padStart(2,"0")}-${String(w.getDate()).padStart(2,"0")}</th>`
+  ).join("");
+
+  const pressRowCells = pressBuckets.map((pc) =>
+    pc > 0
+      ? `<td style="padding:6px 8px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border)"><span style="font-family:monospace;font-size:11px;font-weight:700;color:#${PRESS_COLOR}">${pc}</span></td>`
+      : `<td style="padding:6px 8px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:11px;color:var(--muted)">·</td>`
+  ).join("");
+
+  const orgRows = orgOrder.map(({ o, i }) => {
+    const cells = weeks.map((_, wi) => {
+      const cv = buckets[wi][i];
+      if (cv === 0) {
+        return `<td style="padding:6px 8px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:11px;color:var(--muted)">·</td>`;
+      }
+      const uid = `hm${i}_${wi}`;
+      const links = artIndex[wi][i].map(a =>
+        a.url
+          ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.title || a.url)}</a>`
+          : `<div style="font-size:10px;color:var(--muted);padding:2px 0">${esc(a.title || "")}</div>`
+      ).join("");
+      return `<td style="padding:6px 8px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer" onclick="td('${uid}')"><span style="font-family:monospace;font-size:11px;font-weight:700;color:#${orgColors[i]};background:${hmColor(cv)};padding:1px 7px;border-radius:3px;display:inline-block">${cv}</span><div class="evd" id="${uid}" style="text-align:left;max-height:160px;overflow-y:auto;min-width:180px;padding-top:4px">${links}</div></td>`;
+    }).join("");
+    return `<tr>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1"><span style="font-family:monospace;font-size:11px;font-weight:700;color:#${orgColors[i]}">${esc(o)}</span></td>
+        ${cells}
+        <td style="padding:6px 12px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:12px;font-weight:700;color:#${orgColors[i]}">${totalPerOrg[i]}</td>
+      </tr>`;
   }).join("");
 
-  const summary = ORGS.map((o, i) => `${esc(o)}: ${totalPerOrg[i]}`).join(" · ");
+  const hmTable = `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--surface2)">
+      <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Organisation</th>
+      ${wkHeaders}
+      <th style="padding:6px 10px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border);white-space:nowrap">Total</th>
+    </tr></thead><tbody>
+      <tr style="background:var(--surface2)">
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1"><span style="font-family:monospace;font-size:11px;font-weight:700;color:#${PRESS_COLOR}">Press (all orgs)</span></td>
+        ${pressRowCells}
+        <td style="padding:6px 12px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:12px;font-weight:700;color:#${PRESS_COLOR}">${pressTotal}</td>
+      </tr>
+      ${orgRows}
+    </tbody></table></div></div>`;
 
   const spikeCards = spikeAnnotations.length
     ? `<div style="display:flex;flex-direction:column;gap:8px;margin-top:20px">
@@ -2895,9 +2944,9 @@ ${spikeAnnotations.sort((a, b) => b.count - a.count).map((s) => {
   return `
 <section class="sec" id="momentum"><div class="sh"><div class="se">Section 02c</div><h2 class="st">Coverage Momentum</h2>
 <div class="sd">Weekly AQ article volume per organisation over the report period. Spikes are identified and traced to triggering events.</div><div class="sdiv"></div></div>
-<div class="mch"><div style="margin-bottom:12px"><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:11px;color:var(--muted);margin-bottom:10px">${esc(DATE_FROM)} to ${esc(DATE_TO)}</div><div style="display:flex;gap:12px;flex-wrap:wrap">${legend}</div></div>
-<div class="wbars">${weekBars}</div>
-<div style="font-size:10px;color:var(--muted);margin-top:6px">Bar height = article count that week. Hover for exact count. Spikes annotated below.</div>
+<div class="mch"><div style="margin-bottom:12px"><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:11px;color:var(--muted);margin-bottom:12px">${esc(DATE_FROM)} to ${esc(DATE_TO)}</div></div>
+${hmTable}
+<div style="font-size:10px;color:var(--muted);margin-top:8px">Click any cell to see article links for that week &middot; Orgs sorted by total coverage &middot; Spikes annotated below</div>
 </div>${spikeCards}</section>`;
 }
 
