@@ -278,7 +278,6 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${ytSubsCell}</td>
           <td style="padding:8px 12px;text-align:center">
             <span style="font-family:monospace;font-size:15px;font-weight:700;color:${col}">${total}</span>
-            <div style="margin:4px auto;width:70px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:${col};width:${barW}%"></div></div>
           </td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:600;color:#4caf74">${sov}%</td>
         </tr>`;

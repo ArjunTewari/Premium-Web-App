@@ -259,7 +259,6 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
           <td style="padding:10px 14px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${col}">${escHtml(org)}</span></td>
           <td style="padding:10px 14px;text-align:center">
             <span style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:${col}">${m}</span>
-            <div style="margin:4px auto;width:80px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:${col};width:${Math.round((m/maxMentions)*100)}%"></div></div>
           </td>
           ${allLlms.map(llm => {
             const v = d.llmBreakdown?.[llm] || { mentions: 0, total: maxQ };
@@ -267,7 +266,6 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
             const tc = v.mentions === v.total && v.total > 0 ? '#4caf74' : v.mentions > 0 ? '#d4a017' : '#5e7494';
             return `<td style="padding:10px 14px;text-align:center">
               <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${tc}">${v.mentions}/${v.total}</span>
-              <div style="margin:3px auto;width:60px;height:3px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;background:${tc};width:${pct}%"></div></div>
             </td>`;
           }).join('')}
         </tr>`;
