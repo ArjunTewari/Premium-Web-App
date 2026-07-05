@@ -1,6 +1,18 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 
+// Safety net: a stray unhandled rejection or an 'error' event on a dropped
+// client socket (e.g. during a long-running SSE report generation) must not
+// take down the whole server — that previously looked like report
+// generation "getting stuck" for every subsequent request until a manual
+// restart. Log and keep the process alive instead of crashing.
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "Uncaught exception (process kept alive)");
+});
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason }, "Unhandled promise rejection (process kept alive)");
+});
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {

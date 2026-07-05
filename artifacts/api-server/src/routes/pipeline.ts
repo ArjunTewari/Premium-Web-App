@@ -102,9 +102,33 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   req.setTimeout(0);
   req.socket?.setTimeout(0);
 
+  // Prevent an unhandled 'error' event on the response/request sockets from
+  // crashing the whole Node process (this happens if the client disconnects
+  // or an intermediate proxy closes an idle connection while the pipeline is
+  // still writing to it). Without these listeners, one dropped client during
+  // a long-running report kills the server for every other in-flight/future
+  // request — which looked like the report "getting stuck" after a few orgs.
+  let clientDisconnected = false;
+  res.on("error", () => { clientDisconnected = true; });
+  req.on("error", () => { clientDisconnected = true; });
+  res.on("close", () => { clientDisconnected = true; });
+
   const send = (type: string, data: unknown) => {
-    res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+    if (clientDisconnected || res.writableEnded) return;
+    try {
+      res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+    } catch {
+      clientDisconnected = true;
+    }
   };
+
+  // Heartbeat comment every 15s so intermediate proxies don't treat long
+  // silent stretches (e.g. Claude/Serper batches with no cb() calls) as an
+  // idle connection and terminate it mid-report.
+  const heartbeat = setInterval(() => {
+    if (clientDisconnected || res.writableEnded) { clearInterval(heartbeat); return; }
+    try { res.write(`: ping\n\n`); } catch { clientDisconnected = true; }
+  }, 15000);
 
   const cb = (msg: string, level = "") => {
     send("log", { msg, level });
@@ -140,9 +164,11 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   } catch (e: unknown) {
     send("error", { msg: (e as Error).message });
     console.error("Pipeline error:", e);
+  } finally {
+    clearInterval(heartbeat);
   }
 
-  res.end();
+  if (!clientDisconnected && !res.writableEnded) res.end();
 });
 
 router.get("/outputs", requireAuth, async (_req: Request, res: Response) => {
