@@ -1314,6 +1314,7 @@ ${batchText}`;
   }
   await sleep(300);
 
+  const actionTimeoutMs = Math.min(180000, 40000 + ORGS.length * 8000);
   try {
     cb("  Action matrix...");
     const r = await Promise.race([
@@ -1325,8 +1326,8 @@ ${batchText}`;
       ),
       new Promise((_, rej) =>
         setTimeout(
-          () => rej(new Error("Action matrix timed out after 85s")),
-          85000,
+          () => rej(new Error(`Action matrix timed out after ${Math.round(actionTimeoutMs/1000)}s`)),
+          actionTimeoutMs,
         ),
       ),
     ]);
@@ -1355,22 +1356,28 @@ ${batchText}`;
       : ORGS.slice(0, 3).join("-vs-") + `-and-${ORGS.length - 3}-more`;
   const base = `aq-report-${orgLabel}-${stamp}`;
   const htmlFile = path.join(cfg.outDir, `${base}.html`);
-  const html = buildHTML(
-    data,
-    {},
-    emerging,
-    execF,
-    actions,
-    arts,
-    aeoResults,
-    null,
-    cfg,
-    socialERHtml,
-    socialERResults,
-    youtubeERResults,
-    spikeAnnotations,
-    aeoQueriesUsed,
-  );
+  let html;
+  try {
+    html = buildHTML(
+      data,
+      {},
+      emerging,
+      execF,
+      actions,
+      arts,
+      aeoResults,
+      null,
+      cfg,
+      socialERHtml,
+      socialERResults,
+      youtubeERResults,
+      spikeAnnotations,
+      aeoQueriesUsed,
+    );
+  } catch (e) {
+    cb(`  HTML build error: ${e.message}\n${e.stack?.split("\n").slice(0,4).join("\n")}`, "err");
+    throw e;
+  }
   fs.writeFileSync(htmlFile, html, "utf8");
   cb(`  HTML: ${base}.html (${Math.round(html.length / 1024)}KB)`, "ok");
 
