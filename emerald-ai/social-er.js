@@ -225,7 +225,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT ER%</th>
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT subs</th>
         <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap">SoV%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap;cursor:help" title="Share of Voice — how much of the tracked group's total AQ social activity this org accounts for during the report period">SoV%</th>
       </tr>
       <tr style="background:#0f1422;border-top:1px solid #252d40">
         <td colspan="2" style="padding:5px 12px;font-family:monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3a4a5e">COHORT</td>
