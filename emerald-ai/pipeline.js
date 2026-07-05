@@ -71,6 +71,7 @@ const TOPICS = [
   "Rice Residue Burning",
   "Wheat Residue Burning",
   "Road Dust",
+  "General AQ",
 ];
 // 13 visually distinct colours — one per org slot
 const ORG_COLORS_HEX = [
@@ -1017,7 +1018,7 @@ For EACH numbered article, return one JSON object with:
 - citation_quality: "Data Cited" if a specific number, %, statistic, or named report FROM "${org}" appears in the CONTENT excerpt. "Named Mention" if org is named but no specific data cited. "Not Mentioned" if org does not appear in the excerpt.
 - aq_relevant: true ONLY if the article's PRIMARY subject is air quality, pollution, emissions, AQ policy, or environmental health in India. false for everything else — including articles where air quality is a minor mention, and articles about rankings, awards, PhD programs, sports, finance, or general institutional news even if they mention "${org}".
 - mention_count: copy the ORG MENTIONS IN FULL SCRAPED TEXT number exactly as given — do not recount from the excerpt
-- aq_subtopic: EXACTLY one of: NCAP, Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance, Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI, Brick Kilns, Petrol Emissions, Diesel Emissions, Super Emitters, Thermal Power Plants, Household Pollution, Indoor Pollution, Biomass Air Pollution, Rice Residue Burning, Wheat Residue Burning, Road Dust, General AQ
+- aq_subtopic: EXACTLY one of: NCAP, Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance, Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI, Brick Kilns, Petrol Emissions, Diesel Emissions, Super Emitters, Thermal Power Plants, Household Pollution, Indoor Pollution, Biomass Air Pollution, Rice Residue Burning, Wheat Residue Burning, Road Dust, General AQ. Prefer the most specific topic; use General AQ only when the article covers overall air quality without focusing on any particular source, pollutant type, or policy.
 - evidence_quote: exact phrase ≤12 words from content. "not mentioned" if absent.
 - outlet: publication from SOURCE field
 - date: date from DATE field
@@ -2992,9 +2993,7 @@ function buildHTML(
   }
 
   function sovByOrgTable() {
-    const activeOutlets = PRINT_OUTLETS.filter((outlet) =>
-      ORGS.some((o) => (data[o]?.outletCounts[outlet] || 0) > 0)
-    );
+    const activeOutlets = PRINT_OUTLETS; // always show all 5 outlets
     if (!activeOutlets.length)
       return `<p style="color:var(--muted);font-size:12px">No newspaper site coverage indexed in this period.</p>`;
     return `<table class="nt"><thead><tr><th>Org</th>${activeOutlets.map((o) => `<th>${esc(o)}</th>`).join("")}</tr></thead><tbody>
@@ -3034,7 +3033,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
   function outletRows() {
     return PRINT_OUTLETS.map((outlet) => {
       if (!ORGS.some((o) => (data[o]?.outletCounts[outlet] || 0) > 0))
-        return "";
+        return `<tr><td style="font-weight:600">${esc(outlet)}</td><td style="font-family:monospace;font-size:13px;color:var(--muted)">0</td><td colspan="3"><span style="font-size:10px;color:var(--muted)">No coverage indexed in this period</span></td></tr>`;
       const orgCnts = ORGS.map((o, i) => ({
         o,
         i,
@@ -3104,6 +3103,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
       "Rice Residue Burning": "Rice Residue Burning",
       "Wheat Residue Burning": "Wheat Residue Burning",
       "Road Dust": "Road Dust",
+      "General AQ": "General Air Quality",
     };
     const topicSubtitles = {
       NCAP: "National Clean Air Programme progress & compliance",
@@ -3126,6 +3126,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
       "Rice Residue Burning": "Paddy straw burning, Punjab, Haryana",
       "Wheat Residue Burning": "Wheat stubble burning, post-harvest",
       "Road Dust": "Resuspended road dust, unpaved roads",
+      "General AQ": "Broad air quality coverage not specific to one source or policy",
     };
 
     // Build topic→org→articles index (join classification with original article for title/url)
