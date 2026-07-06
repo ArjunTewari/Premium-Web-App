@@ -3428,13 +3428,55 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
   const scorecardRows = rankedOrgs.map(({ org, i, rank }) => {
     const d   = data[org];
     const col = orgHex(i);
-    const er  = socialERResults.find((r) => r.org === org);
-    const yt  = youtubeERResults.find((r) => r.org === org);
     const socialScore = d.social || 0;
     const socialCell = socialScore > 0
       ? `<span style="font-family:monospace;font-size:13px;font-weight:600;color:${col}">${socialScore}<span style="font-size:10px;font-weight:400;color:var(--muted)">/10</span></span>`
       : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`;
-    return `<tr>
+
+    const pressCont  = +(d.sov      * 0.25).toFixed(2);
+    const citCont    = +(d.dataPct  * 0.25).toFixed(2);
+    const llmCont    = +((d.aeo||0) * 0.30).toFixed(2);
+    const socCont    = +(socialScore * 2   ).toFixed(2);
+    const uid = `sc_${org.replace(/\W/g,'_')}`;
+
+    const components = [
+      { label:'Press',      desc:'AQ article volume score (articles × 2.5, max 100)',   raw: d.sov,       weight:'×0.25', contrib: pressCont },
+      { label:'Citation %', desc:'% of articles citing the org\'s own data or research', raw: d.dataPct,   weight:'×0.25', contrib: citCont   },
+      { label:'LLM',        desc:'Times cited by AI models across probing questions',    raw: d.aeo||0,    weight:'×0.30', contrib: llmCont   },
+      { label:'Social',     desc:'Cross-platform AQ presence score (0–10)',              raw: socialScore, weight:'×2',    contrib: socCont   },
+    ];
+
+    const cards = components.map(({ label, desc, raw, weight, contrib }) => `
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2)">${label}</span>
+          <span style="font-family:monospace;font-size:10px;color:var(--muted);background:var(--surface2);padding:2px 6px;border-radius:3px">${weight}</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.4">${desc}</div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px">
+          <span style="font-family:monospace;font-size:20px;font-weight:700;color:${col}">${raw}</span>
+          <span style="font-family:monospace;font-size:12px;color:var(--muted)">→</span>
+          <span style="font-family:monospace;font-size:15px;font-weight:600;color:var(--amber)">+${contrib}</span>
+        </div>
+      </div>`).join('');
+
+    const breakdown = `<tr id="${uid}" style="display:none">
+      <td colspan="7" style="padding:0">
+        <div style="border-left:3px solid ${col};background:var(--surface2);padding:20px 24px">
+          <div style="font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${col};margin-bottom:14px">${esc(org)} — Score Breakdown</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">${cards}</div>
+          <div style="display:flex;align-items:center;gap:12px;border-top:1px solid var(--border);padding-top:14px;flex-wrap:wrap">
+            <span style="font-family:monospace;font-size:12px;color:var(--muted)">${d.sov}×0.25 + ${d.dataPct}×0.25 + ${d.aeo||0}×0.30 + ${socialScore}×2</span>
+            <span style="font-family:monospace;font-size:12px;color:var(--muted)">=</span>
+            <span style="font-family:monospace;font-size:12px;color:var(--muted)">${pressCont} + ${citCont} + ${llmCont} + ${socCont}</span>
+            <span style="font-family:monospace;font-size:12px;color:var(--muted)">=</span>
+            <span style="font-family:monospace;font-size:26px;font-weight:700;color:${col}">${d.score}</span>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+
+    return `<tr style="cursor:pointer;transition:background .15s" onclick="td('${uid}')" onmouseenter="this.style.background='rgba(255,255,255,.03)'" onmouseleave="this.style.background=''">
       <td style="text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:${rankCol(rank)}">${ordinal(rank)}</td>
       <td><span style="font-size:12px;font-weight:700;color:${col};letter-spacing:.04em">${esc(org)}</span></td>
       <td>${inlineBar(d.sov, maxSov, col)}</td>
@@ -3442,7 +3484,7 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       <td>${d.aeo > 0 ? inlineBar(d.aeo, maxAeo, col) : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`}</td>
       <td style="text-align:center">${socialCell}</td>
       <td>${inlineBar(d.score, maxScr, col)}</td>
-    </tr>`;
+    </tr>${breakdown}`;
   }).join("");
 
   const scorecards = `<div style="overflow-x:auto">
@@ -3814,7 +3856,7 @@ ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
 <section class="sec" id="social"><div class="sh"><div class="se">Section 08 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Live social data from official org handles — LinkedIn (LinkedIn API), X/Twitter (X API v2), Instagram (Graph API), and YouTube (Data API v3). ER = Engagement Rate. <strong style="color:var(--good)">✓ cit</strong> in the Citations section indicates the org appeared within 2 lines of an AQ keyword.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd">Organisations ranked by weighted composite: Press · LLM · Social Media. YouTube ER and full social metrics appear in the <a href="#social" style="color:var(--amber);text-decoration:none">Social Media section ↑</a>.</div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd">Each org is scored on four dimensions — <strong>Press</strong>: AQ article volume score (articles × 2.5, max 100) · <strong>Citation %</strong>: share of articles citing the org's own data or research · <strong>LLM</strong>: times cited by AI models across 15 questions · <strong>Social</strong>: cross-platform AQ presence (0–10). Final score = Press × 0.25 + Citation% × 0.25 + LLM × 0.30 + Social × 2. Click any row to see the breakdown. Full social metrics in the <a href="#social" style="color:var(--amber);text-decoration:none">Social Media section ↑</a>.</div><div class="sdiv"></div></div>
 ${scorecards}</section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
