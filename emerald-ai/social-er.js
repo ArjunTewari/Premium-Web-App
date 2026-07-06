@@ -212,35 +212,35 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   <table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead>
       <tr style="background:#181e2e">
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">#</th>
-        <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494">Org</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI posts</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X posts</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X ER%</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X flw</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG posts</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG ER%</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG flw</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT ER%</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT subs</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
-        <th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap;cursor:help" title="Share of Voice — how much of the tracked group's total AQ social activity this org accounts for during the report period">SoV%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8;white-space:nowrap">#</th>
+        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8">Org</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI posts</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X posts</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X flw</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG posts</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG flw</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT subs</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
+        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap;cursor:help" title="Share of Voice — how much of the tracked group's total AQ social activity this org accounts for during the report period">SoV%</th>
       </tr>
       <tr style="background:#0f1422;border-top:1px solid #252d40">
-        <td colspan="2" style="padding:5px 12px;font-family:monospace;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#3a4a5e">COHORT</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4a7fd4">${colTotals.li}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4a9fd4">${colTotals.x}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#e05c9c">${colTotals.ig}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#e53935">${colTotals.yt}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:11px;color:#3a4a5e">—</td>
+        <td colspan="2" style="padding:5px 12px;font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7e9a">COHORT</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a7fd4">${colTotals.li}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a9fd4">${colTotals.x}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e05c9c">${colTotals.ig}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e53935">${colTotals.yt}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;color:#6b7e9a">—</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#c9922a">${cohortTotal}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#4caf74">100%</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4caf74">100%</td>
       </tr>
     </thead>
     <tbody>
@@ -252,34 +252,34 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         const igFollowers = r.igData?.followers || 0;
         const ytER   = yt.avgER || yt.avgViewER || 0;
         const ytSubs = yt.videos?.find(v => v.subscribers > 0)?.subscribers || 0;
-        const twER  = r.twitterER  > 0 ? `<span style="color:#4a9fd4">${r.twitterER}%</span>` : '<span style="color:#3a4a5e">—</span>';
+        const twER  = r.twitterER  > 0 ? `<span style="color:#4a9fd4">${r.twitterER}%</span>` : '<span style="color:#6b7e9a">—</span>';
         // IG ER: show ~ when followers < 500 (unreliable denominator)
         const igER  = r.instagramER > 0
           ? (igFollowers >= 500
               ? `<span style="color:#e05c9c">${r.instagramER}%</span>`
-              : `<span style="color:#3a4a5e" title="ER unreliable — follower count too low (${igFollowers}) for meaningful ER">~</span>`)
-          : '<span style="color:#3a4a5e">—</span>';
-        const ytERCell = ytER > 0 ? `<span style="color:#e53935">${ytER}%</span>` : '<span style="color:#3a4a5e">—</span>';
-        const twFlwCell = twFollowers > 0 ? `<span style="color:#4a9fd4;font-size:11px">${fmtNum(twFollowers)}</span>` : '<span style="color:#3a4a5e">—</span>';
-        const igFlwCell = igFollowers > 0 ? `<span style="color:#e05c9c;font-size:11px">${fmtNum(igFollowers)}</span>` : '<span style="color:#3a4a5e">—</span>';
-        const ytSubsCell = ytSubs > 0 ? `<span style="color:#e53935;font-size:11px">${fmtNum(ytSubs)}</span>` : '<span style="color:#3a4a5e">—</span>';
+              : `<span style="color:#6b7e9a" title="ER unreliable — follower count too low (${igFollowers}) for meaningful ER">~</span>`)
+          : '<span style="color:#6b7e9a">—</span>';
+        const ytERCell = ytER > 0 ? `<span style="color:#e53935">${ytER}%</span>` : '<span style="color:#6b7e9a">—</span>';
+        const twFlwCell = twFollowers > 0 ? `<span style="color:#4a9fd4;font-size:13px">${fmtNum(twFollowers)}</span>` : '<span style="color:#6b7e9a">—</span>';
+        const igFlwCell = igFollowers > 0 ? `<span style="color:#e05c9c;font-size:13px">${fmtNum(igFollowers)}</span>` : '<span style="color:#6b7e9a">—</span>';
+        const ytSubsCell = ytSubs > 0 ? `<span style="color:#e53935;font-size:13px">${fmtNum(ytSubs)}</span>` : '<span style="color:#6b7e9a">—</span>';
         return `<tr style="border-top:1px solid #252d40">
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:700;color:#2e3a52">#${unifiedRank}</td>
-          <td style="padding:8px 12px"><span style="font-family:monospace;font-size:11px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#8fa3b8">#${unifiedRank}</td>
+          <td style="padding:8px 12px"><span style="font-family:monospace;font-size:13px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a7fd4">${r.linkedinPosts || 0}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a9fd4">${r.twitterPosts || 0}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px">${twER}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px">${twER}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${twFlwCell}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px">${igER}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px">${igER}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${igFlwCell}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e53935">${yt.videoCount || 0}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:11px">${ytERCell}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px">${ytERCell}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${ytSubsCell}</td>
           <td style="padding:8px 12px;text-align:center">
             <span style="font-family:monospace;font-size:15px;font-weight:700;color:${col}">${total}</span>
           </td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:12px;font-weight:600;color:#4caf74">${sov}%</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:600;color:#4caf74">${sov}%</td>
         </tr>`;
       }).join('')}
     </tbody>

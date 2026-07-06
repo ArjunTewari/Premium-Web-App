@@ -243,10 +243,10 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
   <table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead>
       <tr style="background:#181e2e">
-        <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">Rank</th>
-        <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494">Org</th>
-        <th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
-        ${allLlms.map(llm => `<th style="padding:10px 14px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#5e7494;white-space:nowrap">${escHtml(llm)}</th>`).join('')}
+        <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8;white-space:nowrap">Rank</th>
+        <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8">Org</th>
+        <th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
+        ${allLlms.map(llm => `<th style="padding:10px 14px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8;white-space:nowrap">${escHtml(llm)}</th>`).join('')}
       </tr>
     </thead>
     <tbody>
@@ -255,17 +255,17 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
         const d = aeoResults[org] || { llmBreakdown: {} };
         const maxQ = queriesUsed ? queriesUsed.length : 1;
         return `<tr style="border-top:1px solid #252d40">
-          <td style="padding:10px 14px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${m > 0 ? '#2e3a52' : '#5e7494'}">${m > 0 ? `#${rank}` : '—'}</td>
-          <td style="padding:10px 14px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${col}">${escHtml(org)}</span></td>
+          <td style="padding:10px 14px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${m > 0 ? '#8fa3b8' : '#6b7e9a'}">${m > 0 ? `#${rank}` : '—'}</td>
+          <td style="padding:10px 14px"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${col}">${escHtml(org)}</span></td>
           <td style="padding:10px 14px;text-align:center">
             <span style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:${col}">${m}</span>
           </td>
           ${allLlms.map(llm => {
             const v = d.llmBreakdown?.[llm] || { mentions: 0, total: maxQ };
             const pct = Math.round((v.mentions / Math.max(v.total, 1)) * 100);
-            const tc = v.mentions === v.total && v.total > 0 ? '#4caf74' : v.mentions > 0 ? '#d4a017' : '#5e7494';
+            const tc = v.mentions === v.total && v.total > 0 ? '#4caf74' : v.mentions > 0 ? '#d4a017' : '#7d90aa';
             return `<td style="padding:10px 14px;text-align:center">
-              <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${tc}">${v.mentions}/${v.total}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;color:${tc}">${v.mentions}/${v.total}</span>
             </td>`;
           }).join('')}
         </tr>`;
