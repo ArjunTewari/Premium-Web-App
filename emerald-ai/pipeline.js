@@ -494,9 +494,8 @@ function aggregateOrg(artList, clsList, dateFrom) {
 }
 
 function computeScore(d, aeoScore, socialScore = 0) {
-  // socialScore is 0–10; multiply ×2 to keep max 20-pt contribution like before
   const tot = Math.round(
-    d.sov * 0.25 + d.dataPct * 0.25 + aeoScore * 0.3 + socialScore * 2,
+    d.sov * 0.25 + aeoScore * 0.3 + socialScore * 2,
   );
   return {
     ...d,
@@ -3418,7 +3417,6 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
     : 0;
   // Pre-compute max values for bar scaling
   const maxSov  = Math.max(...ORGS.map((o) => data[o].sov     || 0), 1);
-  const maxCit  = Math.max(...ORGS.map((o) => data[o].dataPct || 0), 1);
   const maxAeo  = Math.max(...ORGS.map((o) => data[o].aeo     || 0), 1);
   const maxScr  = Math.max(...ORGS.map((o) => data[o].score   || 0), 1);
 
@@ -3434,16 +3432,14 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       : `<span style="font-family:monospace;font-size:16px;color:var(--muted)">—</span>`;
 
     const pressCont  = +(d.sov      * 0.25).toFixed(2);
-    const citCont    = +(d.dataPct  * 0.25).toFixed(2);
     const llmCont    = +((d.aeo||0) * 0.30).toFixed(2);
     const socCont    = +(socialScore * 2   ).toFixed(2);
     const uid = `sc_${org.replace(/\W/g,'_')}`;
 
     const components = [
-      { label:'Press',      desc:'AQ article volume score (articles × 2.5, max 100)',   raw: d.sov,       weight:'×0.25', contrib: pressCont },
-      { label:'Citation %', desc:'% of articles citing the org\'s own data or research', raw: d.dataPct,   weight:'×0.25', contrib: citCont   },
-      { label:'LLM',        desc:'Times cited by AI models across probing questions',    raw: d.aeo||0,    weight:'×0.30', contrib: llmCont   },
-      { label:'Social',     desc:'Cross-platform AQ presence score (0–10)',              raw: socialScore, weight:'×2',    contrib: socCont   },
+      { label:'Press',   desc:'AQ article volume score (articles × 2.5, max 100)', raw: d.sov,       weight:'×0.25', contrib: pressCont },
+      { label:'LLM',     desc:'Times cited by AI models across probing questions',  raw: d.aeo||0,    weight:'×0.30', contrib: llmCont   },
+      { label:'Social',  desc:'Cross-platform AQ presence score (0–10)',            raw: socialScore, weight:'×2',    contrib: socCont   },
     ];
 
     const cards = components.map(({ label, desc, raw, weight, contrib }) => `
@@ -3461,14 +3457,14 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       </div>`).join('');
 
     const breakdown = `<tr id="${uid}" style="display:none">
-      <td colspan="7" style="padding:0">
+      <td colspan="6" style="padding:0">
         <div style="border-left:3px solid ${col};background:var(--surface2);padding:20px 24px">
           <div style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${col};margin-bottom:14px">${esc(org)} — Score Breakdown</div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">${cards}</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px">${cards}</div>
           <div style="display:flex;align-items:center;gap:12px;border-top:1px solid var(--border);padding-top:14px;flex-wrap:wrap">
-            <span style="font-family:monospace;font-size:17px;color:var(--muted)">${d.sov}×0.25 + ${d.dataPct}×0.25 + ${d.aeo||0}×0.30 + ${socialScore}×2</span>
+            <span style="font-family:monospace;font-size:17px;color:var(--muted)">${d.sov}×0.25 + ${d.aeo||0}×0.30 + ${socialScore}×2</span>
             <span style="font-family:monospace;font-size:17px;color:var(--muted)">=</span>
-            <span style="font-family:monospace;font-size:17px;color:var(--muted)">${pressCont} + ${citCont} + ${llmCont} + ${socCont}</span>
+            <span style="font-family:monospace;font-size:17px;color:var(--muted)">${pressCont} + ${llmCont} + ${socCont}</span>
             <span style="font-family:monospace;font-size:17px;color:var(--muted)">=</span>
             <span style="font-family:monospace;font-size:31px;font-weight:700;color:${col}">${d.score}</span>
           </div>
@@ -3480,7 +3476,6 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       <td style="text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:${rankCol(rank)}">${ordinal(rank)}</td>
       <td><span style="font-size:17px;font-weight:700;color:${col};letter-spacing:.04em">${esc(org)}</span></td>
       <td>${inlineBar(d.sov, maxSov, col)}</td>
-      <td>${inlineBar(d.dataPct, maxCit, col)}</td>
       <td>${d.aeo > 0 ? inlineBar(d.aeo, maxAeo, col) : `<span style="font-family:monospace;font-size:16px;color:var(--muted)">—</span>`}</td>
       <td style="text-align:center">${socialCell}</td>
       <td>${inlineBar(d.score, maxScr, col)}</td>
@@ -3494,7 +3489,6 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
         <th style="padding:10px 12px;text-align:center;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Rank</th>
         <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Organisation</th>
         <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Press</th>
-        <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Citation %</th>
         <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">LLM Mentions</th>
         <th style="padding:10px 12px;text-align:center;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Social /10</th>
         <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Score</th>
@@ -3856,7 +3850,7 @@ ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
 <section class="sec" id="social"><div class="sh"><div class="se">Section 08 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Live social data from official org handles — LinkedIn (LinkedIn API), X/Twitter (X API v2), Instagram (Graph API), and YouTube (Data API v3). Posts are date-filtered to the report window using smart pagination (stops fetching once posts fall outside the window). ER = Engagement Rate.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd">Each org is scored on four dimensions — <strong>Press</strong>: AQ article volume score (articles × 2.5, max 100) · <strong>Citation %</strong>: share of articles citing the org's own data or research · <strong>LLM</strong>: times cited by AI models across 15 questions · <strong>Social</strong>: cross-platform AQ presence (0–10). Final score = Press × 0.25 + Citation% × 0.25 + LLM × 0.30 + Social × 2. Click any row to see the breakdown.</div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd"><ul style="margin:0;padding-left:20px;line-height:2"><li><strong>Press</strong>: AQ article volume score (articles × 2.5, max 100)</li><li><strong>LLM</strong>: Times cited by AI models across probing questions</li><li><strong>Social</strong>: Cross-platform AQ presence score (0–10)</li><li>Final score = Press × 0.25 + LLM × 0.30 + Social × 2. Click any row to see the breakdown.</li></ul></div><div class="sdiv"></div></div>
 ${scorecards}</section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
