@@ -423,8 +423,28 @@ export default function Home() {
       const html = await res.text();
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
-      const actionsSection = doc.getElementById("actions") || doc.querySelector('[id*="action"]');
-      if (actionsSection) actionsSection.remove();
+
+      // Remove Action Matrix and Executive Summary from commercial version
+      doc.getElementById("actions")?.remove();
+      doc.getElementById("exec")?.remove();
+
+      // Remove Executive Summary nav link (and its "Report" label if now empty)
+      const execNavLink = doc.querySelector('a[href="#exec"]');
+      if (execNavLink) {
+        const prev = execNavLink.previousElementSibling;
+        const next = execNavLink.nextElementSibling;
+        if (prev?.classList.contains("nav-lbl") && (!next || next.classList.contains("nav-lbl"))) {
+          prev.remove();
+        }
+        execNavLink.remove();
+      }
+
+      // Renumber remaining section eyebrows sequentially (01, 02, 03 …)
+      doc.querySelectorAll(".se").forEach((el, idx) => {
+        const num = String(idx + 1).padStart(2, "0");
+        el.textContent = el.textContent!.replace(/^Section\s+\S+/, `Section ${num}`);
+      });
+
       const clientHtml = "<!DOCTYPE html>" + doc.documentElement.outerHTML;
       const blob = new Blob([clientHtml], { type: "text/html" });
       const url = URL.createObjectURL(blob);
@@ -1177,7 +1197,7 @@ export default function Home() {
               >⬇ PDF</button>
             </div>
             <div style={{ fontSize: 10, color: C.muted, marginTop: 8, fontFamily: "'DM Mono', monospace" }}>
-              Commercial excludes Action Matrix · Personal includes everything · PDF opens on any device
+              Commercial excludes AI Executive Summary &amp; Action Matrix · Personal includes everything · PDF opens on any device
             </div>
           </div>
         )}

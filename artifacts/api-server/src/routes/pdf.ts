@@ -9,13 +9,18 @@ const OUT_DIR = path.join(process.cwd(), "outputs");
 // Find a usable Chrome/Chromium binary on Replit / Linux
 function findChrome(): string | undefined {
   const candidates = [
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    process.env.CHROME_BIN,
     "/usr/bin/google-chrome-stable",
     "/usr/bin/google-chrome",
     "/usr/bin/chromium-browser",
     "/usr/bin/chromium",
     "/nix/var/nix/profiles/default/bin/chromium",
+    "/run/current-system/sw/bin/chromium",
+    "/home/user/.nix-profile/bin/chromium",
   ];
   for (const p of candidates) {
+    if (!p) continue;
     try { fs.accessSync(p, fs.constants.X_OK); return p; } catch {}
   }
   return undefined;
@@ -45,6 +50,8 @@ router.get("/pdf/:file", requireAuth, async (req: Request, res: Response) => {
         "--disable-extensions",
         "--disable-background-networking",
         "--no-first-run",
+        "--single-process",
+        "--no-zygote",
       ],
     });
     const page = await browser.newPage();
