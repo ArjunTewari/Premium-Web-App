@@ -8,7 +8,6 @@ interface ReportLog {
   dateFrom: string;
   dateTo: string;
   htmlName: string | null;
-  pptxName: string | null;
   clientName: string | null;
   generatedBy: string | null;
   costInr: string;

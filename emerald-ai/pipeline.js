@@ -1366,7 +1366,6 @@ ${batchText}`;
       actions,
       arts,
       aeoResults,
-      null,
       cfg,
       socialERHtml,
       socialERResults,
@@ -2968,7 +2967,6 @@ function buildHTML(
   actions,
   arts,
   aeoResults,
-  pptxFilename,
   cfg,
   socialERHtml = "",
   socialERResults = [],
@@ -3785,7 +3783,6 @@ body.edit-mode .sec-x{display:flex}
 <div class="rm">Period: ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)} &middot; ${now}</div>
 <div class="chips">${orgChips}</div>
 <div class="dn"><strong>Publicly available data</strong> Insight linked to evidence &middot; ${now}</div>
-${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;gap:12px;background:rgba(61,142,240,.08);border:1px solid rgba(61,142,240,.25);border-radius:6px;padding:12px 16px;font-size:18px"><div style="flex:1;color:var(--text)"><strong style="font-weight:600">PowerPoint version available.</strong> Open the <code style="background:var(--surface3);padding:1px 5px;border-radius:3px;font-size:16px">.pptx</code> file in the same folder.</div><div style="font-family:monospace;font-size:16px;color:var(--muted2);flex-shrink:0">📁 ${esc(pptxFilename)}</div></div>` : ""}
 </header>
 
 <section class="sec" id="exec"><div class="sh"><div class="se">Section 01</div><h2 class="st">Executive Summary</h2><div class="sd">Headline comparative findings across ${ORGS.length} organisations — Press, LLM, and Social Media.</div><div class="sdiv"></div></div>

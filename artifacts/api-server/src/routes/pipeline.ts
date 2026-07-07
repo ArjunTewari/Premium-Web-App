@@ -143,14 +143,13 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     const { run } = require(pipelinePath) as any;
     const result = await run(cfg, cb);
     const costs = calculateReportCosts(cfg.ORGS, cfg.DATE_FROM, cfg.DATE_TO);
-    send("done", { htmlName: result.htmlName, pptxName: result.pptxName, costInr: costs.costInr });
+    send("done", { htmlName: result.htmlName, costInr: costs.costInr });
     sendReportSms(costs.costInr, cfg.ORGS, result.htmlName ?? "").catch(() => {});
     db.insert(reportLogsTable).values({
       organizations: cfg.ORGS,
       dateFrom: cfg.DATE_FROM,
       dateTo: cfg.DATE_TO,
       htmlName: result.htmlName ?? null,
-      pptxName: result.pptxName ?? null,
       clientName: cfg.CLIENT_NAME,
       generatedBy: req.user?.username ?? null,
       costInr: costs.costInr.toFixed(2),
@@ -175,7 +174,7 @@ router.get("/outputs", requireAuth, async (_req: Request, res: Response) => {
   try {
     const files = fs
       .readdirSync(OUT_DIR)
-      .filter((f) => f.endsWith(".html") || f.endsWith(".pptx"))
+      .filter((f) => f.endsWith(".html"))
       .map((f) => ({
         name: f,
         size: Math.round(fs.statSync(path.join(OUT_DIR, f)).size / 1024),
@@ -183,11 +182,10 @@ router.get("/outputs", requireAuth, async (_req: Request, res: Response) => {
       }))
       .sort((a, b) => b.mtime.localeCompare(a.mtime));
 
-    const logs = await db.select({ htmlName: reportLogsTable.htmlName, pptxName: reportLogsTable.pptxName, costInr: reportLogsTable.costInr }).from(reportLogsTable);
+    const logs = await db.select({ htmlName: reportLogsTable.htmlName, costInr: reportLogsTable.costInr }).from(reportLogsTable);
     const costMap: Record<string, string> = {};
     for (const log of logs) {
       if (log.htmlName && log.costInr) costMap[log.htmlName] = log.costInr;
-      if (log.pptxName && log.costInr) costMap[log.pptxName] = log.costInr;
     }
 
     res.json(files.map((f) => ({ ...f, costInr: costMap[f.name] ?? null })));
