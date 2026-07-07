@@ -366,7 +366,7 @@ async function callClaude(prompt, key, maxTokens = 2500, model = CLAUDE_MODEL) {
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
       },
-      timeout: 90000,
+      timeout: 360000,
     },
   );
   const usage = res.data.usage;
@@ -1315,7 +1315,7 @@ ${batchText}`;
   }
   await sleep(300);
 
-  const actionTimeoutMs = Math.min(180000, 40000 + ORGS.length * 8000);
+  const actionTimeoutMs = Math.min(420000, 60000 + ORGS.length * 12000);
   try {
     cb("  Action matrix...");
     const r = await Promise.race([
