@@ -127,7 +127,7 @@ function fmtNum(n) {
 }
 
 function topPostsHtml(posts, color, fields) {
-  if (!posts?.length) return '<div style="font-size:15px;color:#3a4a5e">No posts found</div>';
+  if (!posts?.length) return '<div style="font-size:15px;color:#7d90aa">No posts found</div>';
   return posts.map((p, i) => {
     const metrics = fields.map(f => {
       const icons = { likes: '♥', comments: '💬', shares: '↗', retweets: '↻', replies: '↩', views: '👁' };
@@ -285,7 +285,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     </tbody>
   </table>
 </div>
-<div style="background:#0d1120;border:1px solid #1e2638;border-radius:6px;padding:10px 14px;font-family:monospace;font-size:14px;color:#3a4a5e;line-height:1.9;margin-bottom:16px">
+<div style="background:#0d1120;border:1px solid #1e2638;border-radius:6px;padding:10px 14px;font-family:monospace;font-size:14px;color:#7d90aa;line-height:1.9;margin-bottom:16px">
   <strong style="color:#5e7494;letter-spacing:.06em">LEGEND</strong> &nbsp;·&nbsp;
   <strong style="color:#4a7fd4">LI</strong> = LinkedIn AQ posts &nbsp;·&nbsp;
   <strong style="color:#4a9fd4">X</strong> = X/Twitter AQ posts from official handle &nbsp;·&nbsp;
@@ -305,7 +305,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const li = r.liData || { postCount: 0, totalLikes: 0, totalComments: 0, totalShares: 0, topPosts: [] };
     const liHtml = li.postCount > 0 ? `
       <div style="margin-top:8px">
-        <div style="font-size:14px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+        <div style="font-size:14px;color:#7d90aa;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
           LinkedIn — <span style="color:#4a7fd4">${li.postCount} AQ post${li.postCount === 1 ? '' : 's'}</span>
           &middot; ♥ ${li.totalLikes} &middot; 💬 ${li.totalComments} &middot; ↗ ${li.totalShares}
         </div>
@@ -316,7 +316,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const tw = r.twData || { postCount: 0, totalLikes: 0, totalReplies: 0, totalRetweets: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
     const twHtml = tw.postCount > 0 ? `
       <div style="margin-top:8px">
-        <div style="font-size:14px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+        <div style="font-size:14px;color:#7d90aa;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
           X/Twitter — <span style="color:#4a9fd4">${tw.postCount} tweet${tw.postCount === 1 ? '' : 's'}</span>
           ${tw.followers ? `&middot; ${fmtNum(tw.followers)} followers` : ''}
           ${tw.er > 0 ? `&middot; <span style="color:#4a9fd4;background:rgba(74,159,212,.1);border:1px solid rgba(74,159,212,.25);border-radius:3px;padding:1px 5px">ER ${tw.er}%</span>` : ''}
@@ -329,7 +329,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const ig = r.igData || { postCount: 0, totalLikes: 0, totalComments: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
     const igHtml = ig.postCount > 0 ? `
       <div style="margin-top:8px">
-        <div style="font-size:14px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+        <div style="font-size:14px;color:#7d90aa;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
           Instagram — <span style="color:#e05c9c">${ig.postCount} post${ig.postCount === 1 ? '' : 's'}</span>
           ${ig.followers ? `&middot; ${fmtNum(ig.followers)} followers` : ''}
           ${ig.er > 0 ? `&middot; <span style="color:#e05c9c;background:rgba(224,92,156,.1);border:1px solid rgba(224,92,156,.25);border-radius:3px;padding:1px 5px">ER ${ig.er}%</span>` : ''}
@@ -349,9 +349,9 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const ytHtml = yt.videoCount > 0 ? `
       <div style="margin-top:10px">
         <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:5px">
-          <span style="font-size:14px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700">YouTube — <span style="color:#e53935">${yt.videoCount} video${yt.videoCount === 1 ? '' : 's'}</span>${yt.totalViews > 0 ? ` &middot; ${yt.totalViews.toLocaleString()} total views` : ''}</span>
+          <span style="font-size:14px;color:#7d90aa;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700">YouTube — <span style="color:#e53935">${yt.videoCount} video${yt.videoCount === 1 ? '' : 's'}</span>${yt.totalViews > 0 ? ` &middot; ${yt.totalViews.toLocaleString()} total views` : ''}</span>
           ${avgER > 0 ? `<span style="font-family:monospace;font-size:15px;color:#e53935;background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.2);border-radius:4px;padding:1px 7px">avg ER ${avgER}%</span>` : ''}
-          ${erMethodLabel ? `<span style="font-family:monospace;font-size:14px;color:#3a4a5e">${erMethodLabel}</span>` : ''}
+          ${erMethodLabel ? `<span style="font-family:monospace;font-size:14px;color:#7d90aa">${erMethodLabel}</span>` : ''}
         </div>
         ${sortedYtVideos.map((v, idx) => {
           const metricsStr = v.views !== null
@@ -362,7 +362,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
             : (v.viewER !== null) ? ` &middot; <span style="color:#e05c5c">ER ${v.viewER}% (view)</span>` : '';
           return `<div style="padding:6px 10px;background:#0a0e17;border-left:2px solid ${idx === 0 ? '#e53935' : '#1e2638'};border-radius:0 4px 4px 0;margin-bottom:4px">
             <div style="display:flex;align-items:flex-start;gap:8px">
-              <span style="font-family:monospace;font-size:14px;color:#3a4a5e;flex-shrink:0;margin-top:2px">#${idx + 1}</span>
+              <span style="font-family:monospace;font-size:14px;color:#7d90aa;flex-shrink:0;margin-top:2px">#${idx + 1}</span>
               <div style="flex:1;min-width:0">
                 ${v.url
                   ? `<a href="${escHtml(v.url)}" target="_blank" style="font-size:16px;color:#e53935;text-decoration:none;line-height:1.4;display:block;font-weight:600;margin-bottom:2px">${escHtml((v.title || v.url || '').slice(0, 150))}${(v.title || v.url || '').length > 150 ? '…' : ''}</a>`
@@ -378,7 +378,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
 
     return `<details style="border:1px solid #252d40;border-radius:6px;margin-bottom:6px">
       <summary style="padding:10px 14px;cursor:pointer;background:#181e2e;border-radius:6px;list-style:none;display:flex;align-items:center;gap:12px;user-select:none">
-        <span style="font-family:monospace;font-size:15px;font-weight:700;color:#2e3a52">#${r.rank}</span>
+        <span style="font-family:monospace;font-size:15px;font-weight:700;color:#6b7e9a">#${r.rank}</span>
         <span style="font-family:monospace;font-size:16px;font-weight:700;color:${col}">${escHtml(r.org)}</span>
         <span style="font-family:monospace;font-size:17px;font-weight:700;color:${col}">${r.presenceScore}/10</span>
         <span style="font-size:15px;color:#5e7494;margin-left:4px">
@@ -395,7 +395,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         <span style="color:#c9922a;font-size:16px;margin-left:auto">▾</span>
       </summary>
       <div style="padding:12px 14px;background:#0e1420">
-        ${!hasAnyPost ? '<div style="font-size:16px;color:#3a4a5e">No AQ social posts found via APIdirect in this period</div>' : ''}
+        ${!hasAnyPost ? '<div style="font-size:16px;color:#7d90aa">No AQ social posts found via APIdirect in this period</div>' : ''}
         ${liHtml}
         ${twHtml}
         ${igHtml}

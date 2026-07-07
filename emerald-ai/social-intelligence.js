@@ -312,7 +312,7 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
       const qResults = aeoResults[org]?.questionResults?.[qKey] || [];
       const cited = qResults.filter(r => r.cited).length;
       const total = qResults.length;
-      if (total === 0) return `<td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40"><span style="color:#2e3a52;font-size:17px">—</span></td>`;
+      if (total === 0) return `<td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40"><span style="color:#6b7e9a;font-size:17px">—</span></td>`;
       const tc  = cited === total ? '#4caf74' : cited > 0 ? '#d4a017' : '#5e7494';
       const sym = cited > 0 ? '✓' : '✗';
       return `<td style="padding:8px 12px;text-align:center;border-left:1px solid #252d40">
