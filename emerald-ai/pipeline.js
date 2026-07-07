@@ -3703,7 +3703,7 @@ body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line
 .pri-lev{display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:15px;font-weight:600;white-space:nowrap}
 .pri-opt{display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.25);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:15px;font-weight:600;white-space:nowrap}
 .pri-inv{display:inline-block;background:rgba(224,92,92,.1);color:var(--bad);border:1px solid rgba(224,92,92,.25);border-radius:3px;padding:2px 7px;font-family:monospace;font-size:15px;font-weight:600;white-space:nowrap}
-.rat{font-size:16px;color:var(--muted);font-family:monospace;line-height:1.55}
+.rat{font-size:16px;color:var(--text);font-family:monospace;line-height:1.55}
 .apt td{font-family:monospace;color:var(--muted2);font-size:16px}.apt td a{color:var(--amber);text-decoration:none}
 .rf{border-top:1px solid var(--border);padding:28px 0 0;font-family:monospace;font-size:15px;color:var(--muted);line-height:2}
 .edit-bar{position:fixed;top:14px;right:18px;z-index:2000;display:flex;gap:8px;align-items:center}
