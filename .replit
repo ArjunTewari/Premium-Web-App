@@ -42,6 +42,7 @@ externalPort = 3000
 SEED_ADMIN = "true"
 YOUTUBE_AUTHORIZED_URI = "https://premium-web-app-arjuntewari0505.replit.app/api/auth/youtube/callback"
 NODE_OPTIONS = "--use-openssl-ca"
+PUPPETEER_EXECUTABLE_PATH = "/nix/store/khk7xpgsm5insk81azy9d560yq4npf77-chromium-131.0.6778.204/bin/chromium"
 
 [nix]
 channel = "stable-24_11"
