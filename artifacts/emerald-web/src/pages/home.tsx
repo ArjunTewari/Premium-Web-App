@@ -260,6 +260,9 @@ export default function Home() {
   const [aeoEditIdx, setAeoEditIdx] = useState<number | null>(null);
   const [aeoEditVal, setAeoEditVal] = useState("");
 
+  const [confirmState, setConfirmState] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  function withConfirm(message: string, action: () => void) { setConfirmState({ message, onConfirm: action }); }
+
   const [activeTab, setActiveTab] = useState<"dashboard" | "reports" | "handles">("dashboard");
 
   // Handles tab — new org add form
@@ -395,25 +398,49 @@ export default function Home() {
 
   function addScope() {
     const val = scopeInput.trim();
-    if (val && !scopeKeywords.includes(val)) setScopeKeywords((p) => [...p, val]);
-    setScopeInput("");
+    if (!val || scopeKeywords.includes(val)) { setScopeInput(""); return; }
+    withConfirm(`Add "${val}" to scope keywords?`, () => {
+      setScopeKeywords((p) => [...p, val]);
+      setScopeInput("");
+    });
   }
 
-  function removeScope(kw: string) { setScopeKeywords((p) => p.filter((k) => k !== kw)); }
+  function removeScope(kw: string) {
+    withConfirm(`Remove keyword "${kw}" from scope?`, () => setScopeKeywords((p) => p.filter((k) => k !== kw)));
+  }
+
+  function resetScope() {
+    withConfirm("Reset scope keywords to defaults? All custom keywords will be removed.", () => setScopeKeywords([...DEFAULT_SCOPE]));
+  }
 
   function addAeoQuery() {
     const val = aeoInput.trim();
-    if (val && !aeoQueries.includes(val)) setAeoQueries((p) => [...p, val]);
-    setAeoInput("");
+    if (!val || aeoQueries.includes(val)) { setAeoInput(""); return; }
+    withConfirm(`Add this query?\n\n"${val}"`, () => {
+      setAeoQueries((p) => [...p, val]);
+      setAeoInput("");
+    });
   }
 
-  function removeAeoQuery(idx: number) { setAeoQueries((p) => p.filter((_, i) => i !== idx)); }
+  function removeAeoQuery(idx: number) {
+    withConfirm(`Remove Q${idx + 1}?\n\n"${aeoQueries[idx]}"`, () => setAeoQueries((p) => p.filter((_, i) => i !== idx)));
+  }
+
+  function resetAeoQueries() {
+    withConfirm("Reset AEO queries to defaults? All custom queries will be removed.", () => setAeoQueries([...DEFAULT_AEO_QUERIES]));
+  }
+
   function startEditAeo(idx: number) { setAeoEditIdx(idx); setAeoEditVal(aeoQueries[idx]); }
   function saveEditAeo() {
     if (aeoEditIdx === null) return;
     const val = aeoEditVal.trim();
-    if (val) setAeoQueries((p) => p.map((q, i) => (i === aeoEditIdx ? val : q)));
-    setAeoEditIdx(null); setAeoEditVal("");
+    if (!val) { setAeoEditIdx(null); setAeoEditVal(""); return; }
+    const original = aeoQueries[aeoEditIdx];
+    if (val === original) { setAeoEditIdx(null); setAeoEditVal(""); return; }
+    withConfirm(`Save changes to Q${aeoEditIdx + 1}?\n\nBefore: "${original}"\nAfter: "${val}"`, () => {
+      setAeoQueries((p) => p.map((q, i) => (i === aeoEditIdx ? val : q)));
+      setAeoEditIdx(null); setAeoEditVal("");
+    });
   }
 
   async function downloadClientReport(htmlName: string) {
@@ -569,6 +596,37 @@ export default function Home() {
 
   return (
     <div style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", background: C.bg, minHeight: "100vh", color: C.text, position: "relative", overflow: "hidden" }}>
+
+      {/* ── Confirmation dialog ─────────────────────────────────────────── */}
+      {confirmState && (
+        <div
+          onClick={() => setConfirmState(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "var(--elevate-2)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "28px 28px 22px", maxWidth: 440, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column", gap: 20 }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+              <span style={{ fontSize: 22, lineHeight: 1, marginTop: 2 }}>⚠</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Confirm Change</div>
+                <div style={{ fontSize: 15, color: C.text, lineHeight: 1.65, whiteSpace: "pre-wrap", fontFamily: "'DM Mono', monospace" }}>{confirmState.message}</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setConfirmState(null)}
+                style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+              >Cancel</button>
+              <button
+                onClick={() => { confirmState.onConfirm(); setConfirmState(null); }}
+                style={{ background: C.gold, color: "var(--bg-app)", border: "none", borderRadius: 8, padding: "8px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+              >Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Animated background blobs */}
       <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
@@ -895,7 +953,7 @@ export default function Home() {
                     <div style={{ display: "flex", gap: 6 }}>
                       <input value={scopeInput} onChange={(e) => setScopeInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addScope(); } }} placeholder="Add keyword…" style={{ ...inputStyle, flex: 1, width: "auto" }} />
                       <button onClick={addScope} style={{ background: "var(--elevate-2)", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>+ Add</button>
-                      <button onClick={() => setScopeKeywords([...DEFAULT_SCOPE])} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>Reset</button>
+                      <button onClick={resetScope} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>Reset</button>
                     </div>
                   </div>
                 )}
@@ -951,7 +1009,7 @@ export default function Home() {
                     <div style={{ display: "flex", gap: 6 }}>
                       <input value={aeoInput} onChange={(e) => setAeoInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addAeoQuery(); } }} placeholder="Add custom query…" style={{ ...inputStyle, flex: 1, width: "auto" }} />
                       <button onClick={addAeoQuery} style={{ background: "var(--elevate-2)", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>+ Add</button>
-                      <button onClick={() => setAeoQueries([...DEFAULT_AEO_QUERIES])} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>Reset</button>
+                      <button onClick={resetAeoQueries} style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", fontSize: 15, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}>Reset</button>
                     </div>
                   </div>
                 )}
