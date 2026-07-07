@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 /**
  * social-er.js — Social AQ Presence (APIdirect.io)
  *
@@ -127,7 +127,7 @@ function fmtNum(n) {
 }
 
 function topPostsHtml(posts, color, fields) {
-  if (!posts?.length) return '<div style="font-size:10px;color:#3a4a5e">No posts found</div>';
+  if (!posts?.length) return '<div style="font-size:15px;color:#3a4a5e">No posts found</div>';
   return posts.map((p, i) => {
     const metrics = fields.map(f => {
       const icons = { likes: '♥', comments: '💬', shares: '↗', retweets: '↻', replies: '↩', views: '👁' };
@@ -135,9 +135,9 @@ function topPostsHtml(posts, color, fields) {
     }).join(' · ');
     return `<div style="padding:6px 10px;background:#0a0e17;border-left:2px solid ${i === 0 ? color : '#1e2638'};border-radius:0 4px 4px 0;margin-bottom:4px">
       ${p.url
-        ? `<a href="${escHtml(p.url)}" target="_blank" rel="noopener" style="font-size:11px;color:${color};text-decoration:none;line-height:1.4;display:block;font-weight:600">${escHtml((p.snippet || '').slice(0, 200))}${(p.snippet||'').length > 200 ? '…' : ''}</a>`
-        : `<div style="font-size:11px;color:#8fa3b8;line-height:1.4">${escHtml((p.snippet || '').slice(0, 200))}</div>`}
-      <div style="font-family:monospace;font-size:9px;color:#5e7494;margin-top:3px">${metrics}${p.date ? ' · ' + p.date.slice(0, 10) : ''}</div>
+        ? `<a href="${escHtml(p.url)}" target="_blank" rel="noopener" style="font-size:16px;color:${color};text-decoration:none;line-height:1.4;display:block;font-weight:600">${escHtml((p.snippet || '').slice(0, 200))}${(p.snippet||'').length > 200 ? '…' : ''}</a>`
+        : `<div style="font-size:16px;color:#8fa3b8;line-height:1.4">${escHtml((p.snippet || '').slice(0, 200))}</div>`}
+      <div style="font-family:monospace;font-size:14px;color:#5e7494;margin-top:3px">${metrics}${p.date ? ' · ' + p.date.slice(0, 10) : ''}</div>
     </div>`;
   }).join('');
 }
@@ -162,23 +162,23 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     { label: 'YouTube videos',             value: totalYt,                            unit: 'YouTube Data API v3',             col: '#e53935' },
   ].map(c => `
     <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
-      <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">${c.label}</div>
-      <div style="font-family:monospace;font-size:22px;font-weight:700;color:${c.col};line-height:1">${c.value}</div>
-      <div style="font-size:11px;color:#5e7494;margin-top:5px">${c.unit}</div>
+      <div style="font-family:monospace;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">${c.label}</div>
+      <div style="font-family:monospace;font-size:27px;font-weight:700;color:${c.col};line-height:1">${c.value}</div>
+      <div style="font-size:16px;color:#5e7494;margin-top:5px">${c.unit}</div>
     </div>`).join('');
 
   // Source banner
   const sourceBanner = `
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
-    <span style="font-family:monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Data sources:</span>
-    <span style="font-family:monospace;font-size:10px;background:rgba(74,127,212,.14);border:1px solid rgba(74,127,212,.35);color:#4a7fd4;border-radius:4px;padding:2px 8px">LinkedIn · ✓ LinkedIn API</span>
-    <span style="font-family:monospace;font-size:10px;background:rgba(74,159,212,.14);border:1px solid rgba(74,159,212,.35);color:#4a9fd4;border-radius:4px;padding:2px 8px">X/Twitter · ✓ X API v2</span>
-    <span style="font-family:monospace;font-size:10px;background:rgba(224,92,156,.14);border:1px solid rgba(224,92,156,.35);color:#e05c9c;border-radius:4px;padding:2px 8px">Instagram · ✓ Graph API</span>
-    <span style="font-family:monospace;font-size:10px;background:rgba(229,57,53,.12);border:1px solid rgba(229,57,53,.3);color:#e53935;border-radius:4px;padding:2px 8px">YouTube · ✓ Data API v3</span>
+    <span style="font-family:monospace;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Data sources:</span>
+    <span style="font-family:monospace;font-size:15px;background:rgba(74,127,212,.14);border:1px solid rgba(74,127,212,.35);color:#4a7fd4;border-radius:4px;padding:2px 8px">LinkedIn · ✓ LinkedIn API</span>
+    <span style="font-family:monospace;font-size:15px;background:rgba(74,159,212,.14);border:1px solid rgba(74,159,212,.35);color:#4a9fd4;border-radius:4px;padding:2px 8px">X/Twitter · ✓ X API v2</span>
+    <span style="font-family:monospace;font-size:15px;background:rgba(224,92,156,.14);border:1px solid rgba(224,92,156,.35);color:#e05c9c;border-radius:4px;padding:2px 8px">Instagram · ✓ Graph API</span>
+    <span style="font-family:monospace;font-size:15px;background:rgba(229,57,53,.12);border:1px solid rgba(229,57,53,.3);color:#e53935;border-radius:4px;padding:2px 8px">YouTube · ✓ Data API v3</span>
   </div>`;
 
   const ytKeyNotice = !hasYtKey
-    ? `<div style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:11px;color:#d4a017;line-height:1.7">
+    ? `<div style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:16px;color:#d4a017;line-height:1.7">
         <strong>&#9432; YOUTUBE_KEY not configured</strong> — videos are discovered via Serper but views/likes/ER require a Google API key with YouTube Data API v3 enabled.
       </div>`
     : '';
@@ -209,38 +209,38 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   });
 
   const summaryTable = `<div style="overflow-x:auto;border:1px solid #252d40;border-radius:8px;margin-bottom:16px;overflow:hidden">
-  <table style="width:100%;border-collapse:collapse;font-size:12px">
+  <table style="width:100%;border-collapse:collapse;font-size:17px">
     <thead>
       <tr style="background:#181e2e">
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8;white-space:nowrap">#</th>
-        <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8">Org</th>
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI posts</th>
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X posts</th>
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X ER%</th>
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X flw</th>
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG posts</th>
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG ER%</th>
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG flw</th>
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT</th>
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT ER%</th>
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT subs</th>
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
-        <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap;cursor:help" title="Share of Voice — how much of the tracked group's total AQ social activity this org accounts for during the report period">SoV%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8;white-space:nowrap">#</th>
+        <th style="padding:8px 12px;text-align:left;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8">Org</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI posts</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X posts</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X flw</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG posts</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e05c9c;white-space:nowrap">IG flw</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e53935;white-space:nowrap">YT subs</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap;cursor:help" title="Share of Voice — how much of the tracked group's total AQ social activity this org accounts for during the report period">SoV%</th>
       </tr>
       <tr style="background:#0f1422;border-top:1px solid #252d40">
-        <td colspan="2" style="padding:5px 12px;font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7e9a">COHORT</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a7fd4">${colTotals.li}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a9fd4">${colTotals.x}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;color:#6b7e9a">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;color:#6b7e9a">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e05c9c">${colTotals.ig}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;color:#6b7e9a">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;color:#6b7e9a">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e53935">${colTotals.yt}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;color:#6b7e9a">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;color:#6b7e9a">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#c9922a">${cohortTotal}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4caf74">100%</td>
+        <td colspan="2" style="padding:5px 12px;font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7e9a">COHORT</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4a7fd4">${colTotals.li}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4a9fd4">${colTotals.x}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#e05c9c">${colTotals.ig}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#e53935">${colTotals.yt}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#c9922a">${cohortTotal}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4caf74">100%</td>
       </tr>
     </thead>
     <tbody>
@@ -260,32 +260,32 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
               : `<span style="color:#6b7e9a" title="ER unreliable — follower count too low (${igFollowers}) for meaningful ER">~</span>`)
           : '<span style="color:#6b7e9a">—</span>';
         const ytERCell = ytER > 0 ? `<span style="color:#e53935">${ytER}%</span>` : '<span style="color:#6b7e9a">—</span>';
-        const twFlwCell = twFollowers > 0 ? `<span style="color:#4a9fd4;font-size:13px">${fmtNum(twFollowers)}</span>` : '<span style="color:#6b7e9a">—</span>';
-        const igFlwCell = igFollowers > 0 ? `<span style="color:#e05c9c;font-size:13px">${fmtNum(igFollowers)}</span>` : '<span style="color:#6b7e9a">—</span>';
-        const ytSubsCell = ytSubs > 0 ? `<span style="color:#e53935;font-size:13px">${fmtNum(ytSubs)}</span>` : '<span style="color:#6b7e9a">—</span>';
+        const twFlwCell = twFollowers > 0 ? `<span style="color:#4a9fd4;font-size:18px">${fmtNum(twFollowers)}</span>` : '<span style="color:#6b7e9a">—</span>';
+        const igFlwCell = igFollowers > 0 ? `<span style="color:#e05c9c;font-size:18px">${fmtNum(igFollowers)}</span>` : '<span style="color:#6b7e9a">—</span>';
+        const ytSubsCell = ytSubs > 0 ? `<span style="color:#e53935;font-size:18px">${fmtNum(ytSubs)}</span>` : '<span style="color:#6b7e9a">—</span>';
         return `<tr style="border-top:1px solid #252d40">
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#8fa3b8">#${unifiedRank}</td>
-          <td style="padding:8px 12px"><span style="font-family:monospace;font-size:13px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a7fd4">${r.linkedinPosts || 0}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#4a9fd4">${r.twitterPosts || 0}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px">${twER}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#8fa3b8">#${unifiedRank}</td>
+          <td style="padding:8px 12px"><span style="font-family:monospace;font-size:18px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4a7fd4">${r.linkedinPosts || 0}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4a9fd4">${r.twitterPosts || 0}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${twER}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${twFlwCell}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px">${igER}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${igER}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${igFlwCell}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:#e53935">${yt.videoCount || 0}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px">${ytERCell}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#e53935">${yt.videoCount || 0}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${ytERCell}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${ytSubsCell}</td>
           <td style="padding:8px 12px;text-align:center">
-            <span style="font-family:monospace;font-size:15px;font-weight:700;color:${col}">${total}</span>
+            <span style="font-family:monospace;font-size:20px;font-weight:700;color:${col}">${total}</span>
           </td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:13px;font-weight:600;color:#4caf74">${sov}%</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:600;color:#4caf74">${sov}%</td>
         </tr>`;
       }).join('')}
     </tbody>
   </table>
 </div>
-<div style="background:#0d1120;border:1px solid #1e2638;border-radius:6px;padding:10px 14px;font-family:monospace;font-size:9px;color:#3a4a5e;line-height:1.9;margin-bottom:16px">
+<div style="background:#0d1120;border:1px solid #1e2638;border-radius:6px;padding:10px 14px;font-family:monospace;font-size:14px;color:#3a4a5e;line-height:1.9;margin-bottom:16px">
   <strong style="color:#5e7494;letter-spacing:.06em">LEGEND</strong> &nbsp;·&nbsp;
   <strong style="color:#4a7fd4">LI</strong> = LinkedIn AQ posts &nbsp;·&nbsp;
   <strong style="color:#4a9fd4">X</strong> = X/Twitter AQ posts from official handle &nbsp;·&nbsp;
@@ -305,7 +305,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const li = r.liData || { postCount: 0, totalLikes: 0, totalComments: 0, totalShares: 0, topPosts: [] };
     const liHtml = li.postCount > 0 ? `
       <div style="margin-top:8px">
-        <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+        <div style="font-size:14px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
           LinkedIn — <span style="color:#4a7fd4">${li.postCount} AQ post${li.postCount === 1 ? '' : 's'}</span>
           &middot; ♥ ${li.totalLikes} &middot; 💬 ${li.totalComments} &middot; ↗ ${li.totalShares}
         </div>
@@ -316,7 +316,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const tw = r.twData || { postCount: 0, totalLikes: 0, totalReplies: 0, totalRetweets: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
     const twHtml = tw.postCount > 0 ? `
       <div style="margin-top:8px">
-        <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+        <div style="font-size:14px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
           X/Twitter — <span style="color:#4a9fd4">${tw.postCount} tweet${tw.postCount === 1 ? '' : 's'}</span>
           ${tw.followers ? `&middot; ${fmtNum(tw.followers)} followers` : ''}
           ${tw.er > 0 ? `&middot; <span style="color:#4a9fd4;background:rgba(74,159,212,.1);border:1px solid rgba(74,159,212,.25);border-radius:3px;padding:1px 5px">ER ${tw.er}%</span>` : ''}
@@ -329,7 +329,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const ig = r.igData || { postCount: 0, totalLikes: 0, totalComments: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
     const igHtml = ig.postCount > 0 ? `
       <div style="margin-top:8px">
-        <div style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+        <div style="font-size:14px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
           Instagram — <span style="color:#e05c9c">${ig.postCount} post${ig.postCount === 1 ? '' : 's'}</span>
           ${ig.followers ? `&middot; ${fmtNum(ig.followers)} followers` : ''}
           ${ig.er > 0 ? `&middot; <span style="color:#e05c9c;background:rgba(224,92,156,.1);border:1px solid rgba(224,92,156,.25);border-radius:3px;padding:1px 5px">ER ${ig.er}%</span>` : ''}
@@ -349,9 +349,9 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const ytHtml = yt.videoCount > 0 ? `
       <div style="margin-top:10px">
         <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:5px">
-          <span style="font-size:9px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700">YouTube — <span style="color:#e53935">${yt.videoCount} video${yt.videoCount === 1 ? '' : 's'}</span>${yt.totalViews > 0 ? ` &middot; ${yt.totalViews.toLocaleString()} total views` : ''}</span>
-          ${avgER > 0 ? `<span style="font-family:monospace;font-size:10px;color:#e53935;background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.2);border-radius:4px;padding:1px 7px">avg ER ${avgER}%</span>` : ''}
-          ${erMethodLabel ? `<span style="font-family:monospace;font-size:9px;color:#3a4a5e">${erMethodLabel}</span>` : ''}
+          <span style="font-size:14px;color:#3a4a5e;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700">YouTube — <span style="color:#e53935">${yt.videoCount} video${yt.videoCount === 1 ? '' : 's'}</span>${yt.totalViews > 0 ? ` &middot; ${yt.totalViews.toLocaleString()} total views` : ''}</span>
+          ${avgER > 0 ? `<span style="font-family:monospace;font-size:15px;color:#e53935;background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.2);border-radius:4px;padding:1px 7px">avg ER ${avgER}%</span>` : ''}
+          ${erMethodLabel ? `<span style="font-family:monospace;font-size:14px;color:#3a4a5e">${erMethodLabel}</span>` : ''}
         </div>
         ${sortedYtVideos.map((v, idx) => {
           const metricsStr = v.views !== null
@@ -362,12 +362,12 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
             : (v.viewER !== null) ? ` &middot; <span style="color:#e05c5c">ER ${v.viewER}% (view)</span>` : '';
           return `<div style="padding:6px 10px;background:#0a0e17;border-left:2px solid ${idx === 0 ? '#e53935' : '#1e2638'};border-radius:0 4px 4px 0;margin-bottom:4px">
             <div style="display:flex;align-items:flex-start;gap:8px">
-              <span style="font-family:monospace;font-size:9px;color:#3a4a5e;flex-shrink:0;margin-top:2px">#${idx + 1}</span>
+              <span style="font-family:monospace;font-size:14px;color:#3a4a5e;flex-shrink:0;margin-top:2px">#${idx + 1}</span>
               <div style="flex:1;min-width:0">
                 ${v.url
-                  ? `<a href="${escHtml(v.url)}" target="_blank" style="font-size:11px;color:#e53935;text-decoration:none;line-height:1.4;display:block;font-weight:600;margin-bottom:2px">${escHtml((v.title || v.url || '').slice(0, 150))}${(v.title || v.url || '').length > 150 ? '…' : ''}</a>`
-                  : `<div style="font-size:11px;color:#8fa3b8;line-height:1.4;margin-bottom:2px">${escHtml((v.title || '').slice(0, 150))}</div>`}
-                <div style="font-family:monospace;font-size:9px;color:#5e7494">${metricsStr}${erStr}</div>
+                  ? `<a href="${escHtml(v.url)}" target="_blank" style="font-size:16px;color:#e53935;text-decoration:none;line-height:1.4;display:block;font-weight:600;margin-bottom:2px">${escHtml((v.title || v.url || '').slice(0, 150))}${(v.title || v.url || '').length > 150 ? '…' : ''}</a>`
+                  : `<div style="font-size:16px;color:#8fa3b8;line-height:1.4;margin-bottom:2px">${escHtml((v.title || '').slice(0, 150))}</div>`}
+                <div style="font-family:monospace;font-size:14px;color:#5e7494">${metricsStr}${erStr}</div>
               </div>
             </div>
           </div>`;
@@ -378,24 +378,24 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
 
     return `<details style="border:1px solid #252d40;border-radius:6px;margin-bottom:6px">
       <summary style="padding:10px 14px;cursor:pointer;background:#181e2e;border-radius:6px;list-style:none;display:flex;align-items:center;gap:12px;user-select:none">
-        <span style="font-family:monospace;font-size:10px;font-weight:700;color:#2e3a52">#${r.rank}</span>
-        <span style="font-family:monospace;font-size:11px;font-weight:700;color:${col}">${escHtml(r.org)}</span>
-        <span style="font-family:monospace;font-size:12px;font-weight:700;color:${col}">${r.presenceScore}/10</span>
-        <span style="font-size:10px;color:#5e7494;margin-left:4px">
+        <span style="font-family:monospace;font-size:15px;font-weight:700;color:#2e3a52">#${r.rank}</span>
+        <span style="font-family:monospace;font-size:16px;font-weight:700;color:${col}">${escHtml(r.org)}</span>
+        <span style="font-family:monospace;font-size:17px;font-weight:700;color:${col}">${r.presenceScore}/10</span>
+        <span style="font-size:15px;color:#5e7494;margin-left:4px">
           <span style="color:#4a7fd4">${r.linkedinPosts || 0} LI</span> &middot;
           <span style="color:#4a9fd4">${r.twitterPosts || 0} X</span> &middot;
           <span style="color:#e05c9c">${r.instagramPosts || 0} IG</span> &middot;
           <span style="color:#e53935">${yt.videoCount || 0} YT</span>
         </span>
-        ${r.twitterER > 0 || r.instagramER > 0 ? `<span style="font-size:10px;color:#5e7494">
+        ${r.twitterER > 0 || r.instagramER > 0 ? `<span style="font-size:15px;color:#5e7494">
           ${r.twitterER > 0 ? `<span style="color:#4a9fd4">X ${r.twitterER}%</span>` : ''}
           ${r.twitterER > 0 && r.instagramER > 0 ? ' · ' : ''}
           ${r.instagramER > 0 ? `<span style="color:#e05c9c">IG ${r.instagramER}%</span>` : ''}
         </span>` : ''}
-        <span style="color:#c9922a;font-size:11px;margin-left:auto">▾</span>
+        <span style="color:#c9922a;font-size:16px;margin-left:auto">▾</span>
       </summary>
       <div style="padding:12px 14px;background:#0e1420">
-        ${!hasAnyPost ? '<div style="font-size:11px;color:#3a4a5e">No AQ social posts found via APIdirect in this period</div>' : ''}
+        ${!hasAnyPost ? '<div style="font-size:16px;color:#3a4a5e">No AQ social posts found via APIdirect in this period</div>' : ''}
         ${liHtml}
         ${twHtml}
         ${igHtml}

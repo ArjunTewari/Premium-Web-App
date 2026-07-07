@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 /**
  * Emerald AI — AQ Intelligence Pipeline
  * Called by index.js with a config object. Streams log lines via cb().
@@ -2888,45 +2888,45 @@ function momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations = []) 
     .sort((a, b) => b.total - a.total);
 
   const wkHeaders = weeks.map(w =>
-    `<th style="padding:6px 8px;text-align:center;font-family:monospace;font-size:9px;font-weight:600;color:var(--muted);white-space:nowrap;min-width:42px;border-left:1px solid var(--border)">${String(w.getMonth()+1).padStart(2,"0")}-${String(w.getDate()).padStart(2,"0")}</th>`
+    `<th style="padding:6px 8px;text-align:center;font-family:monospace;font-size:14px;font-weight:600;color:var(--muted);white-space:nowrap;min-width:42px;border-left:1px solid var(--border)">${String(w.getMonth()+1).padStart(2,"0")}-${String(w.getDate()).padStart(2,"0")}</th>`
   ).join("");
 
   const pressRowCells = pressBuckets.map((pc) =>
     pc > 0
-      ? `<td style="padding:6px 8px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border)"><span style="font-family:monospace;font-size:11px;font-weight:700;color:#${PRESS_COLOR}">${pc}</span></td>`
-      : `<td style="padding:6px 8px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:11px;color:var(--muted)">·</td>`
+      ? `<td style="padding:6px 8px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border)"><span style="font-family:monospace;font-size:16px;font-weight:700;color:#${PRESS_COLOR}">${pc}</span></td>`
+      : `<td style="padding:6px 8px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:16px;color:var(--muted)">·</td>`
   ).join("");
 
   const orgRows = orgOrder.map(({ o, i }) => {
     const cells = weeks.map((_, wi) => {
       const cv = buckets[wi][i];
       if (cv === 0) {
-        return `<td style="padding:6px 8px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:11px;color:var(--muted)">·</td>`;
+        return `<td style="padding:6px 8px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:16px;color:var(--muted)">·</td>`;
       }
       const uid = `hm${i}_${wi}`;
       const links = artIndex[wi][i].map(a =>
         a.url
-          ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.title || a.url)}</a>`
-          : `<div style="font-size:10px;color:var(--muted);padding:2px 0">${esc(a.title || "")}</div>`
+          ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.title || a.url)}</a>`
+          : `<div style="font-size:15px;color:var(--muted);padding:2px 0">${esc(a.title || "")}</div>`
       ).join("");
-      return `<td style="padding:6px 8px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer" onclick="td('${uid}')"><span style="font-family:monospace;font-size:11px;font-weight:700;color:#${orgColors[i]};background:${hmColor(cv)};padding:1px 7px;border-radius:3px;display:inline-block">${cv}</span><div class="evd" id="${uid}" style="text-align:left;max-height:160px;overflow-y:auto;min-width:180px;padding-top:4px">${links}</div></td>`;
+      return `<td style="padding:6px 8px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer" onclick="td('${uid}')"><span style="font-family:monospace;font-size:16px;font-weight:700;color:#${orgColors[i]};background:${hmColor(cv)};padding:1px 7px;border-radius:3px;display:inline-block">${cv}</span><div class="evd" id="${uid}" style="text-align:left;max-height:160px;overflow-y:auto;min-width:180px;padding-top:4px">${links}</div></td>`;
     }).join("");
     return `<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1"><span style="font-family:monospace;font-size:11px;font-weight:700;color:#${orgColors[i]}">${esc(o)}</span></td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1"><span style="font-family:monospace;font-size:16px;font-weight:700;color:#${orgColors[i]}">${esc(o)}</span></td>
         ${cells}
-        <td style="padding:6px 12px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:12px;font-weight:700;color:#${orgColors[i]}">${totalPerOrg[i]}</td>
+        <td style="padding:6px 12px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:17px;font-weight:700;color:#${orgColors[i]}">${totalPerOrg[i]}</td>
       </tr>`;
   }).join("");
 
-  const hmTable = `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--surface2)">
-      <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Organisation</th>
+  const hmTable = `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:17px"><thead><tr style="background:var(--surface2)">
+      <th style="padding:8px 12px;text-align:left;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Organisation</th>
       ${wkHeaders}
-      <th style="padding:6px 10px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border);white-space:nowrap">Total</th>
+      <th style="padding:6px 10px;text-align:center;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border);white-space:nowrap">Total</th>
     </tr></thead><tbody>
       <tr style="background:var(--surface2)">
-        <td style="padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1"><span style="font-family:monospace;font-size:11px;font-weight:700;color:#${PRESS_COLOR}">Press (all orgs)</span></td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1"><span style="font-family:monospace;font-size:16px;font-weight:700;color:#${PRESS_COLOR}">Press (all orgs)</span></td>
         ${pressRowCells}
-        <td style="padding:6px 12px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:12px;font-weight:700;color:#${PRESS_COLOR}">${pressTotal}</td>
+        <td style="padding:6px 12px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:17px;font-weight:700;color:#${PRESS_COLOR}">${pressTotal}</td>
       </tr>
       ${orgRows}
     </tbody></table></div></div>`;
@@ -2938,11 +2938,11 @@ ${spikeAnnotations.sort((a, b) => b.count - a.count).map((s) => {
   const col = ORG_COLORS_HEX[orgIdx % ORG_COLORS_HEX.length] || "3d8ef0";
   const outlets = [...new Set(s.articles.map((a) => a.source || "").filter(Boolean))].slice(0, 4).join(", ");
   return `<div style="display:flex;gap:14px;align-items:flex-start;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid #${col};border-radius:6px">
-  <div style="flex-shrink:0;font-family:monospace;font-size:10px;color:var(--muted);width:80px;padding-top:1px">${esc(s.wLabel)}</div>
+  <div style="flex-shrink:0;font-family:monospace;font-size:15px;color:var(--muted);width:80px;padding-top:1px">${esc(s.wLabel)}</div>
   <div style="flex:1">
-    <div style="font-size:12px;font-weight:700;color:#${col};margin-bottom:3px">${esc(s.org)} spike: ${s.count} articles</div>
-    ${s.annotation ? `<div style="font-size:12px;color:var(--text);line-height:1.55">${esc(s.annotation)}</div>` : ""}
-    ${outlets ? `<div style="margin-top:4px;font-size:11px;color:var(--muted2)">${esc(outlets)}</div>` : ""}
+    <div style="font-size:17px;font-weight:700;color:#${col};margin-bottom:3px">${esc(s.org)} spike: ${s.count} articles</div>
+    ${s.annotation ? `<div style="font-size:17px;color:var(--text);line-height:1.55">${esc(s.annotation)}</div>` : ""}
+    ${outlets ? `<div style="margin-top:4px;font-size:16px;color:var(--muted2)">${esc(outlets)}</div>` : ""}
   </div>
 </div>`;
 }).join("")}
@@ -2952,9 +2952,9 @@ ${spikeAnnotations.sort((a, b) => b.count - a.count).map((s) => {
   return `
 <section class="sec" id="momentum"><div class="sh"><div class="se">Section 02c</div><h2 class="st">Coverage Momentum</h2>
 <div class="sd">Weekly AQ article volume per organisation over the report period. Spikes are identified and traced to triggering events.</div><div class="sdiv"></div></div>
-<div class="mch"><div style="margin-bottom:12px"><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:11px;color:var(--muted);margin-bottom:12px">${esc(DATE_FROM)} to ${esc(DATE_TO)}</div></div>
+<div class="mch"><div style="margin-bottom:12px"><div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:4px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:16px;color:var(--muted);margin-bottom:12px">${esc(DATE_FROM)} to ${esc(DATE_TO)}</div></div>
 ${hmTable}
-<div style="font-size:10px;color:var(--muted);margin-top:8px">Click any cell to see article links for that week &middot; Orgs sorted by total coverage &middot; Spikes annotated below</div>
+<div style="font-size:15px;color:var(--muted);margin-top:8px">Click any cell to see article links for that week &middot; Orgs sorted by total coverage &middot; Spikes annotated below</div>
 </div>${spikeCards}</section>`;
 }
 
@@ -2987,7 +2987,7 @@ function buildHTML(
     const bars = ORGS.map((org, i) => {
       const pct =
         tot > 0 ? Math.round(((data[org]?.total || 0) / tot) * 100) : 0;
-      return `<div style="background:${orgHex(i)};width:${pct}%;display:flex;align-items:center;padding-left:9px;font-family:monospace;font-size:11px;font-weight:500;color:#fff;min-width:0;overflow:hidden">${data[org]?.total || 0}</div>`;
+      return `<div style="background:${orgHex(i)};width:${pct}%;display:flex;align-items:center;padding-left:9px;font-family:monospace;font-size:16px;font-weight:500;color:#fff;min-width:0;overflow:hidden">${data[org]?.total || 0}</div>`;
     }).join("");
     return `<div style="height:28px;background:#1e2638;border-radius:4px;overflow:hidden;display:flex;margin-bottom:12px">${bars}</div>`;
   }
@@ -2995,17 +2995,17 @@ function buildHTML(
   function sovByOrgTable() {
     const activeOutlets = PRINT_OUTLETS; // always show all 5 outlets
     if (!activeOutlets.length)
-      return `<p style="color:var(--muted);font-size:12px">No newspaper site coverage indexed in this period.</p>`;
+      return `<p style="color:var(--muted);font-size:17px">No newspaper site coverage indexed in this period.</p>`;
     return `<table class="nt"><thead><tr><th>Org</th>${activeOutlets.map((o) => `<th>${esc(o)}</th>`).join("")}</tr></thead><tbody>
-${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${activeOutlets.map((outlet) => {
+${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${activeOutlets.map((outlet) => {
       const evArts = (arts[org] || []).filter((a) => canonOutlet(a.source || "") === outlet);
       const n = evArts.length;
       if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`;
       const uid = `sov_${org}_${outlet}`.replace(/\W/g, "_");
       const links = evArts.slice(0, 5).map((a) =>
-        `<a href="${esc(a.url || "#")}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || "").length > 70 ? (a.title || "").slice(0, 70) + "…" : (a.title || ""))}</a>`
+        `<a href="${esc(a.url || "#")}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || "").length > 70 ? (a.title || "").slice(0, 70) + "…" : (a.title || ""))}</a>`
       ).join("");
-      return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:10px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`;
+      return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`;
     }).join("")}</tr>`).join("\n")}
 </tbody></table>`;
   }
@@ -3015,17 +3015,17 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
       ORGS.some((o) => (data[o]?.outletCounts[ch] || 0) > 0)
     );
     if (!activeChs.length)
-      return `<p style="color:var(--muted);font-size:12px">No TV channel coverage indexed in this period.</p>`;
+      return `<p style="color:var(--muted);font-size:17px">No TV channel coverage indexed in this period.</p>`;
     return `<table class="nt"><thead><tr><th>Org</th>${activeChs.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
-${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${activeChs.map((ch) => {
+${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${activeChs.map((ch) => {
       const evArts = (arts[org] || []).filter((a) => canonOutlet(a.source || "") === ch);
       const n = evArts.length;
       if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`;
       const uid = `sov2_${org}_${ch}`.replace(/\W/g, "_");
       const links = evArts.slice(0, 5).map((a) =>
-        `<a href="${esc(a.url || "#")}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || "").length > 70 ? (a.title || "").slice(0, 70) + "…" : (a.title || ""))}</a>`
+        `<a href="${esc(a.url || "#")}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || "").length > 70 ? (a.title || "").slice(0, 70) + "…" : (a.title || ""))}</a>`
       ).join("");
-      return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:10px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`;
+      return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`;
     }).join("")}</tr>`).join("\n")}
 </tbody></table>`;
   }
@@ -3033,7 +3033,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
   function outletRows() {
     return PRINT_OUTLETS.map((outlet) => {
       if (!ORGS.some((o) => (data[o]?.outletCounts[outlet] || 0) > 0))
-        return `<tr><td style="font-weight:600">${esc(outlet)}</td><td style="font-family:monospace;font-size:13px;color:var(--muted)">0</td><td colspan="3"><span style="font-size:10px;color:var(--muted)">No coverage indexed in this period</span></td></tr>`;
+        return `<tr><td style="font-weight:600">${esc(outlet)}</td><td style="font-family:monospace;font-size:18px;color:var(--muted)">0</td><td colspan="3"><span style="font-size:15px;color:var(--muted)">No coverage indexed in this period</span></td></tr>`;
       const orgCnts = ORGS.map((o, i) => ({
         o,
         i,
@@ -3047,12 +3047,12 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
         .slice(0, 3)
         .map(
           (x) =>
-            `<span style="display:inline-flex;align-items:center;gap:4px;font-family:monospace;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;background:${orgHex(x.i)}1a;color:${orgHex(x.i)};border:1px solid ${orgHex(x.i)}4d;white-space:nowrap">${esc(x.o)} (${x.n})</span>`,
+            `<span style="display:inline-flex;align-items:center;gap:4px;font-family:monospace;font-size:15px;font-weight:700;padding:2px 8px;border-radius:3px;background:${orgHex(x.i)}1a;color:${orgHex(x.i)};border:1px solid ${orgHex(x.i)}4d;white-space:nowrap">${esc(x.o)} (${x.n})</span>`,
         )
         .join(" ");
       const more =
         orgCnts.length > 3
-          ? `<span style="font-family:monospace;font-size:10px;color:var(--muted)"> +${orgCnts.length - 3} more</span>`
+          ? `<span style="font-family:monospace;font-size:15px;color:var(--muted)"> +${orgCnts.length - 3} more</span>`
           : "";
 
       // Advantage: ranked list of all orgs for this outlet
@@ -3063,7 +3063,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
         const rankColors = ['#4caf74', '#c9922a', '#5e7494'];
         const rankBadges = orgCnts.map((x, ri) => {
           const rc = rankColors[ri] || '#5e7494';
-          return `<div style="display:flex;align-items:center;gap:4px"><span style="font-family:monospace;font-size:9px;font-weight:700;color:${rc};width:18px;flex-shrink:0">#${ri+1}</span><span style="font-size:10px;color:${orgHex(x.i)};font-weight:600">${esc(x.o)}</span><span style="font-family:monospace;font-size:9px;color:var(--muted)">(${x.n})</span></div>`;
+          return `<div style="display:flex;align-items:center;gap:4px"><span style="font-family:monospace;font-size:14px;font-weight:700;color:${rc};width:18px;flex-shrink:0">#${ri+1}</span><span style="font-size:15px;color:${orgHex(x.i)};font-weight:600">${esc(x.o)}</span><span style="font-family:monospace;font-size:14px;color:var(--muted)">(${x.n})</span></div>`;
         });
         advantage = `<div style="display:flex;flex-direction:column;gap:3px">${rankBadges.join('')}</div>`;
       }
@@ -3077,7 +3077,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
             evItems += `<div class="ei"><div class="en" style="color:${orgHex(x.i)};font-weight:600">${esc(x.o)}</div><div class="eb"><div class="eq">${esc((a.snippet || a.title).slice(0, 130))}</div><div class="es">${esc(outlet)} &middot; ${esc(a.date)}${a.url ? `<br><a href="${esc(a.url)}" target="_blank">${esc(a.url.slice(0, 65))}</a>` : ""}</div></div></div>`;
           });
       });
-      return `<tr><td style="font-weight:600">${esc(outlet)}</td><td style="font-family:monospace;font-size:13px;font-weight:700;color:var(--muted2)">${total}</td><td style="line-height:2.2">${top3}${more}</td><td>${advantage}</td><td>${evItems ? `<a class="ctag" onclick="td('${eid}')">&#8599; articles</a><div class="evd" id="${eid}">${evItems}</div>` : '<span class="lc">&#9888; no articles</span>'}</td></tr>`;
+      return `<tr><td style="font-weight:600">${esc(outlet)}</td><td style="font-family:monospace;font-size:18px;font-weight:700;color:var(--muted2)">${total}</td><td style="line-height:2.2">${top3}${more}</td><td>${advantage}</td><td>${evItems ? `<a class="ctag" onclick="td('${eid}')">&#8599; articles</a><div class="evd" id="${eid}">${evItems}</div>` : '<span class="lc">&#9888; no articles</span>'}</td></tr>`;
     }).join("");
   }
 
@@ -3154,7 +3154,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
     const theadTopics = TOPICS.map((tk) => {
       const dn = topicDisplayNames[tk] || tk;
       const sub = topicSubtitles[tk] || "";
-      return `<th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="${esc(sub)}">${esc(dn)}</th>`;
+      return `<th style="padding:8px 12px;text-align:left;font-size:14px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="${esc(sub)}">${esc(dn)}</th>`;
     }).join("");
 
     const tbodyRows = ORGS.map((org, i) => {
@@ -3166,31 +3166,31 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
           ? ["rgba(74,222,128,.10)", "rgba(74,222,128,.30)", "#4ade80"]
           : ["rgba(251,191,36,.10)", "rgba(251,191,36,.30)", "#fbbf24"];
         if (cv === 0) {
-          return `<td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td>`;
+          return `<td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:15px;color:var(--muted)">—</span></td>`;
         }
         const uid = `tm${org.replace(/\W/g,"")}${tk.replace(/\W/g,"")}`;
         const srcLinks = artList.map((a) =>
           a.url
-            ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.title||a.url)}</a>`
-            : `<div style="font-size:10px;color:var(--muted);padding:2px 0">${esc(a.title||"")}</div>`
+            ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.title||a.url)}</a>`
+            : `<div style="font-size:15px;color:var(--muted);padding:2px 0">${esc(a.title||"")}</div>`
         ).join("");
         return `<td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top">
           <div style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:3px;background:${bgCol};border:1px solid ${borderCol};margin-bottom:5px;white-space:nowrap">
-            <span style="font-family:monospace;font-size:10px;font-weight:700;color:${textCol}">${label} &middot; ${cv}</span>
+            <span style="font-family:monospace;font-size:15px;font-weight:700;color:${textCol}">${label} &middot; ${cv}</span>
           </div>
-          <div><a class="ctag" onclick="td('${uid}')" style="cursor:pointer;font-size:10px;padding:2px 6px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.25);border-radius:3px;color:var(--amber);font-weight:700;text-decoration:none">&#8599; sources</a><div class="evd" id="${uid}" style="padding:4px 0;border:none;max-height:200px;overflow-y:auto">${srcLinks}</div></div>
+          <div><a class="ctag" onclick="td('${uid}')" style="cursor:pointer;font-size:15px;padding:2px 6px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.25);border-radius:3px;color:var(--amber);font-weight:700;text-decoration:none">&#8599; sources</a><div class="evd" id="${uid}" style="padding:4px 0;border:none;max-height:200px;overflow-y:auto">${srcLinks}</div></div>
         </td>`;
       }).join("");
       return `<tr>
         <td style="padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1">
-          <span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span>
+          <span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span>
         </td>
         ${orgCells}
       </tr>`;
     }).join("");
 
-    return `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--surface2)">
-      <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Org</th>
+    return `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:17px"><thead><tr style="background:var(--surface2)">
+      <th style="padding:10px 14px;text-align:left;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Org</th>
       ${theadTopics}
     </tr></thead><tbody>${tbodyRows}</tbody></table></div></div>`;
   }
@@ -3227,7 +3227,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
     if (!dynTopics.length) return '';
 
     const theadDyn = dynTopics.map(({ topic }) =>
-      `<th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)">${esc(topic)}</th>`
+      `<th style="padding:8px 12px;text-align:left;font-size:14px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)">${esc(topic)}</th>`
     ).join("");
 
     const tbodyDyn = ORGS.map((org, i) => {
@@ -3235,7 +3235,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
         const artList = orgData[org] || [];
         const cv = artList.length;
         if (cv === 0) {
-          return `<td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:10px;color:var(--muted)">—</span></td>`;
+          return `<td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top"><span style="font-family:monospace;font-size:15px;color:var(--muted)">—</span></td>`;
         }
         const label = cv >= 5 ? "Leader" : "Active";
         const [bgCol, borderCol, textCol] = cv >= 5
@@ -3244,31 +3244,31 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
         const uid = `dyn${org.replace(/\W/g, "")}${topic.replace(/\W/g, "")}`;
         const srcLinks = artList.map((a) =>
           a.url
-            ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.title || a.url)}</a>`
-            : `<div style="font-size:10px;color:var(--muted);padding:2px 0">${esc(a.title || "")}</div>`
+            ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;padding:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.title || a.url)}</a>`
+            : `<div style="font-size:15px;color:var(--muted);padding:2px 0">${esc(a.title || "")}</div>`
         ).join("");
         return `<td style="padding:10px 12px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:top">
           <div style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:3px;background:${bgCol};border:1px solid ${borderCol};margin-bottom:5px;white-space:nowrap">
-            <span style="font-family:monospace;font-size:10px;font-weight:700;color:${textCol}">${label} &middot; ${cv}</span>
+            <span style="font-family:monospace;font-size:15px;font-weight:700;color:${textCol}">${label} &middot; ${cv}</span>
           </div>
-          <div><a class="ctag" onclick="td('${uid}')" style="cursor:pointer;font-size:10px;padding:2px 6px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.25);border-radius:3px;color:var(--amber);font-weight:700;text-decoration:none">&#8599; sources</a><div class="evd" id="${uid}" style="padding:4px 0;border:none;max-height:200px;overflow-y:auto">${srcLinks}</div></div>
+          <div><a class="ctag" onclick="td('${uid}')" style="cursor:pointer;font-size:15px;padding:2px 6px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.25);border-radius:3px;color:var(--amber);font-weight:700;text-decoration:none">&#8599; sources</a><div class="evd" id="${uid}" style="padding:4px 0;border:none;max-height:200px;overflow-y:auto">${srcLinks}</div></div>
         </td>`;
       }).join("");
       return `<tr>
         <td style="padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1">
-          <span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span>
+          <span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span>
         </td>
         ${orgCells}
       </tr>`;
     }).join("");
 
     return `<div style="margin-top:28px">
-      <div style="font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2);margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2);margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span>Dynamic Coverage — ${dynTopics.length} additional topic${dynTopics.length === 1 ? "" : "s"} detected this period</span>
-        <span style="font-size:9px;color:var(--muted);font-weight:400">Topics Claude identified outside the fixed taxonomy above &middot; topics with zero mentions across all orgs are excluded (see Emerging Narratives)</span>
+        <span style="font-size:14px;color:var(--muted);font-weight:400">Topics Claude identified outside the fixed taxonomy above &middot; topics with zero mentions across all orgs are excluded (see Emerging Narratives)</span>
       </div>
-      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--surface2)">
-        <th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Org</th>
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:17px"><thead><tr style="background:var(--surface2)">
+        <th style="padding:10px 14px;text-align:left;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Org</th>
         ${theadDyn}
       </tr></thead><tbody>${tbodyDyn}</tbody></table></div></div>
     </div>`;
@@ -3300,7 +3300,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
     return `<table class="nt"><thead><tr><th>Org</th><th>Primary Source</th><th>Secondary Mention</th><th>Not Mentioned</th><th>Primary Source %</th><th>Examples</th></tr></thead><tbody>${rows
       .map(
         (r) =>
-          `<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(r.i)}">${esc(r.org)}</span></td><td style="font-family:monospace;font-weight:700;color:var(--good)">${r.primary}</td><td style="font-family:monospace;color:var(--muted2)">${r.secondary}</td><td style="font-family:monospace;color:var(--muted)">${r.notM}</td><td><span style="font-family:monospace;font-weight:700;color:${orgHex(r.i)}">${r.pct}%</span></td><td>${r.exHtml}</td></tr>`,
+          `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(r.i)}">${esc(r.org)}</span></td><td style="font-family:monospace;font-weight:700;color:var(--good)">${r.primary}</td><td style="font-family:monospace;color:var(--muted2)">${r.secondary}</td><td style="font-family:monospace;color:var(--muted)">${r.notM}</td><td><span style="font-family:monospace;font-weight:700;color:${orgHex(r.i)}">${r.pct}%</span></td><td>${r.exHtml}</td></tr>`,
       )
       .join("")}</tbody></table>`;
   }
@@ -3321,7 +3321,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
     ];
     const aeoQs = AEO_QUESTIONS.map(
       (q, i) =>
-        `<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><div style="font-family:monospace;font-size:10px;color:var(--amber);flex-shrink:0;padding-top:2px">${i + 1}</div><div style="color:var(--muted2)">${esc(q)}</div></div>`,
+        `<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:17px"><div style="font-family:monospace;font-size:15px;color:var(--amber);flex-shrink:0;padding-top:2px">${i + 1}</div><div style="color:var(--muted2)">${esc(q)}</div></div>`,
     ).join("");
     // Ranking by total mentions for the AEO section header bar
     const aeoRanked = [...ORGS]
@@ -3331,7 +3331,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
     const aeoRankBar = aeoRanked
       .map(
         (x, ri) =>
-          `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)"><span style="font-family:monospace;font-size:10px;color:var(--muted);width:16px;flex-shrink:0">${ri + 1}</span><span style="font-size:11px;font-weight:600;color:${orgHex(x.i)};width:90px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.o)}</span><div style="flex:1;height:7px;background:var(--surface3);border-radius:4px;overflow:hidden"><div style="height:100%;background:${orgHex(x.i)};width:${Math.round((x.m / maxMentions) * 100)}%;border-radius:4px"></div></div><span style="font-family:monospace;font-size:11px;font-weight:700;width:36px;text-align:right;color:${orgHex(x.i)};flex-shrink:0">${x.m} <span style="font-weight:400;color:var(--muted)">mentions</span></span></div>`,
+          `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)"><span style="font-family:monospace;font-size:15px;color:var(--muted);width:16px;flex-shrink:0">${ri + 1}</span><span style="font-size:16px;font-weight:600;color:${orgHex(x.i)};width:90px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.o)}</span><div style="flex:1;height:7px;background:var(--surface3);border-radius:4px;overflow:hidden"><div style="height:100%;background:${orgHex(x.i)};width:${Math.round((x.m / maxMentions) * 100)}%;border-radius:4px"></div></div><span style="font-family:monospace;font-size:16px;font-weight:700;width:36px;text-align:right;color:${orgHex(x.i)};flex-shrink:0">${x.m} <span style="font-weight:400;color:var(--muted)">mentions</span></span></div>`,
       )
       .join("");
     const cards = ORGS.map((org, i) => {
@@ -3340,17 +3340,17 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
       const bk = Object.entries(a.llmBreakdown || {})
         .map(
           ([llm, v]) =>
-            `<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted2)">${esc(llm)}</span><span style="font-family:monospace;font-weight:600;color:${col}">${v.mentions}/${v.total || "?"} mentions</span></div>`,
+            `<div style="display:flex;justify-content:space-between;font-size:17px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted2)">${esc(llm)}</span><span style="font-family:monospace;font-weight:600;color:${col}">${v.mentions}/${v.total || "?"} mentions</span></div>`,
         )
         .join("");
       return `<div class="cqp" style="border-top:2px solid ${col}">
-        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${col};margin-bottom:12px">${esc(org)}</div>
+        <div style="font-size:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${col};margin-bottom:12px">${esc(org)}</div>
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-          <div style="font-family:monospace;font-size:40px;font-weight:700;color:${col};line-height:1;flex-shrink:0">${a.mentions || 0}</div>
-          <div><div style="font-size:12px;color:var(--muted2);margin-bottom:2px">LLM Mentions</div><div style="font-size:11px;color:var(--muted)">${llmNames.length > 0 ? "across " + llmNames.length + " model" + (llmNames.length !== 1 ? "s" : "") : "no models run"}</div></div>
+          <div style="font-family:monospace;font-size:45px;font-weight:700;color:${col};line-height:1;flex-shrink:0">${a.mentions || 0}</div>
+          <div><div style="font-size:17px;color:var(--muted2);margin-bottom:2px">LLM Mentions</div><div style="font-size:16px;color:var(--muted)">${llmNames.length > 0 ? "across " + llmNames.length + " model" + (llmNames.length !== 1 ? "s" : "") : "no models run"}</div></div>
         </div>
-        ${bk || '<div style="font-size:11px;color:var(--muted)">No LLM data collected</div>'}
-        ${a.topResponse ? `<div class="cqe cqd" style="margin-top:10px"><div class="cqet">Example LLM response</div><div style="color:var(--text);font-family:monospace;font-size:11px;line-height:1.5">&ldquo;${esc(a.topResponse)}&rdquo;</div></div>` : ""}
+        ${bk || '<div style="font-size:16px;color:var(--muted)">No LLM data collected</div>'}
+        ${a.topResponse ? `<div class="cqe cqd" style="margin-top:10px"><div class="cqet">Example LLM response</div><div style="color:var(--text);font-family:monospace;font-size:16px;line-height:1.5">&ldquo;${esc(a.topResponse)}&rdquo;</div></div>` : ""}
       </div>`;
     }).join("");
     const grid =
@@ -3360,21 +3360,21 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11p
     return `
 <section class="sec" id="aeo"><div class="sh"><div class="se">LLM Visibility</div><h2 class="st">LLM Visibility</h2>
 <div class="sd">How often is each organisation cited when AI models (GPT-4o, Perplexity, Gemini) are asked about Indian air quality? ${hasAEO ? "Probed with " + AEO_QUESTIONS.length + " standard questions per LLM." : "No LLM API keys provided — add keys to enable."}</div><div class="sdiv"></div></div>
-${!hasAEO ? `<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:13px;color:var(--muted2)"><strong style="color:var(--warn)">⚠ AEO data not available</strong> — Add OpenAI, Perplexity, or Gemini API keys and re-run to populate this section.</div>` : ""}
-${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px"><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px">LLM Mention Ranking</div>${aeoRankBar}</div>` : ""}
+${!hasAEO ? `<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:18px;color:var(--muted2)"><strong style="color:var(--warn)">⚠ AEO data not available</strong> — Add OpenAI, Perplexity, or Gemini API keys and re-run to populate this section.</div>` : ""}
+${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px"><div style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:10px">LLM Mention Ranking</div>${aeoRankBar}</div>` : ""}
 <div style="${grid}">${cards}</div>
 <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px">
-  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px">Standard AEO questions (${AEO_QUESTIONS.length} per LLM)</div>
+  <div style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:10px">Standard AEO questions (${AEO_QUESTIONS.length} per LLM)</div>
   ${aeoQs}
 </div></section>`;
   }
 
   const clsNotice = ORGS.every((o) => (data[o]?.classified || 0) === 0)
-    ? `<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:13px;color:var(--muted2)"><strong style="color:var(--warn)">&#9888; Classification unavailable</strong> &mdash; Claude API calls failed. Check CLAUDE_KEY and re-run.</div>`
+    ? `<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:18px;color:var(--muted2)"><strong style="color:var(--warn)">&#9888; Classification unavailable</strong> &mdash; Claude API calls failed. Check CLAUDE_KEY and re-run.</div>`
     : "";
 
   function scRow(label, val, color, barPct) {
-    return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px"><span style="color:var(--muted2)">${label}</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:${color};width:${barPct !== undefined ? Math.min(barPct, 100) : val}%"></div></div><span style="font-family:monospace;font-size:11px;font-weight:600;width:30px;text-align:right;color:${color}">${val}</span></div>`;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:17px"><span style="color:var(--muted2)">${label}</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:${color};width:${barPct !== undefined ? Math.min(barPct, 100) : val}%"></div></div><span style="font-family:monospace;font-size:16px;font-weight:600;width:30px;text-align:right;color:${color}">${val}</span></div>`;
   }
 
   const topicCols = `175px ${ORGS.map(() => "1fr").join(" ")}`;
@@ -3384,7 +3384,7 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
   ).join("");
   const navOrgs = ORGS.map(
     (o) =>
-      `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2);padding:3px 20px"><div style="width:8px;height:8px;border-radius:2px;background:${orgHex(ORGS.indexOf(o))}"></div>${esc(o)}: ${data[o].total} arts</div>`,
+      `<div style="display:flex;align-items:center;gap:6px;font-size:16px;color:var(--muted2);padding:3px 20px"><div style="width:8px;height:8px;border-radius:2px;background:${orgHex(ORGS.indexOf(o))}"></div>${esc(o)}: ${data[o].total} arts</div>`,
   ).join("");
 
   const ordinal = (n) => {
@@ -3423,15 +3423,15 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
   const maxScr  = Math.max(...ORGS.map((o) => data[o].score   || 0), 1);
 
   const inlineBar = (val, _max, col) =>
-    `<span style="font-family:monospace;font-size:13px;font-weight:600;color:${col}">${val}</span>`;
+    `<span style="font-family:monospace;font-size:18px;font-weight:600;color:${col}">${val}</span>`;
 
   const scorecardRows = rankedOrgs.map(({ org, i, rank }) => {
     const d   = data[org];
     const col = orgHex(i);
     const socialScore = d.social || 0;
     const socialCell = socialScore > 0
-      ? `<span style="font-family:monospace;font-size:13px;font-weight:600;color:${col}">${socialScore}<span style="font-size:10px;font-weight:400;color:var(--muted)">/10</span></span>`
-      : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`;
+      ? `<span style="font-family:monospace;font-size:18px;font-weight:600;color:${col}">${socialScore}<span style="font-size:15px;font-weight:400;color:var(--muted)">/10</span></span>`
+      : `<span style="font-family:monospace;font-size:16px;color:var(--muted)">—</span>`;
 
     const pressCont  = +(d.sov      * 0.25).toFixed(2);
     const citCont    = +(d.dataPct  * 0.25).toFixed(2);
@@ -3449,55 +3449,55 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
     const cards = components.map(({ label, desc, raw, weight, contrib }) => `
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2)">${label}</span>
-          <span style="font-family:monospace;font-size:10px;color:var(--muted);background:var(--surface2);padding:2px 6px;border-radius:3px">${weight}</span>
+          <span style="font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2)">${label}</span>
+          <span style="font-family:monospace;font-size:15px;color:var(--muted);background:var(--surface2);padding:2px 6px;border-radius:3px">${weight}</span>
         </div>
-        <div style="font-size:11px;color:var(--muted);line-height:1.4">${desc}</div>
+        <div style="font-size:16px;color:var(--muted);line-height:1.4">${desc}</div>
         <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px">
-          <span style="font-family:monospace;font-size:20px;font-weight:700;color:${col}">${raw}</span>
-          <span style="font-family:monospace;font-size:12px;color:var(--muted)">→</span>
-          <span style="font-family:monospace;font-size:15px;font-weight:600;color:var(--amber)">+${contrib}</span>
+          <span style="font-family:monospace;font-size:25px;font-weight:700;color:${col}">${raw}</span>
+          <span style="font-family:monospace;font-size:17px;color:var(--muted)">→</span>
+          <span style="font-family:monospace;font-size:20px;font-weight:600;color:var(--amber)">+${contrib}</span>
         </div>
       </div>`).join('');
 
     const breakdown = `<tr id="${uid}" style="display:none">
       <td colspan="7" style="padding:0">
         <div style="border-left:3px solid ${col};background:var(--surface2);padding:20px 24px">
-          <div style="font-family:monospace;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${col};margin-bottom:14px">${esc(org)} — Score Breakdown</div>
+          <div style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${col};margin-bottom:14px">${esc(org)} — Score Breakdown</div>
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">${cards}</div>
           <div style="display:flex;align-items:center;gap:12px;border-top:1px solid var(--border);padding-top:14px;flex-wrap:wrap">
-            <span style="font-family:monospace;font-size:12px;color:var(--muted)">${d.sov}×0.25 + ${d.dataPct}×0.25 + ${d.aeo||0}×0.30 + ${socialScore}×2</span>
-            <span style="font-family:monospace;font-size:12px;color:var(--muted)">=</span>
-            <span style="font-family:monospace;font-size:12px;color:var(--muted)">${pressCont} + ${citCont} + ${llmCont} + ${socCont}</span>
-            <span style="font-family:monospace;font-size:12px;color:var(--muted)">=</span>
-            <span style="font-family:monospace;font-size:26px;font-weight:700;color:${col}">${d.score}</span>
+            <span style="font-family:monospace;font-size:17px;color:var(--muted)">${d.sov}×0.25 + ${d.dataPct}×0.25 + ${d.aeo||0}×0.30 + ${socialScore}×2</span>
+            <span style="font-family:monospace;font-size:17px;color:var(--muted)">=</span>
+            <span style="font-family:monospace;font-size:17px;color:var(--muted)">${pressCont} + ${citCont} + ${llmCont} + ${socCont}</span>
+            <span style="font-family:monospace;font-size:17px;color:var(--muted)">=</span>
+            <span style="font-family:monospace;font-size:31px;font-weight:700;color:${col}">${d.score}</span>
           </div>
         </div>
       </td>
     </tr>`;
 
     return `<tr style="cursor:pointer;transition:background .15s" onclick="td('${uid}')" onmouseenter="this.style.background='rgba(255,255,255,.03)'" onmouseleave="this.style.background=''">
-      <td style="text-align:center;font-family:monospace;font-size:13px;font-weight:700;color:${rankCol(rank)}">${ordinal(rank)}</td>
-      <td><span style="font-size:12px;font-weight:700;color:${col};letter-spacing:.04em">${esc(org)}</span></td>
+      <td style="text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:${rankCol(rank)}">${ordinal(rank)}</td>
+      <td><span style="font-size:17px;font-weight:700;color:${col};letter-spacing:.04em">${esc(org)}</span></td>
       <td>${inlineBar(d.sov, maxSov, col)}</td>
       <td>${inlineBar(d.dataPct, maxCit, col)}</td>
-      <td>${d.aeo > 0 ? inlineBar(d.aeo, maxAeo, col) : `<span style="font-family:monospace;font-size:11px;color:var(--muted)">—</span>`}</td>
+      <td>${d.aeo > 0 ? inlineBar(d.aeo, maxAeo, col) : `<span style="font-family:monospace;font-size:16px;color:var(--muted)">—</span>`}</td>
       <td style="text-align:center">${socialCell}</td>
       <td>${inlineBar(d.score, maxScr, col)}</td>
     </tr>${breakdown}`;
   }).join("");
 
   const scorecards = `<div style="overflow-x:auto">
-  <table style="width:100%;border-collapse:collapse;font-size:13px">
+  <table style="width:100%;border-collapse:collapse;font-size:18px">
     <thead>
       <tr style="border-bottom:2px solid var(--border)">
-        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Rank</th>
-        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Organisation</th>
-        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Press</th>
-        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Citation %</th>
-        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">LLM Mentions</th>
-        <th style="padding:10px 12px;text-align:center;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Social /10</th>
-        <th style="padding:10px 12px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Score</th>
+        <th style="padding:10px 12px;text-align:center;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Rank</th>
+        <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Organisation</th>
+        <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Press</th>
+        <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Citation %</th>
+        <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">LLM Mentions</th>
+        <th style="padding:10px 12px;text-align:center;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Social /10</th>
+        <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Score</th>
       </tr>
     </thead>
     <tbody>
@@ -3520,14 +3520,14 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       .map((a, i) => {
         const c = d.classifications[i] || {};
         const cq = c.citation_quality || "—";
-        const citBadge = a.citationVerified ? `<span style="display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:1px 5px;font-size:9px;font-family:monospace;font-weight:700;margin-left:4px" title="Org appears within 2 lines of AQ keyword">✓ cit</span>` : '';
-        return `<tr><td>${i + 1}</td><td>${esc(a.source || "")}</td><td style="font-size:10px">${esc(a.date || "")}</td><td style="max-width:260px">${esc(a.title || "")}${citBadge}</td><td style="font-size:10px;font-family:monospace;color:${cqColor(cq)}">${esc(cq)}</td><td>${a.url ? `<a href="${esc(a.url)}" target="_blank">link</a>` : "—"}</td></tr>`;
+        const citBadge = a.citationVerified ? `<span style="display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:1px 5px;font-size:14px;font-family:monospace;font-weight:700;margin-left:4px" title="Org appears within 2 lines of AQ keyword">✓ cit</span>` : '';
+        return `<tr><td>${i + 1}</td><td>${esc(a.source || "")}</td><td style="font-size:15px">${esc(a.date || "")}</td><td style="max-width:260px">${esc(a.title || "")}${citBadge}</td><td style="font-size:15px;font-family:monospace;color:${cqColor(cq)}">${esc(cq)}</td><td>${a.url ? `<a href="${esc(a.url)}" target="_blank">link</a>` : "—"}</td></tr>`;
       })
       .join("");
     return `<details ${orgIdx === 0 ? 'open' : ''} style="border:1px solid var(--border);border-radius:6px;margin-bottom:8px;overflow:hidden">
 <summary style="padding:10px 16px;cursor:pointer;background:var(--surface2);display:flex;align-items:center;justify-content:space-between;list-style:none;user-select:none">
-  <span style="font-size:13px;font-weight:600;color:var(--text)">${esc(org)} <span style="color:var(--muted);font-weight:400">&mdash; ${d.total} articles</span></span>
-  <span style="font-family:monospace;font-size:10px;color:var(--muted)">▾</span>
+  <span style="font-size:18px;font-weight:600;color:var(--text)">${esc(org)} <span style="color:var(--muted);font-weight:400">&mdash; ${d.total} articles</span></span>
+  <span style="font-family:monospace;font-size:15px;color:var(--muted)">▾</span>
 </summary>
 <div style="padding:0 0 4px">
 <table class="apt"><thead><tr><th>#</th><th>Outlet</th><th>Date</th><th>Headline</th><th>Classification</th><th>URL</th></tr></thead><tbody>${rows}</tbody></table>
@@ -3551,7 +3551,7 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
     .slice(0, 3)
     .map(
       (f, i) =>
-        `<div class="fc"><div class="fn">${i + 1}</div><div class="fb"><div class="fh">${esc(f.headline)}</div><div class="fd">${esc(f.detail)}${f.section_ref ? ` <span style="font-family:monospace;font-size:10px;color:var(--muted)">&rarr; ${esc(f.section_ref)}</span>` : ""}</div></div></div>`,
+        `<div class="fc"><div class="fn">${i + 1}</div><div class="fb"><div class="fh">${esc(f.headline)}</div><div class="fd">${esc(f.detail)}${f.section_ref ? ` <span style="font-family:monospace;font-size:15px;color:var(--muted)">&rarr; ${esc(f.section_ref)}</span>` : ""}</div></div></div>`,
     )
     .join("");
 
@@ -3569,17 +3569,17 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
               .join("");
             const artCount = (n.supporting_articles || []).length;
             const absentBadges = ORGS.map((o, i) =>
-              `<span style="font-family:monospace;font-size:10px;font-weight:700;padding:1px 7px;border-radius:3px;background:${orgHex(i)}1a;color:${orgHex(i)};border:1px solid ${orgHex(i)}4d">${esc(o)}</span>`
+              `<span style="font-family:monospace;font-size:15px;font-weight:700;padding:1px 7px;border-radius:3px;background:${orgHex(i)}1a;color:${orgHex(i)};border:1px solid ${orgHex(i)}4d">${esc(o)}</span>`
             ).join(" ");
             return `<div class="em-card">
 <div class="em-hdr"><div class="em-topic">${esc(n.topic)}</div></div>
 <div class="em-body">${esc(n.description || "")}</div>
 <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-  <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Absent:</span>
+  <span style="font-size:15px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Absent:</span>
   ${absentBadges}
 </div>
 ${articleLinks ? `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-  ${artCount > 0 ? `<div style="font-family:monospace;font-size:10px;color:var(--muted2);margin-bottom:7px;letter-spacing:.04em">${artCount} article${artCount !== 1 ? "s" : ""} in this narrative</div>` : ""}
+  ${artCount > 0 ? `<div style="font-family:monospace;font-size:15px;color:var(--muted2);margin-bottom:7px;letter-spacing:.04em">${artCount} article${artCount !== 1 ? "s" : ""} in this narrative</div>` : ""}
   ${articleLinks}
 </div>` : ""}
 </div>`;
@@ -3599,121 +3599,121 @@ ${articleLinks ? `<div style="margin-top:10px;border-top:1px solid var(--border)
           .map((a) => {
             const oi = ORGS.indexOf(a.org);
             const oc = oi >= 0 ? orgHex(oi) : "#c9922a";
-            return `<tr><td style="font-weight:600;color:${oc}">${esc(a.org)}</td><td><span class="${pmap[a.priority] || "pri-opt"}">${esc(a.priority)}</span></td><td style="font-family:monospace;font-size:11px;color:var(--muted2)">${esc(a.area)}</td><td>${esc(a.action)}</td><td class="rat">${esc(a.rationale)}</td></tr>`;
+            return `<tr><td style="font-weight:600;color:${oc}">${esc(a.org)}</td><td><span class="${pmap[a.priority] || "pri-opt"}">${esc(a.priority)}</span></td><td style="font-family:monospace;font-size:16px;color:var(--muted2)">${esc(a.area)}</td><td>${esc(a.action)}</td><td class="rat">${esc(a.rationale)}</td></tr>`;
           })
           .join("");
 
   const CSS = `:root{--ink:#0a0e17;--surface:#111520;--surface2:#181e2e;--surface3:#1e2638;--border:#252d40;--border2:#2e3a52;--text:#d8e4f0;--muted:#5e7494;--muted2:#8fa3b8;--amber:#c9922a;--amber-dim:rgba(201,146,42,.12);--amber-glow:rgba(201,146,42,.06);--good:#4caf74;--warn:#d4a017;--bad:#e05c5c}
 *{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
-body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line-height:1.65;font-size:14px}
+body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line-height:1.65;font-size:19px}
 .shell{display:flex;min-height:100vh}
 .sidenav{width:220px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:28px 0;display:flex;flex-direction:column}
 .sidenav-logo{padding:0 20px 24px;border-bottom:1px solid var(--border);margin-bottom:16px}
-.sidenav-logo-name{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
-.sidenav-logo-sub{font-size:10px;color:var(--muted);margin-top:2px;font-family:monospace}
-.nav-lbl{font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:12px 20px 6px}
-.nav-a{display:block;padding:7px 20px;font-size:12px;color:var(--muted2);text-decoration:none;border-left:2px solid transparent}
+.sidenav-logo-name{font-size:16px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+.sidenav-logo-sub{font-size:15px;color:var(--muted);margin-top:2px;font-family:monospace}
+.nav-lbl{font-size:14px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:12px 20px 6px}
+.nav-a{display:block;padding:7px 20px;font-size:17px;color:var(--muted2);text-decoration:none;border-left:2px solid transparent}
 .nav-a:hover{color:var(--text);background:var(--surface2)}.nav-a.active{color:var(--amber);border-left-color:var(--amber);background:var(--amber-glow)}
-.sidenav-footer{margin-top:auto;padding:16px 20px 0;border-top:1px solid var(--border);font-family:monospace;font-size:10px;color:var(--muted);line-height:1.8}
+.sidenav-footer{margin-top:auto;padding:16px 20px 0;border-top:1px solid var(--border);font-family:monospace;font-size:15px;color:var(--muted);line-height:1.8}
 .main{flex:1;min-width:0;padding:0 48px 80px}
 .rh{padding:52px 0 44px;border-bottom:1px solid var(--border);margin-bottom:48px}
-.ey{font-family:monospace;font-size:11px;color:var(--amber);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
-.rt{font-family:'DM Serif Display',serif;font-size:42px;line-height:1.15;margin-bottom:10px;font-weight:400}
+.ey{font-family:monospace;font-size:16px;color:var(--amber);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px}
+.rt{font-family:'DM Serif Display',serif;font-size:47px;line-height:1.15;margin-bottom:10px;font-weight:400}
 .rti{color:var(--amber);font-style:italic}
-.rm{font-size:13px;color:var(--muted2);margin-bottom:28px;font-family:monospace}
+.rm{font-size:18px;color:var(--muted2);margin-bottom:28px;font-family:monospace}
 .chips{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
-.chip{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:4px;font-size:12px;font-weight:600}
-.dn{background:var(--amber-glow);border:1px solid rgba(201,146,42,.2);border-radius:6px;padding:11px 16px;font-size:12px;color:var(--muted2);font-family:monospace}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:4px;font-size:17px;font-weight:600}
+.dn{background:var(--amber-glow);border:1px solid rgba(201,146,42,.2);border-radius:6px;padding:11px 16px;font-size:17px;color:var(--muted2);font-family:monospace}
 .dn strong{color:var(--amber)}
 .sec{margin-bottom:56px;scroll-margin-top:24px}
 .sh{margin-bottom:24px}
-.se{font-family:monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-.st{font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;color:var(--text);line-height:1.2}
-.sd{margin-top:8px;font-size:13px;color:var(--muted2);max-width:680px}
+.se{font-family:monospace;font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.st{font-family:'DM Serif Display',serif;font-size:33px;font-weight:400;color:var(--text);line-height:1.2}
+.sd{margin-top:8px;font-size:18px;color:var(--muted2);max-width:680px}
 .sdiv{width:40px;height:2px;background:var(--amber);margin:14px 0 0}
 .mg{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .mc{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px}
-.ml{font-family:monospace;font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin-bottom:6px}
-.mt{font-size:12px;color:var(--muted2);line-height:1.6}
-.sb-scope{background:var(--amber-glow);border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:14px 18px;font-size:12px;color:var(--muted2);margin-bottom:20px;line-height:1.7}
+.ml{font-family:monospace;font-size:15px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin-bottom:6px}
+.mt{font-size:17px;color:var(--muted2);line-height:1.6}
+.sb-scope{background:var(--amber-glow);border:1px solid rgba(201,146,42,.18);border-radius:8px;padding:14px 18px;font-size:17px;color:var(--muted2);margin-bottom:20px;line-height:1.7}
 .sb-scope strong{color:var(--amber)}
 .cp{display:grid;grid-template-columns:${ORGS.map(() => "1fr").join(" ")};gap:16px;margin-bottom:16px}
 .op{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:20px}
-.opn{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
+.opn{font-size:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
 .mch{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
 .ch-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
 .wbars{display:flex;gap:5px;align-items:flex-end;height:96px;margin-bottom:8px}
-.tg{display:grid;grid-template-columns:${topicCols};border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;font-size:12px}
-.tgh{background:var(--surface3);padding:10px 14px;font-family:monospace;font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+.tg{display:grid;grid-template-columns:${topicCols};border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:16px;font-size:17px}
+.tgh{background:var(--surface3);padding:10px 14px;font-family:monospace;font-size:15px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
 .tc{padding:12px 14px;border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
 .tc:nth-child(${ORGS.length + 1}n){border-right:none}
-.tn{font-weight:600;color:var(--text);margin-bottom:3px}.cell-hl{font-size:11px;color:var(--muted);line-height:1.4;margin-top:5px}
+.tn{font-weight:600;color:var(--text);margin-bottom:3px}.cell-hl{font-size:16px;color:var(--muted);line-height:1.4;margin-top:5px}
 .owns{background:rgba(76,175,116,.06)}.con{background:rgba(61,142,240,.04)}
-.ob{display:inline-block;font-family:monospace;font-size:10px;font-weight:600;padding:1px 7px;border-radius:3px;margin-bottom:4px}
+.ob{display:inline-block;font-family:monospace;font-size:15px;font-weight:600;padding:1px 7px;border-radius:3px;margin-bottom:4px}
 .badge-owns{background:rgba(76,175,116,.15);color:var(--good);border:1px solid rgba(76,175,116,.3)}
 .badge-con{background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.25)}
 .badge-absent{background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
-.nt,.at,.apt{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px}
-.nt th,.at th,.apt th{background:var(--surface3);padding:10px 14px;text-align:left;font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+.nt,.at,.apt{width:100%;border-collapse:collapse;font-size:17px;margin-bottom:16px}
+.nt th,.at th,.apt th{background:var(--surface3);padding:10px 14px;text-align:left;font-family:monospace;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
 .nt td,.at td,.apt td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
 .nt tr:hover td{background:var(--surface2)}
-.pos-auth{display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600}
-.pos-per{display:inline-block;background:var(--surface3);color:var(--muted2);border:1px solid var(--border2);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600}
-.pos-abs{display:inline-block;background:rgba(224,92,92,.1);color:var(--bad);border:1px solid rgba(224,92,92,.25);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600}
-.ctag{display:inline-flex;font-family:monospace;font-size:10px;color:var(--amber);background:var(--amber-dim);border:1px solid rgba(201,146,42,.25);border-radius:3px;padding:1px 6px;cursor:pointer;text-decoration:none;vertical-align:middle;margin-left:4px}
+.pos-auth{display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:15px;font-weight:600}
+.pos-per{display:inline-block;background:var(--surface3);color:var(--muted2);border:1px solid var(--border2);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:15px;font-weight:600}
+.pos-abs{display:inline-block;background:rgba(224,92,92,.1);color:var(--bad);border:1px solid rgba(224,92,92,.25);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:15px;font-weight:600}
+.ctag{display:inline-flex;font-family:monospace;font-size:15px;color:var(--amber);background:var(--amber-dim);border:1px solid rgba(201,146,42,.25);border-radius:3px;padding:1px 6px;cursor:pointer;text-decoration:none;vertical-align:middle;margin-left:4px}
 .evd{display:none;background:var(--ink);border:1px solid var(--border2);border-radius:5px;padding:12px 14px;margin-top:9px}
 .evd.open{display:block}
 .ei{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start}
 .ei:last-child{border:none;padding-bottom:0}
-.en{font-family:monospace;font-size:10px;color:var(--muted);flex-shrink:0;min-width:40px;padding-top:2px}
-.eq{font-family:monospace;font-size:11px;color:var(--text);line-height:1.6;background:var(--surface3);border-left:2px solid var(--amber);padding:5px 9px;border-radius:0 3px 3px 0;margin-bottom:4px}
-.es{font-family:monospace;font-size:10px;color:var(--muted)}.es a{color:var(--amber);text-decoration:none}
-.lc{font-family:monospace;font-size:10px;color:var(--warn);background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.25);border-radius:3px;padding:2px 6px}
+.en{font-family:monospace;font-size:15px;color:var(--muted);flex-shrink:0;min-width:40px;padding-top:2px}
+.eq{font-family:monospace;font-size:16px;color:var(--text);line-height:1.6;background:var(--surface3);border-left:2px solid var(--amber);padding:5px 9px;border-radius:0 3px 3px 0;margin-bottom:4px}
+.es{font-family:monospace;font-size:15px;color:var(--muted)}.es a{color:var(--amber);text-decoration:none}
+.lc{font-family:monospace;font-size:15px;color:var(--warn);background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.25);border-radius:3px;padding:2px 6px}
 .cqp{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:18px}
-.cqe{padding:8px 10px;border-radius:4px;margin-bottom:6px;font-size:11px;line-height:1.6}
+.cqe{padding:8px 10px;border-radius:4px;margin-bottom:6px;font-size:16px;line-height:1.6}
 .cqd{background:rgba(76,175,116,.07);border-left:2px solid var(--good)}
 .cqv{background:var(--surface3);border-left:2px solid var(--muted)}
-.cqet{font-family:monospace;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px}
-.cqd .cqet{color:var(--good)}.cqv .cqet{color:var(--muted)}.cqetx{color:var(--text);font-family:monospace;font-size:11px}
+.cqet{font-family:monospace;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px}
+.cqd .cqet{color:var(--good)}.cqv .cqet{color:var(--muted)}.cqetx{color:var(--text);font-family:monospace;font-size:16px}
 .em-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:12px}
 .em-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:12px}
-.em-topic{font-size:14px;font-weight:600;color:var(--text)}
-.em-mom{font-family:monospace;font-size:11px;color:var(--good);background:rgba(76,175,116,.1);border:1px solid rgba(76,175,116,.25);border-radius:3px;padding:2px 8px;flex-shrink:0}
-.em-body{font-size:13px;color:var(--muted2);line-height:1.65;margin-bottom:10px}
-.em-inf{background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.2);border-radius:4px;padding:8px 12px;font-size:11px;color:var(--warn);font-family:monospace}
+.em-topic{font-size:19px;font-weight:600;color:var(--text)}
+.em-mom{font-family:monospace;font-size:16px;color:var(--good);background:rgba(76,175,116,.1);border:1px solid rgba(76,175,116,.25);border-radius:3px;padding:2px 8px;flex-shrink:0}
+.em-body{font-size:18px;color:var(--muted2);line-height:1.65;margin-bottom:10px}
+.em-inf{background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.2);border-radius:4px;padding:8px 12px;font-size:16px;color:var(--warn);font-family:monospace}
 .em-inf::before{content:"⚠ INFERENCE — ";font-weight:600}
-.em-src{font-size:11px;color:var(--muted);padding:3px 0;font-family:monospace;display:flex;gap:8px}
+.em-src{font-size:16px;color:var(--muted);padding:3px 0;font-family:monospace;display:flex;gap:8px}
 .em-src::before{content:"→";color:var(--amber)}
 .scc{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px}
 .sca{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:22px;text-align:center}
-.scn{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
-.scg{font-family:'DM Serif Display',serif;font-size:44px;line-height:1;margin:8px 0 4px;font-weight:400}
+.scn{font-size:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.scg{font-family:'DM Serif Display',serif;font-size:49px;line-height:1;margin:8px 0 4px;font-weight:400}
 #score table tbody tr{border-bottom:1px solid var(--border)}
 #score table tbody tr:hover{background:var(--surface2)}
 #score table td{padding:12px 12px}
 #score table thead th{padding:10px 12px;background:var(--surface3)}
-.scs{font-family:monospace;font-size:13px;color:var(--muted2);margin-bottom:14px}
-.scf{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:12px 16px;font-family:monospace;font-size:11px;color:var(--muted2);margin-top:8px}
+.scs{font-family:monospace;font-size:18px;color:var(--muted2);margin-bottom:14px}
+.scf{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:12px 16px;font-family:monospace;font-size:16px;color:var(--muted2);margin-top:8px}
 .scf strong{color:var(--amber)}
 .fc{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:20px 22px;display:flex;gap:18px;align-items:flex-start;margin-bottom:14px}
-.fn{font-family:'DM Serif Display',serif;font-size:36px;color:var(--amber);line-height:1;flex-shrink:0;opacity:.45;margin-top:2px}
-.fb{flex:1}.fh{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;line-height:1.4}
-.fd{font-size:13px;color:var(--muted2);line-height:1.65}
-.pri-fix{display:inline-block;background:rgba(212,160,23,.12);color:var(--warn);border:1px solid rgba(212,160,23,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600;white-space:nowrap}
-.pri-lev{display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600;white-space:nowrap}
-.pri-opt{display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.25);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:10px;font-weight:600;white-space:nowrap}
-.pri-inv{display:inline-block;background:rgba(224,92,92,.1);color:var(--bad);border:1px solid rgba(224,92,92,.25);border-radius:3px;padding:2px 7px;font-family:monospace;font-size:10px;font-weight:600;white-space:nowrap}
-.rat{font-size:11px;color:var(--muted);font-family:monospace;line-height:1.55}
-.apt td{font-family:monospace;color:var(--muted2);font-size:11px}.apt td a{color:var(--amber);text-decoration:none}
-.rf{border-top:1px solid var(--border);padding:28px 0 0;font-family:monospace;font-size:10px;color:var(--muted);line-height:2}
+.fn{font-family:'DM Serif Display',serif;font-size:41px;color:var(--amber);line-height:1;flex-shrink:0;opacity:.45;margin-top:2px}
+.fb{flex:1}.fh{font-size:20px;font-weight:600;color:var(--text);margin-bottom:6px;line-height:1.4}
+.fd{font-size:18px;color:var(--muted2);line-height:1.65}
+.pri-fix{display:inline-block;background:rgba(212,160,23,.12);color:var(--warn);border:1px solid rgba(212,160,23,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:15px;font-weight:600;white-space:nowrap}
+.pri-lev{display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:15px;font-weight:600;white-space:nowrap}
+.pri-opt{display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.25);border-radius:3px;padding:2px 8px;font-family:monospace;font-size:15px;font-weight:600;white-space:nowrap}
+.pri-inv{display:inline-block;background:rgba(224,92,92,.1);color:var(--bad);border:1px solid rgba(224,92,92,.25);border-radius:3px;padding:2px 7px;font-family:monospace;font-size:15px;font-weight:600;white-space:nowrap}
+.rat{font-size:16px;color:var(--muted);font-family:monospace;line-height:1.55}
+.apt td{font-family:monospace;color:var(--muted2);font-size:16px}.apt td a{color:var(--amber);text-decoration:none}
+.rf{border-top:1px solid var(--border);padding:28px 0 0;font-family:monospace;font-size:15px;color:var(--muted);line-height:2}
 .edit-bar{position:fixed;top:14px;right:18px;z-index:2000;display:flex;gap:8px;align-items:center}
-.edit-btn{background:#1e2638;border:1px solid var(--border2);border-radius:5px;padding:6px 13px;font-family:monospace;font-size:11px;color:var(--muted2);cursor:pointer;transition:all .15s;line-height:1.4}
+.edit-btn{background:#1e2638;border:1px solid var(--border2);border-radius:5px;padding:6px 13px;font-family:monospace;font-size:16px;color:var(--muted2);cursor:pointer;transition:all .15s;line-height:1.4}
 .edit-btn:hover,.edit-btn.on{background:rgba(201,146,42,.15);border-color:rgba(201,146,42,.4);color:var(--amber)}
 .edit-dl{color:var(--good)!important;border-color:rgba(76,175,116,.3)!important;background:rgba(76,175,116,.07)!important;display:none}
 body.edit-mode .edit-dl{display:inline-block}
 body.edit-mode [contenteditable="true"]:hover{outline:1.5px dashed rgba(201,146,42,.55);border-radius:2px;cursor:text}
 body.edit-mode [contenteditable="true"]:focus{outline:1.5px solid rgba(201,146,42,.7);border-radius:2px}
-.sec-x{display:none;position:absolute;top:10px;right:14px;width:22px;height:22px;border-radius:4px;background:rgba(224,92,92,.12);border:1px solid rgba(224,92,92,.3);color:var(--bad);font-size:15px;cursor:pointer;align-items:center;justify-content:center;line-height:1;font-weight:700}
+.sec-x{display:none;position:absolute;top:10px;right:14px;width:22px;height:22px;border-radius:4px;background:rgba(224,92,92,.12);border:1px solid rgba(224,92,92,.3);color:var(--bad);font-size:20px;cursor:pointer;align-items:center;justify-content:center;line-height:1;font-weight:700}
 .sec-x:hover{background:rgba(224,92,92,.28)}
 body.edit-mode .sec-x{display:flex}
 .sec.sec-hidden{display:none}
@@ -3721,38 +3721,38 @@ body.edit-mode .sec-x{display:flex}
   .sidenav{display:none}
   .main{padding:24px 20px 60px;max-width:100%}
   .rh{padding:32px 0 28px;margin-bottom:32px}
-  .rt{font-size:28px}
-  .st{font-size:22px}
-  .sd{font-size:12px}
+  .rt{font-size:33px}
+  .st{font-size:27px}
+  .sd{font-size:17px}
   .cp,.scc,.mg{grid-template-columns:1fr}
   .tg{grid-template-columns:1fr!important}
   .ch-hdr{flex-direction:column;gap:8px}
   .wbars{height:64px}
   .fc{flex-direction:column;gap:10px}
-  .fn{font-size:26px}
+  .fn{font-size:31px}
   .em-hdr{flex-direction:column;gap:6px}
-  .scg{font-size:32px}
+  .scg{font-size:37px}
   .edit-bar{top:8px;right:8px;gap:5px}
   .nt,.at,.apt{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
   #score table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
 @media(max-width:480px){
   .main{padding:16px 14px 60px}
-  .rt{font-size:20px}
-  .st{font-size:18px}
+  .rt{font-size:25px}
+  .st{font-size:23px}
   .op{padding:14px 12px}
   .sec{margin-bottom:36px}
   .mch{padding:14px 12px}
   .em-card{padding:14px 16px}
-  .scg{font-size:26px}
-  .ey{font-size:9px;letter-spacing:.08em}
+  .scg{font-size:31px}
+  .ey{font-size:14px;letter-spacing:.08em}
 }
 @media(max-width:380px){
   .main{padding:12px 10px 60px}
-  .rt{font-size:17px}
-  .st{font-size:16px}
-  .chip{font-size:10px;padding:4px 8px}
-  .rm,.sd{font-size:9px}
+  .rt{font-size:22px}
+  .st{font-size:21px}
+  .chip{font-size:15px;padding:4px 8px}
+  .rm,.sd{font-size:14px}
 }
 .mob-nav{display:none}
 @media(max-width:900px){
@@ -3760,7 +3760,7 @@ body.edit-mode .sec-x{display:flex}
   .shell{display:block!important}
   .mob-nav{display:flex;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;padding:0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   .mob-nav::-webkit-scrollbar{display:none}
-  .mob-nav a{padding:11px 14px;font-size:11px;font-weight:600;color:var(--muted2);text-decoration:none;white-space:nowrap;letter-spacing:.04em;flex-shrink:0;border-bottom:2px solid transparent}
+  .mob-nav a{padding:11px 14px;font-size:16px;font-weight:600;color:var(--muted2);text-decoration:none;white-space:nowrap;letter-spacing:.04em;flex-shrink:0;border-bottom:2px solid transparent}
   .mob-nav a:active{color:var(--amber);border-bottom-color:var(--amber)}
 }
 @media print{
@@ -3791,18 +3791,18 @@ body.edit-mode .sec-x{display:flex}
 <div class="rm">Period: ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)} &middot; ${now}</div>
 <div class="chips">${orgChips}</div>
 <div class="dn"><strong>Publicly available data</strong> Insight linked to evidence &middot; ${now}</div>
-${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;gap:12px;background:rgba(61,142,240,.08);border:1px solid rgba(61,142,240,.25);border-radius:6px;padding:12px 16px;font-size:13px"><div style="flex:1;color:var(--text)"><strong style="font-weight:600">PowerPoint version available.</strong> Open the <code style="background:var(--surface3);padding:1px 5px;border-radius:3px;font-size:11px">.pptx</code> file in the same folder.</div><div style="font-family:monospace;font-size:11px;color:var(--muted2);flex-shrink:0">📁 ${esc(pptxFilename)}</div></div>` : ""}
+${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;gap:12px;background:rgba(61,142,240,.08);border:1px solid rgba(61,142,240,.25);border-radius:6px;padding:12px 16px;font-size:18px"><div style="flex:1;color:var(--text)"><strong style="font-weight:600">PowerPoint version available.</strong> Open the <code style="background:var(--surface3);padding:1px 5px;border-radius:3px;font-size:16px">.pptx</code> file in the same folder.</div><div style="font-family:monospace;font-size:16px;color:var(--muted2);flex-shrink:0">📁 ${esc(pptxFilename)}</div></div>` : ""}
 </header>
 
 <section class="sec" id="exec"><div class="sh"><div class="se">Section 01</div><h2 class="st">Executive Summary</h2><div class="sd">Headline comparative findings across ${ORGS.length} organisations — Press, LLM, and Social Media.</div><div class="sdiv"></div></div>
 <div style="background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.2);border-radius:8px;overflow:hidden;margin-bottom:4px">
 <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;cursor:pointer;user-select:none" onclick="toggleExecDraft()">
-<span style="font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)">Draft Executive Summary <span style="font-weight:400;color:var(--muted2)">(AI-generated &mdash; review before sharing)</span></span>
-<span id="exec-draft-icon" style="font-family:monospace;font-size:12px;color:var(--amber)">&#9660; Show draft</span>
+<span style="font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)">Draft Executive Summary <span style="font-weight:400;color:var(--muted2)">(AI-generated &mdash; review before sharing)</span></span>
+<span id="exec-draft-icon" style="font-family:monospace;font-size:17px;color:var(--amber)">&#9660; Show draft</span>
 </div>
 <div id="exec-draft" style="display:none;padding:0 18px 18px">${execCards}</div>
 </div>
-<div style="margin-top:20px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);font-size:11px;color:var(--muted2);line-height:1.7">
+<div style="margin-top:20px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);font-size:16px;color:var(--muted2);line-height:1.7">
   <strong style="font-weight:600;letter-spacing:.04em">METHODOLOGY</strong> &mdash;
   Serper News API for media coverage &middot; Claude Sonnet 4.6 for article classification &middot;
   LLM probing (GPT-4o, Perplexity Sonar, Gemini 1.5 Flash) for AEO visibility &middot;
@@ -3812,26 +3812,26 @@ ${pptxFilename ? `<div style="margin-top:16px;display:flex;align-items:center;ga
 </div>
 </section>
 <section class="sec" id="sov"><div class="sh"><div class="se">Section 02a</div><h2 class="st">Press Analytics</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
-<div class="mch"><div class="ch-hdr"><div style="font-size:13px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div><div style="font-size:11px;color:var(--muted2);margin-top:3px">${printTot} Print / Online &middot; ${tvTot} TV News</div></div>
+<div class="mch"><div class="ch-hdr"><div style="font-size:18px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div><div style="font-size:16px;color:var(--muted2);margin-top:3px">${printTot} Print / Online &middot; ${tvTot} TV News</div></div>
 ${sovBar()}
-<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o, i) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join("")}</div>
+<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:16px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o, i) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join("")}</div>
 </div>
-<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Print / Online</div>
+<div style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Print / Online</div>
 ${sovByOrgTable()}
-<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-top:24px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">TV News</div>
+<div style="font-size:17px;font-weight:600;color:var(--muted2);margin-top:24px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">TV News</div>
 ${sovByOrgTVTable()}</section>
 
 <section class="sec" id="tv"><div class="sh"><div class="se">Section 02b</div><h2 class="st">TV Channel Coverage</h2>
 <div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (Aaj Tak, India TV, ABP News) channels.</div><div class="sdiv"></div></div>
 <div style="margin-bottom:16px">
-<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">English TV</div>
+<div style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">English TV</div>
 <table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_ENGLISH.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
-${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_ENGLISH.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="display:block;font-size:10px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:10px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
+${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_ENGLISH.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
 </tbody></table></div>
 <div>
-<div style="font-size:12px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Hindi TV</div>
+<div style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Hindi TV</div>
 <table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_HINDI.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
-${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:11px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_HINDI.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="font-size:10px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px;display:block" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:10px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
+${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_HINDI.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px;display:block" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
 </tbody></table></div></section>
 
 ${momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations)}
@@ -3847,8 +3847,8 @@ ${appendixSections}</section>
 
 <section class="sec" id="em"><div class="sh"><div class="se">Section 06</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations had <strong style="color:var(--warn)">no coverage in during this report period</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. <strong>Gap signal</strong> = evidence of the absence.</div><div class="sdiv"></div></div>
 <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 14px;cursor:pointer;user-select:none" onclick="toggleEm()">
-<span style="font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber)">${emerging.length} narrative gap${emerging.length !== 1 ? "s" : ""} identified</span>
-<span id="em-icon" style="font-family:monospace;font-size:12px;color:var(--amber)">&#9650; Collapse</span>
+<span style="font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber)">${emerging.length} narrative gap${emerging.length !== 1 ? "s" : ""} identified</span>
+<span id="em-icon" style="font-family:monospace;font-size:17px;color:var(--amber)">&#9650; Collapse</span>
 </div>
 <div id="em-body">${emergingCards}</div></section>
 
