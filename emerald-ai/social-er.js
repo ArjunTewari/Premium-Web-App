@@ -208,7 +208,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     else { _lastRank = idx + 1; unifiedRows[idx].unifiedRank = _lastRank; _lastTotal = total; }
   });
 
-  const summaryTable = `<div style="overflow-x:auto;border:1px solid #252d40;border-radius:8px;margin-bottom:16px;overflow:hidden">
+  const summaryTable = `<div style="overflow:hidden;overflow-x:auto;border:1px solid #252d40;border-radius:8px;margin-bottom:16px">
   <table style="width:100%;border-collapse:collapse;font-size:17px">
     <thead>
       <tr style="background:#181e2e">
