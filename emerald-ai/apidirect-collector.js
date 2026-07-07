@@ -99,12 +99,23 @@ function inDateRange(dateVal, from, to) {
   return true;
 }
 
+// Returns the oldest date found in a batch of posts, given one or more date field names.
+function oldestInBatch(batch, ...fields) {
+  let oldest = null;
+  for (const p of batch) {
+    for (const f of fields) {
+      const d = parseDate(p[f]);
+      if (d && (!oldest || d < oldest)) oldest = d;
+    }
+  }
+  return oldest;
+}
+
 // ── LinkedIn ─────────────────────────────────────────────────────────────────
-// Flow: official channel posts → authorship filter → AQ filter → metrics + ER
-// NOTE: LinkedIn API has no server-side date filter and no reliable pagination.
-// We fetch the most recent page and treat it as "current voice" — not a count
-// within the report date window. The date range constraint does not apply here.
-async function fetchLinkedIn(org, liHandle, apiKey, aqKw, cb) {
+// Smart pagination: fetch pages sequentially, stop as soon as the oldest post
+// on a page predates dateFrom (we've gone far enough back in time).
+// Max 3 pages — LinkedIn search ordering is less stable than a user timeline.
+async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
   const EMPTY = { postCount: 0, totalLikes: 0, totalComments: 0, totalShares: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
   const handle = liHandle ? liHandle.replace(/^@/, '').trim() : null;
   if (!handle) {
@@ -113,30 +124,42 @@ async function fetchLinkedIn(org, liHandle, apiKey, aqKw, cb) {
   }
   const kwClause = aqKw.slice(0, 8).map(k => `"${k}"`).join(' OR ');
   const q = `"${org}" (${kwClause})`;
+  const MAX_PAGES = 3;
   try {
-    const r = await apiFetch('linkedin/posts', { query: q, page: 1, sort_by: 'most_recent' }, apiKey);
-    let posts = r.posts || [];
-    const fetched = posts.length;
+    // Paginate until we've seen a post older than dateFrom or hit MAX_PAGES
+    let allPosts = [];
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const r = await apiFetch('linkedin/posts', { query: q, page, sort_by: 'most_recent' }, apiKey);
+      const batch = r.posts || [];
+      if (!batch.length) break;
+      allPosts = allPosts.concat(batch);
+      const oldest = oldestInBatch(batch, 'date');
+      if (dateRange?.from && oldest && oldest < dateRange.from) break;
+    }
+    const fetched = allPosts.length;
 
     // 1) official channel only — fail closed if no author metadata
     const handleLower = handle.toLowerCase();
     const orgLower = org.toLowerCase();
-    posts = posts.filter(p => {
+    let posts = allPosts.filter(p => {
       const author = (p.author || p.author_name || p.company || '').toLowerCase();
       return author.includes(handleLower) || author.includes(orgLower);
     });
     if (posts.length === 0 && fetched > 0) {
       cb?.(`  [APIdirect/LI] ${org}: no posts with matching author field — ${fetched} dropped`, 'warn');
     }
-    const byOrg = posts.length;
 
-    // 2) AQ relevance
+    // 2) date range
+    posts = posts.filter(p => inDateRange(p.date, dateRange?.from, dateRange?.to));
+    const inRange = posts.length;
+
+    // 3) AQ relevance
     posts = posts.filter(p => isAQ(
       `${p.title || ''} ${p.snippet || ''} ${p.text || ''} ${p.body || ''} ${p.content || ''}`,
       aqKw
     ));
 
-    // 3) metrics + ER
+    // 4) metrics + ER
     const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
     const totalComments = posts.reduce((s, p) => s + (p.comments || 0), 0);
     const totalShares   = posts.reduce((s, p) => s + (p.shares   || 0), 0);
@@ -154,7 +177,7 @@ async function fetchLinkedIn(org, liHandle, apiKey, aqKw, cb) {
         date:     p.date     || '',
       }));
     const erVal = er(totalEngage, 0, posts.length);
-    cb?.(`  [APIdirect/LI] ${org}: ${fetched} fetched → ${byOrg} by org → ${posts.length} AQ posts, ${totalEngage} engagements`, posts.length > 0 ? 'ok' : 'warn');
+    cb?.(`  [APIdirect/LI] ${org}: ${fetched} fetched → ${inRange} in range → ${posts.length} AQ posts, ${totalEngage} engagements`, posts.length > 0 ? 'ok' : 'warn');
     return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers: 0, er: erVal, topPosts };
   } catch (e) {
     cb?.(`  [APIdirect/LI] ${org}: ${e.message}`, 'warn');
@@ -163,36 +186,52 @@ async function fetchLinkedIn(org, liHandle, apiKey, aqKw, cb) {
 }
 
 // ── Twitter / X ───────────────────────────────────────────────────────────────
-// Flow: official timeline → drop retweets → AQ filter → metrics + ER
-// NOTE: Twitter API via APIdirect has no server-side date filter. We fetch the
-// most recent page and treat it as "current voice" — not a count within the
-// report date window.
-async function fetchTwitter(org, twitterHandle, apiKey, aqKw, cb) {
+// Smart pagination: fetch pages sequentially, stop as soon as the oldest tweet
+// on a page predates dateFrom. Max 5 pages (~100 tweets).
+async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
   const EMPTY = { postCount: 0, totalLikes: 0, totalReplies: 0, totalRetweets: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
   if (!twitterHandle) {
     cb?.(`  [APIdirect/X] ${org}: no official handle — skipped`, 'warn');
     return EMPTY;
   }
+  const MAX_PAGES = 5;
   try {
     const handle = twitterHandle.replace(/^@/, '');
-    const [userRes, tweetsRes] = await Promise.allSettled([
+    // Fetch user profile and first page of tweets in parallel
+    const [userRes, firstPageRes] = await Promise.allSettled([
       apiFetch('twitter/user', { username: handle }, apiKey),
       apiFetch('twitter/user/tweets', { username: handle, page: 1 }, apiKey),
     ]);
-    let followers = userRes.status === 'fulfilled' ? (userRes.value?.user?.followers_count || 0) : 0;
-    let tweets = tweetsRes.status === 'fulfilled' ? (tweetsRes.value?.tweets || []) : [];
-    const fetched = tweets.length;
+    const followers = userRes.status === 'fulfilled' ? (userRes.value?.user?.followers_count || 0) : 0;
 
-    // 1) drop retweets — another account's content, not the org's own posts
-    tweets = tweets.filter(t => !(t.text || '').trim().startsWith('RT @') && !t.retweeted_status);
-    const ownTweets = tweets.length;
-    const rtDropped = fetched - ownTweets;
-    if (rtDropped > 0) cb?.(`  [APIdirect/X] ${org}: dropped ${rtDropped} retweet(s)`);
+    // Collect all pages; page 1 already fetched above
+    let allTweets = firstPageRes.status === 'fulfilled' ? (firstPageRes.value?.tweets || []) : [];
+    if (allTweets.length > 0) {
+      const oldest = oldestInBatch(allTweets, 'date', 'created_at');
+      if (!dateRange?.from || !oldest || oldest >= dateRange.from) {
+        for (let page = 2; page <= MAX_PAGES; page++) {
+          const r = await apiFetch('twitter/user/tweets', { username: handle, page }, apiKey);
+          const batch = r.tweets || [];
+          if (!batch.length) break;
+          allTweets = allTweets.concat(batch);
+          const batchOldest = oldestInBatch(batch, 'date', 'created_at');
+          if (dateRange?.from && batchOldest && batchOldest < dateRange.from) break;
+        }
+      }
+    }
+    const fetched = allTweets.length;
 
-    // 2) AQ relevance
+    // 1) drop retweets
+    allTweets = allTweets.filter(t => !(t.text || '').trim().startsWith('RT @') && !t.retweeted_status);
+
+    // 2) date range
+    let tweets = allTweets.filter(t => inDateRange(t.date || t.created_at, dateRange?.from, dateRange?.to));
+    const inRange = tweets.length;
+
+    // 3) AQ relevance
     tweets = tweets.filter(t => isAQ(`${t.title || ''} ${t.snippet || ''} ${t.text || ''}`, aqKw));
 
-    // 3) metrics + ER
+    // 4) metrics + ER
     const totalLikes    = tweets.reduce((s, t) => s + (t.likes    || 0), 0);
     const totalReplies  = tweets.reduce((s, t) => s + (t.replies  || 0), 0);
     const totalRetweets = tweets.reduce((s, t) => s + (t.retweets || 0), 0);
@@ -212,7 +251,7 @@ async function fetchTwitter(org, twitterHandle, apiKey, aqKw, cb) {
         date:     t.date     || '',
       }));
     const erVal = er(totalEngage, followers, tweets.length);
-    cb?.(`  [APIdirect/X] ${org}: ${fetched} fetched → ${ownTweets} own → ${tweets.length} AQ tweets, ${followers.toLocaleString()} followers, ER=${erVal}%`, tweets.length > 0 ? 'ok' : 'warn');
+    cb?.(`  [APIdirect/X] ${org}: ${fetched} fetched → ${inRange} in range → ${tweets.length} AQ tweets, ${followers.toLocaleString()} followers, ER=${erVal}%`, tweets.length > 0 ? 'ok' : 'warn');
     return { postCount: tweets.length, totalLikes, totalReplies, totalRetweets, totalViews, followers, er: erVal, topPosts };
   } catch (e) {
     cb?.(`  [APIdirect/X] ${org}: ${e.message}`, 'warn');
@@ -221,30 +260,45 @@ async function fetchTwitter(org, twitterHandle, apiKey, aqKw, cb) {
 }
 
 // ── Instagram ─────────────────────────────────────────────────────────────────
-// Flow: official channel posts → authorship filter → AQ filter → metrics + ER
-// NOTE: Instagram Graph API has no server-side date filter. We fetch the most
-// recent page and treat it as "current voice" — not a count within the report
-// date window.
-async function fetchInstagram(org, igHandle, apiKey, aqKw, cb) {
+// Smart pagination: fetch pages sequentially, stop as soon as the oldest post
+// on a page predates dateFrom. Max 5 pages (~100 posts).
+async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
   const EMPTY = { postCount: 0, totalLikes: 0, totalComments: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
   if (!igHandle) {
     cb?.(`  [APIdirect/IG] ${org}: no official handle — skipped`, 'warn');
     return EMPTY;
   }
+  const MAX_PAGES = 5;
   try {
     const handle = igHandle.replace(/^@/, '').toLowerCase();
     const kwClause = aqKw.slice(0, 6).map(k => `"${k}"`).join(' OR ');
     const query = `${handle} (${kwClause})`;
-    const [postsRes, userRes] = await Promise.allSettled([
+
+    // Fetch user profile and first page in parallel
+    const [firstPageRes, userRes] = await Promise.allSettled([
       apiFetch('instagram/posts', { query, page: 1 }, apiKey),
       apiFetch('instagram/user', { username: handle }, apiKey),
     ]);
-    let posts = postsRes.status === 'fulfilled' ? (postsRes.value?.posts || []) : [];
-    let followers = (userRes.status === 'fulfilled' && userRes.value) ? (userRes.value?.user?.follower_count || 0) : 0;
-    const fetched = posts.length;
+    const followers = (userRes.status === 'fulfilled' && userRes.value) ? (userRes.value?.user?.follower_count || 0) : 0;
+
+    let allPosts = firstPageRes.status === 'fulfilled' ? (firstPageRes.value?.posts || []) : [];
+    if (allPosts.length > 0) {
+      const oldest = oldestInBatch(allPosts, 'date', 'taken_at');
+      if (!dateRange?.from || !oldest || oldest >= dateRange.from) {
+        for (let page = 2; page <= MAX_PAGES; page++) {
+          const r = await apiFetch('instagram/posts', { query, page }, apiKey);
+          const batch = r.posts || [];
+          if (!batch.length) break;
+          allPosts = allPosts.concat(batch);
+          const batchOldest = oldestInBatch(batch, 'date', 'taken_at');
+          if (dateRange?.from && batchOldest && batchOldest < dateRange.from) break;
+        }
+      }
+    }
+    const fetched = allPosts.length;
 
     // 1) official channel only — fail closed if no author metadata
-    posts = posts.filter(p =>
+    let posts = allPosts.filter(p =>
       (p.author || '').toLowerCase() === handle ||
       (p.username || '').toLowerCase() === handle ||
       (p.author_name || '').toLowerCase() === handle
@@ -252,15 +306,18 @@ async function fetchInstagram(org, igHandle, apiKey, aqKw, cb) {
     if (posts.length === 0 && fetched > 0) {
       cb?.(`  [APIdirect/IG] ${org}: no posts with matching author field — ${fetched} dropped`, 'warn');
     }
-    const byOrg = posts.length;
 
-    // 2) AQ relevance
+    // 2) date range
+    posts = posts.filter(p => inDateRange(p.date || p.taken_at, dateRange?.from, dateRange?.to));
+    const inRange = posts.length;
+
+    // 3) AQ relevance
     posts = posts.filter(p => isAQ(
       `${p.title || ''} ${p.snippet || ''} ${p.caption || ''} ${p.description || ''} ${p.text || ''} ${p.body || ''}`,
       aqKw
     ));
 
-    // 3) metrics + ER
+    // 4) metrics + ER
     const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
     const totalComments = posts.reduce((s, p) => s + (p.comments || 0), 0);
     const totalViews    = posts.reduce((s, p) => s + (p.views    || 0), 0);
@@ -279,7 +336,7 @@ async function fetchInstagram(org, igHandle, apiKey, aqKw, cb) {
         isVideo:  !!p.is_video,
       }));
     const erVal = er(totalEngage, followers, posts.length);
-    cb?.(`  [APIdirect/IG] ${org}: ${fetched} fetched → ${byOrg} by org → ${posts.length} AQ posts, ${followers.toLocaleString()} followers, ER=${erVal}%`, posts.length > 0 ? 'ok' : 'warn');
+    cb?.(`  [APIdirect/IG] ${org}: ${fetched} fetched → ${inRange} in range → ${posts.length} AQ posts, ${followers.toLocaleString()} followers, ER=${erVal}%`, posts.length > 0 ? 'ok' : 'warn');
     return { postCount: posts.length, totalLikes, totalComments, totalViews, followers, er: erVal, topPosts };
   } catch (e) {
     cb?.(`  [APIdirect/IG] ${org}: ${e.message}`, 'warn');
@@ -336,8 +393,9 @@ async function run(cfg, selectedOrgs, orgHandles = {}, cb) {
     }));
   }
 
+  const dateRange = { from: parseDate(cfg.DATE_FROM), to: parseDate(cfg.DATE_TO) };
+  cb?.(`  APIdirect date window: ${dateRange.from ? dateRange.from.toISOString().slice(0,10) : '—'} → ${dateRange.to ? dateRange.to.toISOString().slice(0,10) : '—'} (smart pagination — stops when oldest post predates window start)`);
   cb?.(`  APIdirect social collection: ${selectedOrgs.length} orgs (LI + X + IG + YT channel)…`);
-  cb?.(`  Note: social APIs have no server-side date filter — counts reflect most recent fetched posts`, 'warn');
 
   // Merge base AQ keywords with user-supplied scope keywords so all filters
   // and API queries cover the full configured topic scope.
@@ -352,9 +410,9 @@ async function run(cfg, selectedOrgs, orgHandles = {}, cb) {
     const batchResults = await Promise.allSettled(batch.map(async org => {
       const handles = orgHandles[org] || {};
       const [li, tw, ig, yt] = await Promise.allSettled([
-        fetchLinkedIn(org, handles.linkedin || null, apiKey, aqKw, cb),
-        fetchTwitter(org, handles.twitter || null, apiKey, aqKw, cb),
-        fetchInstagram(org, handles.instagram || null, apiKey, aqKw, cb),
+        fetchLinkedIn(org, handles.linkedin || null, apiKey, dateRange, aqKw, cb),
+        fetchTwitter(org, handles.twitter || null, apiKey, dateRange, aqKw, cb),
+        fetchInstagram(org, handles.instagram || null, apiKey, dateRange, aqKw, cb),
         fetchYouTubeChannel(org, handles.youtube || null, apiKey, cb),
       ]);
       return {
