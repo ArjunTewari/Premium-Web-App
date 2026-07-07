@@ -27,7 +27,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+const server = app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
@@ -35,3 +35,12 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 });
+
+// Node 18+ defaults: requestTimeout=300000ms, headersTimeout=60000ms.
+// Report generation for large org sets (13+ orgs) takes longer than 5 min —
+// the request was being killed at exactly the 300s mark. Set both to 0
+// (no timeout) since the SSE pipeline route already manages its own
+// per-request and per-socket timeouts.
+server.requestTimeout = 0;
+server.headersTimeout = 0;
+server.timeout = 0;
