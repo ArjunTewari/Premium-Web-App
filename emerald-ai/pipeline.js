@@ -1314,25 +1314,43 @@ ${batchText}`;
   }
   await sleep(300);
 
-  const actionTimeoutMs = Math.min(420000, 60000 + ORGS.length * 12000);
+  // Per-org action matrix — one Claude call per org so no single request can
+  // time out or produce malformed JSON for the whole batch.
   try {
-    cb("  Action matrix...");
-    const r = await Promise.race([
-      callClaude(
-        `Generate 4 actions for EACH of these orgs: ${ORGS.join(", ")} — based on Indian AQ media + AEO + social media intelligence.\n${orgSummary}\nWhite-space gap topics (AQ media conversations tracked orgs are absent from): ${emerging.map((e) => e.topic).join(",") || "none"}\nReturn ONLY JSON array of ${ORGS.length * 4} objects: [{"org":"orgname","priority":"Fix Now|Leverage|Optimise|Invest","area":"Media|Topics|Narrative|AEO|Social","action":"...","rationale":"1-2 sentences with specific data"}]`,
-        cfg.CLAUDE_KEY,
-        Math.min(16000, 2000 + ORGS.length * 800),
-        CLAUDE_CLASSIFY_MODEL,
-      ),
-      new Promise((_, rej) =>
-        setTimeout(
-          () => rej(new Error(`Action matrix timed out after ${Math.round(actionTimeoutMs/1000)}s`)),
-          actionTimeoutMs,
-        ),
-      ),
-    ]);
-    actions = parseJ(r) || [];
-    cb(`  ${actions.length} actions`, actions.length > 0 ? "ok" : "err");
+    cb("  Action matrix (per-org batches)...");
+    const gapTopics = emerging.map((e) => e.topic).join(", ") || "none";
+    const PER_ORG_TIMEOUT = 90000; // 90s per org is generous
+    const orgLines = Object.fromEntries(
+      orgSummary.split("\n").map((line) => [line.split(":")[0].trim(), line]),
+    );
+
+    for (const org of ORGS) {
+      const line = orgLines[org] || `${org}: no data`;
+      try {
+        const r = await Promise.race([
+          callClaude(
+            `Generate exactly 4 strategic actions for "${org}" based on Indian AQ media, AEO, and social media data.\n\nORG DATA:\n${line}\n\nWhite-space gap topics (AQ conversations this org is absent from): ${gapTopics}\n\nRules:\n- Each action must be specific to the data above, not generic.\n- priority must be one of: Fix Now, Leverage, Optimise, Invest\n- area must be one of: Media, Topics, Narrative, AEO, Social\n- rationale: 1-2 sentences citing the specific numbers above\n\nReturn ONLY a JSON array of exactly 4 objects:\n[{"org":"${org}","priority":"...","area":"...","action":"...","rationale":"..."}]`,
+            cfg.CLAUDE_KEY,
+            600, // 4 actions × ~150 tokens each
+            CLAUDE_CLASSIFY_MODEL,
+          ),
+          new Promise((_, rej) =>
+            setTimeout(() => rej(new Error(`timeout`)), PER_ORG_TIMEOUT),
+          ),
+        ]);
+        const parsed = parseJ(r) || [];
+        if (parsed.length) {
+          actions.push(...parsed);
+          cb(`    ${org}: ${parsed.length} actions`, "ok");
+        } else {
+          cb(`    ${org}: empty response`, "warn");
+        }
+      } catch (e) {
+        cb(`    ${org}: failed (${e.message})`, "warn");
+      }
+      await sleep(200); // brief pause between orgs to avoid rate-limit bursts
+    }
+    cb(`  Action matrix: ${actions.length} actions total`, actions.length > 0 ? "ok" : "err");
   } catch (e) {
     cb(`  actions err: ${e.message}`, "err");
   }
