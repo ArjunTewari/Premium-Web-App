@@ -38,21 +38,82 @@ function isAQ(text, aqKw) {
   return (aqKw || AQ_KW_BASE).some(k => t.includes(k));
 }
 
+// ── Adaptive per-endpoint concurrency gate ──────────────────────────────────
+// APIdirect caps each endpoint at 3 concurrent requests. We start at 2 for
+// headroom and ADAPT DOWN to 1 (serial) the instant an endpoint returns 429,
+// so the agent backs off on its own instead of repeatedly slamming the limit.
+// Each endpoint throttles independently; gating at this single choke point
+// means every caller — fetchers, pagination loops, sentinel retries — inherits
+// the throttle automatically.
+const START_CONCURRENCY = 2;
+const MIN_CONCURRENCY = 1;
+const RATE_RETRY_DELAYS = [1500, 4000, 8000]; // backoff on 429 before giving up
+const endpointGates = new Map(); // endpoint -> { active, limit, queue }
+
+let _log = null;
+function setLogger(cb) { _log = cb; }
+
+function gateFor(endpoint) {
+  let g = endpointGates.get(endpoint);
+  if (!g) { g = { active: 0, limit: START_CONCURRENCY, queue: [] }; endpointGates.set(endpoint, g); }
+  return g;
+}
+// Reset adaptive limits at the start of each run so a new report begins with
+// full headroom (runs are sequential, so gates are idle between them).
+function resetGates() {
+  for (const g of endpointGates.values()) { g.limit = START_CONCURRENCY; }
+}
+function acquireGate(endpoint) {
+  const g = gateFor(endpoint);
+  if (g.active < g.limit) { g.active++; return Promise.resolve(); }
+  return new Promise(res => g.queue.push(res));
+}
+function releaseGate(endpoint) {
+  const g = gateFor(endpoint);
+  g.active--;
+  // Wake as many waiters as the (possibly reduced) limit now allows.
+  while (g.active < g.limit && g.queue.length) { g.active++; g.queue.shift()(); }
+}
+// Agent-visible adaptation: a 429 means we're over the endpoint's ceiling, so
+// permanently lower this endpoint's concurrency for the rest of the run.
+function throttleDown(endpoint) {
+  const g = gateFor(endpoint);
+  if (g.limit > MIN_CONCURRENCY) {
+    g.limit -= 1;
+    _log?.(`  [APIdirect] concurrency limit hit on /${endpoint} → throttling to ${g.limit} concurrent for rest of run`, 'warn');
+  }
+}
+
 async function apiFetch(endpoint, params, apiKey) {
   const url = `${BASE}/${endpoint}`;
+  await acquireGate(endpoint);
   try {
-    const { data } = await axios.get(url, {
-      params,
-      headers: { 'X-API-Key': apiKey },
-      timeout: 18000,
-    });
-    return data;
-  } catch (e) {
-    const msg = e.response?.data?.error || e.message;
-    const err = new Error(`APIdirect /${endpoint}: ${msg}`);
-    err.status = e.response?.status;
-    err.code = require('./sentinel').classifyError({ status: err.status, message: msg });
-    throw err;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const { data } = await axios.get(url, {
+          params,
+          headers: { 'X-API-Key': apiKey },
+          timeout: 18000,
+        });
+        return data;
+      } catch (e) {
+        const status = e.response?.status;
+        const msg = e.response?.data?.error || e.message;
+        if (status === 429) {
+          throttleDown(endpoint); // adapt globally, not just retry this one call
+          if (attempt < RATE_RETRY_DELAYS.length) {
+            await new Promise(r => setTimeout(r, RATE_RETRY_DELAYS[attempt]));
+            continue;
+          }
+        }
+        const err = new Error(`APIdirect /${endpoint}: ${msg}`);
+        err.status = status;
+        err.code = require('./sentinel').classifyError({ status, message: msg });
+        throw err;
+      }
+    }
+  } finally {
+    releaseGate(endpoint);
   }
 }
 
@@ -405,6 +466,8 @@ async function fetchYouTubeChannel(org, ytHandle, apiKey, cb) {
  */
 async function run(cfg, selectedOrgs, orgHandles = {}, cb) {
   const apiKey = cfg.APIDIRECT_KEY;
+  setLogger(cb);   // route adaptive-throttle notices into the run transcript
+  resetGates();    // fresh concurrency headroom for this run
   if (!apiKey) {
     cb?.('  [APIdirect] No APIDIRECT_KEY — social collection skipped', 'warn');
     return selectedOrgs.map(org => ({
