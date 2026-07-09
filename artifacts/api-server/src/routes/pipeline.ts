@@ -1,10 +1,11 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import path from "node:path";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import { createRequire } from "node:module";
 import { db, reportLogsTable } from "@workspace/db";
 import { calculateReportCosts } from "../lib/auth.js";
-import { requireAuth, requireAdmin } from "../middleware/require-auth.js";
+import { requireAuth } from "../middleware/require-auth.js";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 
 const ALERT_TO = "+918588098882";
@@ -52,6 +53,34 @@ const router: IRouter = Router();
 const OUT_DIR = path.join(process.cwd(), "outputs");
 if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
 
+// ── In-memory run result store ────────────────────────────────────────────────
+// Survives the SSE connection being killed by the 5-min proxy timeout.
+// The pipeline keeps running after the client disconnects; when it finishes
+// it writes the result here so the frontend can poll and retrieve it.
+type RunStatus =
+  | { status: "running" }
+  | { status: "done"; htmlName: string; costInr: number }
+  | { status: "error"; msg: string };
+
+const runStore = new Map<string, RunStatus>();
+
+// Evict entries older than 2 hours to prevent unbounded memory growth.
+setInterval(() => {
+  const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+  for (const [id] of runStore) {
+    const ts = parseInt(id.split("-")[0] ?? "0", 16);
+    if (ts < cutoff / 1000) runStore.delete(id);
+  }
+}, 30 * 60 * 1000);
+
+// ── GET /run/status/:runId — poll for result after SSE drop ──────────────────
+router.get("/run/status/:runId", requireAuth, (req: Request, res: Response) => {
+  const entry = runStore.get(req.params.runId);
+  if (!entry) return res.status(404).json({ status: "not_found" });
+  res.json(entry);
+});
+
+// ── POST /run ─────────────────────────────────────────────────────────────────
 router.post("/run", requireAuth, async (req: Request, res: Response) => {
   const body = req.body || {};
 
@@ -73,17 +102,13 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     TWITTER_KEY: process.env.TWITTER_KEY || "",
     APIDIRECT_KEY: process.env.APIDIRECT_KEY || "",
     ORG_YT_HANDLES: (body.orgYtHandles && typeof body.orgYtHandles === "object" && !Array.isArray(body.orgYtHandles))
-      ? body.orgYtHandles
-      : {},
+      ? body.orgYtHandles : {},
     ORG_TW_HANDLES: (body.orgTwHandles && typeof body.orgTwHandles === "object" && !Array.isArray(body.orgTwHandles))
-      ? body.orgTwHandles
-      : {},
+      ? body.orgTwHandles : {},
     ORG_IG_HANDLES: (body.orgIgHandles && typeof body.orgIgHandles === "object" && !Array.isArray(body.orgIgHandles))
-      ? body.orgIgHandles
-      : {},
+      ? body.orgIgHandles : {},
     ORG_LI_HANDLES: (body.orgLiHandles && typeof body.orgLiHandles === "object" && !Array.isArray(body.orgLiHandles))
-      ? body.orgLiHandles
-      : {},
+      ? body.orgLiHandles : {},
     outDir: OUT_DIR,
   };
 
@@ -95,6 +120,11 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   if (!cfg.CLAUDE_KEY)
     return res.status(400).json({ error: "Claude API key is required." });
 
+  // Generate a stable run ID: hex-encoded seconds + random suffix.
+  // The seconds prefix is used by the eviction timer above.
+  const runId = Math.floor(Date.now() / 1000).toString(16) + "-" + crypto.randomBytes(8).toString("hex");
+  runStore.set(runId, { status: "running" });
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -102,12 +132,6 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   req.setTimeout(0);
   req.socket?.setTimeout(0);
 
-  // Prevent an unhandled 'error' event on the response/request sockets from
-  // crashing the whole Node process (this happens if the client disconnects
-  // or an intermediate proxy closes an idle connection while the pipeline is
-  // still writing to it). Without these listeners, one dropped client during
-  // a long-running report kills the server for every other in-flight/future
-  // request — which looked like the report "getting stuck" after a few orgs.
   let clientDisconnected = false;
   res.on("error", () => { clientDisconnected = true; });
   req.on("error", () => { clientDisconnected = true; });
@@ -122,9 +146,11 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     }
   };
 
-  // Heartbeat comment every 15s so intermediate proxies don't treat long
-  // silent stretches (e.g. Claude/Serper batches with no cb() calls) as an
-  // idle connection and terminate it mid-report.
+  // Send runId immediately so the frontend can start polling if the SSE
+  // connection gets killed by the 5-min infrastructure proxy timeout.
+  send("runId", { runId });
+
+  // Heartbeat every 15s to keep intermediate proxies from dropping idle connections.
   const heartbeat = setInterval(() => {
     if (clientDisconnected || res.writableEnded) { clearInterval(heartbeat); return; }
     try { res.write(`: ping\n\n`); } catch { clientDisconnected = true; }
@@ -137,13 +163,16 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
 
   try {
     const pipelinePath = path.resolve(__dirname, "../../../emerald-ai/pipeline.js");
-    // Bust require cache so pipeline changes are picked up without server restart
     delete require.cache[require.resolve(pipelinePath)];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { run } = require(pipelinePath) as any;
     const result = await run(cfg, cb);
     const costs = calculateReportCosts(cfg.ORGS, cfg.DATE_FROM, cfg.DATE_TO);
-    send("done", { htmlName: result.htmlName, costInr: costs.costInr });
+
+    // Always persist result — the client may already be disconnected.
+    runStore.set(runId, { status: "done", htmlName: result.htmlName, costInr: costs.costInr });
+
+    send("done", { runId, htmlName: result.htmlName, costInr: costs.costInr });
     sendReportSms(costs.costInr, cfg.ORGS, result.htmlName ?? "").catch(() => {});
     db.insert(reportLogsTable).values({
       organizations: cfg.ORGS,
@@ -151,7 +180,6 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
       dateTo: cfg.DATE_TO,
       htmlName: result.htmlName ?? null,
       clientName: cfg.CLIENT_NAME,
-      generatedBy: req.user?.username ?? null,
       costInr: costs.costInr.toFixed(2),
       costSerperInr: costs.costSerperInr.toFixed(2),
       costLlmAeoInr: costs.costLlmAeoInr.toFixed(2),
@@ -161,7 +189,9 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
       costDeploymentInr: costs.costDeploymentInr.toFixed(2),
     }).catch((e: unknown) => console.error("Failed to log report:", e));
   } catch (e: unknown) {
-    send("error", { msg: (e as Error).message });
+    const msg = (e as Error).message;
+    runStore.set(runId, { status: "error", msg });
+    send("error", { msg });
     console.error("Pipeline error:", e);
   } finally {
     clearInterval(heartbeat);

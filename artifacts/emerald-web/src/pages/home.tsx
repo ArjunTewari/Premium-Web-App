@@ -496,6 +496,11 @@ export default function Home() {
     const TOTAL_STEPS = 60;
     let stepCount = 0;
 
+    // Track runId sent by the server so we can poll for the result if the
+    // 5-min infrastructure proxy timeout kills the SSE connection mid-run.
+    let runId: string | null = null;
+    let gotDone = false;
+
     try {
       const res = await fetch("/api/run", {
         method: "POST",
@@ -517,7 +522,7 @@ export default function Home() {
         const parts = buf.split("\n\n");
         buf = parts.pop() || "";
         for (const block of parts) {
-          if (!block.trim()) continue;
+          if (!block.trim() || block.startsWith(":")) continue; // skip heartbeat pings
           const lines = block.split("\n");
           let event = "message"; let data = "";
           for (const line of lines) {
@@ -525,10 +530,12 @@ export default function Home() {
             if (line.startsWith("data:")) data = line.slice(5).trim();
           }
           if (!data) continue;
-          let parsed: { msg?: string; level?: string; htmlName?: string; costInr?: number };
+          let parsed: { msg?: string; level?: string; htmlName?: string; costInr?: number; runId?: string };
           try { parsed = JSON.parse(data); } catch { continue; }
 
-          if (event === "log") {
+          if (event === "runId") {
+            runId = parsed.runId ?? null;
+          } else if (event === "log") {
             const level = (parsed.level || "") as LogLevel;
             setLogs((prev) => [...prev, { msg: parsed.msg || "", level }]);
             stepCount = Math.min(stepCount + 1, TOTAL_STEPS - 1);
@@ -544,17 +551,49 @@ export default function Home() {
               }
             }
           } else if (event === "done") {
+            gotDone = true;
             setProgress(100);
             setResult({ htmlName: parsed.htmlName!, costInr: parsed.costInr });
             await loadPrev();
           } else if (event === "error") {
+            gotDone = true; // error counts as terminal — don't poll
             setLogs((prev) => [...prev, { msg: "✗ Fatal error: " + parsed.msg, level: "err" }]);
           }
         }
       }
     } catch (e: unknown) {
-      setLogs((prev) => [...prev, { msg: "✗ Connection error: " + (e as Error).message, level: "err" }]);
+      setLogs((prev) => [...prev, { msg: "✗ Connection dropped: " + (e as Error).message, level: "warn" }]);
     }
+
+    // If the SSE stream closed without a `done` event (proxy timeout kills the
+    // connection at ~5 min) but we have a runId, poll the status endpoint until
+    // the pipeline finishes on the server — up to 15 minutes total.
+    if (!gotDone && runId) {
+      setLogs((prev) => [...prev, { msg: "⏳ Stream closed — pipeline still running. Checking for result every 15s (up to 15 min)…", level: "warn" }]);
+      setProgress(95);
+      const MAX_POLLS = 60; // 60 × 15s = 15 minutes
+      for (let i = 0; i < MAX_POLLS; i++) {
+        await new Promise(r => setTimeout(r, 15000));
+        try {
+          const sr = await fetch(`/api/run/status/${runId}`, { credentials: "include" });
+          if (!sr.ok) continue;
+          const s = await sr.json() as { status: string; htmlName?: string; costInr?: number; msg?: string };
+          if (s.status === "done" && s.htmlName) {
+            setProgress(100);
+            setResult({ htmlName: s.htmlName, costInr: s.costInr });
+            await loadPrev();
+            setLogs((prev) => [...prev, { msg: `✓ Report recovered — ${s.htmlName}`, level: "ok" }]);
+            break;
+          } else if (s.status === "error") {
+            setLogs((prev) => [...prev, { msg: `✗ Pipeline error: ${s.msg}`, level: "err" }]);
+            break;
+          } else {
+            setLogs((prev) => [...prev, { msg: `  Still running… (check ${i + 1}/${MAX_POLLS})`, level: "warn" }]);
+          }
+        } catch { /* network blip — retry */ }
+      }
+    }
+
     setRunning(false);
   }
 
