@@ -367,7 +367,7 @@ async function callClaude(prompt, key, maxTokens = 2500, model = CLAUDE_MODEL) {
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
       },
-      timeout: 360000,
+      timeout: 600000,
     },
   );
   const usage = res.data.usage;
