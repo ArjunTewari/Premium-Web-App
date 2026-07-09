@@ -3043,20 +3043,20 @@ function momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations = []) 
     }).join("");
     return `<tr>
         <td style="padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1"><span style="font-family:monospace;font-size:16px;font-weight:700;color:#${orgColors[i]}">${esc(o)}</span></td>
-        ${cells}
         <td style="padding:6px 12px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:17px;font-weight:700;color:#${orgColors[i]}">${totalPerOrg[i]}</td>
+        ${cells}
       </tr>`;
   }).join("");
 
   const hmTable = `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:17px"><thead><tr style="background:var(--surface2)">
       <th style="padding:8px 12px;text-align:left;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Organisation</th>
-      ${wkHeaders}
       <th style="padding:6px 10px;text-align:center;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border);white-space:nowrap">Total</th>
+      ${wkHeaders}
     </tr></thead><tbody>
       <tr style="background:var(--surface2)">
         <td style="padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1"><span style="font-family:monospace;font-size:16px;font-weight:700;color:#${PRESS_COLOR}">Press (all orgs)</span></td>
-        ${pressRowCells}
         <td style="padding:6px 12px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:17px;font-weight:700;color:#${PRESS_COLOR}">${pressTotal}</td>
+        ${pressRowCells}
       </tr>
       ${orgRows}
     </tbody></table></div></div>`;
