@@ -63,6 +63,15 @@ async function run(cfg, selectedOrgs, cb) {
     return [];
   }
 
+  // SENTINEL: validate every org × platform result, diagnose zeros, retry
+  // transient failures, and log the data-health verdict for this run.
+  try {
+    const Sentinel = require('./sentinel');
+    rawResults = await Sentinel.socialSentinel(rawResults, { cfg, orgHandles, cb });
+  } catch (e) {
+    cb?.(`  Sentinel error (non-fatal): ${e.message}`, 'warn');
+  }
+
   // Map APIdirect results → pipeline.js-compatible format
   const orgResults = rawResults.map((d, idx) => {
     const liCount = d.li.postCount;
@@ -146,6 +155,28 @@ function topPostsHtml(posts, color, fields) {
 
 function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   if (!erResults?.length) return '';
+
+  // ── Sentinel data-health: collect per-platform fetch failures ─────────────
+  const fetchFailures = [];
+  for (const r of erResults) {
+    for (const [pName, pd] of [['LinkedIn', r.liData], ['X/Twitter', r.twData], ['Instagram', r.igData]]) {
+      if (pd?.failed) fetchFailures.push({ org: r.org, platform: pName, reason: pd.failReason || 'unknown' });
+    }
+  }
+  const healthBanner = fetchFailures.length
+    ? `<div style="background:rgba(224,92,92,.08);border:1px solid rgba(224,92,92,.35);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:16px;color:#e05c5c;line-height:1.7">
+        <strong>&#9888; DATA COLLECTION INCOMPLETE</strong> — ${fetchFailures.length} platform fetch(es) failed (${[...new Set(fetchFailures.map(f => f.reason))].join(', ')}).
+        Affected cells show <strong>✕</strong> and are excluded from totals — they are <strong>not</strong> zeros.
+        <span style="color:#c9922a">${[...new Set(fetchFailures.map(f => f.platform))].map(p => `${p}: ${fetchFailures.filter(f => f.platform === p).length} org(s)`).join(' · ')}</span>
+      </div>`
+    : '';
+
+  // Post-count cell: failure ≠ zero ≠ no handle — each renders distinctly.
+  const postCell = (count, pd, color) => {
+    if (pd?.failed) return `<span style="color:#e05c5c;cursor:help" title="API request failed (${escHtml(pd.failReason || 'unknown')}) — data unavailable, not zero">✕</span>`;
+    if (pd?.noHandle) return `<span style="color:#3d4a63;cursor:help" title="No handle configured for this platform">–</span>`;
+    return `<span style="color:${color}">${count || 0}</span>`;
+  };
 
   const orgsWithPresence = erResults.filter(r => r.totalPosts > 0).length;
   const totalLi = erResults.reduce((s, r) => s + (r.linkedinPosts || 0), 0);
@@ -266,11 +297,11 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         return `<tr style="border-top:1px solid #252d40">
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#8fa3b8">#${unifiedRank}</td>
           <td style="padding:8px 12px"><span style="font-family:monospace;font-size:18px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4a7fd4">${r.linkedinPosts || 0}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4a9fd4">${r.twitterPosts || 0}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.linkedinPosts, r.liData, '#4a7fd4')}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.twitterPosts, r.twData, '#4a9fd4')}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${twER}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${twFlwCell}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#e05c9c">${r.instagramPosts || 0}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.instagramPosts, r.igData, '#e05c9c')}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${igER}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${igFlwCell}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#e53935">${yt.videoCount || 0}</td>
@@ -408,6 +439,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
 <!-- SOCIAL PRESENCE SECTION -->
 <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">${statCards}</div>
 ${sourceBanner}
+${healthBanner}
 ${ytKeyNotice}
 ${summaryTable}
 ${orgDetails.join('')}`;

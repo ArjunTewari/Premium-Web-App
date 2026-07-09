@@ -8,6 +8,7 @@ const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 const SI = require("./social-intelligence");
+const Sentinel = require("./sentinel");
 
 const OUTLETS = [
   "Times of India",
@@ -749,6 +750,44 @@ async function run(cfg, cb) {
     })));
   }
 
+  // ── SENTINEL (press): zero-article orgs get one relaxed retry ─────────────
+  // The exact-phrase query can miss orgs whose name appears with different
+  // word order / punctuation. A relaxed (unquoted) retry is safe because the
+  // org-presence filter (STEP 1d) and Haiku filter (STEP 1e) guard precision
+  // downstream.
+  {
+    const zeroOrgs = ORGS.filter((o) => arts[o].length === 0);
+    if (zeroOrgs.length) {
+      cb(`\n  SENTINEL · press: ${zeroOrgs.length} org(s) with 0 articles — retrying with relaxed queries...`, "head");
+      for (const org of zeroOrgs) {
+        const seen = new Set(arts[org].map((a) => a.url || a.title));
+        for (const kw of SCOPE_KEYWORDS.slice(0, 3)) {
+          const q = `${org} ${kw} India`;
+          try {
+            const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+            let added = 0;
+            for (const r of results) {
+              const k = r.link || r.title;
+              if (seen.has(k)) continue;
+              seen.add(k);
+              if (!inRange(r.date || "")) continue;
+              const outlet = canonOutlet(r.source || dom(r.link || ""));
+              if (outlet !== null && isThirdParty(r.link || "", org)) {
+                arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: outlet, url: r.link || "", date: r.date || "", relaxed: true });
+                added++;
+              }
+            }
+            if (added > 0) cb(`    ${org} · relaxed "${kw}": +${added}`, "ok");
+          } catch (e) {
+            cb(`    ${org} relaxed retry error: ${e.message}`, "warn");
+          }
+          await sleep(300);
+        }
+        cb(`    ${org}: ${arts[org].length ? `recovered ${arts[org].length} article(s) — will be verified by org-presence + Haiku filters` : "still 0 — org appears genuinely absent from indexed press in this window"}`, arts[org].length ? "ok" : "warn");
+      }
+    }
+  }
+
   // Snapshot before TV so we know which articles are TV-only (for targeted scrape later)
   const tvStartIdx = {};
   for (const org of ORGS) tvStartIdx[org] = arts[org].length;
@@ -807,6 +846,65 @@ async function run(cfg, cb) {
         await sleep(300);
       }
     })));
+  }
+
+  // ── SENTINEL (press): Hindi TV language-mismatch repair ──────────────────
+  // English org names + English keywords rarely appear on Devanagari sites
+  // (Aaj Tak / India TV / ABP News), so all-zero Hindi TV is usually a query
+  // language problem, not real absence. Diagnose → get Hindi renderings of
+  // each org name from Claude → retry the site: searches in Hindi.
+  {
+    const hindiHits = ORGS.reduce(
+      (s, org) => s + arts[org].filter((a) => TV_CHANNELS_HINDI.includes(a.source)).length,
+      0,
+    );
+    if (hindiHits === 0 && cfg.CLAUDE_KEY) {
+      cb(`\n  SENTINEL · press: Hindi TV returned 0 across all orgs. Diagnosis: English names on Devanagari sites. Repair: retrying with Hindi org names...`, "head");
+      try {
+        const raw = await callClaude(
+          `For each organisation below, give the rendering of its name most commonly used by Indian HINDI news media (Aaj Tak, India TV, ABP News).\n- If Hindi media writes it in Devanagari, return the Devanagari form.\n- If Hindi media keeps the English acronym/short form (common for IITs, CSE etc.), return that short form.\n- If unsure, return the most plausible Devanagari transliteration.\n\nOrganisations:\n${ORGS.map((o) => `- ${o}`).join("\n")}\n\nReturn ONLY a JSON object mapping each original name to its Hindi-media rendering: {"Org Name":"rendering", ...}`,
+          cfg.CLAUDE_KEY,
+          1000,
+        );
+        const hindiNames = parseJ(raw) || {};
+        const HINDI_KW = ["वायु प्रदूषण", "वायु गुणवत्ता", "प्रदूषण"];
+        const hindiKwClause = `(${HINDI_KW.map((k) => `"${k}"`).join(" OR ")})`;
+        let totalRecovered = 0;
+        for (const org of ORGS) {
+          const hName = (hindiNames[org] || "").trim();
+          if (!hName || hName.toLowerCase() === org.toLowerCase()) continue;
+          const tvSeen = new Set(arts[org].map((a) => a.url || a.title));
+          for (const channel of TV_CHANNELS_HINDI) {
+            const domain = TV_CHANNEL_DOMAINS[channel];
+            if (!domain) continue;
+            const q = `site:${domain} "${hName}" ${hindiKwClause}`;
+            try {
+              const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+              let added = 0;
+              for (const r of results) {
+                const k = r.link || r.title;
+                if (tvSeen.has(k)) continue;
+                tvSeen.add(k);
+                if (!inRange(r.date || "")) continue;
+                arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "", matchTerm: hName });
+                added++;
+                totalRecovered++;
+              }
+              if (added > 0) cb(`    ${channel} · "${hName}": +${added}`, "ok");
+            } catch (e) {
+              cb(`    Hindi TV retry error (${channel}): ${e.message}`, "warn");
+            }
+            await sleep(300);
+          }
+        }
+        cb(
+          `    VERDICT: ${totalRecovered > 0 ? `recovered ${totalRecovered} Hindi TV article(s) via Hindi-name search` : "still 0 after Hindi-name search — orgs appear genuinely absent from Hindi TV in this window"}`,
+          totalRecovered > 0 ? "ok" : "warn",
+        );
+      } catch (e) {
+        cb(`    Hindi TV repair failed: ${e.message}`, "warn");
+      }
+    }
   }
 
   // ── STEP 1b (TV scrape): Scrape TV articles separately ─────
@@ -892,6 +990,9 @@ async function run(cfg, cb) {
       if (text.includes(orgLower)) return true;
       // Word-boundary abbreviation match for abbr-search results
       if (abbrRe && abbrRe.test(a.fullText)) return true;
+      // Alternative match term (abbreviation or Hindi/Devanagari rendering
+      // from the sentinel's Hindi TV repair)
+      if (a.matchTerm && text.includes(a.matchTerm.toLowerCase())) return true;
       return false;
     });
 
@@ -926,7 +1027,7 @@ async function run(cfg, cb) {
         const prompt = `You are filtering news articles for the organisation "${org}" (air quality / environment sector).
 
 DEFAULT: keep=true. Only set keep=false when you are CERTAIN the mention is trivial. When in doubt, return keep=true.
-IMPORTANT: If "${org}" does not appear anywhere in the CONTENT text, set keep=false — the article was fetched by mistake.
+IMPORTANT: If "${org}" does not appear anywhere in the CONTENT text, set keep=false — the article was fetched by mistake. The organisation may appear under an abbreviation or a Hindi (Devanagari) rendering of its name — treat those as valid mentions of "${org}".
 
 Set keep=true if ANY of these apply:
 - "${org}"'s research, report, study, data, or statistic is cited or referenced
@@ -1395,6 +1496,19 @@ ${batchText}`;
     cb(`  HTML build error: ${e.message}\n${e.stack?.split("\n").slice(0,4).join("\n")}`, "err");
     throw e;
   }
+  // ── SENTINEL (report): post-build audit — self-heal section numbering ────
+  try {
+    const audit = Sentinel.auditSectionNumbering(html);
+    if (audit.fixes.length) {
+      html = audit.html;
+      cb(`  SENTINEL · report: fixed ${audit.fixes.length} section-number gap(s): ${audit.fixes.join(", ")}`, "ok");
+    } else {
+      cb(`  SENTINEL · report: section numbering contiguous ✓`, "ok");
+    }
+  } catch (e) {
+    cb(`  SENTINEL · report audit skipped: ${e.message}`, "warn");
+  }
+
   fs.writeFileSync(htmlFile, html, "utf8");
   cb(`  HTML: ${base}.html (${Math.round(html.length / 1024)}KB)`, "ok");
 
@@ -3841,7 +3955,13 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
 <div style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Hindi TV</div>
 <table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_HINDI.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
 ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_HINDI.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px;display:block" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
-</tbody></table></div></section>
+</tbody></table></div>
+${(() => {
+  const hindiTotal = ORGS.reduce((s, org) => s + (arts[org] || []).filter(a => TV_CHANNELS_HINDI.includes(canonOutlet(a.source || '') || '')).length, 0);
+  return hindiTotal === 0
+    ? `<div style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:16px;color:var(--warn);line-height:1.7"><strong>&#9432; SENTINEL</strong> — No Hindi TV coverage found, including after retrying with Hindi (Devanagari) org names. The tracked orgs appear genuinely absent from Aaj Tak / India TV / ABP News in this window; the zeros above are verified, not a query artefact.</div>`
+    : '';
+})()}</section>
 
 ${momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations)}
 

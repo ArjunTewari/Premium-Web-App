@@ -49,8 +49,22 @@ async function apiFetch(endpoint, params, apiKey) {
     return data;
   } catch (e) {
     const msg = e.response?.data?.error || e.message;
-    throw new Error(`APIdirect /${endpoint}: ${msg}`);
+    const err = new Error(`APIdirect /${endpoint}: ${msg}`);
+    err.status = e.response?.status;
+    err.code = require('./sentinel').classifyError({ status: err.status, message: msg });
+    throw err;
   }
+}
+
+// Failure result — same metric shape as EMPTY but carries the failure so the
+// report can render "unavailable" instead of a confident zero.
+function failResult(EMPTY, e) {
+  return {
+    ...EMPTY,
+    failed: true,
+    failReason: e.code || require('./sentinel').classifyError(e),
+    failMessage: e.message,
+  };
 }
 
 // Per-post averaged Engagement Rate:
@@ -120,7 +134,7 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
   const handle = liHandle ? liHandle.replace(/^@/, '').trim() : null;
   if (!handle) {
     cb?.(`  [APIdirect/LI] ${org}: no official handle — skipped`, 'warn');
-    return EMPTY;
+    return { ...EMPTY, noHandle: true };
   }
   const kwClause = aqKw.slice(0, 8).map(k => `"${k}"`).join(' OR ');
   const q = `"${org}" (${kwClause})`;
@@ -145,6 +159,7 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
       const author = (p.author || p.author_name || p.company || '').toLowerCase();
       return author.includes(handleLower) || author.includes(orgLower);
     });
+    const afterAuthor = posts.length;
     if (posts.length === 0 && fetched > 0) {
       cb?.(`  [APIdirect/LI] ${org}: no posts with matching author field — ${fetched} dropped`, 'warn');
     }
@@ -178,10 +193,10 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
       }));
     const erVal = er(totalEngage, 0, posts.length);
     cb?.(`  [APIdirect/LI] ${org}: ${fetched} fetched → ${inRange} in range → ${posts.length} AQ posts, ${totalEngage} engagements`, posts.length > 0 ? 'ok' : 'warn');
-    return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers: 0, er: erVal, topPosts };
+    return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers: 0, er: erVal, topPosts, fetched, afterAuthor, inRangeCount: inRange };
   } catch (e) {
     cb?.(`  [APIdirect/LI] ${org}: ${e.message}`, 'warn');
-    return { postCount: 0, totalLikes: 0, totalComments: 0, totalShares: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
+    return failResult(EMPTY, e);
   }
 }
 
@@ -192,7 +207,7 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
   const EMPTY = { postCount: 0, totalLikes: 0, totalReplies: 0, totalRetweets: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
   if (!twitterHandle) {
     cb?.(`  [APIdirect/X] ${org}: no official handle — skipped`, 'warn');
-    return EMPTY;
+    return { ...EMPTY, noHandle: true };
   }
   const MAX_PAGES = 5;
   try {
@@ -204,8 +219,12 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
     ]);
     const followers = userRes.status === 'fulfilled' ? (userRes.value?.user?.followers_count || 0) : 0;
 
+    // A rejected first page is a FAILED fetch, not "0 tweets" — surface it so
+    // the sentinel can retry and the report can render "unavailable".
+    if (firstPageRes.status === 'rejected') throw firstPageRes.reason;
+
     // Collect all pages; page 1 already fetched above
-    let allTweets = firstPageRes.status === 'fulfilled' ? (firstPageRes.value?.tweets || []) : [];
+    let allTweets = firstPageRes.value?.tweets || [];
     if (allTweets.length > 0) {
       const oldest = oldestInBatch(allTweets, 'date', 'created_at');
       if (!dateRange?.from || !oldest || oldest >= dateRange.from) {
@@ -252,10 +271,10 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
       }));
     const erVal = er(totalEngage, followers, tweets.length);
     cb?.(`  [APIdirect/X] ${org}: ${fetched} fetched → ${inRange} in range → ${tweets.length} AQ tweets, ${followers.toLocaleString()} followers, ER=${erVal}%`, tweets.length > 0 ? 'ok' : 'warn');
-    return { postCount: tweets.length, totalLikes, totalReplies, totalRetweets, totalViews, followers, er: erVal, topPosts };
+    return { postCount: tweets.length, totalLikes, totalReplies, totalRetweets, totalViews, followers, er: erVal, topPosts, fetched, inRangeCount: inRange };
   } catch (e) {
     cb?.(`  [APIdirect/X] ${org}: ${e.message}`, 'warn');
-    return EMPTY;
+    return failResult(EMPTY, e);
   }
 }
 
@@ -266,7 +285,7 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
   const EMPTY = { postCount: 0, totalLikes: 0, totalComments: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
   if (!igHandle) {
     cb?.(`  [APIdirect/IG] ${org}: no official handle — skipped`, 'warn');
-    return EMPTY;
+    return { ...EMPTY, noHandle: true };
   }
   const MAX_PAGES = 5;
   try {
@@ -281,7 +300,10 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
     ]);
     const followers = (userRes.status === 'fulfilled' && userRes.value) ? (userRes.value?.user?.follower_count || 0) : 0;
 
-    let allPosts = firstPageRes.status === 'fulfilled' ? (firstPageRes.value?.posts || []) : [];
+    // A rejected first page is a FAILED fetch, not "0 posts" — surface it.
+    if (firstPageRes.status === 'rejected') throw firstPageRes.reason;
+
+    let allPosts = firstPageRes.value?.posts || [];
     if (allPosts.length > 0) {
       const oldest = oldestInBatch(allPosts, 'date', 'taken_at');
       if (!dateRange?.from || !oldest || oldest >= dateRange.from) {
@@ -303,6 +325,7 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
       (p.username || '').toLowerCase() === handle ||
       (p.author_name || '').toLowerCase() === handle
     );
+    const afterAuthor = posts.length;
     if (posts.length === 0 && fetched > 0) {
       cb?.(`  [APIdirect/IG] ${org}: no posts with matching author field — ${fetched} dropped`, 'warn');
     }
@@ -337,10 +360,10 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
       }));
     const erVal = er(totalEngage, followers, posts.length);
     cb?.(`  [APIdirect/IG] ${org}: ${fetched} fetched → ${inRange} in range → ${posts.length} AQ posts, ${followers.toLocaleString()} followers, ER=${erVal}%`, posts.length > 0 ? 'ok' : 'warn');
-    return { postCount: posts.length, totalLikes, totalComments, totalViews, followers, er: erVal, topPosts };
+    return { postCount: posts.length, totalLikes, totalComments, totalViews, followers, er: erVal, topPosts, fetched, afterAuthor, inRangeCount: inRange };
   } catch (e) {
     cb?.(`  [APIdirect/IG] ${org}: ${e.message}`, 'warn');
-    return EMPTY;
+    return failResult(EMPTY, e);
   }
 }
 
@@ -415,11 +438,14 @@ async function run(cfg, selectedOrgs, orgHandles = {}, cb) {
         fetchInstagram(org, handles.instagram || null, apiKey, dateRange, aqKw, cb),
         fetchYouTubeChannel(org, handles.youtube || null, apiKey, cb),
       ]);
+      // Rejected platform promises are failures, not zeros — keep the flag.
+      const rejected = (res, EMPTY) =>
+        res.status === 'fulfilled' ? res.value : failResult(EMPTY, res.reason || new Error('unknown'));
       return {
         org,
-        li: li.status === 'fulfilled' ? li.value : { postCount: 0, totalLikes: 0, totalComments: 0, totalShares: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] },
-        tw: tw.status === 'fulfilled' ? tw.value : { postCount: 0, totalLikes: 0, totalReplies: 0, totalRetweets: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] },
-        ig: ig.status === 'fulfilled' ? ig.value : { postCount: 0, totalLikes: 0, totalComments: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] },
+        li: rejected(li, { postCount: 0, totalLikes: 0, totalComments: 0, totalShares: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] }),
+        tw: rejected(tw, { postCount: 0, totalLikes: 0, totalReplies: 0, totalRetweets: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] }),
+        ig: rejected(ig, { postCount: 0, totalLikes: 0, totalComments: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] }),
         yt: yt.status === 'fulfilled' ? yt.value : { subscribers: 0, channelTitle: '', channelUrl: '' },
       };
     }));
@@ -431,4 +457,9 @@ async function run(cfg, selectedOrgs, orgHandles = {}, cb) {
   return results;
 }
 
-module.exports = { run };
+module.exports = {
+  run,
+  // Individual fetchers + helpers exported for the sentinel's targeted retries
+  fetchLinkedIn, fetchTwitter, fetchInstagram, fetchYouTubeChannel,
+  buildAqKeywords, parseDate,
+};
