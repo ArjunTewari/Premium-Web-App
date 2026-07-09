@@ -56,7 +56,7 @@ async function fetchVideoStats(videoIds, apiKey) {
     try {
       const { data } = await axios.get(YT_VIDEOS_URL, {
         params: { part: 'statistics,snippet', id: batch.join(','), key: apiKey },
-        timeout: 15000,
+        timeout: 20000,
       });
       for (const item of data.items || []) {
         const s = item.statistics || {};
@@ -88,7 +88,7 @@ async function fetchChannelStats(channelIds, apiKey) {
     try {
       const { data } = await axios.get(YT_CHANNELS_URL, {
         params: { part: 'statistics,snippet', id: batch.join(','), key: apiKey },
-        timeout: 15000,
+        timeout: 20000,
       });
       for (const item of data.items || []) {
         const s = item.statistics || {};
@@ -118,7 +118,7 @@ async function searchYouTube(orgName, serperKey, dateFrom, dateTo, scopeKeywords
   }
   const { data } = await axios.post('https://google.serper.dev/search', body, {
     headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' },
-    timeout: 15000,
+    timeout: 30000,
   });
   return data.organic || [];
 }
@@ -130,7 +130,7 @@ async function resolveHandleToChannelId(handle, apiKey) {
   try {
     const { data } = await axios.get(YT_CHANNELS_URL, {
       params: { part: 'id', forHandle: h, key: apiKey },
-      timeout: 10000,
+      timeout: 20000,
     });
     return data.items?.[0]?.id || null;
   } catch (e) {

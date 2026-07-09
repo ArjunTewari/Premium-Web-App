@@ -93,7 +93,10 @@ async function apiFetch(endpoint, params, apiKey) {
         const { data } = await axios.get(url, {
           params,
           headers: { 'X-API-Key': apiKey },
-          timeout: 18000,
+          // Generous per-request ceiling: under adaptive serial throttling the
+          // API can be slower to respond. Note this covers only the HTTP call —
+          // gate-queue waiting happens before axios starts, so it isn't counted.
+          timeout: 30000,
         });
         return data;
       } catch (e) {

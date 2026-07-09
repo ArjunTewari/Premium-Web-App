@@ -567,11 +567,14 @@ export default function Home() {
 
     // If the SSE stream closed without a `done` event (proxy timeout kills the
     // connection at ~5 min) but we have a runId, poll the status endpoint until
-    // the pipeline finishes on the server — up to 15 minutes total.
+    // the pipeline finishes on the server. Adaptive API-concurrency throttling
+    // can make a large run take much longer, so poll for up to 45 minutes. The
+    // server keeps the result for 2 h regardless, and a finished report also
+    // lands in Previous Reports, so this cap only bounds the live progress view.
     if (!gotDone && runId) {
-      setLogs((prev) => [...prev, { msg: "⏳ Stream closed — pipeline still running. Checking for result every 15s (up to 15 min)…", level: "warn" }]);
+      setLogs((prev) => [...prev, { msg: "⏳ Stream closed — pipeline still running on the server. Checking for the result every 15s (up to 45 min)…", level: "warn" }]);
       setProgress(95);
-      const MAX_POLLS = 60; // 60 × 15s = 15 minutes
+      const MAX_POLLS = 180; // 180 × 15s = 45 minutes
       for (let i = 0; i < MAX_POLLS; i++) {
         await new Promise(r => setTimeout(r, 15000));
         try {
@@ -588,7 +591,8 @@ export default function Home() {
             setLogs((prev) => [...prev, { msg: `✗ Pipeline error: ${s.msg}`, level: "err" }]);
             break;
           } else {
-            setLogs((prev) => [...prev, { msg: `  Still running… (check ${i + 1}/${MAX_POLLS})`, level: "warn" }]);
+            const mins = Math.round(((i + 1) * 15) / 60);
+            setLogs((prev) => [...prev, { msg: `  Still running… (${mins} min elapsed since stream closed)`, level: "warn" }]);
           }
         } catch { /* network blip — retry */ }
       }

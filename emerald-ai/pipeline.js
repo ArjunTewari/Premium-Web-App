@@ -315,7 +315,7 @@ async function serperSearch(query, key, dateFrom, dateTo) {
       body,
       {
         headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-        timeout: 15000,
+        timeout: 30000,
       },
     );
     costTracker.serperQueries++;
@@ -333,7 +333,7 @@ async function serperScrape(url, key) {
       { url },
       {
         headers: { "X-API-KEY": key, "Content-Type": "application/json" },
-        timeout: 15000,
+        timeout: 45000,
       },
     );
     costTracker.serperQueries++;
