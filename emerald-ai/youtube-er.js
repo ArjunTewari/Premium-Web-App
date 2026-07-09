@@ -186,7 +186,7 @@ async function run(cfg, selectedOrgs, cb) {
       orgResults.push({
         org: orgName, videos: [], videoCount: 0,
         avgER: 0, avgViewER: 0, totalViews: 0, totalLikes: 0, totalComments: 0,
-        erMethod: 'none',
+        erMethod: 'none', noHandle: true,
       });
       continue;
     }
@@ -219,7 +219,7 @@ async function run(cfg, selectedOrgs, cb) {
       orgResults.push({
         org: orgName, videos: [], videoCount: 0,
         avgER: 0, avgViewER: 0, totalViews: 0, totalLikes: 0, totalComments: 0,
-        erMethod: 'none',
+        erMethod: 'none', serperFound: 0,
       });
       continue;
     }
@@ -227,6 +227,7 @@ async function run(cfg, selectedOrgs, cb) {
     // ── Step 2 & 3: fetch stats if API key available ──────────────────────
     let videoStats = {};
     let channelStats = {};
+    let apiFailed = false, apiFailReason = null, apiFailMessage = null;
 
     if (YOUTUBE_KEY) {
       try {
@@ -243,6 +244,14 @@ async function run(cfg, selectedOrgs, cb) {
         } else if (status === 400) {
           cb?.('  [YouTubeER] 400 Fix: check the API key value — it may be malformed or belong to the wrong project.', 'warn');
         }
+        // This call's failure would otherwise silently zero out videoCount
+        // via the official-channel filter below (every video's channelId
+        // stays '' when videoStats never populated) — indistinguishable from
+        // a genuine "no videos" result. Flag it so the report can show
+        // "unavailable" instead of a confident zero.
+        apiFailed = true;
+        apiFailReason = require('./sentinel').classifyError({ status, message: msg });
+        apiFailMessage = msg;
       }
     }
 
@@ -336,6 +345,14 @@ async function run(cfg, selectedOrgs, cb) {
 
     cb?.(`  [YouTubeER] ${orgName}: ${finalVideos.length} official-channel videos | avgER=${avgER}% (${erMethod}) | views=${totalViews.toLocaleString()}`, finalVideos.length > 0 ? 'ok' : 'warn');
 
+    // The stats-fetch failure above only produced a FALSE zero when we had a
+    // resolved official channel to filter against (every video's channelId
+    // stayed '' because videoStats never populated, so none matched). If the
+    // handle was never resolved, the zero is already correctly explained by
+    // handleUnresolved and shouldn't ALSO be claimed as an API failure.
+    const handleUnresolved = !officialChannelId;
+    const causedFalseZero = apiFailed && !!officialChannelId;
+
     orgResults.push({
       org: orgName,
       videos:       finalVideos,
@@ -346,6 +363,11 @@ async function run(cfg, selectedOrgs, cb) {
       totalViews,
       totalLikes,
       totalComments,
+      serperFound: videos.length,
+      handleUnresolved,
+      failed: causedFalseZero,
+      failReason: causedFalseZero ? apiFailReason : null,
+      failMessage: causedFalseZero ? apiFailMessage : null,
     });
   }
 

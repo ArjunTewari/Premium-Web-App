@@ -495,8 +495,12 @@ function aggregateOrg(artList, clsList, dateFrom) {
 }
 
 function computeScore(d, aeoScore, socialScore = 0) {
+  // Equal weighting (1 point per component) — the previous 0.25/0.30/2
+  // multipliers were an ad hoc scale-normalization, not a published or
+  // industry-standard scoring scheme, so per instruction each component now
+  // counts for 1 point rather than a custom fraction.
   const tot = Math.round(
-    d.sov * 0.25 + aeoScore * 0.3 + socialScore * 2,
+    d.sov * 1 + aeoScore * 1 + socialScore * 1,
   );
   return {
     ...d,
@@ -3559,15 +3563,15 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       ? `<span style="font-family:monospace;font-size:18px;font-weight:600;color:${col}">${socialScore}<span style="font-size:15px;font-weight:400;color:var(--muted)">/10</span></span>`
       : `<span style="font-family:monospace;font-size:16px;color:var(--muted)">—</span>`;
 
-    const pressCont  = +(d.sov      * 0.25).toFixed(2);
-    const llmCont    = +((d.aeo||0) * 0.30).toFixed(2);
-    const socCont    = +(socialScore * 2   ).toFixed(2);
+    const pressCont  = +(d.sov      * 1).toFixed(2);
+    const llmCont    = +((d.aeo||0) * 1).toFixed(2);
+    const socCont    = +(socialScore * 1).toFixed(2);
     const uid = `sc_${org.replace(/\W/g,'_')}`;
 
     const components = [
-      { label:'Press',   desc:'AQ article volume score (articles × 2.5, max 100)', raw: d.sov,       weight:'×0.25', contrib: pressCont },
-      { label:'LLM',     desc:'Times cited by AI models across probing questions',  raw: d.aeo||0,    weight:'×0.30', contrib: llmCont   },
-      { label:'Social',  desc:'Cross-platform AQ presence score (0–10)',            raw: socialScore, weight:'×2',    contrib: socCont   },
+      { label:'Press',   desc:'AQ article volume score (articles × 2.5, max 100)', raw: d.sov,       weight:'×1', contrib: pressCont },
+      { label:'LLM',     desc:'Times cited by AI models across probing questions',  raw: d.aeo||0,    weight:'×1', contrib: llmCont   },
+      { label:'Social',  desc:'Cross-platform AQ presence score (0–10)',            raw: socialScore, weight:'×1', contrib: socCont   },
     ];
 
     const cards = components.map(({ label, desc, raw, weight, contrib }) => `
@@ -3590,7 +3594,7 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
           <div style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${col};margin-bottom:14px">${esc(org)} — Score Breakdown</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px">${cards}</div>
           <div style="display:flex;align-items:center;gap:12px;border-top:1px solid var(--border);padding-top:14px;flex-wrap:wrap">
-            <span style="font-family:monospace;font-size:17px;color:var(--muted)">${d.sov}×0.25 + ${d.aeo||0}×0.30 + ${socialScore}×2</span>
+            <span style="font-family:monospace;font-size:17px;color:var(--muted)">${d.sov}×1 + ${d.aeo||0}×1 + ${socialScore}×1</span>
             <span style="font-family:monospace;font-size:17px;color:var(--muted)">=</span>
             <span style="font-family:monospace;font-size:17px;color:var(--muted)">${pressCont} + ${llmCont} + ${socCont}</span>
             <span style="font-family:monospace;font-size:17px;color:var(--muted)">=</span>
@@ -3999,7 +4003,7 @@ ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
 <section class="sec" id="social"><div class="sh"><div class="se">Section 08 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Live social data from official org handles — LinkedIn (LinkedIn API), X/Twitter (X API v2), Instagram (Graph API), and YouTube (Data API v3). Posts are date-filtered to the report window using smart pagination (stops fetching once posts fall outside the window). ER = Engagement Rate.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd"><ul style="margin:0;padding-left:20px;line-height:2"><li><strong>Press</strong>: AQ article volume score (articles × 2.5, max 100)</li><li><strong>LLM</strong>: Times cited by AI models across probing questions</li><li><strong>Social</strong>: Cross-platform AQ presence score (0–10)</li><li>Final score = Press × 0.25 + LLM × 0.30 + Social × 2. Click any row to see the breakdown.</li></ul></div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd"><ul style="margin:0;padding-left:20px;line-height:2"><li><strong>Press</strong>: AQ article volume score (articles × 2.5, max 100)</li><li><strong>LLM</strong>: Times cited by AI models across probing questions</li><li><strong>Social</strong>: Cross-platform AQ presence score (0–10)</li><li>Final score = Press + LLM + Social — equal weight, 1 point per component (no published/industry-standard scoring scheme is used; this is a simple unweighted sum). Click any row to see the breakdown.</li></ul></div><div class="sdiv"></div></div>
 ${scorecards}</section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>

@@ -14,6 +14,8 @@
  *   Relevance(0–3): API-verified AQ posts → always 3 when APIdirect returns data
  */
 
+const Sentinel = require('./sentinel');
+
 function escHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -66,7 +68,6 @@ async function run(cfg, selectedOrgs, cb) {
   // SENTINEL: validate every org × platform result, diagnose zeros, retry
   // transient failures, and log the data-health verdict for this run.
   try {
-    const Sentinel = require('./sentinel');
     rawResults = await Sentinel.socialSentinel(rawResults, { cfg, orgHandles, cb });
   } catch (e) {
     cb?.(`  Sentinel error (non-fatal): ${e.message}`, 'warn');
@@ -157,9 +158,13 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   if (!erResults?.length) return '';
 
   // ── Sentinel data-health: collect per-platform fetch failures ─────────────
+  // Every zero-valued column across LI/X/IG/YT gets vouched for: a completed
+  // fetch that legitimately found nothing gets a diagnosis tooltip; a failed
+  // fetch never gets to claim a zero at all.
   const fetchFailures = [];
   for (const r of erResults) {
-    for (const [pName, pd] of [['LinkedIn', r.liData], ['X/Twitter', r.twData], ['Instagram', r.igData]]) {
+    const yt = ytResults.find((y) => y.org === r.org);
+    for (const [pName, pd] of [['LinkedIn', r.liData], ['X/Twitter', r.twData], ['Instagram', r.igData], ['YouTube', yt]]) {
       if (pd?.failed) fetchFailures.push({ org: r.org, platform: pName, reason: pd.failReason || 'unknown' });
     }
   }
@@ -168,16 +173,42 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         <strong>&#9888; SENTINEL · DATA COLLECTION INCOMPLETE</strong> — ${fetchFailures.length} platform fetch(es) failed (${[...new Set(fetchFailures.map(f => f.reason))].join(', ')}).
         Affected cells show <strong>✕</strong> and are excluded from totals — they are <strong>not</strong> zeros.
         <span style="color:#c9922a">${[...new Set(fetchFailures.map(f => f.platform))].map(p => `${p}: ${fetchFailures.filter(f => f.platform === p).length} org(s)`).join(' · ')}</span>
+        Every other zero-valued cell below has been checked and carries a hover tooltip explaining why it's genuinely zero.
       </div>`
     : `<div class="sentinel-note" style="background:rgba(74,175,116,.08);border:1px solid rgba(74,175,116,.3);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:16px;color:#4caf74;line-height:1.7">
-        <strong>&#9432; SENTINEL</strong> — All social fetches across ${erResults.length} orgs (LinkedIn · X · Instagram) completed; any zeros shown are verified absence, not collection failures.
+        <strong>&#9432; SENTINEL</strong> — All social fetches across ${erResults.length} orgs (LinkedIn · X · Instagram · YouTube) completed; every zero-valued cell below has been individually checked and carries a hover tooltip confirming it's a verified absence, not a collection failure.
       </div>`;
 
-  // Post-count cell: failure ≠ zero ≠ no handle — each renders distinctly.
-  const postCell = (count, pd, color) => {
+  // Post-count cell: failure ≠ zero ≠ no handle — each renders distinctly,
+  // and every genuine zero carries a tooltip vouching for why it's zero.
+  const postCell = (count, pd, color, platformName) => {
     if (pd?.failed) return `<span style="color:#e05c5c;cursor:help" title="API request failed (${escHtml(pd.failReason || 'unknown')}) — data unavailable, not zero">✕</span>`;
     if (pd?.noHandle) return `<span style="color:#3d4a63;cursor:help" title="No handle configured for this platform">–</span>`;
-    return `<span style="color:${color}">${count || 0}</span>`;
+    if (!count) {
+      const diag = pd ? Sentinel.diagnoseZero(pd, platformName) : 'no data collected for this platform';
+      return `<span style="color:${color};cursor:help" title="SENTINEL verified: ${escHtml(diag)}">0</span>`;
+    }
+    return `<span style="color:${color}">${count}</span>`;
+  };
+
+  // YouTube's zero-cause vocabulary differs from LI/X/IG (no author/date-range
+  // funnel — it's Serper discovery + official-channel matching), so it gets
+  // its own diagnosis rather than reusing diagnoseZero()'s fetched/inRange shape.
+  // Shared between the compact table cell and the per-org detail note below.
+  const ytZeroDiagnosis = (yt) =>
+    (yt.serperFound || 0) === 0
+      ? 'no videos discovered via Serper for this org/keyword combination'
+      : yt.handleUnresolved
+        ? `Serper found ${yt.serperFound} video(s) but the channel handle couldn't be resolved to confirm they're from the official channel`
+        : `Serper found ${yt.serperFound} video(s) but none matched the resolved official channel`;
+
+  const ytCell = (yt) => {
+    if (!yt || yt.noHandle) return `<span style="color:#3d4a63;cursor:help" title="No handle configured for this platform">–</span>`;
+    if (yt.failed) return `<span style="color:#e05c5c;cursor:help" title="YouTube Data API request failed (${escHtml(yt.failReason || 'unknown')}) — data unavailable, not zero">✕</span>`;
+    if (!yt.videoCount) {
+      return `<span style="color:#e53935;cursor:help" title="SENTINEL verified: ${escHtml(ytZeroDiagnosis(yt))}">0</span>`;
+    }
+    return `<span style="color:#e53935">${yt.videoCount}</span>`;
   };
 
   const orgsWithPresence = erResults.filter(r => r.totalPosts > 0).length;
@@ -299,14 +330,14 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         return `<tr style="border-top:1px solid #252d40">
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#8fa3b8">#${unifiedRank}</td>
           <td style="padding:8px 12px"><span style="font-family:monospace;font-size:18px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.linkedinPosts, r.liData, '#4a7fd4')}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.twitterPosts, r.twData, '#4a9fd4')}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.linkedinPosts, r.liData, '#4a7fd4', 'LinkedIn')}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.twitterPosts, r.twData, '#4a9fd4', 'X/Twitter')}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${twER}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${twFlwCell}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.instagramPosts, r.igData, '#e05c9c')}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.instagramPosts, r.igData, '#e05c9c', 'Instagram')}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${igER}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${igFlwCell}</td>
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#e53935">${yt.videoCount || 0}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${ytCell(yt)}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${ytERCell}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${ytSubsCell}</td>
           <td style="padding:8px 12px;text-align:center">
@@ -329,6 +360,17 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   SoV% = org total ÷ cohort total &nbsp;·&nbsp; Data: LinkedIn API · X API v2 · Instagram Graph API · YouTube Data API v3
 </div>`;
 
+  // Zero-value note for the per-org detail view — each platform block is
+  // otherwise omitted entirely when count is 0, leaving no explanation.
+  // failed/noHandle get their own distinct wording; a genuine zero shows the
+  // sentinel's funnel-based diagnosis so nothing renders unexplained.
+  const platformZeroNote = (pd, platformName, color) => {
+    if (!pd) return '';
+    if (pd.failed) return `<div style="margin-top:6px;font-size:14px;color:#e05c5c">${platformName}: API request failed (${escHtml(pd.failReason || 'unknown')}) — data unavailable, not zero</div>`;
+    if (pd.noHandle) return `<div style="margin-top:6px;font-size:14px;color:#3d4a63">${platformName}: no handle configured for this platform</div>`;
+    return `<div style="margin-top:6px;font-size:14px;color:${color}">${platformName}: 0 — SENTINEL verified: ${escHtml(Sentinel.diagnoseZero(pd, platformName))}</div>`;
+  };
+
   // ── Per-org expandable detail sections ───────────────────────────────────
   const orgDetails = erResults.map(r => {
     const yt  = ytResults.find(y => y.org === r.org) || { videoCount: 0, videos: [], avgER: 0, avgViewER: 0, erMethod: 'none', totalViews: 0 };
@@ -343,7 +385,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
           &middot; ♥ ${li.totalLikes} &middot; 💬 ${li.totalComments} &middot; ↗ ${li.totalShares}
         </div>
         ${topPostsHtml(li.topPosts, '#4a7fd4', ['likes', 'comments', 'shares'])}
-      </div>` : '';
+      </div>` : platformZeroNote(li, 'LinkedIn', '#4a7fd4');
 
     // Twitter block
     const tw = r.twData || { postCount: 0, totalLikes: 0, totalReplies: 0, totalRetweets: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
@@ -356,7 +398,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
           &middot; ♥ ${tw.totalLikes} &middot; ↩ ${tw.totalReplies} &middot; ↻ ${tw.totalRetweets} ${tw.totalViews > 0 ? `&middot; 👁 ${fmtNum(tw.totalViews)}` : ''}
         </div>
         ${topPostsHtml(tw.topPosts, '#4a9fd4', ['likes', 'replies', 'retweets', 'views'])}
-      </div>` : '';
+      </div>` : platformZeroNote(tw, 'X/Twitter', '#4a9fd4');
 
     // Instagram block
     const ig = r.igData || { postCount: 0, totalLikes: 0, totalComments: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
@@ -369,7 +411,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
           &middot; ♥ ${ig.totalLikes} &middot; 💬 ${ig.totalComments} ${ig.totalViews > 0 ? `&middot; 👁 ${fmtNum(ig.totalViews)}` : ''}
         </div>
         ${topPostsHtml(ig.topPosts, '#e05c9c', ['likes', 'comments', 'views'])}
-      </div>` : '';
+      </div>` : platformZeroNote(ig, 'Instagram', '#e05c9c');
 
     // YouTube block (from youtube-er.js)
     const sortedYtVideos = [...(yt.videos || [])].sort((a, b) => (b.views ?? -1) - (a.views ?? -1));
@@ -405,7 +447,11 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
             </div>
           </div>`;
         }).join('')}
-      </div>` : '';
+      </div>` : (yt.failed
+          ? `<div style="margin-top:6px;font-size:14px;color:#e05c5c">YouTube: API request failed (${escHtml(yt.failReason || 'unknown')}) — data unavailable, not zero</div>`
+          : yt.noHandle
+            ? `<div style="margin-top:6px;font-size:14px;color:#3d4a63">YouTube: no handle configured for this platform</div>`
+            : `<div style="margin-top:6px;font-size:14px;color:#e53935">YouTube: 0 — SENTINEL verified: ${escHtml(ytZeroDiagnosis(yt))}</div>`);
 
     const hasAnyPost = r.totalPosts > 0 || yt.videoCount > 0;
 

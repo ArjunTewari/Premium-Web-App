@@ -44,6 +44,27 @@ const PLATFORMS = [
 ];
 
 /**
+ * Diagnose why a single completed (non-failed) platform fetch produced zero,
+ * using only the funnel counts the fetcher already recorded (fetched →
+ * afterAuthor → inRange → final) — no extra API calls. Shared by
+ * validateSocial() (for the run-transcript log) and the HTML renderer (for
+ * per-cell tooltips), so every zero column gets the same verified reasoning
+ * whether it's read from the console or the report.
+ */
+function diagnoseZero(p, platformName) {
+  if ((p.fetched || 0) === 0) {
+    return `API returned no posts for the query/handle — verify the ${platformName} handle`;
+  }
+  if (p.afterAuthor !== undefined && p.afterAuthor === 0) {
+    return `authorship filter dropped all ${p.fetched} fetched posts — handle likely doesn't match the API's author field`;
+  }
+  if ((p.inRangeCount || 0) === 0) {
+    return `all ${p.fetched} fetched posts fall outside the report date window — zero is genuine for this window`;
+  }
+  return `${p.inRangeCount} posts in window but none matched AQ keywords — zero is genuine`;
+}
+
+/**
  * Inspect raw APIdirect results and return anomalies, each with a diagnosis.
  * Zero API calls — diagnosis is derived from the funnel counts the fetchers
  * record (fetched → afterAuthor → inRange → final).
@@ -62,20 +83,9 @@ function validateSocial(rawResults) {
           retryable: RETRYABLE.has(p.failReason),
         });
       } else if (p.postCount === 0) {
-        // Completed fetch that produced zero — diagnose which stage zeroed it.
-        let diagnosis;
-        if ((p.fetched || 0) === 0) {
-          diagnosis = `API returned no posts for the query/handle — verify the ${name} handle`;
-        } else if (p.afterAuthor !== undefined && p.afterAuthor === 0) {
-          diagnosis = `authorship filter dropped all ${p.fetched} fetched posts — handle likely doesn't match the API's author field`;
-        } else if ((p.inRangeCount || 0) === 0) {
-          diagnosis = `all ${p.fetched} fetched posts fall outside the report date window — zero is genuine for this window`;
-        } else {
-          diagnosis = `${p.inRangeCount} posts in window but none matched AQ keywords — zero is genuine`;
-        }
         anomalies.push({
           type: 'zero_diagnosed', org: r.org, platform: key, platformName: name,
-          diagnosis, retryable: false,
+          diagnosis: diagnoseZero(p, name), retryable: false,
         });
       }
     }
@@ -319,4 +329,4 @@ function validateExecSummary(execF, data, ORGS) {
   return { issues, checked };
 }
 
-module.exports = { classifyError, validateSocial, socialSentinel, auditSectionNumbering, validateExecSummary };
+module.exports = { classifyError, diagnoseZero, validateSocial, socialSentinel, auditSectionNumbering, validateExecSummary };
