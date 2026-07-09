@@ -3139,26 +3139,6 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
 </tbody></table>`;
   }
 
-  function sovByOrgTVTable() {
-    const activeChs = ALL_TV_CHANNELS.filter((ch) =>
-      ORGS.some((o) => (data[o]?.outletCounts[ch] || 0) > 0)
-    );
-    if (!activeChs.length)
-      return `<p style="color:var(--muted);font-size:17px">No TV channel coverage indexed in this period.</p>`;
-    return `<table class="nt"><thead><tr><th>Org</th>${activeChs.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
-${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${activeChs.map((ch) => {
-      const evArts = (arts[org] || []).filter((a) => canonOutlet(a.source || "") === ch);
-      const n = evArts.length;
-      if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`;
-      const uid = `sov2_${org}_${ch}`.replace(/\W/g, "_");
-      const links = evArts.slice(0, 5).map((a) =>
-        `<a href="${esc(a.url || "#")}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || "").length > 70 ? (a.title || "").slice(0, 70) + "…" : (a.title || ""))}</a>`
-      ).join("");
-      return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`;
-    }).join("")}</tr>`).join("\n")}
-</tbody></table>`;
-  }
-
   function outletRows() {
     return PRINT_OUTLETS.map((outlet) => {
       if (!ORGS.some((o) => (data[o]?.outletCounts[outlet] || 0) > 0))
@@ -3941,8 +3921,19 @@ ${sovBar()}
 </div>
 <div style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Print / Online</div>
 ${sovByOrgTable()}
-<div style="font-size:17px;font-weight:600;color:var(--muted2);margin-top:24px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">TV News</div>
-${sovByOrgTVTable()}</section>
+${(() => {
+  const absent = ORGS.filter(o => (arts[o] || []).length === 0);
+  const recovered = ORGS.filter(o => (arts[o] || []).some(a => a.relaxed));
+  const warn = 'background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);color:var(--warn)';
+  const good = 'background:rgba(74,175,116,.08);border:1px solid rgba(74,175,116,.3);color:var(--good)';
+  const wrap = (css, body) => `<div class="sentinel-note" style="${css};border-radius:8px;padding:10px 14px;margin-top:20px;font-size:16px;line-height:1.7">${body}</div>`;
+  if (!absent.length && !recovered.length)
+    return wrap(good, `<strong>&#9432; SENTINEL</strong> — All ${ORGS.length} orgs returned press coverage on the first query pass; no retry needed.`);
+  const parts = [];
+  if (recovered.length) parts.push(`recovered press coverage for ${recovered.length} org(s) via relaxed-query retry (${recovered.map(esc).join(', ')}), each re-verified by the org-presence and citation filters`);
+  if (absent.length) parts.push(`found no press coverage for ${absent.length} org(s) even after a relaxed-query retry (${absent.map(esc).join(', ')}) — verified absent from indexed press in this window, not a query artefact`);
+  return wrap(warn, `<strong>&#9432; SENTINEL</strong> — ${parts.join('; ')}.`);
+})()}</section>
 
 <section class="sec" id="tv"><div class="sh"><div class="se">Section 02b</div><h2 class="st">TV Channel Coverage</h2>
 <div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (Aaj Tak, India TV, ABP News) channels.</div><div class="sdiv"></div></div>
@@ -3959,7 +3950,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
 ${(() => {
   const hindiTotal = ORGS.reduce((s, org) => s + (arts[org] || []).filter(a => TV_CHANNELS_HINDI.includes(canonOutlet(a.source || '') || '')).length, 0);
   return hindiTotal === 0
-    ? `<div style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:16px;color:var(--warn);line-height:1.7"><strong>&#9432; SENTINEL</strong> — No Hindi TV coverage found, including after retrying with Hindi (Devanagari) org names. The tracked orgs appear genuinely absent from Aaj Tak / India TV / ABP News in this window; the zeros above are verified, not a query artefact.</div>`
+    ? `<div class="sentinel-note" style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:16px;color:var(--warn);line-height:1.7"><strong>&#9432; SENTINEL</strong> — No Hindi TV coverage found, including after retrying with Hindi (Devanagari) org names. The tracked orgs appear genuinely absent from Aaj Tak / India TV / ABP News in this window; the zeros above are verified, not a query artefact.</div>`
     : '';
 })()}</section>
 

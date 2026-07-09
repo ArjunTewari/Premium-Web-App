@@ -164,12 +164,14 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     }
   }
   const healthBanner = fetchFailures.length
-    ? `<div style="background:rgba(224,92,92,.08);border:1px solid rgba(224,92,92,.35);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:16px;color:#e05c5c;line-height:1.7">
-        <strong>&#9888; DATA COLLECTION INCOMPLETE</strong> — ${fetchFailures.length} platform fetch(es) failed (${[...new Set(fetchFailures.map(f => f.reason))].join(', ')}).
+    ? `<div class="sentinel-note" style="background:rgba(224,92,92,.08);border:1px solid rgba(224,92,92,.35);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:16px;color:#e05c5c;line-height:1.7">
+        <strong>&#9888; SENTINEL · DATA COLLECTION INCOMPLETE</strong> — ${fetchFailures.length} platform fetch(es) failed (${[...new Set(fetchFailures.map(f => f.reason))].join(', ')}).
         Affected cells show <strong>✕</strong> and are excluded from totals — they are <strong>not</strong> zeros.
         <span style="color:#c9922a">${[...new Set(fetchFailures.map(f => f.platform))].map(p => `${p}: ${fetchFailures.filter(f => f.platform === p).length} org(s)`).join(' · ')}</span>
       </div>`
-    : '';
+    : `<div class="sentinel-note" style="background:rgba(74,175,116,.08);border:1px solid rgba(74,175,116,.3);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:16px;color:#4caf74;line-height:1.7">
+        <strong>&#9432; SENTINEL</strong> — All social fetches across ${erResults.length} orgs (LinkedIn · X · Instagram) completed; any zeros shown are verified absence, not collection failures.
+      </div>`;
 
   // Post-count cell: failure ≠ zero ≠ no handle — each renders distinctly.
   const postCell = (count, pd, color) => {

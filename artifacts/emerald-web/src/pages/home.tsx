@@ -455,6 +455,10 @@ export default function Home() {
       doc.getElementById("actions")?.remove();
       doc.getElementById("exec")?.remove();
 
+      // Strip internal SENTINEL data-health notes — these are QA annotations
+      // for the personal (full) report only, not for the client-facing version.
+      doc.querySelectorAll(".sentinel-note").forEach((el) => el.remove());
+
       // Remove Executive Summary nav link (and its "Report" label if now empty)
       const execNavLink = doc.querySelector('a[href="#exec"]');
       if (execNavLink) {
