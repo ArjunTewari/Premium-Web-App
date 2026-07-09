@@ -177,4 +177,146 @@ function auditSectionNumbering(html) {
   return { html: fixed, fixes: [...new Set(fixes)] };
 }
 
-module.exports = { classifyError, validateSocial, socialSentinel, auditSectionNumbering };
+// ── Executive Summary: numeric fact-check ────────────────────────────────────
+
+/**
+ * Fact-check the AI-generated Executive Summary findings against the actual
+ * computed org data. Extracts unit-tagged numbers (articles, %, /10 social,
+ * AEO score) near each org mention in the finding text and verifies each one
+ * matches a real field on that org.
+ *
+ * This exists because the exec-summary prompt hands Claude pre-formatted
+ * data lines, and a labeling bug in that data (or a hallucination on
+ * Claude's part) both surface the same way: a specific number stated as fact
+ * that doesn't match anything the pipeline actually computed. Concretely,
+ * this is what caught the AEO 0–100 "score" being restated as a literal
+ * "mentions" count.
+ *
+ * Deliberately conservative: only unit-tagged numbers are checked (bare
+ * digits are ignored — dates, ranks, section refs would be noise), and a
+ * number only counts as a mismatch if it fails to match ANY plausible field
+ * on the nearest-mentioned org within a small window. False negatives are
+ * acceptable here; false positives would make the note useless.
+ */
+function validateExecSummary(execF, data, ORGS) {
+  if (!Array.isArray(execF) || !execF.length) return { issues: [], checked: 0 };
+
+  // Longest-name-first so a short org name can't shadow a longer one that
+  // contains it as a substring.
+  const orgsByLen = [...ORGS].sort((a, b) => b.length - a.length);
+
+  // Unit patterns are bidirectional where natural phrasing can go either way
+  // ("18 AEO mentions" vs "AEO score of 18") — a capture can land in group 1
+  // or group 2 depending on which alternative matched.
+  const UNIT_PATTERNS = [
+    { re: /(\d+(?:\.\d+)?)\s*articles?\b/gi, fields: ['total'], label: 'articles' },
+    { re: /(\d+(?:\.\d+)?)\s*%/g, fields: ['dataPct', 'authPct'], label: '%' },
+    { re: /(\d+(?:\.\d+)?)\s*\/\s*10\b/g, fields: ['social'], label: '/10 social' },
+    { re: /(\d+(?:\.\d+)?)\s*\/\s*100\b/g, fields: ['aeo'], label: '/100 AEO score' },
+    { re: /(\d+(?:\.\d+)?)\s*AEO\b|AEO\D{0,20}?(\d+(?:\.\d+)?)/gi, fields: ['aeo'], label: 'AEO' },
+  ];
+
+  // A generic plural like "7 organizations registered 0 mentions" refers to
+  // an unnamed aggregate, not any single tracked org — if this phrase sits
+  // closer to a number than any named org does, the number isn't attributable
+  // to a specific org and must be skipped rather than pinned on whichever
+  // named org happens to appear earlier in the sentence.
+  const GENERIC_AGGREGATE_RE = /\borgani[sz]ations?\b|\borgs\b/gi;
+
+  const issues = [];
+  let checked = 0;
+
+  execF.forEach((finding, fi) => {
+    const text = `${finding.headline || ''}. ${finding.detail || ''}`;
+
+    // Index every org-name occurrence so numbers can be attributed to one.
+    const orgHits = [];
+    for (const org of orgsByLen) {
+      let idx = text.indexOf(org);
+      while (idx !== -1) {
+        orgHits.push({ org, pos: idx });
+        idx = text.indexOf(org, idx + org.length);
+      }
+    }
+    if (!orgHits.length) return;
+
+    const genericHits = [];
+    GENERIC_AGGREGATE_RE.lastIndex = 0;
+    let gm;
+    while ((gm = GENERIC_AGGREGATE_RE.exec(text))) genericHits.push(gm.index);
+
+    for (const { re, fields, label } of UNIT_PATTERNS) {
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(text))) {
+        const val = parseFloat(m[1] ?? m[2]);
+        if (Number.isNaN(val)) continue;
+
+        // Attribution favors the closest PRECEDING org mention — this
+        // report's writing style is consistently "Org verb N unit" (e.g.
+        // "Centre for Science and Environment accumulated 18 AEO mentions"),
+        // so a number almost always follows the org it describes, not
+        // precedes the next one. Nearest-by-absolute-distance would
+        // misattribute a trailing number to whichever org happens to be
+        // named next in the same sentence.
+        let nearestOrg = null, bestDist = Infinity;
+        for (const h of orgHits) {
+          if (h.pos > m.index) continue;
+          const d = m.index - h.pos;
+          if (d < bestDist) { bestDist = d; nearestOrg = h.org; }
+        }
+        if (!nearestOrg) {
+          for (const h of orgHits) {
+            const d = h.pos - m.index;
+            if (d > 0 && d < bestDist) { bestDist = d; nearestOrg = h.org; }
+          }
+        }
+
+        // High-confidence override: "N/10 (OrgName)" / "N (OrgName)" — an org
+        // name in parentheses immediately after the number is unambiguous and
+        // takes priority over everything else, including the generic-aggregate
+        // check below (a stray "organizations" earlier in the sentence must
+        // not block an adjacent, explicit parenthetical attribution).
+        const afterText = text.slice(m.index + m[0].length, m.index + m[0].length + 40);
+        const parenMatch = afterText.match(/^\s*\(([^)]+)\)/);
+        let parenOverride = false;
+        if (parenMatch) {
+          const namedInParen = orgsByLen.find((o) => parenMatch[1].includes(o));
+          if (namedInParen) { nearestOrg = namedInParen; bestDist = 0; parenOverride = true; }
+        }
+
+        // If a generic aggregate phrase ("N organizations") sits closer to
+        // this number than the named org does, the claim is about an unnamed
+        // group — not attributable to nearestOrg. Skip it (unless the paren
+        // override above already gave an unambiguous attribution).
+        if (!parenOverride) {
+          const nearestGenericDist = genericHits
+            .filter((gp) => gp <= m.index)
+            .reduce((min, gp) => Math.min(min, m.index - gp), Infinity);
+          if (nearestGenericDist < bestDist) continue;
+        }
+
+        if (!nearestOrg || bestDist > 120) continue; // too far to attribute confidently
+
+        checked++;
+        const truth = data[nearestOrg];
+        if (!truth) continue;
+        const matches = fields.some((f) => truth[f] != null && Math.abs(truth[f] - val) < 0.6);
+        if (!matches) {
+          issues.push({
+            findingIdx: fi,
+            headline: finding.headline || '',
+            org: nearestOrg,
+            claimed: val,
+            metric: label,
+            actual: fields.map((f) => `${f}=${truth[f] ?? 'n/a'}`).join(', '),
+          });
+        }
+      }
+    }
+  });
+
+  return { issues, checked };
+}
+
+module.exports = { classifyError, validateSocial, socialSentinel, auditSectionNumbering, validateExecSummary };

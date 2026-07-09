@@ -1361,7 +1361,7 @@ ${batchText}`;
   const orgSummary = ORGS.map((o) => {
     const er = socialERResults.find((r) => r.org === o);
     const yt = youtubeERResults.find((r) => r.org === o);
-    return `${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO ${data[o].aeo} mentions, Social Presence ${data[o].social}/10 (LI=${er?.linkedinPosts || 0} X=${er?.twitterPosts || 0} IG=${er?.instagramPosts || 0} YT=${yt?.videoCount || 0} videos), top outlet: ${data[o].topOutlet}, topics 2+: ${
+    return `${o}: ${data[o].total} arts, ${data[o].authPct}% auth, ${data[o].dataPct}% data-specific, AEO score ${data[o].aeo}/100 (normalized — NOT a literal mention count), Social Presence ${data[o].social}/10 (LI=${er?.linkedinPosts || 0} X=${er?.twitterPosts || 0} IG=${er?.instagramPosts || 0} YT=${yt?.videoCount || 0} videos), top outlet: ${data[o].topOutlet}, topics 2+: ${
       Object.entries(data[o].topicCounts)
         .filter(([, v]) => v >= 2)
         .map(([k]) => k)
@@ -1383,6 +1383,22 @@ ${batchText}`;
     cb(`  ${execF.length} findings`, execF.length > 0 ? "ok" : "err");
   } catch (e) {
     cb(`  exec err: ${e.message}`, "err");
+  }
+
+  // ── SENTINEL (exec summary): fact-check generated findings against data ──
+  let execAudit = { issues: [], checked: 0 };
+  try {
+    execAudit = Sentinel.validateExecSummary(execF, data, ORGS);
+    if (execAudit.issues.length) {
+      cb(`  SENTINEL · exec summary: ${execAudit.issues.length}/${execAudit.checked} numeric claim(s) don't match computed data`, "warn");
+      execAudit.issues.forEach((iss) =>
+        cb(`    finding #${iss.findingIdx + 1} (${iss.org}): claims ${iss.claimed} ${iss.metric}, actual ${iss.actual}`, "warn"),
+      );
+    } else {
+      cb(`  SENTINEL · exec summary: ${execAudit.checked} numeric claim(s) verified against computed data ✓`, "ok");
+    }
+  } catch (e) {
+    cb(`  SENTINEL · exec summary audit skipped: ${e.message}`, "warn");
   }
   await sleep(300);
 
@@ -1491,6 +1507,7 @@ ${batchText}`;
       youtubeERResults,
       spikeAnnotations,
       aeoQueriesUsed,
+      execAudit,
     );
   } catch (e) {
     cb(`  HTML build error: ${e.message}\n${e.stack?.split("\n").slice(0,4).join("\n")}`, "err");
@@ -3105,6 +3122,7 @@ function buildHTML(
   youtubeERResults = [],
   spikeAnnotations = [],
   aeoQueriesUsed = null,
+  execAudit = { issues: [], checked: 0 },
 ) {
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
   const now = new Date().toUTCString();
@@ -3905,6 +3923,11 @@ body.edit-mode .sec-x{display:flex}
 </div>
 <div id="exec-draft" style="display:none;padding:0 18px 18px">${execCards}</div>
 </div>
+${execAudit.issues.length
+  ? `<div class="sentinel-note" style="background:rgba(224,92,92,.08);border:1px solid rgba(224,92,92,.35);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:16px;color:#e05c5c;line-height:1.7"><strong>&#9888; SENTINEL</strong> — ${execAudit.issues.length} of ${execAudit.checked} numeric claim(s) above don't match the computed data: ${execAudit.issues.map((iss) => `finding #${iss.findingIdx + 1} says ${esc(iss.org)} has ${iss.claimed} ${esc(iss.metric)}, but the pipeline computed ${esc(iss.actual)}`).join('; ')}. Review before sharing.</div>`
+  : execF.length
+    ? `<div class="sentinel-note" style="background:rgba(74,175,116,.08);border:1px solid rgba(74,175,116,.3);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:16px;color:#4caf74;line-height:1.7"><strong>&#9432; SENTINEL</strong> — ${execAudit.checked} numeric claim(s) in the draft above were cross-checked against the computed data; all match.</div>`
+    : ''}
 <div style="margin-top:20px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);font-size:16px;color:var(--muted2);line-height:1.7">
   <strong style="font-weight:600;letter-spacing:.04em">METHODOLOGY</strong> &mdash;
   Serper News API for media coverage &middot; Claude Sonnet 4.6 for article classification &middot;
