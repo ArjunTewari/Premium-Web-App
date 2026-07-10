@@ -3,10 +3,10 @@
  * social-er.js — Social AQ Presence (APIdirect.io)
  *
  * Data sources:
- *   LinkedIn  → APIdirect /v1/linkedin/posts (likes, comments, shares, links)
- *   Twitter/X → APIdirect /v1/twitter/posts + user/tweets + user (ER, followers)
- *   Instagram → APIdirect /v1/instagram/posts + user (ER, followers)
- *   YouTube   → youtube-er.js (YouTube Data API v3) — APIdirect has no video endpoint
+ *   LinkedIn  → APIdirect /v1/linkedin/company/posts (the org's own page timeline)
+ *   Twitter/X → APIdirect /v1/twitter/user/tweets + user (ER, followers)
+ *   Instagram → APIdirect /v1/instagram/user/posts + user (the account's own feed, ER, followers)
+ *   YouTube   → youtube-er.js (YouTube Data API v3 exclusively) — APIdirect has no video endpoint
  *
  * Presence score 0–10 (unchanged formula):
  *   Volume   (0–4): total AQ posts across platforms
@@ -191,22 +191,24 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     return `<span style="color:${color}">${count}</span>`;
   };
 
-  // YouTube's zero-cause vocabulary differs from LI/X/IG (no author-field
-  // funnel — it's APIdirect discovery + official-channel matching + a
-  // client-side date-range filter), so it gets its own diagnosis rather than
-  // reusing diagnoseZero()'s fetched/afterAuthor/inRange shape. Shared
-  // between the compact table cell and the per-org detail note below.
+  // YouTube's zero-cause vocabulary differs from LI/X/IG (channel + date
+  // scoping happen server-side via YouTube Data API v3's search.list params,
+  // not a post-hoc filter — so there's no "afterChannel" step, just
+  // discovered-in-window → AQ-keyword-filtered), so it gets its own
+  // diagnosis rather than reusing diagnoseZero()'s fetched/afterAuthor/inRange
+  // shape. Shared between the compact table cell and the per-org detail note.
   const ytZeroDiagnosis = (yt) =>
-    (yt.discovered || 0) === 0
-      ? 'no videos discovered via APIdirect for this org/keyword combination'
-      : yt.handleUnresolved
-        ? `APIdirect found ${yt.discovered} video(s) but the channel handle couldn't be resolved to confirm they're from the official channel`
-        : (yt.afterChannel || 0) === 0
-          ? `APIdirect found ${yt.discovered} video(s) but none matched the resolved official channel`
-          : `${yt.afterChannel} video(s) matched the official channel but none fall in the report date window`;
+    yt.handleUnresolved
+      ? 'YouTube Data API v3 could not resolve a channel for this org’s handle'
+      : yt.truncated && (yt.discovered || 0) > 0
+        ? `${yt.discovered} video(s) found but none matched the AQ keywords, AND the video-search page cap was hit while still inside the date window — zero is not fully verified, may be a coverage gap`
+        : (yt.discovered || 0) === 0
+          ? 'no videos found on this org’s official channel within the report date window'
+          : `${yt.discovered} video(s) found in the date window but none matched the AQ keywords — zero is genuine`;
 
   const ytCell = (yt) => {
     if (!yt || yt.noHandle) return `<span style="color:#3d4a63;cursor:help" title="No handle configured for this platform">–</span>`;
+    if (yt.noKey) return `<span style="color:#3d4a63;cursor:help" title="YOUTUBE_KEY not configured — YouTube Data API v3 is required, section skipped entirely">–</span>`;
     if (yt.failed) return `<span style="color:#e05c5c;cursor:help" title="YouTube Data API request failed (${escHtml(yt.failReason || 'unknown')}) — data unavailable, not zero">✕</span>`;
     if (!yt.videoCount) {
       return `<span style="color:#e53935;cursor:help" title="SENTINEL verified: ${escHtml(ytZeroDiagnosis(yt))}">0</span>`;
@@ -246,7 +248,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
 
   const ytKeyNotice = !hasYtKey
     ? `<div style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:16px;color:#d4a017;line-height:1.7">
-        <strong>&#9432; YOUTUBE_KEY not configured</strong> — videos are discovered via APIdirect.io but likes/comments/ER require a Google API key with YouTube Data API v3 enabled.
+        <strong>&#9432; YOUTUBE_KEY not configured</strong> — YouTube Data API v3 is required for both video discovery and engagement stats; without it, YouTube is skipped entirely (rendered as "–", not a verified zero).
       </div>`
     : '';
 
@@ -458,7 +460,9 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
           ? `<div style="margin-top:6px;font-size:14px;color:#e05c5c">YouTube: API request failed (${escHtml(yt.failReason || 'unknown')}) — data unavailable, not zero</div>`
           : yt.noHandle
             ? `<div style="margin-top:6px;font-size:14px;color:#3d4a63">YouTube: no handle configured for this platform</div>`
-            : `<div style="margin-top:6px;font-size:14px;color:#e53935">YouTube: 0 — SENTINEL verified: ${escHtml(ytZeroDiagnosis(yt))}</div>`);
+            : yt.noKey
+              ? `<div style="margin-top:6px;font-size:14px;color:#3d4a63">YouTube: YOUTUBE_KEY not configured — section skipped entirely</div>`
+              : `<div style="margin-top:6px;font-size:14px;color:#e53935">YouTube: 0 — SENTINEL verified: ${escHtml(ytZeroDiagnosis(yt))}</div>`);
 
     const hasAnyPost = r.totalPosts > 0 || yt.videoCount > 0;
 

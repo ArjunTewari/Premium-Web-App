@@ -114,12 +114,13 @@ async function run() {
     const Sentinel = require('./sentinel');
     const p = { fetched: 3, afterAuthor: 0, inRangeCount: undefined, postCount: 0 };
     const diag = Sentinel.diagnoseZero(p, 'LinkedIn');
-    assert(/reposts and\/or failed the author-match/.test(diag), `D: LinkedIn afterAuthor=0 should mention reposts/author-match, got: "${diag}"`);
-    const diagIg = Sentinel.diagnoseZero(p, 'Instagram');
-    assert(/authorship filter/.test(diagIg), `D: Instagram afterAuthor=0 should keep the old authorship-filter message, got: "${diagIg}"`);
+    assert(/reposts of other pages/.test(diag), `D: LinkedIn afterAuthor=0 should mention reposts, got: "${diag}"`);
   }
 
-  // ── Scenario F: author-mismatch excluded even when is_repost is false ─
+  // ── Scenario F: kept simple — author field is NOT checked, only is_repost.
+  //    A post with is_repost:false is included regardless of who the author
+  //    field says it is (fetched from the company's own page URL, so the
+  //    endpoint itself already guarantees ownership) ───────────────────────
   {
     delete require.cache[require.resolve('./apidirect-collector')];
     const APIdirect = require('./apidirect-collector');
@@ -129,10 +130,10 @@ async function run() {
         data: {
           posts: [
             post({ text: 'Our air quality index update', author: 'Test Org', is_repost: false, likes: 10 }),
-            // is_repost:false but author doesn't match the org at all — API
-            // inconsistency / showcase-page bleed-through, must still be excluded.
-            post({ text: 'Air pollution insights', author: 'Some Unrelated Page', is_repost: false, likes: 50 }),
-            // no author field at all — fails closed (excluded), not included by default.
+            // author field doesn't literally match the org string — no longer
+            // excluded, since is_repost:false is now the only gate.
+            post({ text: 'Air pollution insights', author: 'Some Display Name Variant', is_repost: false, likes: 50 }),
+            // no author field at all — also fine now, not a reason to exclude.
             post({ text: 'Air quality note', author: '', is_repost: false, likes: 20 }),
           ],
           total: 4,
@@ -140,9 +141,9 @@ async function run() {
       };
     };
     const r = await APIdirect.fetchLinkedIn('Test Org', '@testorg', 'key', { from: new Date('2026-01-01'), to: new Date('2026-12-31') }, ['air quality', 'air pollution'], null);
-    assert(r.afterAuthor === 1, `F: afterAuthor should be 1 (only the genuinely-matching post), got ${r.afterAuthor}`);
-    assert(!r.topPosts.some(p => p.likes === 50), 'F: author-mismatch post (50 likes) must not leak into topPosts');
-    assert(!r.topPosts.some(p => p.likes === 20), 'F: no-author post (20 likes) must not leak into topPosts');
+    assert(r.afterAuthor === 3, `F: afterAuthor should be 3 (all non-repost posts kept — no author check), got ${r.afterAuthor}`);
+    assert(r.topPosts.some(p => p.likes === 50), 'F: post with a differently-formatted author must be kept, not excluded');
+    assert(r.topPosts.some(p => p.likes === 20), 'F: post with no author field must be kept, not excluded');
   }
 
   // ── Scenario E: noHandle unaffected ───────────────────────────────────

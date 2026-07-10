@@ -2,25 +2,37 @@
 /**
  * youtube-er.js — YouTube Engagement Rate module
  *
+ * Uses YouTube Data API v3 exclusively (no APIdirect dependency) — the same
+ * "fetch the account's own content directly" move applied to LinkedIn
+ * (company/posts) and Instagram (user/posts) this session, adapted to
+ * YouTube's actual API: there's no single "channel timeline" endpoint, but
+ * search.list scoped to channelId + type=video + order=date, with
+ * publishedAfter/publishedBefore doing the date-range filtering SERVER-SIDE,
+ * gets the same result — the channel's own videos, already date-bounded, no
+ * keyword search and no post-hoc channel-matching needed.
+ *
  * For each org:
- *   1. APIdirect youtube/channels to resolve the org's official channel_id
- *      (needs only APIDIRECT_KEY — no dependency on YOUTUBE_KEY)
- *   2. APIdirect youtube/posts to discover AQ-related videos (free-text
- *      search, same shape as linkedin/posts and instagram/posts — not
- *      scoped to a channel, so results are filtered to the official
- *      channel using each post's channel_id)
- *   3. Client-side date-range filter — APIdirect's upload_date param only
- *      supports last_hour/today/this_week/this_month/this_year, not an
- *      arbitrary custom range, so DATE_FROM/DATE_TO filtering happens here
- *   4. YouTube Data API v3 /videos for views/likes/comments — APIdirect's
- *      video search returns views but not engagement counts
- *   5. YouTube Data API v3 /channels for subscriber-hidden detection
- *   6. ER = (likes + comments) / subscribers * 100
+ *   1. channels.list?forHandle=... resolves the channel_id, title, and
+ *      subscriber count (incl. hidden-count detection) in one call.
+ *   2. search.list?channelId=...&type=video&order=date&publishedAfter=...
+ *      &publishedBefore=... lists this channel's videos already scoped to
+ *      the report window, paginated via pageToken up to a page cap (each
+ *      page costs 100 quota units — see MAX_SEARCH_PAGES below).
+ *   3. AQ-relevance filter (client-side, on title+description) — search.list
+ *      has no keyword param that stays channel+date scoped at the same time.
+ *   4. videos.list for likes/comments/views (search.list returns snippet
+ *      only, no statistics).
+ *   5. ER = (likes + comments) / subscribers * 100
  *      Fallback to view-ER when subscriber count is hidden: (likes+comments)/views*100
+ *
+ * Quota cost note: search.list is expensive (100 units/page vs 1 unit for
+ * channels.list/videos.list). MAX_SEARCH_PAGES=3 (150 videos/org) caps this
+ * at 300 units/org for discovery; YouTube's default daily quota is 10,000
+ * units, so budget roughly 30 orgs/day before hitting it.
  */
 
 const axios = require('axios');
-const APIdirect = require('./apidirect-collector');
+const APIdirect = require('./apidirect-collector'); // reused for parseDate() and isAQ() only — no API calls to APIdirect from this module
 
 const YT_AQ_BASE = ['air quality', 'air pollution', 'AQI', 'PM2.5', 'NCAP'];
 
@@ -31,8 +43,10 @@ function buildYtAqTerms(scopeKeywords) {
   return [...new Set([...YT_AQ_BASE, ...extra])].slice(0, 15);
 }
 
-const YT_VIDEOS_URL  = 'https://www.googleapis.com/youtube/v3/videos';
+const YT_VIDEOS_URL   = 'https://www.googleapis.com/youtube/v3/videos';
 const YT_CHANNELS_URL = 'https://www.googleapis.com/youtube/v3/channels';
+const YT_SEARCH_URL   = 'https://www.googleapis.com/youtube/v3/search';
+const MAX_SEARCH_PAGES = 3; // 150 videos — see quota-cost note above
 
 function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -56,87 +70,113 @@ function extractVideoId(url) {
   return null;
 }
 
+// ─── Resolve a channel by handle: id, title, subscriber count in one call ──
+async function resolveChannel(ytHandle, apiKey) {
+  const handle = `@${ytHandle.replace(/^@/, '')}`;
+  const { data } = await axios.get(YT_CHANNELS_URL, {
+    params: { part: 'snippet,statistics', forHandle: handle, key: apiKey },
+    timeout: 20000,
+  });
+  const item = (data.items || [])[0];
+  if (!item) return null;
+  const s = item.statistics || {};
+  return {
+    channelId: item.id,
+    channelTitle: item.snippet?.title || '',
+    subscribers: parseInt(s.subscriberCount || '0', 10),
+    subscribersHidden: s.hiddenSubscriberCount === true,
+  };
+}
+
+// ─── List a channel's videos already scoped to the date window ─────────────
+async function discoverChannelVideos(channelId, dateRange, apiKey) {
+  let videos = [];
+  let pageToken;
+  let pages = 0;
+  let truncated = false;
+  do {
+    const { data } = await axios.get(YT_SEARCH_URL, {
+      params: {
+        part: 'snippet',
+        channelId,
+        type: 'video',
+        order: 'date',
+        publishedAfter: dateRange.from ? dateRange.from.toISOString() : undefined,
+        publishedBefore: dateRange.to ? dateRange.to.toISOString() : undefined,
+        maxResults: 50,
+        pageToken,
+        key: apiKey,
+      },
+      timeout: 20000,
+    });
+    const items = data.items || [];
+    videos = videos.concat(items.map((it) => ({
+      video_id: it.id?.videoId || '',
+      title: it.snippet?.title || '',
+      description: it.snippet?.description || '',
+      date: it.snippet?.publishedAt || '',
+      channel_id: it.snippet?.channelId || channelId,
+      url: it.id?.videoId ? `https://www.youtube.com/watch?v=${it.id.videoId}` : '',
+    })));
+    pageToken = data.nextPageToken;
+    pages++;
+    if (pageToken && pages >= MAX_SEARCH_PAGES) { truncated = true; break; }
+  } while (pageToken);
+  return { videos, truncated };
+}
+
 // ─── Batch fetch video stats (max 50 IDs per call) ─────────────────────────
-// Still YouTube Data API v3 — APIdirect's youtube/posts returns views but no
-// likes/comments, and there's no APIdirect endpoint for per-video engagement
-// stats at all.
+// search.list returns snippet only — no statistics — so this call is still
+// required regardless of discovery method.
 async function fetchVideoStats(videoIds, apiKey) {
   if (!videoIds.length) return {};
   const out = {};
-  // Chunk into batches of 50
   for (let i = 0; i < videoIds.length; i += 50) {
     const batch = videoIds.slice(i, i + 50);
-    try {
-      const { data } = await axios.get(YT_VIDEOS_URL, {
-        params: { part: 'statistics,snippet', id: batch.join(','), key: apiKey },
-        timeout: 20000,
-      });
-      for (const item of data.items || []) {
-        const s = item.statistics || {};
-        out[item.id] = {
-          channelId:    item.snippet?.channelId || '',
-          channelTitle: item.snippet?.channelTitle || '',
-          title:        item.snippet?.title || '',
-          publishedAt:  item.snippet?.publishedAt || '',
-          views:        parseInt(s.viewCount    || '0', 10),
-          likes:        parseInt(s.likeCount    || '0', 10),
-          comments:     parseInt(s.commentCount || '0', 10),
-        };
-      }
-    } catch (e) {
-      // quota exceeded or bad key — caller handles
-      throw e;
+    const { data } = await axios.get(YT_VIDEOS_URL, {
+      params: { part: 'statistics,snippet', id: batch.join(','), key: apiKey },
+      timeout: 20000,
+    });
+    for (const item of data.items || []) {
+      const s = item.statistics || {};
+      out[item.id] = {
+        title:       item.snippet?.title || '',
+        publishedAt: item.snippet?.publishedAt || '',
+        views:       parseInt(s.viewCount    || '0', 10),
+        likes:       parseInt(s.likeCount    || '0', 10),
+        comments:    parseInt(s.commentCount || '0', 10),
+      };
     }
   }
   return out;
 }
 
-// ─── Batch fetch channel stats (max 50 IDs per call) ───────────────────────
-// Still YouTube Data API v3 — APIdirect's channel search doesn't expose
-// hiddenSubscriberCount, which the ER fallback logic depends on.
-async function fetchChannelStats(channelIds, apiKey) {
-  if (!channelIds.length) return {};
-  const out = {};
-  const unique = [...new Set(channelIds)];
-  for (let i = 0; i < unique.length; i += 50) {
-    const batch = unique.slice(i, i + 50);
-    try {
-      const { data } = await axios.get(YT_CHANNELS_URL, {
-        params: { part: 'statistics,snippet', id: batch.join(','), key: apiKey },
-        timeout: 20000,
-      });
-      for (const item of data.items || []) {
-        const s = item.statistics || {};
-        out[item.id] = {
-          name:              item.snippet?.title || '',
-          subscribers:       parseInt(s.subscriberCount || '0', 10),
-          subscribersHidden: s.hiddenSubscriberCount === true,
-          totalViews:        parseInt(s.viewCount || '0', 10),
-          videoCount:        parseInt(s.videoCount || '0', 10),
-        };
-      }
-    } catch (e) {
-      throw e;
-    }
+function classifyYtError(e, cb) {
+  const status = e.response?.status;
+  const reason = e.response?.data?.error?.errors?.[0]?.reason || '';
+  const msg    = e.response?.data?.error?.message || e.message;
+  cb?.(`  [YouTubeER] YouTube API error HTTP ${status || '?'} ${reason}: ${msg}`, 'warn');
+  if (status === 403) {
+    cb?.('  [YouTubeER] 403 Fix: enable "YouTube Data API v3" in Google Cloud Console for this API key, and remove any HTTP-referrer restrictions on the key.', 'warn');
+  } else if (status === 400) {
+    cb?.('  [YouTubeER] 400 Fix: check the API key value — it may be malformed or belong to the wrong project.', 'warn');
   }
-  return out;
+  return { failReason: require('./sentinel').classifyError({ status, message: msg }), failMessage: msg };
 }
+
+const EMPTY_RESULT = { videos: [], videoCount: 0, avgER: 0, avgViewER: 0, totalViews: 0, totalLikes: 0, totalComments: 0, erMethod: 'none' };
 
 // ─── Main run ───────────────────────────────────────────────────────────────
 async function run(cfg, selectedOrgs, cb) {
-  const YOUTUBE_KEY   = cfg.YOUTUBE_KEY    || '';
-  const APIDIRECT_KEY = cfg.APIDIRECT_KEY  || '';
-  const ORG_HANDLES   = cfg.ORG_YT_HANDLES || {};
+  const YOUTUBE_KEY = cfg.YOUTUBE_KEY    || '';
+  const ORG_HANDLES = cfg.ORG_YT_HANDLES || {};
 
-  if (!APIDIRECT_KEY) {
-    cb?.('[YouTubeER] No APIDIRECT_KEY — skipping', 'warn');
-    return [];
-  }
   if (!YOUTUBE_KEY) {
-    cb?.('[YouTubeER] No YOUTUBE_KEY — engagement stats (likes/comments) unavailable, views only', 'warn');
+    cb?.('[YouTubeER] No YOUTUBE_KEY — YouTube Data API v3 required for both discovery and stats, skipping entirely', 'warn');
+    return selectedOrgs.map((org) => ({ org, ...EMPTY_RESULT, noKey: true }));
   }
 
-  cb?.(`[YouTubeER] Searching YouTube (APIdirect) for ${selectedOrgs.length} orgs...`);
+  cb?.(`[YouTubeER] Searching YouTube (Data API v3) for ${selectedOrgs.length} orgs...`);
 
   const aqKw = buildYtAqTerms(cfg.SCOPE_KEYWORDS);
   const dateRange = { from: APIdirect.parseDate(cfg.DATE_FROM), to: APIdirect.parseDate(cfg.DATE_TO) };
@@ -145,113 +185,79 @@ async function run(cfg, selectedOrgs, cb) {
 
   for (const orgName of selectedOrgs) {
     cb?.(`  [YouTubeER] "${orgName}"...`);
-
     const orgHandle = ORG_HANDLES[orgName] || null;
 
-    // If no handle configured at all, skip this org for YT
     if (!orgHandle) {
       cb?.(`  [YouTubeER] ${orgName}: no YT handle configured — skipping`, 'warn');
-      orgResults.push({
-        org: orgName, videos: [], videoCount: 0,
-        avgER: 0, avgViewER: 0, totalViews: 0, totalLikes: 0, totalComments: 0,
-        erMethod: 'none', noHandle: true,
-      });
+      orgResults.push({ org: orgName, ...EMPTY_RESULT, noHandle: true });
       continue;
     }
 
-    // ── Step 1: resolve official channel via APIdirect (needs only APIDIRECT_KEY) ──
-    const channelInfo = await APIdirect.fetchYouTubeChannel(orgName, orgHandle, APIDIRECT_KEY, cb);
-    const officialChannelId = channelInfo.channelId;
-    const handleUnresolved = !officialChannelId;
-    if (handleUnresolved) {
+    // ── Step 1: resolve official channel + subscriber count ──────────────
+    let channel;
+    try {
+      channel = await resolveChannel(orgHandle, YOUTUBE_KEY);
+    } catch (e) {
+      const { failReason, failMessage } = classifyYtError(e, cb);
+      orgResults.push({ org: orgName, ...EMPTY_RESULT, failed: true, failReason, failMessage });
+      continue;
+    }
+    if (!channel) {
       cb?.(`  [YouTubeER] ${orgName}: could not resolve channel for handle ${orgHandle}`, 'warn');
-    }
-
-    // ── Step 2: discover AQ-related videos via APIdirect ───────────────────
-    const searchResult = await APIdirect.searchYouTubeVideos(orgName, APIDIRECT_KEY, aqKw, cb);
-    if (searchResult.failed) {
-      cb?.(`  [YouTubeER] ${orgName}: video discovery failed — ${searchResult.failMessage}`, 'warn');
-      orgResults.push({
-        org: orgName, videos: [], videoCount: 0,
-        avgER: 0, avgViewER: 0, totalViews: 0, totalLikes: 0, totalComments: 0,
-        erMethod: 'none', discovered: 0, handleUnresolved,
-        failed: true, failReason: searchResult.failReason, failMessage: searchResult.failMessage,
-      });
+      orgResults.push({ org: orgName, ...EMPTY_RESULT, handleUnresolved: true });
       continue;
     }
-    const discovered = searchResult.posts;
+    cb?.(`  [YouTubeER] ${orgName}: resolved channel "${channel.channelTitle}" (${channel.subscribers.toLocaleString()} subscribers)`, 'ok');
 
-    // ── Step 3: filter to official channel, then to the report date window ──
-    let candidates = officialChannelId
-      ? discovered.filter(p => p.channel_id === officialChannelId)
-      : []; // can't verify official channel — don't show an unverified count as if genuine
-    const afterChannel = candidates.length;
+    // ── Step 2: this channel's videos in the date window (server-side date filter) ──
+    let discoveredVideos, truncated;
+    try {
+      ({ videos: discoveredVideos, truncated } = await discoverChannelVideos(channel.channelId, dateRange, YOUTUBE_KEY));
+    } catch (e) {
+      const { failReason, failMessage } = classifyYtError(e, cb);
+      orgResults.push({ org: orgName, ...EMPTY_RESULT, discovered: 0, failed: true, failReason, failMessage });
+      continue;
+    }
+    if (truncated) {
+      cb?.(`  [YouTubeER] ${orgName}: hit the ${MAX_SEARCH_PAGES}-page video-search cap while still inside the date window — org uploads frequently, older in-range videos may exist beyond this cap`, 'warn');
+    }
+    const discoveredCount = discoveredVideos.length;
 
-    candidates = candidates.filter(p => APIdirect.inDateRange(p.date, dateRange.from, dateRange.to));
-    const inRangeCount = candidates.length;
+    // ── Step 3: AQ-relevance filter ───────────────────────────────────────
+    const candidates = discoveredVideos.filter((v) => APIdirect.isAQ(`${v.title} ${v.description}`, aqKw));
 
     if (!candidates.length) {
-      const diag = discovered.length === 0
-        ? 'no videos discovered via APIdirect for this org/keyword combination'
-        : handleUnresolved
-          ? `APIdirect found ${discovered.length} video(s) but the channel handle couldn't be resolved to confirm they're from the official channel`
-          : afterChannel === 0
-            ? `APIdirect found ${discovered.length} video(s) but none matched the resolved official channel`
-            : `${afterChannel} video(s) matched the official channel but none fall in the report date window`;
+      const diag = discoveredCount === 0
+        ? 'no videos found on this channel within the report date window'
+        : `${discoveredCount} video(s) found in the date window but none matched the AQ keywords — zero is genuine`;
       cb?.(`  [YouTubeER] ${orgName}: 0 videos — ${diag}`, 'warn');
-      orgResults.push({
-        org: orgName, videos: [], videoCount: 0,
-        avgER: 0, avgViewER: 0, totalViews: 0, totalLikes: 0, totalComments: 0,
-        erMethod: 'none', discovered: discovered.length, afterChannel, inRangeCount, handleUnresolved,
-      });
+      orgResults.push({ org: orgName, ...EMPTY_RESULT, discovered: discoveredCount, truncated });
       continue;
     }
 
-    // ── Step 4 & 5: YouTube Data API v3 for likes/comments/subscriber-hidden ──
+    // ── Step 4: per-video stats (views/likes/comments) ────────────────────
     let videoStats = {};
-    let channelStats = {};
     let statsFailed = false, statsFailReason = null, statsFailMessage = null;
-
-    if (YOUTUBE_KEY) {
-      try {
-        const videoIds = candidates.map(p => p.video_id).filter(Boolean);
-        videoStats = await fetchVideoStats(videoIds, YOUTUBE_KEY);
-        channelStats = await fetchChannelStats([officialChannelId].filter(Boolean), YOUTUBE_KEY);
-      } catch (e) {
-        const status = e.response?.status;
-        const reason = e.response?.data?.error?.errors?.[0]?.reason || '';
-        const msg    = e.response?.data?.error?.message || e.message;
-        cb?.(`  [YouTubeER] YouTube API error (${orgName}) HTTP ${status || '?'} ${reason}: ${msg}`, 'warn');
-        if (status === 403) {
-          cb?.('  [YouTubeER] 403 Fix: enable "YouTube Data API v3" in Google Cloud Console for this API key, and remove any HTTP-referrer restrictions on the key.', 'warn');
-        } else if (status === 400) {
-          cb?.('  [YouTubeER] 400 Fix: check the API key value — it may be malformed or belong to the wrong project.', 'warn');
-        }
-        statsFailed = true;
-        statsFailReason = require('./sentinel').classifyError({ status, message: msg });
-        statsFailMessage = msg;
-      }
+    try {
+      videoStats = await fetchVideoStats(candidates.map((v) => v.video_id).filter(Boolean), YOUTUBE_KEY);
+    } catch (e) {
+      ({ failReason: statsFailReason, failMessage: statsFailMessage } = classifyYtError(e, cb));
+      statsFailed = true;
     }
 
-    // ── Step 6: assemble per-video data and calculate ER ─────────────────
-    const videos = candidates.map(p => {
-      const vid = p.video_id;
-      const vs  = videoStats[vid];
-      const cs  = officialChannelId ? channelStats[officialChannelId] : null;
+    // ── Step 5: assemble per-video data and calculate ER ─────────────────
+    const videos = candidates.map((v) => {
+      const vs = videoStats[v.video_id];
+      const views = vs?.views ?? null;
+      const likes = vs?.likes ?? null;
+      const comments = vs?.comments ?? null;
+      const subscribers = channel.subscribers;
+      const subsHidden = channel.subscribersHidden;
 
-      const views       = vs?.views ?? (typeof p.views === 'number' ? p.views : null);
-      const likes       = vs?.likes    ?? null;
-      const comments    = vs?.comments ?? null;
-      const subscribers = cs?.subscribers ?? null;
-      const subsHidden  = cs?.subscribersHidden ?? false;
-
-      let subscriberER = null;
-      let viewER       = null;
-      let erMethod     = 'none';
-
+      let subscriberER = null, viewER = null, erMethod = 'none';
       if (likes !== null && comments !== null) {
         const engagement = likes + comments;
-        if (!subsHidden && subscribers && subscribers > 0) {
+        if (!subsHidden && subscribers > 0) {
           subscriberER = parseFloat(((engagement / subscribers) * 100).toFixed(3));
           erMethod = 'subscriber';
         }
@@ -262,63 +268,35 @@ async function run(cfg, selectedOrgs, cb) {
       }
 
       return {
-        videoId:     vid,
-        url:         p.url || (vid ? `https://www.youtube.com/watch?v=${vid}` : ''),
-        title:       vs?.title || p.title || '',
-        publishedAt: vs?.publishedAt || p.date || '',
-        channelId:   p.channel_id || '',
-        channelName: cs?.name || p.author || '',
-        subscribers,
-        subsHidden,
-        views,
-        likes,
-        comments,
-        subscriberER,
-        viewER,
-        erMethod,
+        videoId: v.video_id,
+        url: v.url,
+        title: vs?.title || v.title || '',
+        publishedAt: vs?.publishedAt || v.date || '',
+        channelId: v.channel_id,
+        channelName: channel.channelTitle,
+        subscribers, subsHidden, views, likes, comments, subscriberER, viewER, erMethod,
       };
     });
 
-    // Determine the org-level ER method (prefer subscriber-based)
-    const subERVideos  = videos.filter(v => v.subscriberER !== null);
-    const viewERVideos = videos.filter(v => v.viewER !== null);
-
-    let avgER     = 0;
-    let avgViewER = 0;
-    let erMethod  = 'none';
-
-    if (subERVideos.length) {
-      avgER    = parseFloat((subERVideos.reduce((s, v) => s + v.subscriberER, 0) / subERVideos.length).toFixed(3));
-      erMethod = 'subscriber';
-    }
-    if (viewERVideos.length) {
-      avgViewER = parseFloat((viewERVideos.reduce((s, v) => s + v.viewER, 0) / viewERVideos.length).toFixed(3));
-      if (erMethod === 'none') erMethod = 'view';
-    }
+    const subERVideos  = videos.filter((v) => v.subscriberER !== null);
+    const viewERVideos = videos.filter((v) => v.viewER !== null);
+    let avgER = 0, avgViewER = 0, erMethod = 'none';
+    if (subERVideos.length)  { avgER = parseFloat((subERVideos.reduce((s, v) => s + v.subscriberER, 0) / subERVideos.length).toFixed(3)); erMethod = 'subscriber'; }
+    if (viewERVideos.length) { avgViewER = parseFloat((viewERVideos.reduce((s, v) => s + v.viewER, 0) / viewERVideos.length).toFixed(3)); if (erMethod === 'none') erMethod = 'view'; }
 
     const totalViews    = videos.reduce((s, v) => s + (v.views    ?? 0), 0);
     const totalLikes    = videos.reduce((s, v) => s + (v.likes    ?? 0), 0);
     const totalComments = videos.reduce((s, v) => s + (v.comments ?? 0), 0);
 
-    cb?.(`  [YouTubeER] ${orgName}: ${videos.length} official-channel videos in window | avgER=${avgER}% (${erMethod}) | views=${totalViews.toLocaleString()}`, videos.length > 0 ? 'ok' : 'warn');
+    cb?.(`  [YouTubeER] ${orgName}: ${videos.length} AQ videos in window | avgER=${avgER}% (${erMethod}) | views=${totalViews.toLocaleString()}`, videos.length > 0 ? 'ok' : 'warn');
 
     orgResults.push({
       org: orgName,
-      videos:       videos,
-      videoCount:   videos.length,
-      avgER,
-      avgViewER,
-      erMethod,
-      totalViews,
-      totalLikes,
-      totalComments,
-      discovered: discovered.length,
-      afterChannel,
-      inRangeCount,
-      handleUnresolved,
-      failed: statsFailed,
-      failReason: statsFailed ? statsFailReason : null,
-      failMessage: statsFailed ? statsFailMessage : null,
+      videos, videoCount: videos.length,
+      avgER, avgViewER, erMethod,
+      totalViews, totalLikes, totalComments,
+      discovered: discoveredCount, truncated,
+      failed: statsFailed, failReason: statsFailed ? statsFailReason : null, failMessage: statsFailed ? statsFailMessage : null,
     });
   }
 
@@ -345,15 +323,15 @@ function buildYoutubeERHtml(results, hasApiKey) {
 
   const methodNote = !hasApiKey
     ? `<div style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:#d4a017;line-height:1.7">
-        <strong>&#9432; YOUTUBE_KEY not configured</strong> — videos discovered and channel-matched via APIdirect.io, but engagement metrics (likes, comments) are unavailable since only YouTube Data API v3 exposes those. Add <code style="background:#1e2638;padding:1px 5px;border-radius:3px">YOUTUBE_KEY</code> (Google API key with YouTube Data API v3 enabled) to unlock likes, comments, and ER scores.
+        <strong>&#9432; YOUTUBE_KEY not configured</strong> — YouTube Data API v3 is required for both video discovery and engagement stats; without it this section is skipped entirely. Add <code style="background:#1e2638;padding:1px 5px;border-radius:3px">YOUTUBE_KEY</code> (Google API key with YouTube Data API v3 enabled) to unlock this section.
       </div>`
     : `<div style="background:rgba(76,175,116,.06);border:1px solid rgba(76,175,116,.2);border-radius:8px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:#8fa3b8;line-height:1.7">
-        <strong style="color:#4caf74">Methodology:</strong> APIdirect.io discovers AQ-related videos (<code style="background:#1e2638;padding:1px 5px;border-radius:3px">GET /youtube/posts</code>) and resolves the official channel (<code style="background:#1e2638;padding:1px 5px;border-radius:3px">GET /youtube/channels</code>); YouTube Data API v3 fetches live likes/comments/view stats per video. <strong>Subscriber ER</strong> = (likes + comments) / subscribers × 100. <strong>View ER</strong> used as fallback when subscriber count is hidden.
+        <strong style="color:#4caf74">Methodology:</strong> YouTube Data API v3 resolves the official channel (<code style="background:#1e2638;padding:1px 5px;border-radius:3px">channels.list?forHandle</code>), lists its videos already scoped to the report window (<code style="background:#1e2638;padding:1px 5px;border-radius:3px">search.list?channelId&order=date&publishedAfter/Before</code>), then fetches live likes/comments/view stats per video. <strong>Subscriber ER</strong> = (likes + comments) / subscribers × 100. <strong>View ER</strong> used as fallback when subscriber count is hidden.
       </div>`;
 
   const statCards = [
     { label: 'Orgs with YT videos', value: orgsWithVideos, unit: `of ${results.length} tracked`, col: '#ff0000' },
-    { label: 'Videos discovered',   value: totalVideos,    unit: 'via APIdirect.io',              col: '#e53935' },
+    { label: 'Videos discovered',   value: totalVideos,    unit: 'via YouTube Data API v3',       col: '#e53935' },
     { label: 'Total views',         value: totalViews > 999999 ? `${(totalViews/1000000).toFixed(1)}M` : totalViews > 999 ? `${(totalViews/1000).toFixed(0)}K` : totalViews,
                                     unit: 'cumulative',                                             col: '#ef5350' },
     { label: 'Best ER',             value: topOrg?.avgER || topOrg?.avgViewER || '—',
@@ -434,7 +412,7 @@ function buildYoutubeERHtml(results, hasApiKey) {
   <div class="sh">
     <div class="se">Section 08c</div>
     <h2 class="st">YouTube Engagement Rate</h2>
-    <div class="sd">Real engagement metrics from YouTube Data API v3. Videos discovered and channel-matched via APIdirect.io, stats fetched live per video.</div>
+    <div class="sd">Real engagement metrics from YouTube Data API v3. Videos discovered, channel-matched, and stats fetched live per video — all via the official API.</div>
     <div class="sdiv"></div>
   </div>
 

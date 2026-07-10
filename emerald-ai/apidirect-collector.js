@@ -38,24 +38,6 @@ function isAQ(text, aqKw) {
   return (aqKw || AQ_KW_BASE).some(k => t.includes(k));
 }
 
-// Auto-generate a 3+ letter abbreviation from multi-word org names — same
-// logic as pipeline.js's getAbbreviation(), duplicated here (small,
-// self-contained, no external deps) rather than cross-required, since
-// pipeline.js requires this module and a top-level require back would be
-// circular. Used by the authorship filters below: LinkedIn/Instagram pages
-// often use an org's acronym as their display name (e.g. "APAG"), which a
-// handle-or-full-org-name-only substring check would never match.
-const ABBR_STOP = new Set(['of','on','and','the','for','in','at','by','to','a','an','with','its','vs']);
-function getAbbreviation(orgName) {
-  const words = orgName.replace(/[^a-zA-Z\s]/g, ' ').trim().split(/\s+/)
-    .filter(w => w.length > 1 && !ABBR_STOP.has(w.toLowerCase()));
-  if (words.length < 2) return null;
-  const abbr = words.map(w => w[0].toUpperCase()).join('');
-  if (abbr.length < 3) return null;
-  if (orgName.replace(/[^a-zA-Z]/g, '').length <= 6) return null; // already short/acronym
-  return abbr;
-}
-
 // ── Adaptive per-endpoint concurrency gate ──────────────────────────────────
 // APIdirect caps each endpoint at 3 concurrent requests. We start at 2 for
 // headroom and ADAPT DOWN to 1 (serial) the instant an endpoint returns 429,
@@ -224,15 +206,11 @@ function oldestInBatch(batch, ...fields) {
 // original poster, not the org) — e.g. a partner org's event post that WRI
 // India reposted. Those are excluded below; they aren't the org's own voice
 // and would mis-attribute third-party text into this org's topic/engagement
-// numbers.
-//
-// Strict "company page only" posture: is_repost is one signal from a
-// third-party API and shouldn't be the sole gate. Every surviving post is
-// ALSO required to have an author field matching the org (handle, full name,
-// or abbreviation — same match set the old author-substring approach used).
-// A post with is_repost:false but a non-matching author (data inconsistency,
-// showcase/affiliate page bleed-through) is still excluded; a post with no
-// author field at all fails closed (excluded), not included by default.
+// numbers. No further author-matching is needed on top of that — the post
+// came from the company's own page URL, so is_repost:false already means
+// it's the org's own content. Kept simple deliberately: an extra
+// handle/name/abbreviation substring check was tried and dropped — it was
+// redundant with what the endpoint already guarantees.
 //
 // No keyword query here — this endpoint has no query param, it's the org's
 // unfiltered timeline. That means an active poster's AQ-relevant posts can be
@@ -271,26 +249,14 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
       cb?.(`  [APIdirect/LI] ${org}: hit the ${MAX_PAGES}-page fetch cap (${fetched}${total != null ? `/${total}` : ''} posts) while still inside the date window — org posts frequently, older in-range posts may exist beyond this cap`, 'warn');
     }
 
-    // Strict company-page-only gate: exclude reposts AND verify the author
-    // field actually matches the org (handle, full name, or abbreviation —
-    // e.g. "APAG"). No author field at all fails closed (excluded).
+    // Exclude reposts of other pages' content — everything else is the org's
+    // own content by construction (fetched from its own page URL).
     // (Field name kept as afterAuthor for diagnoseZero()/sentinel compatibility.)
-    const handleLower = handle.toLowerCase();
-    const orgLower = org.toLowerCase();
-    const abbr = getAbbreviation(org);
-    const abbrLower = abbr ? abbr.toLowerCase() : null;
-    let posts = allPosts.filter(p => {
-      if (p.is_repost) return false;
-      const author = (p.author || '').toLowerCase();
-      if (!author) return false;
-      return author.includes(handleLower) || author.includes(orgLower) || (abbrLower && author.includes(abbrLower));
-    });
+    let posts = allPosts.filter(p => !p.is_repost);
     const afterAuthor = posts.length;
-    const excludedCount = fetched - afterAuthor;
-    if (excludedCount > 0) {
-      const repostCount = allPosts.filter(p => p.is_repost).length;
-      const authorMismatchCount = excludedCount - repostCount;
-      cb?.(`  [APIdirect/LI] ${org}: ${excludedCount} post(s) excluded (${repostCount} repost(s), ${authorMismatchCount} author mismatch) — not verified as the org's own page content`, 'warn');
+    const repostCount = fetched - afterAuthor;
+    if (repostCount > 0) {
+      cb?.(`  [APIdirect/LI] ${org}: ${repostCount} repost(s) excluded (not the org's own content)`, 'warn');
     }
 
     // 2) date range
@@ -405,82 +371,52 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
 }
 
 // ── Instagram ─────────────────────────────────────────────────────────────────
-// Smart pagination: fetch pages sequentially, stop as soon as the oldest post
-// on a page predates dateFrom. Max 5 pages (~100 posts).
+// Uses instagram/user/posts — the account's own feed by username, not a
+// keyword search (same move as fetchLinkedIn(): fetch the account's own
+// content directly instead of guessing authorship from search results, no
+// author-substring matching needed since every post already belongs to this
+// account). This endpoint has no incremental page cursor — `pages` (1-10)
+// fetches that many pages (12 posts each, up to 120) in ONE call from the
+// start, so there's no cheaper way to "paginate until old enough" than
+// requesting the max in a single shot and checking how far back it reaches.
 async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
   const EMPTY = { postCount: 0, totalLikes: 0, totalComments: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
   if (!igHandle) {
     cb?.(`  [APIdirect/IG] ${org}: no official handle — skipped`, 'warn');
     return { ...EMPTY, noHandle: true };
   }
-  const MAX_PAGES = 5;
+  const handle = igHandle.replace(/^@/, '').trim();
+  const MAX_PAGES = 10; // API ceiling — 120 posts, the most this endpoint can return in one call
   try {
-    const handle = igHandle.replace(/^@/, '').toLowerCase();
-    // Was slice(0,6) — same query-vs-filter keyword-coverage gap as
-    // LinkedIn, just worse (up to 11 of 17 default terms excluded from the
-    // query itself). Raised to 20; stays well under a safe query-length
-    // margin even with a heavier custom scope-keyword set.
-    const kwClause = aqKw.slice(0, 20).map(k => `"${k}"`).join(' OR ');
-    const query = `${handle} (${kwClause})`;
-
-    // Fetch user profile and first page in parallel
-    const [firstPageRes, userRes] = await Promise.allSettled([
-      apiFetch('instagram/posts', { query, page: 1 }, apiKey),
+    const [postsRes, userRes] = await Promise.allSettled([
+      apiFetch('instagram/user/posts', { username: handle, pages: MAX_PAGES }, apiKey),
       apiFetch('instagram/user', { username: handle }, apiKey),
     ]);
     const followers = (userRes.status === 'fulfilled' && userRes.value) ? (userRes.value?.user?.follower_count || 0) : 0;
 
-    // A rejected first page is a FAILED fetch, not "0 posts" — surface it.
-    if (firstPageRes.status === 'rejected') throw firstPageRes.reason;
+    // A rejected posts call is a FAILED fetch, not "0 posts" — surface it.
+    if (postsRes.status === 'rejected') throw postsRes.reason;
 
-    let allPosts = firstPageRes.value?.posts || [];
-    if (allPosts.length > 0) {
-      const oldest = oldestInBatch(allPosts, 'date', 'taken_at');
-      if (!dateRange?.from || !oldest || oldest >= dateRange.from) {
-        for (let page = 2; page <= MAX_PAGES; page++) {
-          const r = await apiFetch('instagram/posts', { query, page }, apiKey);
-          const batch = r.posts || [];
-          if (!batch.length) break;
-          allPosts = allPosts.concat(batch);
-          const batchOldest = oldestInBatch(batch, 'date', 'taken_at');
-          if (dateRange?.from && batchOldest && batchOldest < dateRange.from) break;
-        }
-      }
-    }
+    const allPosts = postsRes.value?.posts || [];
     const fetched = allPosts.length;
-
-    // 1) official channel only — substring match against handle, org name,
-    // OR the org's abbreviation (e.g. "APAG"), same pattern as
-    // fetchLinkedIn(). instagram/posts is a free-text search (not scoped to
-    // the account, same as linkedin/posts), so the author field can come
-    // back formatted differently — display name, different case, extra
-    // text — than the bare handle string used for the separate
-    // instagram/user followers lookup. Exact equality was silently dropping
-    // genuinely-authored posts even when the handle itself was correct
-    // (proven by followers resolving fine from the same handle).
-    const orgLower = org.toLowerCase();
-    const abbr = getAbbreviation(org);
-    const abbrLower = abbr ? abbr.toLowerCase() : null;
-    let posts = allPosts.filter(p => {
-      const author = (p.author || p.username || p.author_name || '').toLowerCase();
-      return author.includes(handle) || author.includes(orgLower) || (abbrLower && author.includes(abbrLower));
-    });
-    const afterAuthor = posts.length;
-    if (posts.length === 0 && fetched > 0) {
-      cb?.(`  [APIdirect/IG] ${org}: no posts with matching author field — ${fetched} dropped`, 'warn');
+    const oldest = oldestInBatch(allPosts, 'date');
+    // Only a coverage gap if we hit the full 120-post ceiling AND still
+    // hadn't reached back before the report window — if the account has
+    // fewer posts than the ceiling, we've genuinely seen its entire history.
+    const hitCeiling = fetched >= MAX_PAGES * 12;
+    const truncated = hitCeiling && !!dateRange?.from && (!oldest || oldest >= dateRange.from);
+    if (truncated) {
+      cb?.(`  [APIdirect/IG] ${org}: hit the ${MAX_PAGES}-page/${MAX_PAGES * 12}-post ceiling while still inside the date window — org posts frequently, older in-range posts may exist beyond this cap`, 'warn');
     }
 
-    // 2) date range
-    posts = posts.filter(p => inDateRange(p.date || p.taken_at, dateRange?.from, dateRange?.to));
+    // 1) date range — no authorship filter needed, this is the account's own feed
+    let posts = allPosts.filter(p => inDateRange(p.date, dateRange?.from, dateRange?.to));
     const inRange = posts.length;
 
-    // 3) AQ relevance
-    posts = posts.filter(p => isAQ(
-      `${p.title || ''} ${p.snippet || ''} ${p.caption || ''} ${p.description || ''} ${p.text || ''} ${p.body || ''}`,
-      aqKw
-    ));
+    // 2) AQ relevance
+    posts = posts.filter(p => isAQ(`${p.snippet || ''} ${p.title || ''}`, aqKw));
 
-    // 4) metrics + ER
+    // 3) metrics + ER
     const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
     const totalComments = posts.reduce((s, p) => s + (p.comments || 0), 0);
     const totalViews    = posts.reduce((s, p) => s + (p.views    || 0), 0);
@@ -490,7 +426,7 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
       .slice(0, 5)
       .map(p => ({
         url:      p.url || '',
-        snippet:  (p.snippet || p.title || p.caption || '').slice(0, 250),
+        snippet:  (p.snippet || '').slice(0, 250),
         author:   p.author || p.author_name || '',
         likes:    p.likes    || 0,
         comments: p.comments || 0,
@@ -500,7 +436,7 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
       }));
     const erVal = er(totalEngage, followers, posts.length);
     cb?.(`  [APIdirect/IG] ${org}: ${fetched} fetched → ${inRange} in range → ${posts.length} AQ posts, ${followers.toLocaleString()} followers, ER=${erVal}%`, posts.length > 0 ? 'ok' : 'warn');
-    return { postCount: posts.length, totalLikes, totalComments, totalViews, followers, er: erVal, topPosts, fetched, afterAuthor, inRangeCount: inRange };
+    return { postCount: posts.length, totalLikes, totalComments, totalViews, followers, er: erVal, topPosts, fetched, inRangeCount: inRange, truncated };
   } catch (e) {
     cb?.(`  [APIdirect/IG] ${org}: ${e.message}`, 'warn');
     return failResult(EMPTY, e);
@@ -508,9 +444,12 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
 }
 
 // ── YouTube channel resolution + subscriber count ─────────────────────────────
-// Also returns channelId now — youtube-er.js uses it to filter video-search
-// results to the official channel, replacing the old Google-API forHandle
-// lookup (which required YOUTUBE_KEY; this only needs APIDIRECT_KEY).
+// Used by this module's own run() (below) to show a subscriber count
+// alongside LinkedIn/Twitter/Instagram in the Social Media summary table.
+// youtube-er.js's own engagement-rate section resolves the channel itself via
+// YouTube Data API v3 instead (channels.list?forHandle=...) — that section
+// needs subscriber-hidden detection and video listing that only the official
+// API exposes, so it doesn't reuse this APIdirect-based resolution.
 async function fetchYouTubeChannel(org, ytHandle, apiKey, cb) {
   try {
     const query = ytHandle ? ytHandle.replace(/^@/, '') : org;
@@ -537,23 +476,6 @@ async function fetchYouTubeChannel(org, ytHandle, apiKey, cb) {
   }
 }
 
-// ── YouTube video discovery ─────────────────────────────────────────────────
-// Free-text search (GET /v1/youtube/posts) — same shape as linkedin/posts and
-// instagram/posts: not scoped to a channel, so results must be filtered to
-// the official channel by the caller using each post's channel_id. Returns
-// views but NOT likes/comments — youtube-er.js still uses YouTube Data API v3
-// for those (APIdirect has no per-video engagement-stats endpoint).
-async function searchYouTubeVideos(org, apiKey, aqKw, cb) {
-  const kwClause = aqKw.slice(0, 8).map(k => `"${k}"`).join(' OR ');
-  const query = `${org} (${kwClause})`.slice(0, 500); // APIdirect caps query at 500 chars
-  try {
-    const r = await apiFetch('youtube/posts', { query, pages: 1 }, apiKey);
-    return { posts: r.posts || [], failed: false };
-  } catch (e) {
-    cb?.(`  [APIdirect/YT] ${org} video search: ${e.message}`, 'warn');
-    return { posts: [], failed: true, failReason: e.code || require('./sentinel').classifyError(e), failMessage: e.message };
-  }
-}
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
@@ -623,6 +545,6 @@ async function run(cfg, selectedOrgs, orgHandles = {}, cb) {
 module.exports = {
   run,
   // Individual fetchers + helpers exported for the sentinel's targeted retries
-  fetchLinkedIn, fetchTwitter, fetchInstagram, fetchYouTubeChannel, searchYouTubeVideos,
-  buildAqKeywords, parseDate, inDateRange,
+  fetchLinkedIn, fetchTwitter, fetchInstagram, fetchYouTubeChannel,
+  buildAqKeywords, parseDate, inDateRange, isAQ,
 };
