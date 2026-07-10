@@ -360,7 +360,11 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   <strong style="color:#e53935">YT</strong> = YouTube videos via Data API v3 &nbsp;·&nbsp;
   <span style="color:#5e7494">flw = follower count &nbsp;·&nbsp; subs = subscriber count</span><br>
   ER% = Engagement Rate — X: (likes+replies+retweets)÷followers×100 &nbsp;·&nbsp; IG: (likes+comments)÷followers×100 (shown as <strong>~</strong> when followers &lt; 500, unreliable) &nbsp;·&nbsp; YT: (likes+comments)÷subscribers×100, falls back to ÷views &nbsp;·&nbsp;
-  SoV% = org total ÷ cohort total &nbsp;·&nbsp; Data: LinkedIn API · X API v2 · Instagram Graph API · YouTube Data API v3
+  SoV% = org total ÷ cohort total &nbsp;·&nbsp; Data: LinkedIn API · X API v2 · Instagram Graph API · YouTube Data API v3<br>
+  <strong style="color:#5e7494;letter-spacing:.06em">CELL VALUES</strong> &nbsp;·&nbsp;
+  <strong style="color:#4caf74">0</strong> = fetch completed, verified no AQ posts in this window (hover any 0 for the specific reason) &nbsp;·&nbsp;
+  <strong style="color:#3d4a63">–</strong> = no handle configured for that platform &nbsp;·&nbsp;
+  <strong style="color:#e05c5c">✕</strong> = API request failed — data unavailable, NOT a zero (hover for the failure reason)
 </div>`;
 
   // Zero-value note for the per-org detail view — each platform block is
