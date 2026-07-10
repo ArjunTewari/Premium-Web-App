@@ -3078,10 +3078,16 @@ function buildHTML(
   const tvTot = ORGS.reduce((s, o) => s + ALL_TV_CHANNELS.reduce((ts, ch) => ts + (data[o]?.outletCounts[ch] || 0), 0), 0);
 
   function sovBar() {
+    // A 0% flex-basis collapses to zero width, so a zero-count org's label
+    // never has room to render — give it a small fixed-width muted segment
+    // instead so "0" is actually visible, distinct from real coverage.
     const bars = ORGS.map((org, i) => {
-      const pct =
-        tot > 0 ? Math.round(((data[org]?.total || 0) / tot) * 100) : 0;
-      return `<div style="background:${orgHex(i)};width:${pct}%;display:flex;align-items:center;padding-left:9px;font-family:monospace;font-size:16px;font-weight:500;color:#fff;min-width:0;overflow:hidden">${data[org]?.total || 0}</div>`;
+      const count = data[org]?.total || 0;
+      if (count === 0) {
+        return `<div style="background:#2a3548;width:26px;flex:0 0 26px;display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:15px;font-weight:500;color:#5e7494">0</div>`;
+      }
+      const pct = tot > 0 ? Math.round((count / tot) * 100) : 0;
+      return `<div style="background:${orgHex(i)};width:${pct}%;display:flex;align-items:center;padding-left:9px;font-family:monospace;font-size:16px;font-weight:500;color:#fff;min-width:0;overflow:hidden">${count}</div>`;
     }).join("");
     return `<div style="height:28px;background:#1e2638;border-radius:4px;overflow:hidden;display:flex;margin-bottom:12px">${bars}</div>`;
   }

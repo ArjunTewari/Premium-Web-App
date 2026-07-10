@@ -383,12 +383,19 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
     }
     const fetched = allPosts.length;
 
-    // 1) official channel only — fail closed if no author metadata
-    let posts = allPosts.filter(p =>
-      (p.author || '').toLowerCase() === handle ||
-      (p.username || '').toLowerCase() === handle ||
-      (p.author_name || '').toLowerCase() === handle
-    );
+    // 1) official channel only — substring match against handle OR org name,
+    // same pattern as fetchLinkedIn(). instagram/posts is a free-text search
+    // (not scoped to the account, same as linkedin/posts), so the author
+    // field can come back formatted differently — display name, different
+    // case, extra text — than the bare handle string used for the separate
+    // instagram/user followers lookup. Exact equality was silently dropping
+    // genuinely-authored posts even when the handle itself was correct
+    // (proven by followers resolving fine from the same handle).
+    const orgLower = org.toLowerCase();
+    let posts = allPosts.filter(p => {
+      const author = (p.author || p.username || p.author_name || '').toLowerCase();
+      return author.includes(handle) || author.includes(orgLower);
+    });
     const afterAuthor = posts.length;
     if (posts.length === 0 && fetched > 0) {
       cb?.(`  [APIdirect/IG] ${org}: no posts with matching author field — ${fetched} dropped`, 'warn');
