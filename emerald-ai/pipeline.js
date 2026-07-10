@@ -3056,7 +3056,7 @@ ${spikeAnnotations.sort((a, b) => b.count - a.count).map((s) => {
     : "";
 
   return `
-<section class="sec" id="momentum"><div class="sh"><div class="se">Section 02c</div><h2 class="st">Coverage Momentum</h2>
+<section class="sec" id="momentum"><div class="sh"><div class="se">Section 02d</div><h2 class="st">Coverage Momentum</h2>
 <div class="sd">Weekly AQ article volume per organisation over the report period. Spikes are identified and traced to triggering events.</div><div class="sdiv"></div></div>
 <div class="mch"><div style="margin-bottom:12px"><div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:4px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:16px;color:var(--muted);margin-bottom:12px">${esc(DATE_FROM)} to ${esc(DATE_TO)}</div></div>
 ${hmTable}
@@ -3872,7 +3872,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a>
-<div class="nav-lbl">Press</div><a href="#sov" class="nav-a">Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social Media</div><a href="#social" class="nav-a">Social Media</a>
+<div class="nav-lbl">Press</div><a href="#sov" class="nav-a">Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#topic-focus" class="nav-a">What Orgs Covered</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social Media</div><a href="#social" class="nav-a">Social Media</a>
 <div class="nav-lbl">LLM</div><a href="#aeo" class="nav-a">LLM Visibility</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>${navOrgs}CONFIDENTIAL<br><span style="display:inline-block;margin-top:6px;padding:4px 8px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.3);border-radius:4px;color:var(--amber);font-weight:700">&#8377;${52 * ORGS.length}/month</span></div></nav>
@@ -3946,6 +3946,31 @@ ${(() => {
     ? `<div class="sentinel-note" style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:16px;color:var(--warn);line-height:1.7"><strong>&#9432; SENTINEL</strong> — No Hindi TV coverage found, including after retrying with Hindi (Devanagari) org names. The tracked orgs appear genuinely absent from Aaj Tak / India TV / ABP News in this window; the zeros above are verified, not a query artefact.</div>`
     : '';
 })()}</section>
+
+<section class="sec" id="topic-focus"><div class="sh"><div class="se">Section 02c</div><h2 class="st">What These Orgs Actually Covered</h2>
+<div class="sd">Independent check on the zeros above: each org's top subtopics from its own VERIFIED press coverage — articles that already passed the org-presence filter (STEP 1d) and the Haiku citation filter (STEP 1e). If an org shows real topics and headlines here, the pipeline is genuinely tracking it; a specific channel or medium showing zero is then a finding about that channel, not a broken query. Full topic breakdown across all orgs: <a href="#topics" style="color:var(--amber)">§03 Topic Ownership Map</a>.</div><div class="sdiv"></div></div>
+${ORGS.map((org, i) => {
+  const tc = data[org]?.topicCounts || {};
+  const topTopics = Object.entries(tc).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const col = orgHex(i);
+  if (!topTopics.length) {
+    return `<div style="padding:12px 16px;border-left:3px solid ${col};background:var(--surface2);border-radius:0 6px 6px 0;margin-bottom:8px">
+      <span style="font-family:monospace;font-size:16px;font-weight:700;color:${col}">${esc(org)}</span>
+      <span style="font-size:15px;color:var(--muted);margin-left:8px">— no classified topics found in verified press either (${data[org]?.total || 0} total article${(data[org]?.total || 0) === 1 ? '' : 's'} this window). Genuinely low/no press presence, not a TV-specific gap.</span>
+    </div>`;
+  }
+  const sampleHeadlines = (arts[org] || []).slice(0, 2).map(a =>
+    a.url
+      ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4">↗ ${esc((a.title || '').slice(0, 90))}${(a.title || '').length > 90 ? '…' : ''}</a>`
+      : ''
+  ).join('');
+  return `<div style="padding:12px 16px;border-left:3px solid ${col};background:var(--surface2);border-radius:0 6px 6px 0;margin-bottom:8px">
+    <div><span style="font-family:monospace;font-size:16px;font-weight:700;color:${col}">${esc(org)}</span>
+    <span style="font-size:15px;color:var(--muted2);margin-left:8px">${topTopics.map(([t, c]) => `${esc(t)} (${c})`).join(' &middot; ')}</span></div>
+    ${sampleHeadlines}
+  </div>`;
+}).join('')}
+</section>
 
 ${momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations)}
 
