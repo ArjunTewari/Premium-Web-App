@@ -9,6 +9,14 @@ const fs = require("fs");
 const path = require("path");
 const SI = require("./social-intelligence");
 const Sentinel = require("./sentinel");
+const {
+  callClaude,
+  parseJ,
+  extractJsonArray,
+  CLAUDE_MODEL,
+  CLAUDE_CLASSIFY_MODEL,
+  costTracker,
+} = require("./claude-client");
 
 const OUTLETS = [
   "Times of India",
@@ -128,43 +136,6 @@ const dom = (url) => {
     return "";
   }
 };
-
-function extractJsonArray(raw) {
-  if (!raw) return null;
-  const s = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  const start = s.indexOf('[');
-  if (start === -1) return null;
-  let depth = 0, inStr = false, esc = false;
-  for (let i = start; i < s.length; i++) {
-    const c = s[i];
-    if (esc) { esc = false; continue; }
-    if (c === '\\' && inStr) { esc = true; continue; }
-    if (c === '"') { inStr = !inStr; continue; }
-    if (inStr) continue;
-    if (c === '[') depth++;
-    else if (c === ']' && --depth === 0) {
-      try { return JSON.parse(s.slice(start, i + 1)); } catch { return null; }
-    }
-  }
-  return null;
-}
-
-function parseJ(raw) {
-  if (!raw) return null;
-  let s = raw
-    .replace(/```json\n?/g, "")
-    .replace(/```\n?/g, "")
-    .trim();
-  const si = s.search(/[\[{]/);
-  if (si > 0) s = s.slice(si);
-  const ei = Math.max(s.lastIndexOf("]"), s.lastIndexOf("}"));
-  if (ei > 0) s = s.slice(0, ei + 1);
-  try {
-    return JSON.parse(s);
-  } catch {
-    return null;
-  }
-}
 
 function parseDateStr(s) {
   if (!s) return null;
@@ -350,33 +321,9 @@ async function serperScrape(url, key) {
   }
 }
 
-const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
-const CLAUDE_CLASSIFY_MODEL = "claude-sonnet-4-6";
-
-async function callClaude(prompt, key, maxTokens = 2500, model = CLAUDE_MODEL) {
-  const res = await axios.post(
-    "https://api.anthropic.com/v1/messages",
-    {
-      model,
-      max_tokens: maxTokens,
-      messages: [{ role: "user", content: prompt }],
-    },
-    {
-      headers: {
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      timeout: 600000,
-    },
-  );
-  const usage = res.data.usage;
-  if (usage) {
-    costTracker.claudeInputTokens += usage.input_tokens || 0;
-    costTracker.claudeOutputTokens += usage.output_tokens || 0;
-  }
-  return res.data.content[0].text;
-}
+// callClaude / parseJ / extractJsonArray / CLAUDE_MODEL / CLAUDE_CLASSIFY_MODEL
+// / costTracker now live in ./claude-client.js (imported above) — LangGraph
+// graph modules need to call Claude without requiring pipeline.js back.
 
 // ── AEO: handled via SI.runAEO (social-intelligence.js)
 // ── Social Media: Twitter/X ────────────────────────────────────────────────
@@ -632,8 +579,7 @@ Return ONLY a JSON array: [{"idx":0,"annotation":"..."},...]`,
   }
 }
 
-// ── Cost accumulator (reset per run) ──────────────────────────────────────
-const costTracker = { serperQueries: 0, claudeInputTokens: 0, claudeOutputTokens: 0 };
+// costTracker is imported from ./claude-client.js (reset per run below).
 
 // ══════════════════════════════════════════════════════════════════════════
 //  MAIN PIPELINE EXPORT
@@ -1382,33 +1328,18 @@ ${batchText}`;
     execF = [],
     actions = [];
 
-  try {
-    cb("  Executive summary...");
-    const r = await callClaude(
-      `Write 3 comparative findings for a media intelligence report comparing these orgs on Indian air quality coverage ${DATE_FROM} to ${DATE_TO}.\nOrgs: ${ORGS.join(", ")}\n\nDATA (includes AEO/LLM visibility and social media):\n${orgSummary}\n\nRULES — follow strictly:\n- State facts directly. NEVER use inferential or interpretive language: banned words include "reflects", "indicates", "demonstrates", "shows", "suggests", "implies", "highlights", "underscores", "signals", "points to", "speaks to", "reveals", "evidences".\n- Do NOT editorialize about what numbers mean. Report the numbers and let the reader draw conclusions.\n- Cite ONLY directly observable counts and scores. NEVER use these phrases: "authoritative tone", "institutional credibility", "greater credibility", "more trustworthy".\n- When EITHER compared value is below 10, use raw counts (e.g. "4 vs 1 articles") not percentages. Use "Nx" ratios only when BOTH values are ≥5.\n- Each headline max 12 words. Each detail 2-3 sentences with specific numbers only.\n- section_ref must be one of: "§03 AQ Press Analytics", "§05 Topic Ownership", "§06 Narrative Position", "§07 Citation Quality", "§AEO LLM Visibility", "§Social Media".\nReturn ONLY JSON array of 3: [{"headline":"...","detail":"...","section_ref":"§03 AQ Press Analytics"}]`,
-      cfg.CLAUDE_KEY,
-      1200,
-    );
-    execF = parseJ(r) || [];
-    cb(`  ${execF.length} findings`, execF.length > 0 ? "ok" : "err");
-  } catch (e) {
-    cb(`  exec err: ${e.message}`, "err");
-  }
-
-  // ── SENTINEL (exec summary): fact-check generated findings against data ──
+  // Exec summary generation + fact-check now live in
+  // graphs/exec-summary-graph.js — a LangGraph loop that regenerates with
+  // corrective feedback when the fact-check finds a numeric mismatch,
+  // bounded to graphs/exec-summary-graph.js's MAX_RETRIES extra attempts.
+  const ExecSummaryGraph = require("./graphs/exec-summary-graph");
   let execAudit = { issues: [], checked: 0 };
   try {
-    execAudit = Sentinel.validateExecSummary(execF, data, ORGS);
-    if (execAudit.issues.length) {
-      cb(`  SENTINEL · exec summary: ${execAudit.issues.length}/${execAudit.checked} numeric claim(s) don't match computed data`, "warn");
-      execAudit.issues.forEach((iss) =>
-        cb(`    finding #${iss.findingIdx + 1} (${iss.org}): claims ${iss.claimed} ${iss.metric}, actual ${iss.actual}`, "warn"),
-      );
-    } else {
-      cb(`  SENTINEL · exec summary: ${execAudit.checked} numeric claim(s) verified against computed data ✓`, "ok");
-    }
+    const result = await ExecSummaryGraph.run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb });
+    execF = result.execF;
+    execAudit = result.execAudit;
   } catch (e) {
-    cb(`  SENTINEL · exec summary audit skipped: ${e.message}`, "warn");
+    cb(`  exec summary graph error: ${e.message}`, "err");
   }
   await sleep(300);
 
@@ -1441,43 +1372,13 @@ ${batchText}`;
   }
   await sleep(300);
 
-  // Per-org action matrix — one Claude call per org so no single request can
-  // time out or produce malformed JSON for the whole batch.
+  // Per-org action matrix now lives in graphs/action-matrix-graph.js — a
+  // LangGraph fan-out (one Send per org) with real per-org retry, instead
+  // of the original strictly-sequential timeout-as-skip loop.
   try {
-    cb("  Action matrix (per-org batches)...");
-    const gapTopics = emerging.map((e) => e.topic).join(", ") || "none";
-    const PER_ORG_TIMEOUT = 90000; // 90s per org is generous
-    const orgLines = Object.fromEntries(
-      orgSummary.split("\n").map((line) => [line.split(":")[0].trim(), line]),
-    );
-
-    for (const org of ORGS) {
-      const line = orgLines[org] || `${org}: no data`;
-      try {
-        const r = await Promise.race([
-          callClaude(
-            `Generate exactly 4 strategic actions for "${org}" based on Indian AQ media, AEO, and social media data.\n\nORG DATA:\n${line}\n\nWhite-space gap topics (AQ conversations this org is absent from): ${gapTopics}\n\nRules:\n- Each action must be specific to the data above, not generic.\n- priority must be one of: Fix Now, Leverage, Optimise, Invest\n- area must be one of: Media, Topics, Narrative, AEO, Social\n- rationale: 1-2 sentences citing the specific numbers above\n\nReturn ONLY a JSON array of exactly 4 objects:\n[{"org":"${org}","priority":"...","area":"...","action":"...","rationale":"..."}]`,
-            cfg.CLAUDE_KEY,
-            600, // 4 actions × ~150 tokens each
-            CLAUDE_CLASSIFY_MODEL,
-          ),
-          new Promise((_, rej) =>
-            setTimeout(() => rej(new Error(`timeout`)), PER_ORG_TIMEOUT),
-          ),
-        ]);
-        const parsed = parseJ(r) || [];
-        if (parsed.length) {
-          actions.push(...parsed);
-          cb(`    ${org}: ${parsed.length} actions`, "ok");
-        } else {
-          cb(`    ${org}: empty response`, "warn");
-        }
-      } catch (e) {
-        cb(`    ${org}: failed (${e.message})`, "warn");
-      }
-      await sleep(200); // brief pause between orgs to avoid rate-limit bursts
-    }
-    cb(`  Action matrix: ${actions.length} actions total`, actions.length > 0 ? "ok" : "err");
+    const ActionMatrixGraph = require("./graphs/action-matrix-graph");
+    const result = await ActionMatrixGraph.run({ cfg, ORGS, orgSummary, emerging, cb });
+    actions = result.actions;
   } catch (e) {
     cb(`  actions err: ${e.message}`, "err");
   }

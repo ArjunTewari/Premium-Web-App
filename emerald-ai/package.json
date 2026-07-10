@@ -8,6 +8,8 @@
     "dev": "node index.js"
   },
   "dependencies": {
+    "@langchain/core": "^1.2.2",
+    "@langchain/langgraph": "^1.4.7",
     "axios": "^1.7.0",
     "express": "^4.19.0",
     "pptxgenjs": "^3.12.0"

@@ -96,15 +96,18 @@ function validateSocial(rawResults) {
 // ── Social: repair loop ──────────────────────────────────────────────────────
 
 /**
- * The agentic loop for social collection.
+ * The agentic loop for social collection — LEGACY hand-rolled implementation.
  *   1. Validate all results.
  *   2. Diagnose: if most failures are rate-limits, declare quota exhaustion
  *      (retrying burns the remaining budget for nothing).
  *   3. Repair: sequentially retry retryable failures with backoff.
  *   4. Re-validate and log the final data-health verdict.
  * Returns rawResults with retried entries patched in place.
+ *
+ * Kept intact (unused by default) as the rollback path for the LangGraph
+ * port in graphs/social-sentinel-graph.js — see socialSentinel() below.
  */
-async function socialSentinel(rawResults, { cfg, orgHandles, cb }) {
+async function socialSentinelLegacy(rawResults, { cfg, orgHandles, cb }) {
   const APIdirect = require('./apidirect-collector');
   const anomalies = validateSocial(rawResults);
   if (!anomalies.length) {
@@ -164,6 +167,24 @@ async function socialSentinel(rawResults, { cfg, orgHandles, cb }) {
   const remaining = validateSocial(rawResults).filter(a => a.type === 'fetch_failed');
   cb?.(`    VERDICT: ${repaired} repaired, ${remaining.length} still unavailable — unavailable cells render as ✕, not 0`, remaining.length ? 'warn' : 'ok');
   return rawResults;
+}
+
+/**
+ * Public entry point — dispatches to the LangGraph port by default (see
+ * graphs/social-sentinel-graph.js), same signature/return shape as the
+ * legacy function. Set SENTINEL_ENGINE=legacy to fall back to the
+ * hand-rolled implementation without a code change (first-ever LangGraph
+ * adoption in this codebase — kept trivially revertible).
+ *
+ * Lazy require (not at module top) avoids a circular require: the graph
+ * module itself requires validateSocial from this file.
+ */
+async function socialSentinel(rawResults, ctx) {
+  if (process.env.SENTINEL_ENGINE === 'legacy') {
+    return socialSentinelLegacy(rawResults, ctx);
+  }
+  const graph = require('./graphs/social-sentinel-graph');
+  return graph.run(rawResults, ctx);
 }
 
 // ── Report: section numbering audit + auto-fix ──────────────────────────────
@@ -329,4 +350,4 @@ function validateExecSummary(execF, data, ORGS) {
   return { issues, checked };
 }
 
-module.exports = { classifyError, diagnoseZero, validateSocial, socialSentinel, auditSectionNumbering, validateExecSummary };
+module.exports = { classifyError, RETRYABLE, diagnoseZero, validateSocial, socialSentinel, socialSentinelLegacy, auditSectionNumbering, validateExecSummary };
