@@ -226,6 +226,14 @@ function oldestInBatch(batch, ...fields) {
 // and would mis-attribute third-party text into this org's topic/engagement
 // numbers.
 //
+// Strict "company page only" posture: is_repost is one signal from a
+// third-party API and shouldn't be the sole gate. Every surviving post is
+// ALSO required to have an author field matching the org (handle, full name,
+// or abbreviation — same match set the old author-substring approach used).
+// A post with is_repost:false but a non-matching author (data inconsistency,
+// showcase/affiliate page bleed-through) is still excluded; a post with no
+// author field at all fails closed (excluded), not included by default.
+//
 // No keyword query here — this endpoint has no query param, it's the org's
 // unfiltered timeline. That means an active poster's AQ-relevant posts can be
 // diluted by a lot of non-AQ content, so the page cap is raised well above
@@ -263,13 +271,26 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
       cb?.(`  [APIdirect/LI] ${org}: hit the ${MAX_PAGES}-page fetch cap (${fetched}${total != null ? `/${total}` : ''} posts) while still inside the date window — org posts frequently, older in-range posts may exist beyond this cap`, 'warn');
     }
 
-    // Exclude reposts of other pages' content — not the org's own voice.
+    // Strict company-page-only gate: exclude reposts AND verify the author
+    // field actually matches the org (handle, full name, or abbreviation —
+    // e.g. "APAG"). No author field at all fails closed (excluded).
     // (Field name kept as afterAuthor for diagnoseZero()/sentinel compatibility.)
-    let posts = allPosts.filter(p => !p.is_repost);
+    const handleLower = handle.toLowerCase();
+    const orgLower = org.toLowerCase();
+    const abbr = getAbbreviation(org);
+    const abbrLower = abbr ? abbr.toLowerCase() : null;
+    let posts = allPosts.filter(p => {
+      if (p.is_repost) return false;
+      const author = (p.author || '').toLowerCase();
+      if (!author) return false;
+      return author.includes(handleLower) || author.includes(orgLower) || (abbrLower && author.includes(abbrLower));
+    });
     const afterAuthor = posts.length;
-    const repostCount = fetched - afterAuthor;
-    if (repostCount > 0) {
-      cb?.(`  [APIdirect/LI] ${org}: ${repostCount} repost(s) excluded (not the org's own content)`, 'warn');
+    const excludedCount = fetched - afterAuthor;
+    if (excludedCount > 0) {
+      const repostCount = allPosts.filter(p => p.is_repost).length;
+      const authorMismatchCount = excludedCount - repostCount;
+      cb?.(`  [APIdirect/LI] ${org}: ${excludedCount} post(s) excluded (${repostCount} repost(s), ${authorMismatchCount} author mismatch) — not verified as the org's own page content`, 'warn');
     }
 
     // 2) date range

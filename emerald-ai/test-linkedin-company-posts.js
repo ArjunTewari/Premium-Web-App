@@ -114,9 +114,35 @@ async function run() {
     const Sentinel = require('./sentinel');
     const p = { fetched: 3, afterAuthor: 0, inRangeCount: undefined, postCount: 0 };
     const diag = Sentinel.diagnoseZero(p, 'LinkedIn');
-    assert(/reposts of other pages/.test(diag), `D: LinkedIn afterAuthor=0 should mention reposts, got: "${diag}"`);
+    assert(/reposts and\/or failed the author-match/.test(diag), `D: LinkedIn afterAuthor=0 should mention reposts/author-match, got: "${diag}"`);
     const diagIg = Sentinel.diagnoseZero(p, 'Instagram');
     assert(/authorship filter/.test(diagIg), `D: Instagram afterAuthor=0 should keep the old authorship-filter message, got: "${diagIg}"`);
+  }
+
+  // ── Scenario F: author-mismatch excluded even when is_repost is false ─
+  {
+    delete require.cache[require.resolve('./apidirect-collector')];
+    const APIdirect = require('./apidirect-collector');
+    axios.get = async (url, opts) => {
+      if (opts.params.page > 1) return { data: { posts: [], total: 4 } };
+      return {
+        data: {
+          posts: [
+            post({ text: 'Our air quality index update', author: 'Test Org', is_repost: false, likes: 10 }),
+            // is_repost:false but author doesn't match the org at all — API
+            // inconsistency / showcase-page bleed-through, must still be excluded.
+            post({ text: 'Air pollution insights', author: 'Some Unrelated Page', is_repost: false, likes: 50 }),
+            // no author field at all — fails closed (excluded), not included by default.
+            post({ text: 'Air quality note', author: '', is_repost: false, likes: 20 }),
+          ],
+          total: 4,
+        },
+      };
+    };
+    const r = await APIdirect.fetchLinkedIn('Test Org', '@testorg', 'key', { from: new Date('2026-01-01'), to: new Date('2026-12-31') }, ['air quality', 'air pollution'], null);
+    assert(r.afterAuthor === 1, `F: afterAuthor should be 1 (only the genuinely-matching post), got ${r.afterAuthor}`);
+    assert(!r.topPosts.some(p => p.likes === 50), 'F: author-mismatch post (50 likes) must not leak into topPosts');
+    assert(!r.topPosts.some(p => p.likes === 20), 'F: no-author post (20 likes) must not leak into topPosts');
   }
 
   // ── Scenario E: noHandle unaffected ───────────────────────────────────

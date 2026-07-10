@@ -57,7 +57,7 @@ function diagnoseZero(p, platformName) {
   }
   if (p.afterAuthor !== undefined && p.afterAuthor === 0) {
     return platformName === 'LinkedIn'
-      ? `all ${p.fetched} fetched posts were reposts of other pages — no original content from this org in this window`
+      ? `all ${p.fetched} fetched posts were reposts and/or failed the author-match check — no verified original content from this org's own page in this window`
       : `authorship filter dropped all ${p.fetched} fetched posts — handle likely doesn't match the API's author field`;
   }
   if ((p.inRangeCount || 0) === 0) {
