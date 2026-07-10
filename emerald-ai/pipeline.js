@@ -3056,7 +3056,7 @@ ${spikeAnnotations.sort((a, b) => b.count - a.count).map((s) => {
     : "";
 
   return `
-<section class="sec" id="momentum"><div class="sh"><div class="se">Section 02d</div><h2 class="st">Coverage Momentum</h2>
+<section class="sec" id="momentum"><div class="sh"><div class="se">Section 02c</div><h2 class="st">Coverage Momentum</h2>
 <div class="sd">Weekly AQ article volume per organisation over the report period. Spikes are identified and traced to triggering events.</div><div class="sdiv"></div></div>
 <div class="mch"><div style="margin-bottom:12px"><div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:4px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:16px;color:var(--muted);margin-bottom:12px">${esc(DATE_FROM)} to ${esc(DATE_TO)}</div></div>
 ${hmTable}
@@ -3945,31 +3945,46 @@ ${(() => {
   return hindiTotal === 0
     ? `<div class="sentinel-note" style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:16px;color:var(--warn);line-height:1.7"><strong>&#9432; SENTINEL</strong> — No Hindi TV coverage found, including after retrying with Hindi (Devanagari) org names. The tracked orgs appear genuinely absent from Aaj Tak / India TV / ABP News in this window; the zeros above are verified, not a query artefact.</div>`
     : '';
-})()}</section>
-
-<section class="sec" id="topic-focus"><div class="sh"><div class="se">Section 02c</div><h2 class="st">What These Orgs Actually Covered</h2>
-<div class="sd">Independent check on the zeros above: each org's top subtopics from its own VERIFIED press coverage — articles that already passed the org-presence filter (STEP 1d) and the Haiku citation filter (STEP 1e). If an org shows real topics and headlines here, the pipeline is genuinely tracking it; a specific channel or medium showing zero is then a finding about that channel, not a broken query. Full topic breakdown across all orgs: <a href="#topics" style="color:var(--amber)">§03 Topic Ownership Map</a>.</div><div class="sdiv"></div></div>
-${ORGS.map((org, i) => {
-  const tc = data[org]?.topicCounts || {};
-  const topTopics = Object.entries(tc).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 3);
-  const col = orgHex(i);
-  if (!topTopics.length) {
+})()}
+<div style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06)">
+<div id="topic-focus" style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">What These Orgs Actually Covered on TV</div>
+<div style="font-size:15px;color:var(--muted2);margin-bottom:12px;line-height:1.6">Independent check on the TV zeros above: each org's top subtopics from ITS OWN verified TV coverage only (NDTV, News18, India Today, Aaj Tak, India TV, ABP News) — articles that already passed the org-presence filter (STEP 1d) and the Haiku citation filter (STEP 1e), narrowed here to the six TV outlets. If an org shows real topics and headlines here, the pipeline is genuinely tracking its TV presence; a specific channel still showing zero above is then a finding about that channel, not a broken query. Full topic breakdown across all outlets (TV + print/online): <a href="#topics" style="color:var(--amber)">§03 Topic Ownership Map</a>.</div>
+${(() => {
+  const TV_OUTLETS = [...TV_CHANNELS_ENGLISH, ...TV_CHANNELS_HINDI];
+  return ORGS.map((org, i) => {
+    // TV-only topic counts: filter this org's classifications (which carry
+    // .outlet and .index back into arts[org]) to the six TV outlets, then
+    // tally aq_subtopic the same way aggregateOrg() does for the all-outlet
+    // version — same join pattern the Topic Ownership Map uses (§03) below.
+    const tvCls = (data[org]?.classifications || []).filter(c => TV_OUTLETS.includes(canonOutlet(c.outlet || '')));
+    const tvTc = {};
+    tvCls.forEach(c => {
+      const t = (c.aq_subtopic || '').trim();
+      const match = TOPICS.find(tp => tp.toLowerCase() === t.toLowerCase() || t.toLowerCase().includes(tp.toLowerCase().split(' ')[0].toLowerCase()));
+      if (match) tvTc[match] = (tvTc[match] || 0) + 1;
+    });
+    const topTopics = Object.entries(tvTc).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const col = orgHex(i);
+    if (!topTopics.length) {
+      return `<div style="padding:12px 16px;border-left:3px solid ${col};background:var(--surface2);border-radius:0 6px 6px 0;margin-bottom:8px">
+        <span style="font-family:monospace;font-size:16px;font-weight:700;color:${col}">${esc(org)}</span>
+        <span style="font-size:15px;color:var(--muted);margin-left:8px">— no classified topics found in verified TV coverage (${tvCls.length} TV article${tvCls.length === 1 ? '' : 's'} this window). Genuinely low/no TV presence, not a broken query.</span>
+      </div>`;
+    }
+    const sampleHeadlines = tvCls.slice(0, 2).map(c => {
+      const art = arts[org]?.[c.index] || {};
+      return art.url
+        ? `<a href="${esc(art.url)}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4">↗ ${esc((art.title || '').slice(0, 90))}${(art.title || '').length > 90 ? '…' : ''}</a>`
+        : '';
+    }).join('');
     return `<div style="padding:12px 16px;border-left:3px solid ${col};background:var(--surface2);border-radius:0 6px 6px 0;margin-bottom:8px">
-      <span style="font-family:monospace;font-size:16px;font-weight:700;color:${col}">${esc(org)}</span>
-      <span style="font-size:15px;color:var(--muted);margin-left:8px">— no classified topics found in verified press either (${data[org]?.total || 0} total article${(data[org]?.total || 0) === 1 ? '' : 's'} this window). Genuinely low/no press presence, not a TV-specific gap.</span>
+      <div><span style="font-family:monospace;font-size:16px;font-weight:700;color:${col}">${esc(org)}</span>
+      <span style="font-size:15px;color:var(--muted2);margin-left:8px">${topTopics.map(([t, c]) => `${esc(t)} (${c})`).join(' &middot; ')}</span></div>
+      ${sampleHeadlines}
     </div>`;
-  }
-  const sampleHeadlines = (arts[org] || []).slice(0, 2).map(a =>
-    a.url
-      ? `<a href="${esc(a.url)}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4">↗ ${esc((a.title || '').slice(0, 90))}${(a.title || '').length > 90 ? '…' : ''}</a>`
-      : ''
-  ).join('');
-  return `<div style="padding:12px 16px;border-left:3px solid ${col};background:var(--surface2);border-radius:0 6px 6px 0;margin-bottom:8px">
-    <div><span style="font-family:monospace;font-size:16px;font-weight:700;color:${col}">${esc(org)}</span>
-    <span style="font-size:15px;color:var(--muted2);margin-left:8px">${topTopics.map(([t, c]) => `${esc(t)} (${c})`).join(' &middot; ')}</span></div>
-    ${sampleHeadlines}
-  </div>`;
-}).join('')}
+  }).join('');
+})()}
+</div>
 </section>
 
 ${momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations)}
