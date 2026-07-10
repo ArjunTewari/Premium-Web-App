@@ -739,6 +739,42 @@ async function run(cfg, cb) {
           }
           await sleep(300);
         }
+
+        // Abbreviation, UNQUOTED — genuinely new coverage, not a duplicate
+        // of STEP 1's primary abbreviation pass (which already tried the
+        // abbreviation QUOTED; repeating that exact query here would waste
+        // a Serper call for zero new information). Still zero after the
+        // full-name relaxed pass above? Try the shorthand loosely too —
+        // e.g. "APAG" for Air Pollution Action Group, "CERAG" for Chintan
+        // Environmental Research and Action Group.
+        if (arts[org].length === 0) {
+          const abbr = getAbbreviation(org);
+          if (abbr) {
+            for (const kw of SCOPE_KEYWORDS.slice(0, 3)) {
+              const q = `${abbr} ${kw} India`;
+              try {
+                const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
+                let added = 0;
+                for (const r of results) {
+                  const k = r.link || r.title;
+                  if (seen.has(k)) continue;
+                  seen.add(k);
+                  if (!inRange(r.date || "")) continue;
+                  const outlet = canonOutlet(r.source || dom(r.link || ""));
+                  if (outlet !== null && isThirdParty(r.link || "", org)) {
+                    arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: outlet, url: r.link || "", date: r.date || "", relaxed: true, matchTerm: abbr });
+                    added++;
+                  }
+                }
+                if (added > 0) cb(`    ${org} · relaxed abbr "${abbr}" "${kw}": +${added}`, "ok");
+              } catch (e) {
+                cb(`    ${org} relaxed abbr retry error: ${e.message}`, "warn");
+              }
+              await sleep(300);
+            }
+          }
+        }
+
         cb(`    ${org}: ${arts[org].length ? `recovered ${arts[org].length} article(s) — will be verified by org-presence + Haiku filters` : "still 0 — org appears genuinely absent from indexed press in this window"}`, arts[org].length ? "ok" : "warn");
       }
     }
