@@ -187,7 +187,12 @@ async function runAEO(cfg, orgs, cb) {
   for (const org of orgs) {
     results[org].mentions = Object.values(results[org].llmBreakdown)
       .reduce((a, b) => a + b.mentions, 0);
-    const activeLlms = [cfg.OPENAI_KEY, cfg.PERPLEXITY_KEY, cfg.APIDIRECT_KEY].filter(Boolean).length || 1;
+    // Must match the 3 LLMs actually probed above (GPT-4o mini, Perplexity,
+    // Claude Haiku) — was checking APIDIRECT_KEY (a social-media API key,
+    // unrelated to AEO probing) instead of CLAUDE_KEY, which silently
+    // miscounted maxPossible whenever APIDIRECT_KEY wasn't configured even
+    // though Claude (gated by the always-required CLAUDE_KEY) was queried.
+    const activeLlms = [cfg.OPENAI_KEY, cfg.PERPLEXITY_KEY, cfg.CLAUDE_KEY].filter(Boolean).length || 1;
     const maxPossible = queriesUsed.length * activeLlms;
     results[org].score = Math.round(results[org].mentions / maxPossible * 100);
     cb(`  AEO total: ${org} = ${results[org].mentions} mentions across all LLMs`, 'ok');

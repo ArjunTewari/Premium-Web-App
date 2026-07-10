@@ -3526,8 +3526,8 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
 
     const components = [
       { label:'Press',   desc:'AQ article volume score (articles × 2.5, max 100)', display: `${d.sov}`,          contrib: pressCont },
-      { label:'LLM',     desc:'Times cited by AI models across probing questions',  display: `${d.aeo || 0}`,     contrib: llmCont   },
-      { label:'Social',  desc:'Cross-platform AQ presence score',                    display: `${socialScore}/10`, contrib: socCont   },
+      { label:'LLM',     desc:'AI-citation rate, already normalized to 0–100 — not the raw mention count (which maxes at 45: 15 questions × 3 LLMs)', display: `${d.aeo || 0}`,     contrib: llmCont   },
+      { label:'Social',  desc:'Cross-platform AQ presence score, out of 10',        display: `${socialScore}/10`, contrib: socCont   },
     ];
 
     const cards = components.map(({ label, desc, display, contrib }) => `
@@ -3548,12 +3548,12 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       <td colspan="6" style="padding:0">
         <div style="border-left:3px solid ${col};background:var(--surface2);padding:20px 24px">
           <div style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${col};margin-bottom:14px">${esc(org)} — Score Breakdown</div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px">${cards}</div>
-          <div style="display:flex;align-items:center;gap:12px;border-top:1px solid var(--border);padding-top:14px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:12px;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid var(--border);flex-wrap:wrap">
             <span style="font-family:monospace;font-size:17px;color:var(--muted)">${pressCont} + ${llmCont} + ${socCont}</span>
             <span style="font-family:monospace;font-size:17px;color:var(--muted)">=</span>
             <span style="font-family:monospace;font-size:31px;font-weight:700;color:${col}">${d.score}</span>
           </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">${cards}</div>
         </div>
       </td>
     </tr>`;
