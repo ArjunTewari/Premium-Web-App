@@ -3512,33 +3512,33 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       ? `<span style="font-family:monospace;font-size:18px;font-weight:600;color:${col}">${socialScore}<span style="font-size:15px;font-weight:400;color:var(--muted)">/10</span></span>`
       : `<span style="font-family:monospace;font-size:16px;color:var(--muted)">—</span>`;
 
-    // Same normalization as computeScore(): Social is 0-10, scaled ×10 to
-    // the 0-100 range Press/LLM are already on, then all three averaged so
-    // each contributes an equal share of the final 0-100 score.
-    const normPress  = d.sov;
-    const normLLM    = d.aeo || 0;
-    const normSocial = socialScore * 10;
-    const pressCont  = +(normPress  / 3).toFixed(2);
-    const llmCont    = +(normLLM    / 3).toFixed(2);
-    const socCont    = +(normSocial / 3).toFixed(2);
+    // One single calculation path per component: raw value (on its own
+    // natural scale) -> its share of the final score. Social is internally
+    // scaled x10 to the 0-100 range Press/LLM already use before the
+    // equal-weight (33% each) average — that intermediate step is real but
+    // isn't shown as a separate number here, since a reader only needs the
+    // input and its resulting contribution, not the normalization arithmetic
+    // in between.
+    const pressCont = +(d.sov / 3).toFixed(1);
+    const llmCont   = +((d.aeo || 0) / 3).toFixed(1);
+    const socCont   = +((socialScore * 10) / 3).toFixed(1);
     const uid = `sc_${org.replace(/\W/g,'_')}`;
 
     const components = [
-      { label:'Press',   desc:'AQ article volume score (articles × 2.5, max 100)', raw: d.sov,       normalized: normPress,  weight:'÷3', contrib: pressCont },
-      { label:'LLM',     desc:'Times cited by AI models across probing questions',  raw: d.aeo||0,    normalized: normLLM,    weight:'÷3', contrib: llmCont   },
-      { label:'Social',  desc:'Cross-platform AQ presence score (0–10), scaled ×10 to the 0–100 range Press/LLM use', raw: socialScore, normalized: normSocial, weight:'÷3', contrib: socCont },
+      { label:'Press',   desc:'AQ article volume score (articles × 2.5, max 100)', display: `${d.sov}`,          contrib: pressCont },
+      { label:'LLM',     desc:'Times cited by AI models across probing questions',  display: `${d.aeo || 0}`,     contrib: llmCont   },
+      { label:'Social',  desc:'Cross-platform AQ presence score',                    display: `${socialScore}/10`, contrib: socCont   },
     ];
 
-    const cards = components.map(({ label, desc, raw, normalized, weight, contrib }) => `
+    const cards = components.map(({ label, desc, display, contrib }) => `
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2)">${label}</span>
-          <span style="font-family:monospace;font-size:15px;color:var(--muted);background:var(--surface2);padding:2px 6px;border-radius:3px">${weight}</span>
+          <span style="font-family:monospace;font-size:15px;color:var(--muted);background:var(--surface2);padding:2px 6px;border-radius:3px">33%</span>
         </div>
         <div style="font-size:16px;color:var(--muted);line-height:1.4">${desc}</div>
-        <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px;flex-wrap:wrap">
-          <span style="font-family:monospace;font-size:25px;font-weight:700;color:${col}">${raw}</span>
-          ${normalized !== raw ? `<span style="font-family:monospace;font-size:14px;color:var(--muted)">(→ ${normalized}/100 normalized)</span>` : ''}
+        <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px">
+          <span style="font-family:monospace;font-size:25px;font-weight:700;color:${col}">${display}</span>
           <span style="font-family:monospace;font-size:17px;color:var(--muted)">→</span>
           <span style="font-family:monospace;font-size:20px;font-weight:600;color:var(--amber)">+${contrib}</span>
         </div>
@@ -3550,8 +3550,6 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
           <div style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${col};margin-bottom:14px">${esc(org)} — Score Breakdown</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px">${cards}</div>
           <div style="display:flex;align-items:center;gap:12px;border-top:1px solid var(--border);padding-top:14px;flex-wrap:wrap">
-            <span style="font-family:monospace;font-size:17px;color:var(--muted)">(${normPress} + ${normLLM} + ${normSocial}) ÷ 3</span>
-            <span style="font-family:monospace;font-size:17px;color:var(--muted)">=</span>
             <span style="font-family:monospace;font-size:17px;color:var(--muted)">${pressCont} + ${llmCont} + ${socCont}</span>
             <span style="font-family:monospace;font-size:17px;color:var(--muted)">=</span>
             <span style="font-family:monospace;font-size:31px;font-weight:700;color:${col}">${d.score}</span>
@@ -3959,7 +3957,7 @@ ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
 <section class="sec" id="social"><div class="sh"><div class="se">Section 08 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Live social data from official org handles — LinkedIn (LinkedIn API), X/Twitter (X API v2), Instagram (Graph API), and YouTube (Data API v3). Posts are date-filtered to the report window using smart pagination (stops fetching once posts fall outside the window). ER = Engagement Rate.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd"><ul style="margin:0;padding-left:20px;line-height:2"><li><strong>Press</strong>: AQ article volume score (articles × 2.5, max 100)</li><li><strong>LLM</strong>: Times cited by AI models across probing questions</li><li><strong>Social</strong>: Cross-platform AQ presence score (0–10)</li><li>Final score = (Press + LLM + Social×10) ÷ 3 — no published/industry-standard scoring scheme is used. Social is scaled ×10 (from its native 0–10 range) to match the 0–100 range Press and LLM already use, then all three are averaged for equal weight. Click any row to see the breakdown.</li></ul></div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd"><ul style="margin:0;padding-left:20px;line-height:2"><li><strong>Press</strong>: AQ article volume score (articles × 2.5, max 100)</li><li><strong>LLM</strong>: Times cited by AI models across probing questions</li><li><strong>Social</strong>: Cross-platform AQ presence score (0–10)</li><li>Each dimension counts equally toward the final score — <strong>33% Press, 33% LLM, 33% Social</strong> (no published/industry-standard scoring scheme is used). Click any row to see the breakdown.</li></ul></div><div class="sdiv"></div></div>
 ${scorecards}</section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
