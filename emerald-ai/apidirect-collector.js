@@ -208,9 +208,30 @@ function oldestInBatch(batch, ...fields) {
 }
 
 // ── LinkedIn ─────────────────────────────────────────────────────────────────
-// Smart pagination: fetch pages sequentially, stop as soon as the oldest post
-// on a page predates dateFrom (we've gone far enough back in time).
-// Max 3 pages — LinkedIn search ordering is less stable than a user timeline.
+// Uses linkedin/company/posts — the org's own page timeline by URL, not a
+// keyword search. This replaced an earlier free-text-search + author-string-
+// guessing approach (query="org name" + keyword OR-clause, then substring-
+// match the author field against handle/org-name/abbreviation) because that
+// approach both under-fetched (query keyword slice excluded legitimate AQ
+// terms) and mis-attributed authorship (LinkedIn display names don't reliably
+// contain the handle, full org name, or acronym). This endpoint returns only
+// posts that actually appear on the org's page, verified live: page 1/2 dates
+// come back strictly descending (most-recent-first), so the existing
+// oldest-post pagination cutoff still applies unchanged.
+//
+// The one caveat verified live (WRI India, 2026-07): the page's own timeline
+// includes REPOSTS of other pages' content (is_repost:true, author = the
+// original poster, not the org) — e.g. a partner org's event post that WRI
+// India reposted. Those are excluded below; they aren't the org's own voice
+// and would mis-attribute third-party text into this org's topic/engagement
+// numbers.
+//
+// No keyword query here — this endpoint has no query param, it's the org's
+// unfiltered timeline. That means an active poster's AQ-relevant posts can be
+// diluted by a lot of non-AQ content, so the page cap is raised well above
+// the old 3-page limit (see Twitter's 5-page precedent below) and truncation
+// (hitting the cap while still inside the date window) is flagged explicitly
+// rather than silently under-counting.
 async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
   const EMPTY = { postCount: 0, totalLikes: 0, totalComments: 0, totalShares: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
   const handle = liHandle ? liHandle.replace(/^@/, '').trim() : null;
@@ -218,46 +239,37 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
     cb?.(`  [APIdirect/LI] ${org}: no official handle — skipped`, 'warn');
     return { ...EMPTY, noHandle: true };
   }
-  // Was slice(0,8) — with the default 11-term AQ_KW_BASE plus user scope
-  // keywords, that silently excluded up to 9 legitimate terms (e.g. "black
-  // carbon", "nitrogen dioxide", "methane") from the search query ITSELF,
-  // even though the AQ-relevance filter below checks the full list — a post
-  // using an excluded term was never fetched in the first place, regardless
-  // of how permissive that later filter is. Raised to 20 (verified: stays
-  // well under a 500-char query length even with a long org name and a
-  // heavier custom scope-keyword set — see test-tv-serper-query.js-style
-  // verification during this fix).
-  const kwClause = aqKw.slice(0, 20).map(k => `"${k}"`).join(' OR ');
-  const q = `"${org}" (${kwClause})`;
-  const MAX_PAGES = 3;
+  const companyUrl = `https://www.linkedin.com/company/${handle}`;
+  const MAX_PAGES = 8; // 80 posts — org has no query filter, so cap needs headroom over a multi-month window
   try {
-    // Paginate until we've seen a post older than dateFrom or hit MAX_PAGES
+    // Paginate until we've seen a post older than dateFrom, run out of pages,
+    // or hit MAX_PAGES (tracked separately as a possible coverage gap).
     let allPosts = [];
+    let total = null;
+    let stopReason = 'no_more_posts';
     for (let page = 1; page <= MAX_PAGES; page++) {
-      const r = await apiFetch('linkedin/posts', { query: q, page, sort_by: 'most_recent' }, apiKey);
+      const r = await apiFetch('linkedin/company/posts', { url: companyUrl, page }, apiKey);
       const batch = r.posts || [];
-      if (!batch.length) break;
+      if (total === null && r.total != null) total = r.total;
+      if (!batch.length) { stopReason = 'no_more_posts'; break; }
       allPosts = allPosts.concat(batch);
       const oldest = oldestInBatch(batch, 'date');
-      if (dateRange?.from && oldest && oldest < dateRange.from) break;
+      if (dateRange?.from && oldest && oldest < dateRange.from) { stopReason = 'date_cutoff'; break; }
+      if (page === MAX_PAGES) stopReason = 'page_cap';
     }
     const fetched = allPosts.length;
+    const truncated = stopReason === 'page_cap';
+    if (truncated) {
+      cb?.(`  [APIdirect/LI] ${org}: hit the ${MAX_PAGES}-page fetch cap (${fetched}${total != null ? `/${total}` : ''} posts) while still inside the date window — org posts frequently, older in-range posts may exist beyond this cap`, 'warn');
+    }
 
-    // 1) official channel only — fail closed if no author metadata. Checks
-    // handle, full org name, AND the org's abbreviation (e.g. "APAG") —
-    // LinkedIn pages often display as their acronym, which neither the
-    // handle nor the full org name would substring-match.
-    const handleLower = handle.toLowerCase();
-    const orgLower = org.toLowerCase();
-    const abbr = getAbbreviation(org);
-    const abbrLower = abbr ? abbr.toLowerCase() : null;
-    let posts = allPosts.filter(p => {
-      const author = (p.author || p.author_name || p.company || '').toLowerCase();
-      return author.includes(handleLower) || author.includes(orgLower) || (abbrLower && author.includes(abbrLower));
-    });
+    // Exclude reposts of other pages' content — not the org's own voice.
+    // (Field name kept as afterAuthor for diagnoseZero()/sentinel compatibility.)
+    let posts = allPosts.filter(p => !p.is_repost);
     const afterAuthor = posts.length;
-    if (posts.length === 0 && fetched > 0) {
-      cb?.(`  [APIdirect/LI] ${org}: no posts with matching author field — ${fetched} dropped`, 'warn');
+    const repostCount = fetched - afterAuthor;
+    if (repostCount > 0) {
+      cb?.(`  [APIdirect/LI] ${org}: ${repostCount} repost(s) excluded (not the org's own content)`, 'warn');
     }
 
     // 2) date range
@@ -265,10 +277,7 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
     const inRange = posts.length;
 
     // 3) AQ relevance
-    posts = posts.filter(p => isAQ(
-      `${p.title || ''} ${p.snippet || ''} ${p.text || ''} ${p.body || ''} ${p.content || ''}`,
-      aqKw
-    ));
+    posts = posts.filter(p => isAQ(`${p.text || ''} ${p.title || ''} ${p.snippet || ''}`, aqKw));
 
     // 4) metrics + ER
     const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
@@ -280,7 +289,7 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
       .slice(0, 5)
       .map(p => ({
         url:      p.url || '',
-        snippet:  (p.snippet || p.title || p.text || p.body || p.content || '').slice(0, 250),
+        snippet:  (p.text || p.title || p.snippet || '').slice(0, 250),
         author:   p.author || '',
         likes:    p.likes    || 0,
         comments: p.comments || 0,
@@ -288,8 +297,8 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
         date:     p.date     || '',
       }));
     const erVal = er(totalEngage, 0, posts.length);
-    cb?.(`  [APIdirect/LI] ${org}: ${fetched} fetched → ${inRange} in range → ${posts.length} AQ posts, ${totalEngage} engagements`, posts.length > 0 ? 'ok' : 'warn');
-    return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers: 0, er: erVal, topPosts, fetched, afterAuthor, inRangeCount: inRange };
+    cb?.(`  [APIdirect/LI] ${org}: ${fetched} fetched → ${afterAuthor} original → ${inRange} in range → ${posts.length} AQ posts, ${totalEngage} engagements`, posts.length > 0 ? 'ok' : 'warn');
+    return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers: 0, er: erVal, topPosts, fetched, afterAuthor, inRangeCount: inRange, truncated };
   } catch (e) {
     cb?.(`  [APIdirect/LI] ${org}: ${e.message}`, 'warn');
     return failResult(EMPTY, e);

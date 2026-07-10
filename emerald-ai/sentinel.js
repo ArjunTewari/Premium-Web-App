@@ -56,10 +56,15 @@ function diagnoseZero(p, platformName) {
     return `API returned no posts for the query/handle — verify the ${platformName} handle`;
   }
   if (p.afterAuthor !== undefined && p.afterAuthor === 0) {
-    return `authorship filter dropped all ${p.fetched} fetched posts — handle likely doesn't match the API's author field`;
+    return platformName === 'LinkedIn'
+      ? `all ${p.fetched} fetched posts were reposts of other pages — no original content from this org in this window`
+      : `authorship filter dropped all ${p.fetched} fetched posts — handle likely doesn't match the API's author field`;
   }
   if ((p.inRangeCount || 0) === 0) {
     return `all ${p.fetched} fetched posts fall outside the report date window — zero is genuine for this window`;
+  }
+  if (p.truncated) {
+    return `${p.inRangeCount} posts in window but none matched AQ keywords, AND the fetch was capped before reaching the full date window (org posts frequently) — zero is not fully verified, may be a coverage gap`;
   }
   return `${p.inRangeCount} posts in window but none matched AQ keywords — zero is genuine`;
 }
