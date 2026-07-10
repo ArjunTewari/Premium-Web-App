@@ -791,6 +791,15 @@ async function run(cfg, cb) {
   const tvKwClause = tvKws.length === 1
     ? `"${tvKws[0]}"`
     : `(${tvKws.map((k) => `"${k}"`).join(" OR ")})`;
+  // Serper's News search doesn't reliably honor the quoted "org name" term —
+  // verified empirically: when a strict site:+"org"+keywords query has no
+  // genuine matches, it falls back to a loose, low-relevance result that can
+  // be about something else entirely (e.g. an unrelated air-quality story
+  // from a different country). The org-presence check below rejects those
+  // at the source instead of relying solely on the downstream STEP 1d filter
+  // (which fails open on some error paths) to catch them.
+  const titleSnippetHasTerm = (r, term) =>
+    `${r.title || ""} ${r.snippet || ""}`.toLowerCase().includes(term.toLowerCase());
   {
     const limit1c = pLimit(4); // 4 orgs in parallel
     await Promise.allSettled(ORGS.map(org => limit1c(async () => {
@@ -801,16 +810,18 @@ async function run(cfg, cb) {
         cb(`  ${q}`);
         try {
           const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
-          let added = 0;
+          let added = 0, rejected = 0;
           for (const r of results) {
             const k = r.link || r.title;
             if (!tvSeen.has(k)) {
               tvSeen.add(k);
               if (!inRange(r.date || "")) continue;
+              if (!titleSnippetHasTerm(r, org)) { rejected++; continue; }
               arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "" });
               added++;
             }
           }
+          if (rejected > 0) cb(`  ${channel} · ${org}: rejected ${rejected} result(s) not actually mentioning the org (Serper fallback match)`, "warn");
           cb(`  ${channel} · ${org}: +${added}`, added > 0 ? "ok" : "warn");
         } catch (e) {
           cb(`  TV search error (${channel}): ${e.message}`, "warn");
@@ -826,6 +837,7 @@ async function run(cfg, cb) {
               if (!tvSeen.has(k)) {
                 tvSeen.add(k);
                 if (!inRange(r.date || "")) continue;
+                if (!titleSnippetHasTerm(r, tvAbbr)) continue;
                 arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "", matchTerm: tvAbbr });
                 added++;
               }
