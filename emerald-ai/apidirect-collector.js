@@ -38,6 +38,24 @@ function isAQ(text, aqKw) {
   return (aqKw || AQ_KW_BASE).some(k => t.includes(k));
 }
 
+// Auto-generate a 3+ letter abbreviation from multi-word org names — same
+// logic as pipeline.js's getAbbreviation(), duplicated here (small,
+// self-contained, no external deps) rather than cross-required, since
+// pipeline.js requires this module and a top-level require back would be
+// circular. Used by the authorship filters below: LinkedIn/Instagram pages
+// often use an org's acronym as their display name (e.g. "APAG"), which a
+// handle-or-full-org-name-only substring check would never match.
+const ABBR_STOP = new Set(['of','on','and','the','for','in','at','by','to','a','an','with','its','vs']);
+function getAbbreviation(orgName) {
+  const words = orgName.replace(/[^a-zA-Z\s]/g, ' ').trim().split(/\s+/)
+    .filter(w => w.length > 1 && !ABBR_STOP.has(w.toLowerCase()));
+  if (words.length < 2) return null;
+  const abbr = words.map(w => w[0].toUpperCase()).join('');
+  if (abbr.length < 3) return null;
+  if (orgName.replace(/[^a-zA-Z]/g, '').length <= 6) return null; // already short/acronym
+  return abbr;
+}
+
 // ── Adaptive per-endpoint concurrency gate ──────────────────────────────────
 // APIdirect caps each endpoint at 3 concurrent requests. We start at 2 for
 // headroom and ADAPT DOWN to 1 (serial) the instant an endpoint returns 429,
@@ -200,7 +218,16 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
     cb?.(`  [APIdirect/LI] ${org}: no official handle — skipped`, 'warn');
     return { ...EMPTY, noHandle: true };
   }
-  const kwClause = aqKw.slice(0, 8).map(k => `"${k}"`).join(' OR ');
+  // Was slice(0,8) — with the default 11-term AQ_KW_BASE plus user scope
+  // keywords, that silently excluded up to 9 legitimate terms (e.g. "black
+  // carbon", "nitrogen dioxide", "methane") from the search query ITSELF,
+  // even though the AQ-relevance filter below checks the full list — a post
+  // using an excluded term was never fetched in the first place, regardless
+  // of how permissive that later filter is. Raised to 20 (verified: stays
+  // well under a 500-char query length even with a long org name and a
+  // heavier custom scope-keyword set — see test-tv-serper-query.js-style
+  // verification during this fix).
+  const kwClause = aqKw.slice(0, 20).map(k => `"${k}"`).join(' OR ');
   const q = `"${org}" (${kwClause})`;
   const MAX_PAGES = 3;
   try {
@@ -216,12 +243,17 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
     }
     const fetched = allPosts.length;
 
-    // 1) official channel only — fail closed if no author metadata
+    // 1) official channel only — fail closed if no author metadata. Checks
+    // handle, full org name, AND the org's abbreviation (e.g. "APAG") —
+    // LinkedIn pages often display as their acronym, which neither the
+    // handle nor the full org name would substring-match.
     const handleLower = handle.toLowerCase();
     const orgLower = org.toLowerCase();
+    const abbr = getAbbreviation(org);
+    const abbrLower = abbr ? abbr.toLowerCase() : null;
     let posts = allPosts.filter(p => {
       const author = (p.author || p.author_name || p.company || '').toLowerCase();
-      return author.includes(handleLower) || author.includes(orgLower);
+      return author.includes(handleLower) || author.includes(orgLower) || (abbrLower && author.includes(abbrLower));
     });
     const afterAuthor = posts.length;
     if (posts.length === 0 && fetched > 0) {
@@ -354,7 +386,11 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
   const MAX_PAGES = 5;
   try {
     const handle = igHandle.replace(/^@/, '').toLowerCase();
-    const kwClause = aqKw.slice(0, 6).map(k => `"${k}"`).join(' OR ');
+    // Was slice(0,6) — same query-vs-filter keyword-coverage gap as
+    // LinkedIn, just worse (up to 11 of 17 default terms excluded from the
+    // query itself). Raised to 20; stays well under a safe query-length
+    // margin even with a heavier custom scope-keyword set.
+    const kwClause = aqKw.slice(0, 20).map(k => `"${k}"`).join(' OR ');
     const query = `${handle} (${kwClause})`;
 
     // Fetch user profile and first page in parallel
@@ -383,18 +419,21 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
     }
     const fetched = allPosts.length;
 
-    // 1) official channel only — substring match against handle OR org name,
-    // same pattern as fetchLinkedIn(). instagram/posts is a free-text search
-    // (not scoped to the account, same as linkedin/posts), so the author
-    // field can come back formatted differently — display name, different
-    // case, extra text — than the bare handle string used for the separate
+    // 1) official channel only — substring match against handle, org name,
+    // OR the org's abbreviation (e.g. "APAG"), same pattern as
+    // fetchLinkedIn(). instagram/posts is a free-text search (not scoped to
+    // the account, same as linkedin/posts), so the author field can come
+    // back formatted differently — display name, different case, extra
+    // text — than the bare handle string used for the separate
     // instagram/user followers lookup. Exact equality was silently dropping
     // genuinely-authored posts even when the handle itself was correct
     // (proven by followers resolving fine from the same handle).
     const orgLower = org.toLowerCase();
+    const abbr = getAbbreviation(org);
+    const abbrLower = abbr ? abbr.toLowerCase() : null;
     let posts = allPosts.filter(p => {
       const author = (p.author || p.username || p.author_name || '').toLowerCase();
-      return author.includes(handle) || author.includes(orgLower);
+      return author.includes(handle) || author.includes(orgLower) || (abbrLower && author.includes(abbrLower));
     });
     const afterAuthor = posts.length;
     if (posts.length === 0 && fetched > 0) {
