@@ -466,11 +466,6 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
           <span style="color:#e05c9c">${r.instagramPosts || 0} IG</span> &middot;
           <span style="color:#e53935">${yt.videoCount || 0} YT</span>
         </span>
-        ${r.twitterER > 0 || r.instagramER > 0 ? `<span style="font-size:15px;color:#5e7494">
-          ${r.twitterER > 0 ? `<span style="color:#4a9fd4">X ${r.twitterER}%</span>` : ''}
-          ${r.twitterER > 0 && r.instagramER > 0 ? ' · ' : ''}
-          ${r.instagramER > 0 ? `<span style="color:#e05c9c">IG ${r.instagramER}%</span>` : ''}
-        </span>` : ''}
         <span style="color:#c9922a;font-size:16px;margin-left:auto">▾</span>
       </summary>
       <div style="padding:12px 14px;background:#0e1420">
