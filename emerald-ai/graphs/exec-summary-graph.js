@@ -120,7 +120,27 @@ async function run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb }) {
     {},
     { configurable: { cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb }, recursionLimit: 15 },
   );
-  return { execF: finalState.execF, execAudit: finalState.execAudit };
+  let execF = finalState.execF;
+  let execAudit = finalState.execAudit;
+
+  // Deterministic final patch: regeneration (above) tries to get Claude to
+  // restate the right number, but there's no need to gamble on that when the
+  // correct value is already known — every issue with an unambiguous single
+  // field (articles/AEO/social; NOT the two-field "%" case, which stays
+  // flagged rather than guessed) gets its digits spliced directly into the
+  // finding text. Runs regardless of whether the loop above converged or hit
+  // MAX_RETRIES, so a report never ships a known-wrong number just because
+  // Claude didn't happen to restate it correctly within the retry budget.
+  if (execAudit.issues.some((iss) => iss.correctedValue != null)) {
+    const corrected = Sentinel.applyCorrections(execF, execAudit.issues);
+    const reAudit = Sentinel.validateExecSummary(corrected, data, ORGS);
+    const fixedCount = execAudit.issues.length - reAudit.issues.length;
+    cb?.(`  SENTINEL · exec summary: auto-corrected ${fixedCount} numeric claim(s) directly in the text`, fixedCount > 0 ? 'ok' : 'warn');
+    execF = corrected;
+    execAudit = reAudit;
+  }
+
+  return { execF, execAudit };
 }
 
 module.exports = { run, graph, MAX_RETRIES };

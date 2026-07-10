@@ -244,12 +244,15 @@ function validateExecSummary(execF, data, ORGS) {
   // Unit patterns are bidirectional where natural phrasing can go either way
   // ("18 AEO mentions" vs "AEO score of 18") — a capture can land in group 1
   // or group 2 depending on which alternative matched.
+  // 'd' flag (match indices) lets us know exactly which characters a capture
+  // group matched — needed both to dedup overlapping patterns below and to
+  // splice a corrected value directly into the finding text later.
   const UNIT_PATTERNS = [
-    { re: /(\d+(?:\.\d+)?)\s*articles?\b/gi, fields: ['total'], label: 'articles' },
-    { re: /(\d+(?:\.\d+)?)\s*%/g, fields: ['dataPct', 'authPct'], label: '%' },
-    { re: /(\d+(?:\.\d+)?)\s*\/\s*10\b/g, fields: ['social'], label: '/10 social' },
-    { re: /(\d+(?:\.\d+)?)\s*\/\s*100\b/g, fields: ['aeo'], label: '/100 AEO score' },
-    { re: /(\d+(?:\.\d+)?)\s*AEO\b|AEO\D{0,20}?(\d+(?:\.\d+)?)/gi, fields: ['aeo'], label: 'AEO' },
+    { re: /(\d+(?:\.\d+)?)\s*articles?\b/gid, fields: ['total'], label: 'articles' },
+    { re: /(\d+(?:\.\d+)?)\s*%/gd, fields: ['dataPct', 'authPct'], label: '%' },
+    { re: /(\d+(?:\.\d+)?)\s*\/\s*10\b/gd, fields: ['social'], label: '/10 social' },
+    { re: /(\d+(?:\.\d+)?)\s*\/\s*100\b/gd, fields: ['aeo'], label: '/100 AEO score' },
+    { re: /(\d+(?:\.\d+)?)\s*AEO\b|AEO\D{0,20}?(\d+(?:\.\d+)?)/gid, fields: ['aeo'], label: 'AEO' },
   ];
 
   // A generic plural like "7 organizations registered 0 mentions" refers to
@@ -281,12 +284,34 @@ function validateExecSummary(execF, data, ORGS) {
     let gm;
     while ((gm = GENERIC_AGGREGATE_RE.exec(text))) genericHits.push(gm.index);
 
+    // Patterns can overlap on the same substring (e.g. "0/100 AEO" is matched
+    // whole by the "/100" pattern AND partially re-matched — just the "100"
+    // — by the "AEO" pattern's "digits-before-AEO" alternative, producing two
+    // contradictory issues for one real claim). Track which character ranges
+    // are already claimed (patterns run in array order, so more specific
+    // patterns like "/100" go first and win) and skip a later pattern's match
+    // if it overlaps.
+    const consumedRanges = [];
+    const overlapsConsumed = (s, e) => consumedRanges.some((r) => s < r.end && e > r.start);
+
     for (const { re, fields, label } of UNIT_PATTERNS) {
       re.lastIndex = 0;
       let m;
       while ((m = re.exec(text))) {
-        const val = parseFloat(m[1] ?? m[2]);
+        const groupIdx = m[1] !== undefined ? 1 : 2;
+        const val = parseFloat(m[groupIdx]);
         if (Number.isNaN(val)) continue;
+        // Dedup on the WHOLE match span ("0/100"), not just the captured
+        // digits ("0") — the AEO pattern's competing match ("100 AEO") only
+        // overlaps the /100 pattern's captured "0" via the surrounding "/100"
+        // text, not the digit itself, so checking just the capture would miss
+        // the collision entirely (this was the actual bug: whole-match spans
+        // for "0/100" and "100 AEO" overlap on the shared "100", but their
+        // individual capture groups — "0" vs "100" — don't overlap at all).
+        const [wStart, wEnd] = m.indices[0];
+        if (overlapsConsumed(wStart, wEnd)) continue;
+        consumedRanges.push({ start: wStart, end: wEnd });
+        const [gStart, gEnd] = m.indices[groupIdx];
 
         // Attribution favors the closest PRECEDING org mention — this
         // report's writing style is consistently "Org verb N unit" (e.g.
@@ -339,6 +364,12 @@ function validateExecSummary(execF, data, ORGS) {
         if (!truth) continue;
         const matches = fields.some((f) => truth[f] != null && Math.abs(truth[f] - val) < 0.6);
         if (!matches) {
+          // Only auto-correctable when the unit maps to exactly one field —
+          // "%" maps to either dataPct or authPct, so which one the finding
+          // meant is ambiguous and must stay a flagged issue, not a guess.
+          const singleField = fields.length === 1 ? fields[0] : null;
+          const correctedValue = singleField != null && truth[singleField] != null
+            ? String(truth[singleField]) : null;
           issues.push({
             findingIdx: fi,
             headline: finding.headline || '',
@@ -346,6 +377,9 @@ function validateExecSummary(execF, data, ORGS) {
             claimed: val,
             metric: label,
             actual: fields.map((f) => `${f}=${truth[f] ?? 'n/a'}`).join(', '),
+            matchStart: gStart,
+            matchEnd: gEnd,
+            correctedValue,
           });
         }
       }
@@ -355,4 +389,47 @@ function validateExecSummary(execF, data, ORGS) {
   return { issues, checked };
 }
 
-module.exports = { classifyError, RETRYABLE, diagnoseZero, validateSocial, socialSentinel, socialSentinelLegacy, auditSectionNumbering, validateExecSummary };
+/**
+ * Deterministically splice the correct computed value into finding text for
+ * every issue that has an unambiguous correctedValue (see validateExecSummary
+ * — single-field units only, not the two-field "%" case). Used as the final
+ * step after the regenerate-and-recheck loop in graphs/exec-summary-graph.js
+ * either converges or exhausts its retries: rather than leaving a
+ * known-wrong number in the report with just a warning, patch it directly.
+ * Returns a NEW execF array (does not mutate the input) — findings with no
+ * correctable issues are returned unchanged (same object reference).
+ */
+function applyCorrections(execF, issues) {
+  const byFinding = new Map();
+  for (const iss of issues) {
+    if (iss.correctedValue == null) continue;
+    if (!byFinding.has(iss.findingIdx)) byFinding.set(iss.findingIdx, []);
+    byFinding.get(iss.findingIdx).push(iss);
+  }
+  if (!byFinding.size) return execF;
+
+  return execF.map((finding, fi) => {
+    const fixes = byFinding.get(fi);
+    if (!fixes) return finding;
+    const headline = finding.headline || '';
+    const detail = finding.detail || '';
+    const boundary = headline.length + 2; // matches the ". " joiner used to build `text` during detection
+
+    let newHeadline = headline;
+    const inHeadline = fixes.filter((f) => f.matchStart < headline.length).sort((a, b) => b.matchStart - a.matchStart);
+    for (const f of inHeadline) {
+      newHeadline = newHeadline.slice(0, f.matchStart) + f.correctedValue + newHeadline.slice(f.matchEnd);
+    }
+
+    let newDetail = detail;
+    const inDetail = fixes.filter((f) => f.matchStart >= boundary).sort((a, b) => b.matchStart - a.matchStart);
+    for (const f of inDetail) {
+      const s = f.matchStart - boundary, e = f.matchEnd - boundary;
+      newDetail = newDetail.slice(0, s) + f.correctedValue + newDetail.slice(e);
+    }
+
+    return { ...finding, headline: newHeadline, detail: newDetail };
+  });
+}
+
+module.exports = { classifyError, RETRYABLE, diagnoseZero, validateSocial, socialSentinel, socialSentinelLegacy, auditSectionNumbering, validateExecSummary, applyCorrections };
