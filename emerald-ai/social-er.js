@@ -191,16 +191,19 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     return `<span style="color:${color}">${count}</span>`;
   };
 
-  // YouTube's zero-cause vocabulary differs from LI/X/IG (no author/date-range
-  // funnel — it's Serper discovery + official-channel matching), so it gets
-  // its own diagnosis rather than reusing diagnoseZero()'s fetched/inRange shape.
-  // Shared between the compact table cell and the per-org detail note below.
+  // YouTube's zero-cause vocabulary differs from LI/X/IG (no author-field
+  // funnel — it's APIdirect discovery + official-channel matching + a
+  // client-side date-range filter), so it gets its own diagnosis rather than
+  // reusing diagnoseZero()'s fetched/afterAuthor/inRange shape. Shared
+  // between the compact table cell and the per-org detail note below.
   const ytZeroDiagnosis = (yt) =>
-    (yt.serperFound || 0) === 0
-      ? 'no videos discovered via Serper for this org/keyword combination'
+    (yt.discovered || 0) === 0
+      ? 'no videos discovered via APIdirect for this org/keyword combination'
       : yt.handleUnresolved
-        ? `Serper found ${yt.serperFound} video(s) but the channel handle couldn't be resolved to confirm they're from the official channel`
-        : `Serper found ${yt.serperFound} video(s) but none matched the resolved official channel`;
+        ? `APIdirect found ${yt.discovered} video(s) but the channel handle couldn't be resolved to confirm they're from the official channel`
+        : (yt.afterChannel || 0) === 0
+          ? `APIdirect found ${yt.discovered} video(s) but none matched the resolved official channel`
+          : `${yt.afterChannel} video(s) matched the official channel but none fall in the report date window`;
 
   const ytCell = (yt) => {
     if (!yt || yt.noHandle) return `<span style="color:#3d4a63;cursor:help" title="No handle configured for this platform">–</span>`;
@@ -243,7 +246,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
 
   const ytKeyNotice = !hasYtKey
     ? `<div style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:16px;color:#d4a017;line-height:1.7">
-        <strong>&#9432; YOUTUBE_KEY not configured</strong> — videos are discovered via Serper but views/likes/ER require a Google API key with YouTube Data API v3 enabled.
+        <strong>&#9432; YOUTUBE_KEY not configured</strong> — videos are discovered via APIdirect.io but likes/comments/ER require a Google API key with YouTube Data API v3 enabled.
       </div>`
     : '';
 

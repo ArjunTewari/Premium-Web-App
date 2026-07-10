@@ -438,7 +438,10 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
   }
 }
 
-// ── YouTube channel subscriber count (video ER stays in youtube-er.js) ────────
+// ── YouTube channel resolution + subscriber count ─────────────────────────────
+// Also returns channelId now — youtube-er.js uses it to filter video-search
+// results to the official channel, replacing the old Google-API forHandle
+// lookup (which required YOUTUBE_KEY; this only needs APIDIRECT_KEY).
 async function fetchYouTubeChannel(org, ytHandle, apiKey, cb) {
   try {
     const query = ytHandle ? ytHandle.replace(/^@/, '') : org;
@@ -455,13 +458,31 @@ async function fetchYouTubeChannel(org, ytHandle, apiKey, cb) {
         ch = null;
       }
     }
-    if (!ch) return { subscribers: 0, channelTitle: '', channelUrl: '' };
+    if (!ch) return { subscribers: 0, channelTitle: '', channelUrl: '', channelId: null };
     const subscribers = parseInt((ch.subscriber_count || '0').replace(/[^\d]/g, ''), 10) || 0;
     cb?.(`  [APIdirect/YT] ${org}: ${subscribers.toLocaleString()} subscribers`, 'ok');
-    return { subscribers, channelTitle: ch.title || '', channelUrl: ch.url || '' };
+    return { subscribers, channelTitle: ch.title || '', channelUrl: ch.url || '', channelId: ch.channel_id || null };
   } catch (e) {
     cb?.(`  [APIdirect/YT] ${org} channel: ${e.message}`, 'warn');
-    return { subscribers: 0, channelTitle: '', channelUrl: '' };
+    return { subscribers: 0, channelTitle: '', channelUrl: '', channelId: null };
+  }
+}
+
+// ── YouTube video discovery ─────────────────────────────────────────────────
+// Free-text search (GET /v1/youtube/posts) — same shape as linkedin/posts and
+// instagram/posts: not scoped to a channel, so results must be filtered to
+// the official channel by the caller using each post's channel_id. Returns
+// views but NOT likes/comments — youtube-er.js still uses YouTube Data API v3
+// for those (APIdirect has no per-video engagement-stats endpoint).
+async function searchYouTubeVideos(org, apiKey, aqKw, cb) {
+  const kwClause = aqKw.slice(0, 8).map(k => `"${k}"`).join(' OR ');
+  const query = `${org} (${kwClause})`.slice(0, 500); // APIdirect caps query at 500 chars
+  try {
+    const r = await apiFetch('youtube/posts', { query, pages: 1 }, apiKey);
+    return { posts: r.posts || [], failed: false };
+  } catch (e) {
+    cb?.(`  [APIdirect/YT] ${org} video search: ${e.message}`, 'warn');
+    return { posts: [], failed: true, failReason: e.code || require('./sentinel').classifyError(e), failMessage: e.message };
   }
 }
 
@@ -533,6 +554,6 @@ async function run(cfg, selectedOrgs, orgHandles = {}, cb) {
 module.exports = {
   run,
   // Individual fetchers + helpers exported for the sentinel's targeted retries
-  fetchLinkedIn, fetchTwitter, fetchInstagram, fetchYouTubeChannel,
-  buildAqKeywords, parseDate,
+  fetchLinkedIn, fetchTwitter, fetchInstagram, fetchYouTubeChannel, searchYouTubeVideos,
+  buildAqKeywords, parseDate, inDateRange,
 };
