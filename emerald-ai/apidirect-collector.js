@@ -25,6 +25,32 @@ const BASE = 'https://apidirect.io/v1';
 const AQ_KW_BASE = ['air quality', 'air pollution', 'aqi', 'pm2.5', 'pm10', 'ncap', 'grap',
                     'smog', 'clean air', 'particulate', 'emission'];
 
+// Hardcoded topic columns used as LinkedIn search queries and Instagram local filter.
+// Each entry maps to exactly one column in the Social AQ report table.
+const AQ_KEYWORDS_SEARCH = [
+  'ncap',
+  'policy regulations',
+  'pm2.5',
+  'exposure mapping',
+  'stubble burning',
+  'clean air finance',
+  'vehicular pollution',
+  'health impact',
+  'industrial pollution',
+  'heat-aqi',
+  'brick kiln',
+  'petrol emission',
+  'diesel emission',
+  'super emitter',
+  'thermal power',
+  'household pollution',
+  'indoor pollution',
+  'biomass',
+  'rice residue',
+  'wheat residue',
+  'road dust',
+];
+
 // Merge base keywords with user-supplied SCOPE_KEYWORDS (lowercased, deduplicated).
 function buildAqKeywords(scopeKeywords) {
   const extra = Array.isArray(scopeKeywords)
@@ -190,34 +216,17 @@ function oldestInBatch(batch, ...fields) {
 }
 
 // ── LinkedIn ─────────────────────────────────────────────────────────────────
-// Uses linkedin/company/posts — the org's own page timeline by URL, not a
-// keyword search. This replaced an earlier free-text-search + author-string-
-// guessing approach (query="org name" + keyword OR-clause, then substring-
-// match the author field against handle/org-name/abbreviation) because that
-// approach both under-fetched (query keyword slice excluded legitimate AQ
-// terms) and mis-attributed authorship (LinkedIn display names don't reliably
-// contain the handle, full org name, or acronym). This endpoint returns only
-// posts that actually appear on the org's page, verified live: page 1/2 dates
-// come back strictly descending (most-recent-first), so the existing
-// oldest-post pagination cutoff still applies unchanged.
+// New approach (2026-07): instead of paginating the org's full timeline via
+// linkedin/company/posts (which cost ~$0.40+/org to reach a Feb start date),
+// we:
+//   1. Call linkedin/company once to resolve the numeric company_id
+//   2. For each of the 21 hardcoded AQ keywords call linkedin/posts with
+//      from_company=<id> + sort_by=most_recent, stopping per-keyword as soon
+//      as the oldest post on a page predates dateFrom
+//   3. Deduplicate by URL across keywords, merging keywords_found
+// This keeps cost to ~$0.15–0.25/org regardless of posting frequency.
 //
-// The one caveat verified live (WRI India, 2026-07): the page's own timeline
-// includes REPOSTS of other pages' content (is_repost:true, author = the
-// original poster, not the org) — e.g. a partner org's event post that WRI
-// India reposted. Those are excluded below; they aren't the org's own voice
-// and would mis-attribute third-party text into this org's topic/engagement
-// numbers. No further author-matching is needed on top of that — the post
-// came from the company's own page URL, so is_repost:false already means
-// it's the org's own content. Kept simple deliberately: an extra
-// handle/name/abbreviation substring check was tried and dropped — it was
-// redundant with what the endpoint already guarantees.
-//
-// No keyword query here — this endpoint has no query param, it's the org's
-// unfiltered timeline. That means an active poster's AQ-relevant posts can be
-// diluted by a lot of non-AQ content, so the page cap is raised well above
-// the old 3-page limit (see Twitter's 5-page precedent below) and truncation
-// (hitting the cap while still inside the date window) is flagged explicitly
-// rather than silently under-counting.
+// Person profiles (/in/ URLs) are supported via the `author` param instead.
 async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
   const EMPTY = { postCount: 0, totalLikes: 0, totalComments: 0, totalShares: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
   const handle = liHandle ? liHandle.replace(/^@/, '').trim() : null;
@@ -225,71 +234,88 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
     cb?.(`  [APIdirect/LI] ${org}: no official handle — skipped`, 'warn');
     return { ...EMPTY, noHandle: true };
   }
-  const companyUrl = `https://www.linkedin.com/company/${handle}`;
-  const MAX_PAGES = 8; // 80 posts — org has no query filter, so cap needs headroom over a multi-month window
+
+  // ── Step 1: resolve filter param (company_id or author URL) ──
+  const isPersonUrl = handle.includes('/in/') && !handle.includes('/company/');
+  let filterParam;
   try {
-    // Paginate until we've seen a post older than dateFrom, run out of pages,
-    // or hit MAX_PAGES (tracked separately as a possible coverage gap).
-    let allPosts = [];
-    let total = null;
-    let stopReason = 'no_more_posts';
-    for (let page = 1; page <= MAX_PAGES; page++) {
-      const r = await apiFetch('linkedin/company/posts', { url: companyUrl, page }, apiKey);
-      const batch = r.posts || [];
-      if (total === null && r.total != null) total = r.total;
-      if (!batch.length) { stopReason = 'no_more_posts'; break; }
-      allPosts = allPosts.concat(batch);
-      const oldest = oldestInBatch(batch, 'date');
-      if (dateRange?.from && oldest && oldest < dateRange.from) { stopReason = 'date_cutoff'; break; }
-      if (page === MAX_PAGES) stopReason = 'page_cap';
+    if (isPersonUrl) {
+      const profileUrl = handle.startsWith('http') ? handle : `https://www.linkedin.com/in/${handle}`;
+      filterParam = { author: profileUrl };
+      cb?.(`  [APIdirect/LI] ${org}: person profile detected, using author filter`);
+    } else {
+      const companyUrl = handle.startsWith('http') ? handle : `https://www.linkedin.com/company/${handle}`;
+      const companyData = await apiFetch('linkedin/company', { url: companyUrl }, apiKey);
+      const companyId = companyData.company_id;
+      if (!companyId) throw new Error('linkedin/company returned no company_id');
+      filterParam = { from_company: String(companyId) };
+      cb?.(`  [APIdirect/LI] ${org}: resolved company_id=${companyId} (${companyData.name || handle})`);
     }
-    const fetched = allPosts.length;
-    const truncated = stopReason === 'page_cap';
-    if (truncated) {
-      cb?.(`  [APIdirect/LI] ${org}: hit the ${MAX_PAGES}-page fetch cap (${fetched}${total != null ? `/${total}` : ''} posts) while still inside the date window — org posts frequently, older in-range posts may exist beyond this cap`, 'warn');
-    }
-
-    // Exclude reposts of other pages' content — everything else is the org's
-    // own content by construction (fetched from its own page URL).
-    // (Field name kept as afterAuthor for diagnoseZero()/sentinel compatibility.)
-    let posts = allPosts.filter(p => !p.is_repost);
-    const afterAuthor = posts.length;
-    const repostCount = fetched - afterAuthor;
-    if (repostCount > 0) {
-      cb?.(`  [APIdirect/LI] ${org}: ${repostCount} repost(s) excluded (not the org's own content)`, 'warn');
-    }
-
-    // 2) date range
-    posts = posts.filter(p => inDateRange(p.date, dateRange?.from, dateRange?.to));
-    const inRange = posts.length;
-
-    // 3) AQ relevance
-    posts = posts.filter(p => isAQ(`${p.text || ''} ${p.title || ''} ${p.snippet || ''}`, aqKw));
-
-    // 4) metrics + ER
-    const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
-    const totalComments = posts.reduce((s, p) => s + (p.comments || 0), 0);
-    const totalShares   = posts.reduce((s, p) => s + (p.shares   || 0), 0);
-    const totalEngage   = totalLikes + totalComments + totalShares;
-    const topPosts = [...posts]
-      .sort((a, b) => ((b.likes || 0) + (b.comments || 0) + (b.shares || 0)) - ((a.likes || 0) + (a.comments || 0) + (a.shares || 0)))
-      .slice(0, 5)
-      .map(p => ({
-        url:      p.url || '',
-        snippet:  (p.text || p.title || p.snippet || '').slice(0, 250),
-        author:   p.author || '',
-        likes:    p.likes    || 0,
-        comments: p.comments || 0,
-        shares:   p.shares   || 0,
-        date:     p.date     || '',
-      }));
-    const erVal = er(totalEngage, 0, posts.length);
-    cb?.(`  [APIdirect/LI] ${org}: ${fetched} fetched → ${afterAuthor} original → ${inRange} in range → ${posts.length} AQ posts, ${totalEngage} engagements`, posts.length > 0 ? 'ok' : 'warn');
-    return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers: 0, er: erVal, topPosts, fetched, afterAuthor, inRangeCount: inRange, truncated };
   } catch (e) {
-    cb?.(`  [APIdirect/LI] ${org}: ${e.message}`, 'warn');
+    cb?.(`  [APIdirect/LI] ${org}: could not resolve profile — ${e.message}`, 'warn');
     return failResult(EMPTY, e);
   }
+
+  // ── Step 2: search per keyword, deduplicate ──
+  // seen: url → { post, keywords: Set<string> }
+  const seen = new Map();
+  const MAX_PAGES_PER_KW = 5;
+
+  for (const keyword of AQ_KEYWORDS_SEARCH) {
+    for (let page = 1; page <= MAX_PAGES_PER_KW; page++) {
+      let data;
+      try {
+        data = await apiFetch('linkedin/posts', { query: keyword, sort_by: 'most_recent', page, ...filterParam }, apiKey);
+      } catch (e) {
+        cb?.(`  [APIdirect/LI] ${org} "${keyword}" p${page}: ${e.message}`, 'warn');
+        break;
+      }
+      const batch = data.posts || [];
+      if (!batch.length) break;
+
+      for (const post of batch) {
+        if (!inDateRange(post.date, dateRange?.from, dateRange?.to)) continue;
+        const key = post.url || `${post.date}:${(post.snippet || '').slice(0, 80)}`;
+        if (!seen.has(key)) seen.set(key, { post, keywords: new Set() });
+        seen.get(key).keywords.add(keyword);
+      }
+
+      // Stop paginating this keyword once we've passed the date window start
+      const oldest = oldestInBatch(batch, 'date');
+      if (dateRange?.from && oldest && oldest < dateRange.from) break;
+    }
+  }
+
+  // ── Step 3: aggregate ──
+  const entries = [...seen.values()];
+  const posts   = entries.map(e => e.post);
+
+  const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
+  const totalComments = posts.reduce((s, p) => s + (p.comments || 0), 0);
+  const totalShares   = posts.reduce((s, p) => s + (p.shares   || 0), 0);
+  const totalEngage   = totalLikes + totalComments + totalShares;
+
+  const topPosts = [...entries]
+    .sort((a, b) => {
+      const ea = (a.post.likes || 0) + (a.post.comments || 0) + (a.post.shares || 0);
+      const eb = (b.post.likes || 0) + (b.post.comments || 0) + (b.post.shares || 0);
+      return eb - ea;
+    })
+    .slice(0, 5)
+    .map(({ post, keywords }) => ({
+      url:            post.url || '',
+      snippet:        (post.snippet || post.text || '').slice(0, 250),
+      author:         post.author || '',
+      likes:          post.likes    || 0,
+      comments:       post.comments || 0,
+      shares:         post.shares   || 0,
+      date:           post.date     || '',
+      keywords_found: [...keywords],
+    }));
+
+  const erVal = er(totalEngage, 0, posts.length);
+  cb?.(`  [APIdirect/LI] ${org}: ${posts.length} AQ posts (${AQ_KEYWORDS_SEARCH.length} keyword searches), ${totalEngage} engagements`, posts.length > 0 ? 'ok' : 'warn');
+  return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers: 0, er: erVal, topPosts, fetched: posts.length, inRangeCount: posts.length };
 }
 
 // ── Twitter / X ───────────────────────────────────────────────────────────────
@@ -413,8 +439,8 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
     let posts = allPosts.filter(p => inDateRange(p.date, dateRange?.from, dateRange?.to));
     const inRange = posts.length;
 
-    // 2) AQ relevance
-    posts = posts.filter(p => isAQ(`${p.snippet || ''} ${p.title || ''}`, aqKw));
+    // 2) AQ relevance — use the same 21 hardcoded keywords as LinkedIn
+    posts = posts.filter(p => isAQ(`${p.snippet || ''} ${p.title || ''}`, AQ_KEYWORDS_SEARCH));
 
     // 3) metrics + ER
     const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
@@ -547,4 +573,5 @@ module.exports = {
   // Individual fetchers + helpers exported for the sentinel's targeted retries
   fetchLinkedIn, fetchTwitter, fetchInstagram, fetchYouTubeChannel,
   buildAqKeywords, parseDate, inDateRange, isAQ,
+  AQ_KEYWORDS_SEARCH,
 };
