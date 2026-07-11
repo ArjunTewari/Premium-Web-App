@@ -10,6 +10,7 @@ const path = require("path");
 const SI = require("./social-intelligence");
 const Sentinel = require("./sentinel");
 const { fetchTvCoverage, AQ_KEYWORDS } = require("./firecrawl-tv");
+const { fetchPrintCoverage } = require("./firecrawl-print");
 const {
   callClaude,
   parseJ,
@@ -640,143 +641,22 @@ async function run(cfg, cb) {
   cb(`\n=== Emerald AI · AQ Intelligence Report ===`, "head");
   cb(`Orgs: ${ORGS.join(", ")} · ${DATE_FROM} to ${DATE_TO}`);
 
-  // ── STEP 1: Fetch articles ─────────────────────────────────
-  cb(`\nSTEP 1/6 — Fetching articles from Serper...`, "head");
+  // ── STEP 1: Fetch print articles via Firecrawl ────────────
+  // One call per org: query = '"OrgName" air quality', includeDomains hardcoded
+  // to 4 print outlets, local 21-keyword filter applied inside firecrawl-print.js.
+  cb(`\nSTEP 1/6 — Fetching print articles (Firecrawl)...`, "head");
   const arts = {};
   for (const o of ORGS) arts[o] = [];
 
   {
-    const limit1 = pLimit(4); // 4 orgs in parallel — safe for Serper rate limits
-    await Promise.allSettled(ORGS.map(org => limit1(async () => {
+    const printResults = await fetchPrintCoverage(cfg, cb);
+    for (const org of ORGS) {
       const seen = new Set();
-      for (const kw of SCOPE_KEYWORDS.slice(0, 8)) {
-        let skipped = 0;
-        const q = `"${org}" ${kw} India`;
-        cb(`  ${q}`);
-        try {
-          const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
-          let added = 0;
-          for (const r of results) {
-            const k = r.link || r.title;
-            if (!seen.has(k)) {
-              seen.add(k);
-              if (!inRange(r.date || "")) { skipped++; continue; }
-              const outlet = canonOutlet(r.source || dom(r.link || ""));
-              if (outlet !== null && isThirdParty(r.link || "", org)) {
-                arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: outlet, url: r.link || "", date: r.date || "" });
-                added++;
-              }
-            }
-          }
-          cb(`  +${added} kept, ${skipped} outside date range`, "ok");
-        } catch (e) {
-          cb(`  Serper error: ${e.message}`, "warn");
-        }
-        await sleep(300);
+      for (const a of (printResults[org] || [])) {
+        const k = a.url || a.title;
+        if (!seen.has(k)) { seen.add(k); arts[org].push(a); }
       }
-      // Abbreviation fallback — search for e.g. "HEI" if org = "Health Effects Institute"
-      const abbr = getAbbreviation(org);
-      if (abbr) {
-        cb(`  [abbr] searching for "${abbr}" (abbreviation of ${org})...`);
-        for (const kw of SCOPE_KEYWORDS.slice(0, 5)) {
-          const q = `"${abbr}" ${kw} India`;
-          try {
-            const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
-            let added = 0;
-            for (const r of results) {
-              const k = r.link || r.title;
-              if (!seen.has(k)) {
-                seen.add(k);
-                if (!inRange(r.date || "")) continue;
-                const outlet = canonOutlet(r.source || dom(r.link || ""));
-                if (outlet !== null && isThirdParty(r.link || "", org)) {
-                  arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: outlet, url: r.link || "", date: r.date || "", matchTerm: abbr });
-                  added++;
-                }
-              }
-            }
-            if (added > 0) cb(`  +${added} via "${abbr}"`, "ok");
-          } catch (e) {
-            cb(`  Abbr search error: ${e.message}`, "warn");
-          }
-          await sleep(300);
-        }
-      }
-      cb(`  ${org}: ${arts[org].length} articles`, "ok");
-    })));
-  }
-
-  // ── SENTINEL (press): zero-article orgs get one relaxed retry ─────────────
-  // The exact-phrase query can miss orgs whose name appears with different
-  // word order / punctuation. A relaxed (unquoted) retry is safe because the
-  // org-presence filter (STEP 1d) and Haiku filter (STEP 1e) guard precision
-  // downstream.
-  {
-    const zeroOrgs = ORGS.filter((o) => arts[o].length === 0);
-    if (zeroOrgs.length) {
-      cb(`\n  SENTINEL · press: ${zeroOrgs.length} org(s) with 0 articles — retrying with relaxed queries...`, "head");
-      for (const org of zeroOrgs) {
-        const seen = new Set(arts[org].map((a) => a.url || a.title));
-        for (const kw of SCOPE_KEYWORDS.slice(0, 3)) {
-          const q = `${org} ${kw} India`;
-          try {
-            const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
-            let added = 0;
-            for (const r of results) {
-              const k = r.link || r.title;
-              if (seen.has(k)) continue;
-              seen.add(k);
-              if (!inRange(r.date || "")) continue;
-              const outlet = canonOutlet(r.source || dom(r.link || ""));
-              if (outlet !== null && isThirdParty(r.link || "", org)) {
-                arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: outlet, url: r.link || "", date: r.date || "", relaxed: true });
-                added++;
-              }
-            }
-            if (added > 0) cb(`    ${org} · relaxed "${kw}": +${added}`, "ok");
-          } catch (e) {
-            cb(`    ${org} relaxed retry error: ${e.message}`, "warn");
-          }
-          await sleep(300);
-        }
-
-        // Abbreviation, UNQUOTED — genuinely new coverage, not a duplicate
-        // of STEP 1's primary abbreviation pass (which already tried the
-        // abbreviation QUOTED; repeating that exact query here would waste
-        // a Serper call for zero new information). Still zero after the
-        // full-name relaxed pass above? Try the shorthand loosely too —
-        // e.g. "APAG" for Air Pollution Action Group, "CERAG" for Chintan
-        // Environmental Research and Action Group.
-        if (arts[org].length === 0) {
-          const abbr = getAbbreviation(org);
-          if (abbr) {
-            for (const kw of SCOPE_KEYWORDS.slice(0, 3)) {
-              const q = `${abbr} ${kw} India`;
-              try {
-                const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
-                let added = 0;
-                for (const r of results) {
-                  const k = r.link || r.title;
-                  if (seen.has(k)) continue;
-                  seen.add(k);
-                  if (!inRange(r.date || "")) continue;
-                  const outlet = canonOutlet(r.source || dom(r.link || ""));
-                  if (outlet !== null && isThirdParty(r.link || "", org)) {
-                    arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: outlet, url: r.link || "", date: r.date || "", relaxed: true, matchTerm: abbr });
-                    added++;
-                  }
-                }
-                if (added > 0) cb(`    ${org} · relaxed abbr "${abbr}" "${kw}": +${added}`, "ok");
-              } catch (e) {
-                cb(`    ${org} relaxed abbr retry error: ${e.message}`, "warn");
-              }
-              await sleep(300);
-            }
-          }
-        }
-
-        cb(`    ${org}: ${arts[org].length ? `recovered ${arts[org].length} article(s) — will be verified by org-presence + Haiku filters` : "still 0 — org appears genuinely absent from indexed press in this window"}`, arts[org].length ? "ok" : "warn");
-      }
+      cb(`  ${org}: ${arts[org].length} print article(s)`, arts[org].length > 0 ? "ok" : "warn");
     }
   }
 
