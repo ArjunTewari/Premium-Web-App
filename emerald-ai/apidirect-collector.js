@@ -18,8 +18,69 @@
  */
 
 const axios = require('axios');
+const fs    = require('fs');
+const path  = require('path');
 
 const BASE = 'https://apidirect.io/v1';
+
+// ── LinkedIn company_id persistent cache ──────────────────────────────────────
+// Stored in linkedin-company-id-cache.json next to this file.
+// Structure: { "<normalised company URL>": { company_id, name, cachedAt } }
+// The linkedin/company resolution call costs ~$0.006 and is idempotent, so
+// caching it means it runs once per org ever, not once per report run.
+const CACHE_FILE = path.join(__dirname, 'linkedin-company-id-cache.json');
+
+let _companyIdCache = null;
+
+function loadCompanyIdCache() {
+  if (_companyIdCache) return _companyIdCache;
+  try {
+    _companyIdCache = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+  } catch {
+    _companyIdCache = {};
+  }
+  return _companyIdCache;
+}
+
+function saveCompanyIdCache() {
+  try {
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(_companyIdCache, null, 2), 'utf8');
+  } catch (e) {
+    // Non-fatal — next run will just re-resolve
+    console.warn('[apidirect] could not save company_id cache:', e.message);
+  }
+}
+
+/** Normalise a LinkedIn company URL to a cache key (lowercase, no trailing slash). */
+function normaliseLiUrl(url) {
+  return url.toLowerCase().replace(/\/+$/, '');
+}
+
+/**
+ * Resolve a LinkedIn company URL to { company_id, name }.
+ * Returns the cached value immediately if already known; otherwise calls the
+ * APIdirect linkedin/company endpoint, stores the result, and returns it.
+ */
+async function resolveCompanyId(companyUrl, apiKey, cb) {
+  const cache = loadCompanyIdCache();
+  const key   = normaliseLiUrl(companyUrl);
+
+  if (cache[key]) {
+    cb?.(`  [APIdirect/LI] company_id=${cache[key].company_id} (${cache[key].name}) — from cache`);
+    return cache[key];
+  }
+
+  const data = await apiFetch('linkedin/company', { url: companyUrl }, apiKey);
+  if (!data.company_id) throw new Error('linkedin/company returned no company_id');
+
+  const entry = { company_id: data.company_id, name: data.name || companyUrl, cachedAt: new Date().toISOString() };
+  cache[key] = entry;
+  _companyIdCache = cache;
+  saveCompanyIdCache();
+
+  cb?.(`  [APIdirect/LI] company_id=${entry.company_id} (${entry.name}) — resolved & cached`);
+  return entry;
+}
 // Base AQ keywords. 'pollution' removed — bare substring matches water/noise/soil/light
 // pollution and produces false positives; 'air pollution' in the list already covers the AQ case.
 const AQ_KW_BASE = ['air quality', 'air pollution', 'aqi', 'pm2.5', 'pm10', 'ncap', 'grap',
@@ -245,11 +306,10 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
       cb?.(`  [APIdirect/LI] ${org}: person profile detected, using author filter`);
     } else {
       const companyUrl = handle.startsWith('http') ? handle : `https://www.linkedin.com/company/${handle}`;
-      const companyData = await apiFetch('linkedin/company', { url: companyUrl }, apiKey);
-      const companyId = companyData.company_id;
-      if (!companyId) throw new Error('linkedin/company returned no company_id');
-      filterParam = { from_company: String(companyId) };
-      cb?.(`  [APIdirect/LI] ${org}: resolved company_id=${companyId} (${companyData.name || handle})`);
+      const { company_id, name } = await resolveCompanyId(companyUrl, apiKey,
+        (msg) => cb?.(`  [APIdirect/LI] ${org}: ${msg.replace(/^\s+\[APIdirect\/LI\]\s*/, '')}`));
+      filterParam = { from_company: String(company_id) };
+      cb?.(`  [APIdirect/LI] ${org}: using company_id=${company_id} (${name})`);
     }
   } catch (e) {
     cb?.(`  [APIdirect/LI] ${org}: could not resolve profile — ${e.message}`, 'warn');

@@ -1,0 +1,210 @@
+import { writeFileSync } from "fs";
+
+const inputUrl = process.argv[2];
+const API_KEY  = process.argv[3] ?? process.env.APIDIRECT_API_KEY;
+
+if (!inputUrl || !API_KEY || inputUrl.startsWith("<") || API_KEY.startsWith("<")) {
+  console.error("Usage: npm run fetch-linkedin -- <linkedin_url> <YOUR_APIDIRECT_API_KEY>");
+  console.error("  Company : npm run fetch-linkedin -- https://linkedin.com/company/cseindia ak_xxx");
+  console.error("  Person  : npm run fetch-linkedin -- https://linkedin.com/in/someprofile ak_xxx");
+  process.exit(1);
+}
+
+// ─── Config ──────────────────────────────────────────────────────────────────
+
+const FROM = new Date("2026-02-01T00:00:00Z");
+const TO   = new Date("2026-04-01T23:59:59Z");
+
+const AQ_KEYWORDS = [
+  "ncap",                  // NCAP / Policy Targets
+  "policy regulations",    // Policy & Regulations
+  "pm2.5",                 // PM2.5 Exposure Mapping
+  "exposure mapping",      // PM2.5 Exposure Mapping
+  "stubble burning",       // Stubble Burning
+  "clean air finance",     // Clean Air Finance
+  "vehicular pollution",   // Vehicular Pollution
+  "health impact",         // Health Impact
+  "industrial pollution",  // Industrial Pollution
+  "heat-aqi",              // Heat-AQI Interaction
+  "brick kiln",            // Brick Kilns
+  "petrol emission",       // Petrol Emissions
+  "diesel emission",       // Diesel Emissions
+  "super emitter",         // Super Emitters
+  "thermal power",         // Thermal Power Plants
+  "household pollution",   // Household Pollution
+  "indoor pollution",      // Indoor Pollution
+  "biomass",               // Biomass Air Pollution
+  "rice residue",          // Rice Residue Burning
+  "wheat residue",         // Wheat Residue Burning
+  "road dust",             // Road Dust
+];
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface Post {
+  url?: string;
+  date?: string;
+  author?: string;
+  snippet?: string;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  reactions?: Record<string, number>;
+  [key: string]: unknown;
+}
+
+interface PostsResponse {
+  posts?: Post[];
+  page?: number;
+  count?: number;
+  error?: string;
+}
+
+interface CompanyResponse {
+  company_id?: number;
+  name?: string;
+  error?: string;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function parseDate(raw: string | undefined): Date | null {
+  if (!raw) return null;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+async function get<T>(endpoint: string, params: Record<string, string>): Promise<T> {
+  const url = new URL(endpoint);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  const res = await fetch(url.toString(), {
+    headers: { "X-API-Key": API_KEY! },
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  return res.json() as Promise<T>;
+}
+
+// ─── Step 1: URL Classifier + resolve company_id ─────────────────────────────
+
+type FilterParam = { from_company: string } | { author: string };
+
+async function resolveFilter(): Promise<{ label: string; filter: FilterParam }> {
+  const lower = inputUrl.toLowerCase();
+
+  if (lower.includes("/company/")) {
+    console.error(`Detected company page — fetching company_id...`);
+    const data = await get<CompanyResponse>("https://apidirect.io/v1/linkedin/company", { url: inputUrl });
+    if (data.error || !data.company_id) throw new Error(`Could not fetch company_id: ${data.error ?? "no id returned"}`);
+    console.error(`  Company: ${data.name} (id: ${data.company_id})`);
+    return { label: data.name ?? inputUrl, filter: { from_company: String(data.company_id) } };
+  }
+
+  if (lower.includes("/in/")) {
+    console.error(`Detected person profile — using author filter.`);
+    return { label: inputUrl, filter: { author: inputUrl } };
+  }
+
+  // Fallback: treat as person slug
+  console.error(`Warning: cannot detect profile type, treating as person/author.`);
+  return { label: inputUrl, filter: { author: inputUrl } };
+}
+
+// ─── Step 2: Search per keyword ───────────────────────────────────────────────
+
+async function fetchKeyword(keyword: string, filter: FilterParam): Promise<Post[]> {
+  const collected: Post[] = [];
+
+  for (let page = 1; page <= 10; page++) {
+    const params: Record<string, string> = {
+      query:    keyword,
+      sort_by:  "most_recent",
+      page:     String(page),
+      ...filter,
+    };
+
+    let data: PostsResponse;
+    try {
+      data = await get<PostsResponse>("https://apidirect.io/v1/linkedin/posts", params);
+    } catch (err) {
+      console.error(`    [error page ${page}] ${err}`);
+      break;
+    }
+
+    const posts = data.posts ?? [];
+    if (posts.length === 0) break;
+
+    collected.push(...posts);
+
+    // Stop once oldest post on this page is before Feb 1
+    const dates = posts.map((p) => parseDate(p.date)).filter(Boolean) as Date[];
+    if (dates.length > 0) {
+      const oldest = new Date(Math.min(...dates.map((d) => d.getTime())));
+      if (oldest < FROM) break;
+    }
+  }
+
+  return collected;
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+console.error(`\nLinkedIn post fetch: ${inputUrl}`);
+console.error(`Date range: ${FROM.toDateString()} → ${TO.toDateString()}\n`);
+
+const { label, filter } = await resolveFilter();
+
+// Per-URL accumulator: url → { post data, set of matched keywords }
+const seen = new Map<string, { post: Post; keywords: Set<string> }>();
+let totalApiCalls = 1; // already used 1 for company details if applicable
+
+for (const keyword of AQ_KEYWORDS) {
+  process.stderr.write(`  Searching "${keyword}"... `);
+  const posts = await fetchKeyword(keyword, filter);
+  totalApiCalls += Math.ceil(posts.length / 10) || 1;
+
+  // Keep only posts in date range, deduplicate
+  let added = 0;
+  for (const post of posts) {
+    const d = parseDate(post.date);
+    if (!d || d < FROM || d > TO) continue;
+    const key = post.url ?? JSON.stringify(post);
+    if (!seen.has(key)) { seen.set(key, { post, keywords: new Set() }); added++; }
+    seen.get(key)!.keywords.add(keyword);
+  }
+  console.error(`${posts.length} fetched, ${added} new in range`);
+}
+
+// Shape final output
+const matched = [...seen.values()].map(({ post, keywords }) => ({
+  url:            post.url,
+  date:           post.date,
+  keywords_found: [...keywords],
+  metrics: {
+    likes:     post.likes     ?? 0,
+    comments:  post.comments  ?? 0,
+    shares:    post.shares    ?? 0,
+    reactions: post.reactions ?? {},
+  },
+}));
+
+console.error(`\nTotal matched: ${matched.length} posts`);
+console.error(`Estimated API calls: ~${totalApiCalls} (~$${(totalApiCalls * 0.006).toFixed(3)})`);
+
+const result = {
+  input_url:     inputUrl,
+  label,
+  fetched_at:    new Date().toISOString(),
+  range:         { from: FROM.toISOString(), to: TO.toISOString() },
+  total_matched: matched.length,
+  posts:         matched,
+};
+
+const slug = inputUrl.replace(/https?:\/\/[^/]+\//, "").replace(/\//g, "_").replace(/[^a-z0-9_]/gi, "-");
+const ts   = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+const out  = `linkedin-${slug}-${ts}.json`;
+
+writeFileSync(out, JSON.stringify(result, null, 2), "utf-8");
+console.error(`Saved → ${out}`);
+
+console.log(JSON.stringify(result, null, 2));
