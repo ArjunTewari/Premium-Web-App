@@ -9,6 +9,7 @@ const fs = require("fs");
 const path = require("path");
 const SI = require("./social-intelligence");
 const Sentinel = require("./sentinel");
+const { fetchTvCoverage } = require("./firecrawl-tv");
 const {
   callClaude,
   parseJ,
@@ -801,55 +802,14 @@ async function run(cfg, cb) {
   const titleSnippetHasTerm = (r, term) =>
     `${r.title || ""} ${r.snippet || ""}`.toLowerCase().includes(term.toLowerCase());
   {
-    const limit1c = pLimit(4); // 4 orgs in parallel
-    await Promise.allSettled(ORGS.map(org => limit1c(async () => {
+    const fcTvResults = await fetchTvCoverage(cfg, cb);
+    for (const org of ORGS) {
       const tvSeen = new Set(arts[org].map((a) => a.url || a.title));
-      const tvAbbr = getAbbreviation(org);
-      for (const [channel, domain] of Object.entries(TV_CHANNEL_DOMAINS)) {
-        const q = `site:${domain} "${org}" ${tvKwClause}`;
-        cb(`  ${q}`);
-        try {
-          const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
-          let added = 0, rejected = 0;
-          for (const r of results) {
-            const k = r.link || r.title;
-            if (!tvSeen.has(k)) {
-              tvSeen.add(k);
-              if (!inRange(r.date || "")) continue;
-              if (!titleSnippetHasTerm(r, org)) { rejected++; continue; }
-              arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "" });
-              added++;
-            }
-          }
-          if (rejected > 0) cb(`  ${channel} · ${org}: rejected ${rejected} result(s) not actually mentioning the org (Serper fallback match)`, "warn");
-          cb(`  ${channel} · ${org}: +${added}`, added > 0 ? "ok" : "warn");
-        } catch (e) {
-          cb(`  TV search error (${channel}): ${e.message}`, "warn");
-        }
-        // Abbreviation TV search
-        if (tvAbbr) {
-          const qAbbr = `site:${domain} "${tvAbbr}" ${tvKwClause}`;
-          try {
-            const results = await serperSearch(qAbbr, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
-            let added = 0;
-            for (const r of results) {
-              const k = r.link || r.title;
-              if (!tvSeen.has(k)) {
-                tvSeen.add(k);
-                if (!inRange(r.date || "")) continue;
-                if (!titleSnippetHasTerm(r, tvAbbr)) continue;
-                arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "", matchTerm: tvAbbr });
-                added++;
-              }
-            }
-            if (added > 0) cb(`  ${channel} · "${tvAbbr}": +${added}`, "ok");
-          } catch (e) {
-            cb(`  TV abbr search error (${channel}): ${e.message}`, "warn");
-          }
-        }
-        await sleep(300);
+      for (const a of (fcTvResults[org] || [])) {
+        const k = a.url || a.title;
+        if (!tvSeen.has(k)) { tvSeen.add(k); arts[org].push(a); }
       }
-    })));
+    }
   }
 
   // ── SENTINEL (press): Hindi TV language-mismatch repair ──────────────────
