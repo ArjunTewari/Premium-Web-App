@@ -1,7 +1,6 @@
 "use strict";
 
 // ── TV Channel Coverage via Firecrawl ────────────────────────────────────────
-
 // One Firecrawl query per org across all TV domains using a short query
 // (`air quality "Org Name"`). Results are post-filtered: only articles where
 // at least one AQ keyword appears in title+description+snippet+summary are kept.
@@ -9,94 +8,51 @@
 
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/search";
 
-// Hardcoded TV channel domains — extraction is scoped to these URLs only
+// Outlet name → domain (drives includeDomains + reverse lookup)
 const TV_CHANNEL_DOMAINS = {
-  NDTV: "ndtv.com",
-  News18: "news18.com",
+  "NDTV":        "ndtv.com",
+  "News18":      "news18.com",
   "India Today": "indiatoday.in",
-  "India TV": "indiatvnews.com",
-  "ABP News": "abplive.com",
+  "India TV":    "indiatvnews.com",
+  "ABP News":    "abplive.com",
 };
 
-const INCLUDE_DOMAINS = Object.values(TV_CHANNEL_DOMAINS);
-
-// Domain → outlet name (reverse lookup)
+// Domain → outlet name (built from the map above + subdomain aliases)
 const DOMAIN_TO_OUTLET = {
-  ...Object.fromEntries(
-    Object.entries(TV_CHANNEL_DOMAINS).map(([name, d]) => [d, name]),
-  ),
-  "news.abplive.com": "ABP News",
+  ...Object.fromEntries(Object.entries(TV_CHANNEL_DOMAINS).map(([name, d]) => [d, name])),
+  "news.abplive.com":    "ABP News",
   "www.indiatvnews.com": "India TV",
 };
 
-// 51 AQ keywords — broad post-fetch filter to catch all relevant TV coverage
+// 51 hardcoded AQ keywords — used as a post-fetch filter, NOT in the query string
 const AQ_KEYWORDS = [
-  // 21 report topic columns
-  "ncap",
-  "policy regulations",
-  "pm2.5",
-  "stubble burning",
-  "clean air finance",
-  "vehicular pollution",
-  "health impact",
-  "industrial pollution",
-  "heat-aqi",
-  "brick kiln",
-  "petrol emission",
-  "diesel emission",
-  "super emitter",
-  "thermal power",
-  "household pollution",
-  "indoor pollution",
-  "biomass",
-  "rice residue",
-  "wheat residue",
-  "road dust",
-  "air quality",
+  // Original taxonomy
+  "ncap", "pm2.5", "exposure mapping", "stubble burn", "clean air finance",
+  "vehicular pollution", "health impact", "industrial pollution", "heat-aqi",
+  "brick kiln", "petrol emission", "diesel emission", "super emitter",
+  "thermal power", "household pollution", "indoor pollution", "biomass",
+  "rice residue", "wheat residue", "road dust", "air quality",
   // Pollutants & metrics
-  "pm10",
-  "aqi",
-  "smog",
-  "air pollution",
-  "particulate matter",
-  "nitrogen dioxide",
-  "no2",
-  "sulfur dioxide",
-  "so2",
-  "nox",
-  "ozone pollution",
-  "black carbon",
-  "fly ash",
+  "pm10", "aqi", "smog", "air pollution", "particulate matter",
+  "nitrogen dioxide", "no2", "sulfur dioxide", "so2", "nox",
+  "ozone pollution", "black carbon", "fly ash",
   // India-specific AQ mechanisms
-  "grap",
-  "caqm",
-  "odd-even",
-  "bs6",
-  "emission norms",
-  "smog tower",
-  "dg set",
-  "pollution hotspot",
+  "grap", "caqm", "odd-even", "bs6", "emission norms",
+  "smog tower", "dg set", "pollution hotspot",
   // Burning sources
-  "paddy burning",
-  "crop fire",
-  "farm fire",
-  "crop residue",
-  "open burning",
-  "garbage burning",
-  "waste burning",
-  "firecracker",
+  "paddy burning", "crop fire", "farm fire", "crop residue",
+  "open burning", "garbage burning", "waste burning", "firecracker",
   // Weather-linked AQ
   "dust storm",
 ];
 
 /** Convert YYYY-MM-DD → M/D/YYYY for Firecrawl's tbs param */
-
 function toTbsDate(iso) {
   const [y, m, d] = iso.split("-");
   return `${parseInt(m)}/${parseInt(d)}/${y}`;
 }
 
-/** Strip www. from hostname */
+/** Extract root domain from a URL, stripping www. prefix */
 function rootDomain(url) {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -105,60 +61,10 @@ function rootDomain(url) {
   }
 }
 
-/** True if any of the 21 AQ keywords appear in the article text */
-function matchesAQ(item) {
-  const text =
-    `${item.title || ""} ${item.description || ""} ${item.snippet || ""} ${item.summary || ""}`.toLowerCase();
-  return AQ_KEYWORDS.some((kw) => text.includes(kw));
-}
-
-/** Keywords found in an article (for downstream keyword_found field) */
-function foundKeywords(item) {
-  const text =
-    `${item.title || ""} ${item.description || ""} ${item.snippet || ""} ${item.summary || ""}`.toLowerCase();
-  return AQ_KEYWORDS.filter((kw) => text.includes(kw));
-}
-
-async function firecrawlSearch(query, tbs, retries = 2) {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const res = await fetch(FIRECRAWL_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${globalThis._fcKey}`,
-      },
-      body: JSON.stringify({
-        query,
-        sources: ["news"],
-        includeDomains: INCLUDE_DOMAINS,
-        tbs,
-        limit: 15,
-        scrapeOptions: { formats: ["summary"] },
-      }),
-      signal: AbortSignal.timeout(120_000),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, (attempt + 1) * 3000));
-        continue;
-      }
-      throw new Error(`HTTP ${res.status}: ${err}`);
-    }
-
-    const json = await res.json();
-    if (!json.success) throw new Error(json.error ?? "unknown Firecrawl error");
-    return json.data?.news ?? json.data?.web ?? [];
-  }
-  return [];
-}
-
 /** Return AQ keywords that appear in the article's combined text fields */
 function matchedKeywords(item) {
-  const text =
-    `${item.title || ""} ${item.description || ""} ${item.snippet || ""} ${item.summary || ""}`.toLowerCase();
-  return AQ_KEYWORDS.filter((kw) => text.includes(kw));
+  const text = `${item.title || ""} ${item.description || ""} ${item.snippet || ""} ${item.summary || ""}`.toLowerCase();
+  return AQ_KEYWORDS.filter(kw => text.includes(kw));
 }
 
 /**
@@ -190,11 +96,8 @@ async function firecrawlSearch(query, params, apiKey, cb) {
     } catch (e) {
       if (attempt < 3) {
         const wait = attempt * 5_000;
-        cb(
-          `  [firecrawl-tv] retry ${attempt}/3 (${wait / 1000}s): ${e.message}`,
-          "warn",
-        );
-        await new Promise((r) => setTimeout(r, wait));
+        cb(`  [firecrawl-tv] retry ${attempt}/3 (${wait / 1000}s): ${e.message}`, "warn");
+        await new Promise(r => setTimeout(r, wait));
       } else {
         throw e;
       }
@@ -205,24 +108,21 @@ async function firecrawlSearch(query, params, apiKey, cb) {
 /**
  * Fetch TV channel coverage for all orgs via Firecrawl.
  *
- * @param {object}   cfg  - Pipeline config: ORGS, DATE_FROM, DATE_TO, FIRECRAWL_KEY
- * @param {function} cb   - Progress callback: cb(msg, level)
- * @returns {Promise<Record<string, object[]>>}
+ * @param {object} cfg  - Pipeline config: ORGS, DATE_FROM, DATE_TO, FIRECRAWL_KEY
+ * @param {function} cb - Progress callback matching pipeline.js cb(msg, level)
+ * @returns {Promise<Record<string, object[]>>} Articles per org, ready for arts[org]
  */
 async function fetchTvCoverage(cfg, cb = () => {}) {
   const { ORGS = [], DATE_FROM, DATE_TO, FIRECRAWL_KEY } = cfg;
 
   if (!FIRECRAWL_KEY) {
-    cb("  [firecrawl-tv] FIRECRAWL_KEY not set — skipping TV coverage", "warn");
-    return Object.fromEntries(ORGS.map((o) => [o, []]));
+    cb("  [firecrawl-tv] FIRECRAWL_KEY not set — skipping Firecrawl TV search", "warn");
+    return Object.fromEntries(ORGS.map(o => [o, []]));
   }
 
-  // Store key where the inner fetch helper can reach it without threading it
-  // through every call; reset after the run so it doesn't leak between runs.
-  globalThis._fcKey = FIRECRAWL_KEY;
-
   const tbs = `cdr:1,cd_min:${toTbsDate(DATE_FROM)},cd_max:${toTbsDate(DATE_TO)}`;
-  const out = Object.fromEntries(ORGS.map((o) => [o, []]));
+  const includeDomains = Object.values(TV_CHANNEL_DOMAINS);
+  const out = Object.fromEntries(ORGS.map(o => [o, []]));
 
   const sharedParams = {
     sources: ["news"],
@@ -237,12 +137,7 @@ async function fetchTvCoverage(cfg, cb = () => {}) {
     cb(`  [firecrawl-tv] ${org}: querying TV channels...`);
 
     try {
-      const items = await firecrawlSearch(
-        query,
-        sharedParams,
-        FIRECRAWL_KEY,
-        cb,
-      );
+      const items = await firecrawlSearch(query, sharedParams, FIRECRAWL_KEY, cb);
       const seen = new Set();
       let skipped = 0;
 
@@ -252,25 +147,20 @@ async function fetchTvCoverage(cfg, cb = () => {}) {
         seen.add(key);
 
         const domain = rootDomain(item.url || "");
-        const outlet =
-          DOMAIN_TO_OUTLET[domain] || DOMAIN_TO_OUTLET[`www.${domain}`];
-        if (!outlet) continue; // not one of our TV domains
+        const outlet = DOMAIN_TO_OUTLET[domain];
+        if (!outlet) continue;
 
         const kws = matchedKeywords(item);
-        if (kws.length === 0) {
-          skipped++;
-          continue;
-        } // no AQ keyword match
+        if (kws.length === 0) { skipped++; continue; }
 
         out[org].push({
-          title: item.title || "",
-          snippet: item.snippet || item.description || "",
-          source: outlet,
-          url: item.url || "",
-          date: item.date || "",
-          keywords: kws,
-          // summary used as fullText so the TV scrape step can skip re-fetching
-          fullText: item.summary
+          title:       item.title   || "",
+          snippet:     item.snippet || item.description || "",
+          source:      outlet,
+          url:         item.url     || "",
+          date:        item.date    || "",
+          keywords:    kws,
+          fullText:    item.summary
             ? item.summary
             : `TITLE: ${item.title}\nSNIPPET: ${item.snippet || item.description || ""}`,
           snippetOnly: !item.summary,
@@ -279,15 +169,13 @@ async function fetchTvCoverage(cfg, cb = () => {}) {
 
       cb(
         `  [firecrawl-tv] ${org}: ${out[org].length} kept (${skipped} filtered out)`,
-
         out[org].length > 0 ? "ok" : "warn",
       );
     } catch (e) {
-      cb(`  [firecrawl-tv] ${org}: ${e.message}`, "warn");
+      cb(`  [firecrawl-tv] Error for "${org}": ${e.message}`, "warn");
     }
   }
 
-  globalThis._fcKey = undefined;
   return out;
 }
 
