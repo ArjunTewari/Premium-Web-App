@@ -171,7 +171,7 @@ function throttleDown(endpoint) {
   }
 }
 
-async function apiFetch(endpoint, params, apiKey, timeout = 30000) {
+async function apiFetch(endpoint, params, apiKey) {
   const url = `${BASE}/${endpoint}`;
   await acquireGate(endpoint);
   try {
@@ -180,9 +180,10 @@ async function apiFetch(endpoint, params, apiKey, timeout = 30000) {
         const { data } = await axios.get(url, {
           params,
           headers: { 'X-API-Key': apiKey },
-          // Caller can pass a shorter timeout for high-volume endpoints
-          // (e.g. linkedin/posts uses 12 s so 21 keywords fail fast).
-          timeout,
+          // Generous per-request ceiling: under adaptive serial throttling the
+          // API can be slower to respond. Note this covers only the HTTP call —
+          // gate-queue waiting happens before axios starts, so it isn't counted.
+          timeout: 30000,
         });
         return data;
       } catch (e) {
@@ -319,28 +320,14 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
   // seen: url → { post, keywords: Set<string> }
   const seen = new Map();
   const MAX_PAGES_PER_KW = 5;
-  // Use a short per-call timeout for linkedin/posts so a slow APIdirect
-  // response doesn't block the entire pipeline. 12 s is enough for a healthy
-  // call; on timeout we log + break this keyword and move to the next.
-  const LI_POSTS_TIMEOUT = 12000;
-  // Circuit-breaker: after 3 consecutive keyword-level failures (timeout or
-  // 5xx) we assume APIdirect is down for this org and stop early.
-  let consecutiveFails = 0;
-  const MAX_CONSECUTIVE_FAILS = 3;
 
   for (const keyword of AQ_KEYWORDS_SEARCH) {
-    if (consecutiveFails >= MAX_CONSECUTIVE_FAILS) {
-      cb?.(`  [APIdirect/LI] ${org}: ${consecutiveFails} consecutive failures — skipping remaining keywords`, 'warn');
-      break;
-    }
-    let kwFailed = false;
     for (let page = 1; page <= MAX_PAGES_PER_KW; page++) {
       let data;
       try {
-        data = await apiFetch('linkedin/posts', { query: keyword, sort_by: 'most_recent', page, ...filterParam }, apiKey, LI_POSTS_TIMEOUT);
+        data = await apiFetch('linkedin/posts', { query: keyword, sort_by: 'most_recent', page, ...filterParam }, apiKey);
       } catch (e) {
         cb?.(`  [APIdirect/LI] ${org} "${keyword}" p${page}: ${e.message}`, 'warn');
-        kwFailed = true;
         break;
       }
       const batch = data.posts || [];
@@ -357,7 +344,6 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
       const oldest = oldestInBatch(batch, 'date');
       if (dateRange?.from && oldest && oldest < dateRange.from) break;
     }
-    if (kwFailed) { consecutiveFails++; } else { consecutiveFails = 0; }
   }
 
   // ── Step 3: aggregate ──
