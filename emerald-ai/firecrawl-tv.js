@@ -29,12 +29,11 @@ const DOMAIN_TO_OUTLET = {
   "www.indiatvnews.com": "India TV",
 };
 
-// 51 hardcoded AQ keywords — used as a post-fetch filter, NOT in the query string
+// 21 hardcoded AQ topic columns — used as a post-fetch filter, NOT in the query string
 const AQ_KEYWORDS = [
   "ncap",
   "policy regulations",
   "pm2.5",
-  "exposure mapping",
   "stubble burning",
   "clean air finance",
   "vehicular pollution",
@@ -52,6 +51,7 @@ const AQ_KEYWORDS = [
   "rice residue",
   "wheat residue",
   "road dust",
+  "air quality",
 ];
 
 /** Convert YYYY-MM-DD → M/D/YYYY for Firecrawl's tbs param */

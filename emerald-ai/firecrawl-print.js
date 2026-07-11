@@ -30,12 +30,11 @@ const DOMAIN_TO_OUTLET = {
   "www.indianexpress.com":  "Indian Express",
 };
 
-// 21 hardcoded AQ topic columns — same list used by TV, LinkedIn, Instagram
+// 21 hardcoded AQ topic columns — one per report column, same list across all modules
 const AQ_KEYWORDS = [
   "ncap",
   "policy regulations",
   "pm2.5",
-  "exposure mapping",
   "stubble burning",
   "clean air finance",
   "vehicular pollution",
@@ -53,6 +52,7 @@ const AQ_KEYWORDS = [
   "rice residue",
   "wheat residue",
   "road dust",
+  "air quality",
 ];
 
 /** YYYY-MM-DD → M/D/YYYY for Firecrawl tbs param */

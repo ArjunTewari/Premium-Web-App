@@ -92,7 +92,6 @@ const AQ_KEYWORDS_SEARCH = [
   'ncap',
   'policy regulations',
   'pm2.5',
-  'exposure mapping',
   'stubble burning',
   'clean air finance',
   'vehicular pollution',
@@ -110,6 +109,7 @@ const AQ_KEYWORDS_SEARCH = [
   'rice residue',
   'wheat residue',
   'road dust',
+  'air quality',
 ];
 
 // Merge base keywords with user-supplied SCOPE_KEYWORDS (lowercased, deduplicated).
