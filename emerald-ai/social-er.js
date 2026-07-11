@@ -143,11 +143,17 @@ function topPostsHtml(posts, color, fields) {
       const icons = { likes: '♥', comments: '💬', shares: '↗', retweets: '↻', replies: '↩', views: '👁' };
       return `${icons[f] || ''} ${fmtNum(p[f] || 0)}`;
     }).join(' · ');
+    const kwPills = (p.keywords_found || []).length
+      ? `<div style="margin-top:4px;line-height:1.9">${(p.keywords_found).map(kw =>
+          `<span style="display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.3);border-radius:3px;padding:0 5px;font-size:11px;font-family:monospace;margin:1px">${escHtml(kw)}</span>`
+        ).join('')}</div>`
+      : '';
     return `<div style="padding:6px 10px;background:#0a0e17;border-left:2px solid ${i === 0 ? color : '#1e2638'};border-radius:0 4px 4px 0;margin-bottom:4px">
       ${p.url
         ? `<a href="${escHtml(p.url)}" target="_blank" rel="noopener" style="font-size:16px;color:${color};text-decoration:none;line-height:1.4;display:block;font-weight:600">${escHtml((p.snippet || '').slice(0, 200))}${(p.snippet||'').length > 200 ? '…' : ''}</a>`
         : `<div style="font-size:16px;color:#8fa3b8;line-height:1.4">${escHtml((p.snippet || '').slice(0, 200))}</div>`}
       <div style="font-family:monospace;font-size:14px;color:#5e7494;margin-top:3px">${metrics}${p.date ? ' · ' + p.date.slice(0, 10) : ''}</div>
+      ${kwPills}
     </div>`;
   }).join('');
 }
