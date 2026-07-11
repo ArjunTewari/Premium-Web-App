@@ -800,64 +800,6 @@ async function run(cfg, cb) {
     }
   }
 
-  // ── SENTINEL (press): Hindi TV language-mismatch repair ──────────────────
-  // English org names + English keywords rarely appear on Devanagari sites
-  // (India TV / ABP News), so all-zero Hindi TV is usually a query language
-  // problem, not real absence. Diagnose → get Hindi renderings of each org
-  // name from Claude → retry with Serper site: searches in Hindi as a fallback.
-  {
-    const hindiHits = ORGS.reduce(
-      (s, org) => s + arts[org].filter((a) => TV_CHANNELS_HINDI.includes(a.source)).length,
-      0,
-    );
-    if (hindiHits === 0 && cfg.CLAUDE_KEY) {
-      cb(`\n  SENTINEL · press: Hindi TV returned 0 across all orgs. Diagnosis: English names on Devanagari sites. Repair: retrying with Hindi org names...`, "head");
-      try {
-        const raw = await callClaude(
-          `For each organisation below, give the rendering of its name most commonly used by Indian HINDI news media (India TV, ABP News).\n- If Hindi media writes it in Devanagari, return the Devanagari form.\n- If Hindi media keeps the English acronym/short form (common for IITs, CSE etc.), return that short form.\n- If unsure, return the most plausible Devanagari transliteration.\n\nOrganisations:\n${ORGS.map((o) => `- ${o}`).join("\n")}\n\nReturn ONLY a JSON object mapping each original name to its Hindi-media rendering: {"Org Name":"rendering", ...}`,
-          cfg.CLAUDE_KEY,
-          1000,
-        );
-        const hindiNames = parseJ(raw) || {};
-        const HINDI_KW = ["वायु प्रदूषण", "वायु गुणवत्ता", "प्रदूषण"];
-        const hindiKwClause = `(${HINDI_KW.map((k) => `"${k}"`).join(" OR ")})`;
-        let totalRecovered = 0;
-        for (const org of ORGS) {
-          const hName = (hindiNames[org] || "").trim();
-          if (!hName || hName.toLowerCase() === org.toLowerCase()) continue;
-          const tvSeen = new Set(arts[org].map((a) => a.url || a.title));
-          for (const channel of TV_CHANNELS_HINDI) {
-            const domain = TV_CHANNEL_DOMAINS[channel];
-            if (!domain) continue;
-            const q = `site:${domain} "${hName}" ${hindiKwClause}`;
-            try {
-              const results = await serperSearch(q, cfg.SERPER_KEY, DATE_FROM, DATE_TO);
-              let added = 0;
-              for (const r of results) {
-                const k = r.link || r.title;
-                if (tvSeen.has(k)) continue;
-                tvSeen.add(k);
-                if (!inRange(r.date || "")) continue;
-                arts[org].push({ title: r.title || "", snippet: r.snippet || "", source: channel, url: r.link || "", date: r.date || "", matchTerm: hName });
-                added++;
-                totalRecovered++;
-              }
-              if (added > 0) cb(`    ${channel} · "${hName}": +${added}`, "ok");
-            } catch (e) {
-              cb(`    Hindi TV retry error (${channel}): ${e.message}`, "warn");
-            }
-            await sleep(300);
-          }
-        }
-        cb(
-          `    VERDICT: ${totalRecovered > 0 ? `recovered ${totalRecovered} Hindi TV article(s) via Hindi-name search` : "still 0 after Hindi-name search — orgs appear genuinely absent from Hindi TV in this window"}`,
-          totalRecovered > 0 ? "ok" : "warn",
-        );
-      } catch (e) {
-        cb(`    Hindi TV repair failed: ${e.message}`, "warn");
-      }
-    }
-  }
 
   // ── STEP 1b (TV scrape): Scrape TV articles separately ─────
   // TV articles were appended after the print search so they fall beyond the
