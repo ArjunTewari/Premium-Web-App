@@ -361,7 +361,6 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
       const eb = (b.post.likes || 0) + (b.post.comments || 0) + (b.post.shares || 0);
       return eb - ea;
     })
-    .slice(0, 5)
     .map(({ post, keywords }) => ({
       url:            post.url || '',
       snippet:        (post.snippet || post.text || '').slice(0, 250),

@@ -149,9 +149,9 @@ function topPostsHtml(posts, color, fields) {
         ).join('')}</div>`
       : '';
     return `<div style="padding:6px 10px;background:#0a0e17;border-left:2px solid ${i === 0 ? color : '#1e2638'};border-radius:0 4px 4px 0;margin-bottom:4px">
-      ${p.url
-        ? `<a href="${escHtml(p.url)}" target="_blank" rel="noopener" style="font-size:16px;color:${color};text-decoration:none;line-height:1.4;display:block;font-weight:600">${escHtml((p.snippet || '').slice(0, 200))}${(p.snippet||'').length > 200 ? '…' : ''}</a>`
-        : `<div style="font-size:16px;color:#8fa3b8;line-height:1.4">${escHtml((p.snippet || '').slice(0, 200))}</div>`}
+      <div style="font-size:16px;color:#8fa3b8;line-height:1.4">
+        ${p.url ? `<a href="${escHtml(p.url)}" target="_blank" rel="noopener" style="color:${color};text-decoration:none;font-weight:600;margin-right:6px">[link]</a>` : ''}${escHtml((p.snippet || '').slice(0, 200))}${(p.snippet||'').length > 200 ? '…' : ''}
+      </div>
       <div style="font-family:monospace;font-size:14px;color:#5e7494;margin-top:3px">${metrics}${p.date ? ' · ' + p.date.slice(0, 10) : ''}</div>
       ${kwPills}
     </div>`;
@@ -397,6 +397,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
       <div style="margin-top:8px">
         <div style="font-size:14px;color:#7d90aa;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
           LinkedIn — <span style="color:#4a7fd4">${li.postCount} AQ post${li.postCount === 1 ? '' : 's'}</span>
+          ${li.er > 0 ? `&middot; <span style="color:#4a7fd4;background:rgba(74,127,212,.1);border:1px solid rgba(74,127,212,.25);border-radius:3px;padding:1px 5px">ER ${li.er}</span>` : ''}
           &middot; ♥ ${li.totalLikes} &middot; 💬 ${li.totalComments} &middot; ↗ ${li.totalShares}
         </div>
         ${topPostsHtml(li.topPosts, '#4a7fd4', ['likes', 'comments', 'shares'])}
