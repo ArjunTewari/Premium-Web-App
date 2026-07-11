@@ -785,9 +785,8 @@ async function run(cfg, cb) {
   for (const org of ORGS) tvStartIdx[org] = arts[org].length;
 
   // ── STEP 1b: TV channel coverage via Firecrawl ─────────────
-  // Each org is queried once across all TV domains (NDTV, News18, India Today,
-  // India TV, ABP News) using the 51-term AQ keyword OR clause. Results are
-  // mapped back to canonical outlet names and merged into arts[org].
+  // One call per org: query = '"OrgName" air quality', includeDomains hardcoded
+  // to 6 TV channels, local 21-keyword filter applied inside firecrawl-tv.js.
   cb(`\nSTEP 1b/6 — Fetching TV channel coverage (Firecrawl)...`, "head");
   {
     const fcTvResults = await fetchTvCoverage(cfg, cb);
