@@ -784,22 +784,11 @@ async function run(cfg, cb) {
   const tvStartIdx = {};
   for (const org of ORGS) tvStartIdx[org] = arts[org].length;
 
-  // ── STEP 1b: TV channel targeted searches ──────────────────
-  cb(`\nSTEP 1b/6 — Fetching TV channel coverage (site: searches)...`, "head");
-  // Build a broad OR clause from the user's scope keywords (up to 6)
-  const tvKws = SCOPE_KEYWORDS.slice(0, 6);
-  const tvKwClause = tvKws.length === 1
-    ? `"${tvKws[0]}"`
-    : `(${tvKws.map((k) => `"${k}"`).join(" OR ")})`;
-  // Serper's News search doesn't reliably honor the quoted "org name" term —
-  // verified empirically: when a strict site:+"org"+keywords query has no
-  // genuine matches, it falls back to a loose, low-relevance result that can
-  // be about something else entirely (e.g. an unrelated air-quality story
-  // from a different country). The org-presence check below rejects those
-  // at the source instead of relying solely on the downstream STEP 1d filter
-  // (which fails open on some error paths) to catch them.
-  const titleSnippetHasTerm = (r, term) =>
-    `${r.title || ""} ${r.snippet || ""}`.toLowerCase().includes(term.toLowerCase());
+  // ── STEP 1b: TV channel coverage via Firecrawl ─────────────
+  // Each org is queried once across all TV domains (NDTV, News18, India Today,
+  // India TV, ABP News) using the 51-term AQ keyword OR clause. Results are
+  // mapped back to canonical outlet names and merged into arts[org].
+  cb(`\nSTEP 1b/6 — Fetching TV channel coverage (Firecrawl)...`, "head");
   {
     const fcTvResults = await fetchTvCoverage(cfg, cb);
     for (const org of ORGS) {
@@ -813,9 +802,9 @@ async function run(cfg, cb) {
 
   // ── SENTINEL (press): Hindi TV language-mismatch repair ──────────────────
   // English org names + English keywords rarely appear on Devanagari sites
-  // (Aaj Tak / India TV / ABP News), so all-zero Hindi TV is usually a query
-  // language problem, not real absence. Diagnose → get Hindi renderings of
-  // each org name from Claude → retry the site: searches in Hindi.
+  // (India TV / ABP News), so all-zero Hindi TV is usually a query language
+  // problem, not real absence. Diagnose → get Hindi renderings of each org
+  // name from Claude → retry with Serper site: searches in Hindi as a fallback.
   {
     const hindiHits = ORGS.reduce(
       (s, org) => s + arts[org].filter((a) => TV_CHANNELS_HINDI.includes(a.source)).length,
