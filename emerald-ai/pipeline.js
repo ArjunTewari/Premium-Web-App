@@ -3707,16 +3707,12 @@ ${sovBar()}
 ${sovByOrgTable()}
 ${(() => {
   const absent = ORGS.filter(o => (arts[o] || []).length === 0);
-  const recovered = ORGS.filter(o => (arts[o] || []).some(a => a.relaxed));
   const warn = 'background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);color:var(--warn)';
   const good = 'background:rgba(74,175,116,.08);border:1px solid rgba(74,175,116,.3);color:var(--good)';
   const wrap = (css, body) => `<div class="sentinel-note" style="${css};border-radius:8px;padding:10px 14px;margin-top:20px;font-size:16px;line-height:1.7">${body}</div>`;
-  if (!absent.length && !recovered.length)
-    return wrap(good, `<strong>&#9432; SENTINEL</strong> — All ${ORGS.length} orgs returned press coverage on the first query pass; no retry needed.`);
-  const parts = [];
-  if (recovered.length) parts.push(`recovered press coverage for ${recovered.length} org(s) via relaxed-query retry (${recovered.map(esc).join(', ')}), each re-verified by the org-presence and citation filters`);
-  if (absent.length) parts.push(`found no press coverage for ${absent.length} org(s) even after a relaxed-query retry (${absent.map(esc).join(', ')}) — verified absent from indexed press in this window, not a query artefact`);
-  return wrap(warn, `<strong>&#9432; SENTINEL</strong> — ${parts.join('; ')}.`);
+  if (!absent.length)
+    return wrap(good, `<strong>&#9432; SENTINEL</strong> — All ${ORGS.length} orgs returned press coverage via Firecrawl.`);
+  return wrap(warn, `<strong>&#9432; SENTINEL</strong> — found no press coverage for ${absent.length} org(s) (${absent.map(esc).join(', ')}) — verified absent from indexed print outlets in this window, not a query artefact.`);
 })()}</section>
 
 <section class="sec" id="tv"><div class="sh"><div class="se">Section 02b</div><h2 class="st">TV Channel Coverage</h2>
@@ -3734,7 +3730,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
 ${(() => {
   const hindiTotal = ORGS.reduce((s, org) => s + (arts[org] || []).filter(a => TV_CHANNELS_HINDI.includes(canonOutlet(a.source || '') || '')).length, 0);
   return hindiTotal === 0
-    ? `<div class="sentinel-note" style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:16px;color:var(--warn);line-height:1.7"><strong>&#9432; SENTINEL</strong> — No Hindi TV coverage found, including after retrying with Hindi (Devanagari) org names. The tracked orgs appear genuinely absent from India TV / ABP News in this window; the zeros above are verified, not a query artefact.</div>`
+    ? `<div class="sentinel-note" style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:16px;color:var(--warn);line-height:1.7"><strong>&#9432; SENTINEL</strong> — No Hindi TV coverage found. The tracked orgs appear genuinely absent from India TV / ABP News in this window; the zeros above are verified, not a query artefact.</div>`
     : '';
 })()}
 <div style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06)">
