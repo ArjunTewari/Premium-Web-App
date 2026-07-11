@@ -28,7 +28,7 @@ const OUTLETS = [
   "India Today",
   "News18",
   "NDTV",
-  "Aaj Tak",
+
   "India TV",
   "ABP News",
 ];
@@ -41,13 +41,13 @@ const PRINT_OUTLETS = [
   "Deccan Herald",
 ];
 const TV_CHANNELS_ENGLISH = ["NDTV", "News18", "India Today"];
-const TV_CHANNELS_HINDI = ["Aaj Tak", "India TV", "ABP News"];
+const TV_CHANNELS_HINDI = ["India TV", "ABP News"];
 const ALL_TV_CHANNELS = [...TV_CHANNELS_ENGLISH, ...TV_CHANNELS_HINDI];
 const TV_CHANNEL_DOMAINS = {
   "NDTV": "ndtv.com",
   "News18": "news18.com",
   "India Today": "indiatoday.in",
-  "Aaj Tak": "aajtak.in",
+
   "India TV": "indiatvnews.com",
   "ABP News": "abplive.com",
 };
@@ -264,7 +264,6 @@ function canonOutlet(src) {
     return "India Today";
   if (s.includes("ndtv")) return "NDTV";
   if (s.includes("news18")) return "News18";
-  if (s.includes("aaj tak") || s.includes("aajtak")) return "Aaj Tak";
   if (s.includes("india tv") || s.includes("indiatv")) return "India TV";
   if (s.includes("abp news") || s.includes("abplive")) return "ABP News";
   return null;
@@ -826,7 +825,7 @@ async function run(cfg, cb) {
       cb(`\n  SENTINEL · press: Hindi TV returned 0 across all orgs. Diagnosis: English names on Devanagari sites. Repair: retrying with Hindi org names...`, "head");
       try {
         const raw = await callClaude(
-          `For each organisation below, give the rendering of its name most commonly used by Indian HINDI news media (Aaj Tak, India TV, ABP News).\n- If Hindi media writes it in Devanagari, return the Devanagari form.\n- If Hindi media keeps the English acronym/short form (common for IITs, CSE etc.), return that short form.\n- If unsure, return the most plausible Devanagari transliteration.\n\nOrganisations:\n${ORGS.map((o) => `- ${o}`).join("\n")}\n\nReturn ONLY a JSON object mapping each original name to its Hindi-media rendering: {"Org Name":"rendering", ...}`,
+          `For each organisation below, give the rendering of its name most commonly used by Indian HINDI news media (India TV, ABP News).\n- If Hindi media writes it in Devanagari, return the Devanagari form.\n- If Hindi media keeps the English acronym/short form (common for IITs, CSE etc.), return that short form.\n- If unsure, return the most plausible Devanagari transliteration.\n\nOrganisations:\n${ORGS.map((o) => `- ${o}`).join("\n")}\n\nReturn ONLY a JSON object mapping each original name to its Hindi-media rendering: {"Org Name":"rendering", ...}`,
           cfg.CLAUDE_KEY,
           1000,
         );
@@ -3885,7 +3884,7 @@ ${execAudit.issues.length
   Serper News API for media coverage &middot; Claude Sonnet 4.6 for article classification &middot;
   LLM probing (GPT-4o, Perplexity Sonar, Gemini 1.5 Flash) for AEO visibility &middot;
   Serper web search for Social Media presence (LinkedIn + X/Twitter) &middot;
-  Articles filtered to 9 core outlets: TOI, HT, The Hindu, NDTV, News18, India Today, Aaj Tak, India TV, ABP News &middot;
+  Articles filtered to 8 core outlets: TOI, HT, The Hindu, NDTV, News18, India Today, India TV, ABP News &middot;
   Only articles where the organisation is mentioned in scraped body text and classified as AQ-primary by Claude are included.
 </div>
 </section>
@@ -3911,7 +3910,7 @@ ${(() => {
 })()}</section>
 
 <section class="sec" id="tv"><div class="sh"><div class="se">Section 02b</div><h2 class="st">TV Channel Coverage</h2>
-<div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (Aaj Tak, India TV, ABP News) channels.</div><div class="sdiv"></div></div>
+<div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (India TV, ABP News) channels.</div><div class="sdiv"></div></div>
 <div style="margin-bottom:16px">
 <div style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">English TV</div>
 <table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_ENGLISH.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
@@ -3925,12 +3924,12 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
 ${(() => {
   const hindiTotal = ORGS.reduce((s, org) => s + (arts[org] || []).filter(a => TV_CHANNELS_HINDI.includes(canonOutlet(a.source || '') || '')).length, 0);
   return hindiTotal === 0
-    ? `<div class="sentinel-note" style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:16px;color:var(--warn);line-height:1.7"><strong>&#9432; SENTINEL</strong> — No Hindi TV coverage found, including after retrying with Hindi (Devanagari) org names. The tracked orgs appear genuinely absent from Aaj Tak / India TV / ABP News in this window; the zeros above are verified, not a query artefact.</div>`
+    ? `<div class="sentinel-note" style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:16px;color:var(--warn);line-height:1.7"><strong>&#9432; SENTINEL</strong> — No Hindi TV coverage found, including after retrying with Hindi (Devanagari) org names. The tracked orgs appear genuinely absent from India TV / ABP News in this window; the zeros above are verified, not a query artefact.</div>`
     : '';
 })()}
 <div style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06)">
 <div id="topic-focus" style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">What These Orgs Actually Covered on TV</div>
-<div style="font-size:15px;color:var(--muted2);margin-bottom:12px;line-height:1.6">Independent check on the TV zeros above: each org's top subtopics from ITS OWN verified TV coverage only (NDTV, News18, India Today, Aaj Tak, India TV, ABP News) — articles that already passed the org-presence filter (STEP 1d) and the Haiku citation filter (STEP 1e), narrowed here to the six TV outlets. If an org shows real topics and headlines here, the pipeline is genuinely tracking its TV presence; a specific channel still showing zero above is then a finding about that channel, not a broken query. Full topic breakdown across all outlets (TV + print/online): <a href="#topics" style="color:var(--amber)">§03 Topic Ownership Map</a>.</div>
+<div style="font-size:15px;color:var(--muted2);margin-bottom:12px;line-height:1.6">Independent check on the TV zeros above: each org's top subtopics from ITS OWN verified TV coverage only (NDTV, News18, India Today, India TV, ABP News) — articles that already passed the org-presence filter (STEP 1d) and the Haiku citation filter (STEP 1e), narrowed here to the six TV outlets. If an org shows real topics and headlines here, the pipeline is genuinely tracking its TV presence; a specific channel still showing zero above is then a finding about that channel, not a broken query. Full topic breakdown across all outlets (TV + print/online): <a href="#topics" style="color:var(--amber)">§03 Topic Ownership Map</a>.</div>
 ${(() => {
   const TV_OUTLETS = [...TV_CHANNELS_ENGLISH, ...TV_CHANNELS_HINDI];
   return ORGS.map((org, i) => {

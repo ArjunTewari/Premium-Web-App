@@ -12,7 +12,7 @@ const TV_CHANNEL_DOMAINS = {
   "NDTV":       "ndtv.com",
   "News18":     "news18.com",
   "India Today":"indiatoday.in",
-  "Aaj Tak":    "aajtak.in",
+
   "India TV":   "indiatvnews.com",
   "ABP News":   "abplive.com",
 };
