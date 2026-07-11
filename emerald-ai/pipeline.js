@@ -9,7 +9,7 @@ const fs = require("fs");
 const path = require("path");
 const SI = require("./social-intelligence");
 const Sentinel = require("./sentinel");
-const { fetchTvCoverage } = require("./firecrawl-tv");
+const { fetchTvCoverage, AQ_KEYWORDS } = require("./firecrawl-tv");
 const {
   callClaude,
   parseJ,
@@ -1039,6 +1039,25 @@ ${batchText}`;
         arts[org].length > 0 ? "ok" : "warn",
       );
     })));
+  }
+
+  // ── STEP 1f: Keyword tagging ─────────────────────────────────────────────
+  // Tag each final article with the AQ keywords found in its text.
+  // TV articles (source matches a TV channel) → checked against the full 51-term
+  //   AQ_KEYWORDS taxonomy used by firecrawl-tv (the same list that drove the query).
+  // Press / online articles → checked against the user's SCOPE_KEYWORDS so the
+  //   "keywords found" column in Press Analytics reflects what Serper was asked for.
+  {
+    const tvSet = new Set(ALL_TV_CHANNELS.map(c => c.toLowerCase()));
+    for (const org of ORGS) {
+      for (const a of arts[org]) {
+        const text = `${a.title || ''} ${a.snippet || ''} ${a.fullText || ''}`.toLowerCase();
+        const isTV = tvSet.has((a.source || '').toLowerCase());
+        const kwList = isTV ? AQ_KEYWORDS : SCOPE_KEYWORDS;
+        const found = kwList.filter(kw => text.includes(kw.toLowerCase()));
+        a.foundKeywords = found.slice(0, 8); // cap at 8 to keep HTML readable
+      }
+    }
   }
 
   // ── STEP 2: Classify with Claude ──────────────────────────
@@ -3573,7 +3592,10 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
         const c = d.classifications[i] || {};
         const cq = c.citation_quality || "—";
         const citBadge = a.citationVerified ? `<span style="display:inline-block;background:rgba(76,175,116,.12);color:var(--good);border:1px solid rgba(76,175,116,.3);border-radius:3px;padding:1px 5px;font-size:14px;font-family:monospace;font-weight:700;margin-left:4px" title="Org appears within 2 lines of AQ keyword">✓ cit</span>` : '';
-        return `<tr><td>${i + 1}</td><td>${esc(a.source || "")}</td><td style="font-size:15px">${esc(a.date || "")}</td><td style="max-width:260px">${esc(a.title || "")}${citBadge}</td><td style="font-size:15px;font-family:monospace;color:${cqColor(cq)}">${esc(cq)}</td><td>${a.url ? `<a href="${esc(a.url)}" target="_blank">link</a>` : "—"}</td></tr>`;
+        const kwCell = (a.foundKeywords || []).length
+          ? `<td style="max-width:180px">${(a.foundKeywords).map(kw => `<span style="display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.3);border-radius:3px;padding:0 4px;font-size:11px;font-family:monospace;margin:1px">${esc(kw)}</span>`).join(' ')}</td>`
+          : `<td style="font-size:14px;color:var(--muted)">—</td>`;
+        return `<tr><td>${i + 1}</td><td>${esc(a.source || "")}</td><td style="font-size:15px">${esc(a.date || "")}</td><td style="max-width:260px">${esc(a.title || "")}${citBadge}</td><td style="font-size:15px;font-family:monospace;color:${cqColor(cq)}">${esc(cq)}</td>${kwCell}<td>${a.url ? `<a href="${esc(a.url)}" target="_blank">link</a>` : "—"}</td></tr>`;
       })
       .join("");
     return `<details ${orgIdx === 0 ? 'open' : ''} style="border:1px solid var(--border);border-radius:6px;margin-bottom:8px;overflow:hidden">
@@ -3582,7 +3604,7 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
   <span style="font-family:monospace;font-size:15px;color:var(--muted)">▾</span>
 </summary>
 <div style="padding:0 0 4px">
-<table class="apt"><thead><tr><th>#</th><th>Outlet</th><th>Date</th><th>Headline</th><th>Classification</th><th>URL</th></tr></thead><tbody>${rows}</tbody></table>
+<table class="apt"><thead><tr><th>#</th><th>Outlet</th><th>Date</th><th>Headline</th><th>Classification</th><th>Keywords</th><th>URL</th></tr></thead><tbody>${rows}</tbody></table>
 </div></details>`;
   }).join("");
 
@@ -3893,12 +3915,12 @@ ${(() => {
 <div style="margin-bottom:16px">
 <div style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">English TV</div>
 <table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_ENGLISH.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
-${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_ENGLISH.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
+${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_ENGLISH.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const kwPills = (kws) => kws && kws.length ? `<div style="margin-top:3px;line-height:1.9">${kws.map(kw => `<span style="display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.3);border-radius:3px;padding:0 4px;font-size:11px;font-family:monospace;margin:1px">${esc(kw)}</span>`).join('')}</div>` : ''; const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>${kwPills(a.foundKeywords)}`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
 </tbody></table></div>
 <div>
 <div style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Hindi TV</div>
 <table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_HINDI.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
-${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_HINDI.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px;display:block" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
+${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_HINDI.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const kwPills = (kws) => kws && kws.length ? `<div style="margin-top:3px;line-height:1.9">${kws.map(kw => `<span style="display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.3);border-radius:3px;padding:0 4px;font-size:11px;font-family:monospace;margin:1px">${esc(kw)}</span>`).join('')}</div>` : ''; const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px;display:block" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>${kwPills(a.foundKeywords)}`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
 </tbody></table></div>
 ${(() => {
   const hindiTotal = ORGS.reduce((s, org) => s + (arts[org] || []).filter(a => TV_CHANNELS_HINDI.includes(canonOutlet(a.source || '') || '')).length, 0);
