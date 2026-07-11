@@ -29,8 +29,9 @@ const DOMAIN_TO_OUTLET = {
   "www.indiatvnews.com": "India TV",
 };
 
-// 21 hardcoded AQ topic columns — used as a post-fetch filter, NOT in the query string
+// 51 AQ keywords — broad post-fetch filter to catch all relevant TV coverage
 const AQ_KEYWORDS = [
+  // 21 report topic columns
   "ncap",
   "policy regulations",
   "pm2.5",
@@ -52,6 +53,40 @@ const AQ_KEYWORDS = [
   "wheat residue",
   "road dust",
   "air quality",
+  // Pollutants & metrics
+  "pm10",
+  "aqi",
+  "smog",
+  "air pollution",
+  "particulate matter",
+  "nitrogen dioxide",
+  "no2",
+  "sulfur dioxide",
+  "so2",
+  "nox",
+  "ozone pollution",
+  "black carbon",
+  "fly ash",
+  // India-specific AQ mechanisms
+  "grap",
+  "caqm",
+  "odd-even",
+  "bs6",
+  "emission norms",
+  "smog tower",
+  "dg set",
+  "pollution hotspot",
+  // Burning sources
+  "paddy burning",
+  "crop fire",
+  "farm fire",
+  "crop residue",
+  "open burning",
+  "garbage burning",
+  "waste burning",
+  "firecracker",
+  // Weather-linked AQ
+  "dust storm",
 ];
 
 /** Convert YYYY-MM-DD → M/D/YYYY for Firecrawl's tbs param */
