@@ -290,6 +290,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8;white-space:nowrap">#</th>
         <th style="padding:8px 12px;text-align:left;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8">Org</th>
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI posts</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap;cursor:help" title="LinkedIn engagement rate = (likes+comments+shares) / post count (follower count not available from keyword search)">LI ER%</th>
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X posts</th>
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X ER%</th>
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X flw</th>
@@ -305,6 +306,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
       <tr style="background:#0f1422;border-top:1px solid #252d40">
         <td colspan="2" style="padding:5px 12px;font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7e9a">COHORT</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4a7fd4">${colTotals.li}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4a9fd4">${colTotals.x}</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
@@ -327,6 +329,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         const igFollowers = r.igData?.followers || 0;
         const ytER   = yt.avgER || yt.avgViewER || 0;
         const ytSubs = yt.videos?.find(v => v.subscribers > 0)?.subscribers || 0;
+        const liER  = r.linkedinER > 0 ? `<span style="color:#4a7fd4">${r.linkedinER}%</span>` : '<span style="color:#6b7e9a">—</span>';
         const twER  = r.twitterER  > 0 ? `<span style="color:#4a9fd4">${r.twitterER}%</span>` : '<span style="color:#6b7e9a">—</span>';
         // IG ER: show ~ when followers < 500 (unreliable denominator)
         const igER  = r.instagramER > 0
@@ -342,6 +345,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#8fa3b8">#${unifiedRank}</td>
           <td style="padding:8px 12px"><span style="font-family:monospace;font-size:18px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.linkedinPosts, r.liData, '#4a7fd4', 'LinkedIn')}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${liER}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.twitterPosts, r.twData, '#4a9fd4', 'X/Twitter')}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${twER}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${twFlwCell}</td>
