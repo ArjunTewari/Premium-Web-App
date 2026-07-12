@@ -59,6 +59,10 @@ app.post('/run', async (req, res) => {
     YOUTUBE_KEY:    body.youtubeKey   || process.env.YOUTUBE_KEY  || '',
     // Official YT channel handles per org — map of { orgName: '@handle' }
     ORG_YT_HANDLES: (body.orgYtHandles && typeof body.orgYtHandles === 'object') ? body.orgYtHandles : {},
+    // Social handles per org — sent from the React UI handle editor
+    ORG_TW_HANDLES: (body.orgTwHandles && typeof body.orgTwHandles === 'object') ? body.orgTwHandles : {},
+    ORG_IG_HANDLES: (body.orgIgHandles && typeof body.orgIgHandles === 'object') ? body.orgIgHandles : {},
+    ORG_LI_HANDLES: (body.orgLiHandles && typeof body.orgLiHandles === 'object') ? body.orgLiHandles : {},
     // Social — always from server secrets (never from form body)
     X_BEARER_TOKEN:          process.env.X_BEARER_TOKEN          || '',
     META_ACCESS_TOKEN:       process.env.META_ACCESS_TOKEN       || '',

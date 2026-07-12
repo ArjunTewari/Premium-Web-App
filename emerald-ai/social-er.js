@@ -46,17 +46,24 @@ function scorePresence(liCount, xCount, igCount) {
 
 // ── Main run() ──────────────────────────────────────────────────────────────
 
+// Default handles used as fallback when the UI doesn't supply them (e.g. old index.html)
+const { ORG_X_HANDLES }  = require('./x-collector');
+const { ORG_IG_HANDLES: ORG_IG_DEFAULTS } = require('./instagram-collector');
+
 async function run(cfg, selectedOrgs, cb) {
   const APIdirect = require('./apidirect-collector');
 
-  // Build orgHandles from all three platform handle maps (user-editable in UI)
+  // Build orgHandles: UI-supplied maps take precedence; module defaults fill gaps
+  const twMap = cfg.ORG_TW_HANDLES || {};
+  const igMap = cfg.ORG_IG_HANDLES || {};
+  const liMap = cfg.ORG_LI_HANDLES || {};
   const orgHandles = {};
   for (const org of selectedOrgs) {
     orgHandles[org] = {
       youtube:   (cfg.ORG_YT_HANDLES || {})[org] || '',
-      twitter:   (cfg.ORG_TW_HANDLES || {})[org] || '',
-      instagram: (cfg.ORG_IG_HANDLES || {})[org] || '',
-      linkedin:  (cfg.ORG_LI_HANDLES || {})[org] || '',
+      twitter:   twMap[org] || ORG_X_HANDLES[org]  || '',
+      instagram: igMap[org] || ORG_IG_DEFAULTS[org] || '',
+      linkedin:  liMap[org] || '',
     };
   }
 
