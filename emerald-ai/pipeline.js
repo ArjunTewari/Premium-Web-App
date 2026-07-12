@@ -327,64 +327,8 @@ async function serperScrape(url, key) {
 // graph modules need to call Claude without requiring pipeline.js back.
 
 // ── AEO: handled via SI.runAEO (social-intelligence.js)
-// ── Social Media: Twitter/X ────────────────────────────────────────────────
-async function fetchTwitter(cfg, orgs, cb) {
-  const results = {};
-  for (const org of orgs)
-    results[org] = { tweetCount: 0, topTweet: null, error: null };
-
-  if (!cfg.TWITTER_KEY) return results;
-
-  // Run all orgs in parallel — Promise.allSettled handles individual failures gracefully
-  cb(
-    `  Querying Twitter/X for ${orgs.length} orgs in parallel (rate-limited to 1 rps)...`,
-  );
-  // Stagger requests by 1 second each to respect Twitter free-tier rate limit
-  await Promise.allSettled(
-    orgs.map((org, i) =>
-      sleep(i * 1100).then(() =>
-        axios
-          .get("https://api.twitter.com/2/tweets/search/recent", {
-            params: {
-              query: `"${org}" air quality India -is:retweet lang:en`,
-              max_results: 10,
-              "tweet.fields": "public_metrics,created_at",
-            },
-            headers: { Authorization: `Bearer ${cfg.TWITTER_KEY}` },
-            timeout: 15000,
-          })
-          .then((res) => {
-            const tweets = res.data.data || [];
-            results[org].tweetCount =
-              res.data.meta?.total_count || tweets.length;
-            const best = tweets.sort(
-              (a, b) =>
-                (b.public_metrics?.like_count || 0) +
-                (b.public_metrics?.retweet_count || 0) -
-                ((a.public_metrics?.like_count || 0) +
-                  (a.public_metrics?.retweet_count || 0)),
-            )[0];
-            if (best)
-              results[org].topTweet = {
-                text: best.text?.slice(0, 200) || "",
-                likes: best.public_metrics?.like_count || 0,
-                retweets: best.public_metrics?.retweet_count || 0,
-                date: best.created_at?.slice(0, 10) || "",
-              };
-            cb(
-              `  Twitter — ${org}: ${results[org].tweetCount} tweets`,
-              results[org].tweetCount > 0 ? "ok" : "warn",
-            );
-          })
-          .catch((e) => {
-            results[org].error = e.response?.data?.detail || e.message;
-            cb(`  Twitter error for ${org}: ${results[org].error}`, "warn");
-          }),
-      ),
-    ),
-  );
-  return results;
-}
+// ── Social Media: Twitter/X handled by apidirect-collector.js fetchTwitter()
+//    via social-er.js → APIdirect.run(). No local fetchTwitter needed here.
 
 // ── Core aggregation ───────────────────────────────────────────────────────
 function aggregateOrg(artList, clsList, dateFrom) {

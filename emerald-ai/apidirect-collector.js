@@ -389,25 +389,33 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
   const MAX_PAGES = 5;
   try {
     const handle = twitterHandle.replace(/^@/, '');
-    // Fetch user profile and first page of tweets in parallel
+
+    // Build a single search query: from:@handle + OR-chain of AQ keywords.
+    // Multi-word keywords are quoted; single words are bare.
+    // This costs 1–MAX_PAGES calls per org (pagination only), not 21 calls per keyword.
+    const kwClause = aqKw
+      .map(kw => kw.includes(' ') ? `"${kw}"` : kw)
+      .join(' OR ');
+    const query = `from:@${handle} (${kwClause}) -is:retweet`;
+
+    // Fetch user followers in parallel with first search page
     const [userRes, firstPageRes] = await Promise.allSettled([
       apiFetch('twitter/user', { username: handle }, apiKey),
-      apiFetch('twitter/user/tweets', { username: handle, page: 1 }, apiKey),
+      apiFetch('twitter/posts', { query, page: 1 }, apiKey),
     ]);
     const followers = userRes.status === 'fulfilled' ? (userRes.value?.user?.followers_count || 0) : 0;
 
-    // A rejected first page is a FAILED fetch, not "0 tweets" — surface it so
-    // the sentinel can retry and the report can render "unavailable".
     if (firstPageRes.status === 'rejected') throw firstPageRes.reason;
 
-    // Collect all pages; page 1 already fetched above
-    let allTweets = firstPageRes.value?.tweets || [];
+    let allTweets = firstPageRes.value?.tweets || firstPageRes.value?.posts || [];
+
+    // Paginate until we run out of results or cross dateFrom
     if (allTweets.length > 0) {
       const oldest = oldestInBatch(allTweets, 'date', 'created_at');
       if (!dateRange?.from || !oldest || oldest >= dateRange.from) {
         for (let page = 2; page <= MAX_PAGES; page++) {
-          const r = await apiFetch('twitter/user/tweets', { username: handle, page }, apiKey);
-          const batch = r.tweets || [];
+          const r = await apiFetch('twitter/posts', { query, page }, apiKey);
+          const batch = r.tweets || r.posts || [];
           if (!batch.length) break;
           allTweets = allTweets.concat(batch);
           const batchOldest = oldestInBatch(batch, 'date', 'created_at');
@@ -415,40 +423,40 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
         }
       }
     }
-    const fetched = allTweets.length;
 
-    // 1) drop retweets
-    allTweets = allTweets.filter(t => !(t.text || '').trim().startsWith('RT @') && !t.retweeted_status);
+    // Date-range filter (search already AQ-filtered by query, so no keyword gate needed)
+    const tweets = allTweets.filter(t => inDateRange(t.date || t.created_at, dateRange?.from, dateRange?.to));
 
-    // 2) date range
-    let tweets = allTweets.filter(t => inDateRange(t.date || t.created_at, dateRange?.from, dateRange?.to));
-    const inRange = tweets.length;
+    // Tag each tweet with which of the 21 keywords actually matched
+    const tagged = tweets.map(t => {
+      const text = `${t.text || t.snippet || t.title || ''}`.toLowerCase();
+      return { ...t, keywords_found: aqKw.filter(kw => text.includes(kw)) };
+    });
 
-    // 3) AQ relevance
-    tweets = tweets.filter(t => isAQ(`${t.title || ''} ${t.snippet || ''} ${t.text || ''}`, aqKw));
-
-    // 4) metrics + ER
-    const totalLikes    = tweets.reduce((s, t) => s + (t.likes    || 0), 0);
-    const totalReplies  = tweets.reduce((s, t) => s + (t.replies  || 0), 0);
-    const totalRetweets = tweets.reduce((s, t) => s + (t.retweets || 0), 0);
-    const totalViews    = tweets.reduce((s, t) => s + (t.views    || 0), 0);
+    const totalLikes    = tagged.reduce((s, t) => s + (t.likes    || 0), 0);
+    const totalReplies  = tagged.reduce((s, t) => s + (t.replies  || 0), 0);
+    const totalRetweets = tagged.reduce((s, t) => s + (t.retweets || 0), 0);
+    const totalViews    = tagged.reduce((s, t) => s + (t.views    || 0), 0);
     const totalEngage   = totalLikes + totalReplies + totalRetweets;
-    const topPosts = [...tweets]
+
+    const topPosts = [...tagged]
       .sort((a, b) => ((b.likes || 0) + (b.replies || 0) + (b.retweets || 0)) - ((a.likes || 0) + (a.replies || 0) + (a.retweets || 0)))
       .slice(0, 5)
       .map(t => ({
-        url:      t.url || '',
-        snippet:  (t.snippet || t.title || t.text || '').slice(0, 250),
-        author:   t.author || '',
-        likes:    t.likes    || 0,
-        replies:  t.replies  || 0,
-        retweets: t.retweets || 0,
-        views:    t.views    || 0,
-        date:     t.date     || '',
+        url:            t.url || '',
+        snippet:        (t.text || t.snippet || t.title || '').slice(0, 250),
+        author:         t.author || handle,
+        likes:          t.likes    || 0,
+        replies:        t.replies  || 0,
+        retweets:       t.retweets || 0,
+        views:          t.views    || 0,
+        date:           t.date || t.created_at || '',
+        keywords_found: t.keywords_found,
       }));
-    const erVal = er(totalEngage, followers, tweets.length);
-    cb?.(`  [APIdirect/X] ${org}: ${fetched} fetched → ${inRange} in range → ${tweets.length} AQ tweets, ${followers.toLocaleString()} followers, ER=${erVal}%`, tweets.length > 0 ? 'ok' : 'warn');
-    return { postCount: tweets.length, totalLikes, totalReplies, totalRetweets, totalViews, followers, er: erVal, topPosts, fetched, inRangeCount: inRange };
+
+    const erVal = er(totalEngage, followers, tagged.length);
+    cb?.(`  [APIdirect/X] ${org}: ${tagged.length} AQ tweets (search), ${followers.toLocaleString()} followers, ER=${erVal}%`, tagged.length > 0 ? 'ok' : 'warn');
+    return { postCount: tagged.length, totalLikes, totalReplies, totalRetweets, totalViews, followers, er: erVal, topPosts, fetched: allTweets.length, inRangeCount: tagged.length };
   } catch (e) {
     cb?.(`  [APIdirect/X] ${org}: ${e.message}`, 'warn');
     return failResult(EMPTY, e);
