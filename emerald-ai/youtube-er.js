@@ -70,13 +70,14 @@ function extractVideoId(url) {
   return null;
 }
 
-// ─── Resolve a channel by handle: id, title, subscriber count in one call ──
+// ─── Resolve a channel by handle or channel ID ──────────────────────────────
+// Accepts either "@handle" / "handle" or a raw YouTube channel ID ("UC...").
 async function resolveChannel(ytHandle, apiKey) {
-  const handle = `@${ytHandle.replace(/^@/, '')}`;
-  const { data } = await axios.get(YT_CHANNELS_URL, {
-    params: { part: 'snippet,statistics', forHandle: handle, key: apiKey },
-    timeout: 20000,
-  });
+  const isChannelId = /^UC[A-Za-z0-9_-]{22}$/.test(ytHandle);
+  const params = isChannelId
+    ? { part: 'snippet,statistics', id: ytHandle, key: apiKey }
+    : { part: 'snippet,statistics', forHandle: `@${ytHandle.replace(/^@/, '')}`, key: apiKey };
+  const { data } = await axios.get(YT_CHANNELS_URL, { params, timeout: 20000 });
   const item = (data.items || [])[0];
   if (!item) return null;
   const s = item.statistics || {};

@@ -841,21 +841,23 @@ const DEFAULT_ORGS = [
   'Sustainable Futures Collaborative',
 ];
 
-// Official YouTube channel handles for each preset org
+// Official YouTube channel IDs for each preset org.
+// Values are raw channel IDs (UC...) — youtube-er.js resolves these via
+// channels.list?id= instead of forHandle= so no @handle is required.
 const ORG_YT_HANDLES = {
-  'WRI India':                                        '@WRIIndiaChannel',
-  'Air Pollution Action Group':                       '@theconvergencefoundation',
-  'Chintan Environmental Research and Action Group':  '@ChintanEnviroGroup',
-  'IIT Kanpur':                                       '@iitkanpur',
-  'CSTEP':                                            '@centerforstudyofsciencetec7663',
-  'IIT Delhi':                                        '@IITDelhiOfficial',
-  'Health Effects Institute':                         '@HEIresearch',
-  'ICCT':                                             '@ICCT',
-  'EPIC India':                                       '@epicindia.uchicago',
-  'Council on Energy, Environment and Water':         '@CEEWIndia',
-  'Centre for Science and Environment':               '@cse_india',
-  'Climate Trends':                                   '@ClimateTrendsIN',
-  'Sustainable Futures Collaborative':                '@SFC_India',
+  'WRI India':                                        'UCYoSZhQQR6Pc9lFJjR5e18g',
+  'Air Pollution Action Group':                       '',
+  'Chintan Environmental Research and Action Group':  'UCg-HN_sFTRBNDDOWxEt138g',
+  'IIT Kanpur':                                       'UCIdajcgyfqnD9PwDnv_xqmg',
+  'CSTEP':                                            '',
+  'IIT Delhi':                                        'UCJX9RwRoVAEFLWlhrNF3Lqg',
+  'Health Effects Institute':                         'UCPli-nivc67QzWoW1nRumIw',
+  'ICCT':                                             'UCjbSjAMN6yiGhczNwSgTJ6Q',
+  'EPIC India':                                       'UCz-PtdD6pJSITzGt7q9gN8A',
+  'Council on Energy, Environment and Water':         'UCNF-vGnm1jdA_jhrIpk84Tg',
+  'Centre for Science and Environment':               'UCPUL9ZjjcobQ6XlgTo6Mr2g',
+  'Climate Trends':                                   'UCed9gfyM-3SAGIAYpvSz8ig',
+  'Sustainable Futures Collaborative':                'UCZcWNjwTwQK48D7z8oWAKCA',
 };
 
 // Custom orgs added by the user: { name, ytHandle }
@@ -872,7 +874,11 @@ function renderOrgCheckboxes() {
     return `<label style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
       <input type="checkbox" value="${name}" ${chk ? 'checked' : ''} onchange="updateOrgCount()">
       <span>${name}</span>
-      ${ytHandle ? `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mt);background:var(--sur3);border:1px solid var(--bdr);border-radius:3px;padding:1px 5px;flex-shrink:0">${ytHandle}</span>` : `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--bad);background:rgba(224,92,92,.08);border:1px solid rgba(224,92,92,.2);border-radius:3px;padding:1px 5px;flex-shrink:0">no YT handle</span>`}
+      ${ytHandle
+        ? (ytHandle.startsWith('UC')
+            ? `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#4caf74;background:rgba(76,175,116,.08);border:1px solid rgba(76,175,116,.25);border-radius:3px;padding:1px 5px;flex-shrink:0" title="${ytHandle}">YT ✓</span>`
+            : `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mt);background:var(--sur3);border:1px solid var(--bdr);border-radius:3px;padding:1px 5px;flex-shrink:0">${ytHandle}</span>`)
+        : `<span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--bad);background:rgba(224,92,92,.08);border:1px solid rgba(224,92,92,.2);border-radius:3px;padding:1px 5px;flex-shrink:0">no YT</span>`}
     </label>`;
   }).join('');
   updateOrgCount();

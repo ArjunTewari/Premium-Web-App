@@ -545,11 +545,12 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
 // API exposes, so it doesn't reuse this APIdirect-based resolution.
 async function fetchYouTubeChannel(org, ytHandle, apiKey, cb) {
   try {
-    const query = ytHandle ? ytHandle.replace(/^@/, '') : org;
+    // Channel IDs (UC...) are passed as-is; @handles have @ stripped; fallback = org name
+    const isChannelId = ytHandle && /^UC[A-Za-z0-9_-]{22}$/.test(ytHandle);
+    const query = isChannelId ? ytHandle : ytHandle ? ytHandle.replace(/^@/, '') : org;
     const r = await apiFetch('youtube/channels', { query }, apiKey);
     let ch = (r.channels || [])[0];
-    // When no handle is configured we search by org name — verify the returned channel
-    // title actually matches the org before trusting its subscriber count.
+    // When no handle/id is configured we search by org name — verify title matches.
     if (!ytHandle && ch) {
       const titleLower = (ch.title || '').toLowerCase();
       const orgWords = org.toLowerCase().split(/\s+/).filter(w => w.length > 3);
