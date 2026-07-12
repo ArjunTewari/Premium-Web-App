@@ -298,6 +298,11 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
 
   // ── Step 1: resolve filter param (company_id or author URL) ──
   const isPersonUrl = handle.includes('/in/') && !handle.includes('/company/');
+  const isSchoolUrl = handle.includes('/school/');
+  if (isSchoolUrl) {
+    cb?.(`  [APIdirect/LI] ${org}: school page not supported by API — skipped`, 'warn');
+    return { ...EMPTY, noHandle: true };
+  }
   let filterParam;
   try {
     if (isPersonUrl) {
@@ -545,13 +550,15 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
 // API exposes, so it doesn't reuse this APIdirect-based resolution.
 async function fetchYouTubeChannel(org, ytHandle, apiKey, cb) {
   try {
-    // Channel IDs (UC...) are passed as-is; @handles have @ stripped; fallback = org name
-    const isChannelId = ytHandle && /^UC[A-Za-z0-9_-]{22}$/.test(ytHandle);
-    const query = isChannelId ? ytHandle : ytHandle ? ytHandle.replace(/^@/, '') : org;
+    // Accept full YouTube URLs; Channel IDs (UC...) passed as-is; @handles have @ stripped
+    const urlM = ytHandle && ytHandle.match(/youtube\.com\/(?:channel\/(UC[A-Za-z0-9_-]{22})|@([A-Za-z0-9_.-]+))/);
+    const resolvedHandle = urlM ? (urlM[1] || `@${urlM[2]}`) : (ytHandle || null);
+    const isChannelId = resolvedHandle && /^UC[A-Za-z0-9_-]{22}$/.test(resolvedHandle);
+    const query = isChannelId ? resolvedHandle : resolvedHandle ? resolvedHandle.replace(/^@/, '') : org;
     const r = await apiFetch('youtube/channels', { query }, apiKey);
     let ch = (r.channels || [])[0];
     // When no handle/id is configured we search by org name — verify title matches.
-    if (!ytHandle && ch) {
+    if (!resolvedHandle && ch) {
       const titleLower = (ch.title || '').toLowerCase();
       const orgWords = org.toLowerCase().split(/\s+/).filter(w => w.length > 3);
       const matched = orgWords.filter(w => titleLower.includes(w)).length;

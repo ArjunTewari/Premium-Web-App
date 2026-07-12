@@ -73,10 +73,13 @@ function extractVideoId(url) {
 // ─── Resolve a channel by handle or channel ID ──────────────────────────────
 // Accepts either "@handle" / "handle" or a raw YouTube channel ID ("UC...").
 async function resolveChannel(ytHandle, apiKey) {
-  const isChannelId = /^UC[A-Za-z0-9_-]{22}$/.test(ytHandle);
+  // Accept full YouTube URLs (e.g. https://www.youtube.com/channel/UCxxx or /@handle)
+  const urlM = ytHandle.match(/youtube\.com\/(?:channel\/(UC[A-Za-z0-9_-]{22})|@([A-Za-z0-9_.-]+))/);
+  const handle = urlM ? (urlM[1] || `@${urlM[2]}`) : ytHandle;
+  const isChannelId = /^UC[A-Za-z0-9_-]{22}$/.test(handle);
   const params = isChannelId
-    ? { part: 'snippet,statistics', id: ytHandle, key: apiKey }
-    : { part: 'snippet,statistics', forHandle: `@${ytHandle.replace(/^@/, '')}`, key: apiKey };
+    ? { part: 'snippet,statistics', id: handle, key: apiKey }
+    : { part: 'snippet,statistics', forHandle: `@${handle.replace(/^@/, '')}`, key: apiKey };
   const { data } = await axios.get(YT_CHANNELS_URL, { params, timeout: 20000 });
   const item = (data.items || [])[0];
   if (!item) return null;

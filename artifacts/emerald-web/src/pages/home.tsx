@@ -34,19 +34,19 @@ const DEFAULT_ORGS = [
 ];
 
 const ORG_YT_HANDLES: Record<string, string> = {
-  "WRI India":                                        "@WRIIndiaChannel",
-  "Air Pollution Action Group":                       "@theconvergencefoundation",
-  "Chintan Environmental Research and Action Group":  "@ChintanEnviroGroup",
-  "IIT Kanpur":                                       "@IITKANPUR_official",
-  "CSTEP":                                            "@cstep20years",
-  "IIT Delhi":                                        "@IITDelhiOfficial",
-  "Health Effects Institute":                         "",
-  "ICCT":                                             "@ICCT",
-  "EPIC India":                                       "@epicindia.uchicago",
-  "Council on Energy, Environment and Water":         "@CEEWIndia",
-  "Centre for Science and Environment":               "",
-  "Climate Trends":                                   "@ClimateTrendsIN",
-  "Sustainable Futures Collaborative":                "",
+  "WRI India":                                        "https://www.youtube.com/channel/UCYoSZhQQR6Pc9lFJjR5e18g",
+  "Air Pollution Action Group":                       "",
+  "Chintan Environmental Research and Action Group":  "https://www.youtube.com/channel/UCg-HN_sFTRBNDDOWxEt138g",
+  "IIT Kanpur":                                       "https://www.youtube.com/channel/UCIdajcgyfqnD9PwDnv_xqmg",
+  "CSTEP":                                            "",
+  "IIT Delhi":                                        "https://www.youtube.com/channel/UCJX9RwRoVAEFLWlhrNF3Lqg",
+  "Health Effects Institute":                         "https://www.youtube.com/channel/UCPli-nivc67QzWoW1nRumIw",
+  "ICCT":                                             "https://www.youtube.com/channel/UCjbSjAMN6yiGhczNwSgTJ6Q",
+  "EPIC India":                                       "https://www.youtube.com/channel/UCz-PtdD6pJSITzGt7q9gN8A",
+  "Council on Energy, Environment and Water":         "https://www.youtube.com/channel/UCNF-vGnm1jdA_jhrIpk84Tg",
+  "Centre for Science and Environment":               "https://www.youtube.com/channel/UCPUL9ZjjcobQ6XlgTo6Mr2g",
+  "Climate Trends":                                   "https://www.youtube.com/channel/UCed9gfyM-3SAGIAYpvSz8ig",
+  "Sustainable Futures Collaborative":                "https://www.youtube.com/channel/UCZcWNjwTwQK48D7z8oWAKCA",
 };
 
 const ORG_TW_HANDLES: Record<string, string> = {
