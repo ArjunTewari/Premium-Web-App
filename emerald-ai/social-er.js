@@ -20,6 +20,11 @@ function escHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+const ORG_COLORS_HEX = [
+  "3d8ef0","e05c3a","4caf74","c9922a","a371f7","e05c5c",
+  "14b8a6","f97316","8b5cf6","06b6d4","84cc16","ef4444","ec4899",
+];
+
 // ── Presence score (transparent formula) ───────────────────────────────────
 
 function scorePresence(liCount, xCount, igCount) {
@@ -283,6 +288,10 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     else { _lastRank = idx + 1; unifiedRows[idx].unifiedRank = _lastRank; _lastTotal = total; }
   });
 
+  const orgColorMap = Object.fromEntries(
+    erResults.map((r, i) => [r.org, '#' + ORG_COLORS_HEX[i % ORG_COLORS_HEX.length]])
+  );
+
   const summaryTable = `<div style="overflow:hidden;overflow-x:auto;border:1px solid #252d40;border-radius:8px;margin-bottom:16px">
   <table style="width:100%;border-collapse:collapse;font-size:17px">
     <thead>
@@ -343,7 +352,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         const ytSubsCell = ytSubs > 0 ? `<span style="color:#e53935;font-size:18px">${fmtNum(ytSubs)}</span>` : '<span style="color:#6b7e9a">—</span>';
         return `<tr style="border-top:1px solid #252d40">
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#8fa3b8">#${unifiedRank}</td>
-          <td style="padding:8px 12px"><span style="font-family:monospace;font-size:18px;font-weight:700;color:${col}">${escHtml(r.org)}</span></td>
+          <td style="padding:8px 12px"><span style="font-family:monospace;font-size:18px;font-weight:700;color:${orgColorMap[r.org]}">${escHtml(r.org)}</span></td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.linkedinPosts, r.liData, '#4a7fd4', 'LinkedIn')}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${liER}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.twitterPosts, r.twData, '#4a9fd4', 'X/Twitter')}</td>
@@ -480,7 +489,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     return `<details style="border:1px solid #252d40;border-radius:6px;margin-bottom:6px">
       <summary style="padding:10px 14px;cursor:pointer;background:#181e2e;border-radius:6px;list-style:none;display:flex;align-items:center;gap:12px;user-select:none">
         <span style="font-family:monospace;font-size:15px;font-weight:700;color:#6b7e9a">#${r.rank}</span>
-        <span style="font-family:monospace;font-size:16px;font-weight:700;color:${col}">${escHtml(r.org)}</span>
+        <span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgColorMap[r.org]}">${escHtml(r.org)}</span>
         <span style="font-family:monospace;font-size:17px;font-weight:700;color:${col}">${r.presenceScore}/10</span>
         <span style="font-size:15px;color:#5e7494;margin-left:4px">
           <span style="color:#4a7fd4">${r.linkedinPosts || 0} LI</span> &middot;
