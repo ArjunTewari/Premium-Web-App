@@ -25,7 +25,7 @@ const ORG_IG_HANDLES = {
   'CEEW':                             'ceewindia',
   'WRI India':                        'wriindia',
   'CSE India':                        'cseindia',
-  'CSTEP':                            'cstep_india',
+  'CSTEP':                            'cstep_ind',
   'Air Pollution Action Group':       'apagindia',
   'Chintan':                          'chintanindia',
   'IIT Delhi':                        'iitdelhi',
@@ -34,7 +34,7 @@ const ORG_IG_HANDLES = {
   'ICCT':                             'theicct',
   'EPIC India':                       'epic_india',
   'Climate Trends':                   'climatetrendsindia',
-  'Sustainable Futures Collaborative':'sfc_india',
+  'Sustainable Futures Collaborative':'sustainablefuturescollab',
 };
 
 async function sleep(ms) {
