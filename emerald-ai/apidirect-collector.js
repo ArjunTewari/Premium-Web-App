@@ -492,8 +492,13 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
     ]);
     const followers = (userRes.status === 'fulfilled' && userRes.value) ? (userRes.value?.user?.follower_count || 0) : 0;
 
-    // A rejected posts call is a FAILED fetch, not "0 posts" — surface it.
-    if (postsRes.status === 'rejected') throw postsRes.reason;
+    // If posts call failed but profile succeeded, return partial data (followers known, posts unavailable)
+    // rather than hard-failing the entire org — avoids ✗ for accounts where only the posts endpoint errors.
+    if (postsRes.status === 'rejected') {
+      const e = postsRes.reason;
+      cb?.(`  [APIdirect/IG] ${org}: posts fetch failed (${e.message}) — recording 0 posts with ${followers.toLocaleString()} followers`, 'warn');
+      return { ...EMPTY, followers, failed: true, failReason: e.code || require('./sentinel').classifyError(e), failMessage: e.message };
+    }
 
     const allPosts = postsRes.value?.posts || [];
     const fetched = allPosts.length;
