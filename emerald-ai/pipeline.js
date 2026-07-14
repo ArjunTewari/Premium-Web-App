@@ -585,10 +585,10 @@ async function run(cfg, cb) {
   cb(`\n=== Emerald AI · AQ Intelligence Report ===`, "head");
   cb(`Orgs: ${ORGS.join(", ")} · ${DATE_FROM} to ${DATE_TO}`);
 
-  // ── STEP 1: Fetch print articles via Firecrawl ────────────
-  // One call per org: query = '"OrgName" air quality', includeDomains hardcoded
-  // to 4 print outlets, local 21-keyword filter applied inside firecrawl-print.js.
-  cb(`\nSTEP 1/6 — Fetching print articles (Firecrawl)...`, "head");
+  // ── STEP 1: Fetch print articles via Serper ───────────────
+  // One Serper /news call per outlet per org (4 outlets), date-scoped via tbs.
+  // Local 21-keyword filter applied inside firecrawl-print.js.
+  cb(`\nSTEP 1/6 — Fetching print articles (Serper)...`, "head");
   const arts = {};
   for (const o of ORGS) arts[o] = [];
 
