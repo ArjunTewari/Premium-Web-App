@@ -34,7 +34,7 @@
 const axios = require('axios');
 const APIdirect = require('./apidirect-collector'); // reused for parseDate() and isAQ() only — no API calls to APIdirect from this module
 
-const YT_AQ_BASE = ['air quality', 'air pollution', 'AQI', 'PM2.5', 'NCAP'];
+const YT_AQ_BASE = ['air quality', 'air pollution', 'aqi', 'pm2.5', 'ncap', 'smog', 'clean air', 'particulate', 'emission', 'pollution'];
 
 // Base AQ terms + user SCOPE_KEYWORDS, capped at 15 (matches apidirect-collector.js's
 // convention of slicing keyword lists before building a query clause).
