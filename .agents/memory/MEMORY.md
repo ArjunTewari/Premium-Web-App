@@ -1,0 +1,1 @@
+- [Emerald AI port — CJS pipeline in ESM monorepo](emerald-ai-cjs-pipeline.md) — CJS pipeline files need a nested package.json with "type":"commonjs" plus graphs/ copied alongside them.
