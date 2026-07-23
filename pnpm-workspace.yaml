@@ -36,7 +36,6 @@ minimumReleaseAgeExclude:
 
 packages:
   - artifacts/*
-  - emerald-ai
   - lib/*
   - lib/integrations/*
   - scripts

@@ -1,0 +1,17 @@
+{
+  "name": "@workspace/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "hello": "tsx ./src/hello.ts",
+    "fetch-articles": "tsx ./src/fetch-air-quality-articles.ts",
+    "fetch-instagram": "tsx ./src/fetch-instagram-posts.ts",
+    "fetch-linkedin": "tsx ./src/fetch-linkedin-posts.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
+  }
+}
