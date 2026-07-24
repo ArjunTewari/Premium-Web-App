@@ -386,24 +386,23 @@ function aggregateOrg(artList, clsList, dateFrom) {
   };
 }
 
-function computeScore(d, aeoScore, socialScore = 0) {
-  // Equal weighting, properly normalized — the previous 0.25/0.30/2
-  // multipliers were an ad hoc scale-normalization, not a published or
-  // industry-standard scoring scheme. A flat ×1 sum isn't equal weighting
-  // either: Press and LLM are already 0-100 scales but Social is 0-10, so
-  // raw addition would make Social's max contribution (10) negligible next
-  // to Press/LLM's (100 each). Scale Social ×10 to the same 0-100 range
-  // first, THEN average all three so each genuinely contributes an equal
-  // share, and the final score stays a clean 0-100 (matching the grade
-  // thresholds below, which assume a 0-100 scale).
-  const normPress  = d.sov;           // already 0-100
-  const normLLM    = aeoScore;        // already 0-100
-  const normSocial = socialScore * 10; // 0-10 -> 0-100
-  const tot = Math.round((normPress + normLLM + normSocial) / 3);
+function computeScore(d, aeoScore, llmMentions, socialScore = 0, marks = {}) {
+  // Add the raw marks earned in all three sections, then divide by the
+  // combined available marks to produce the final percentage.
+  const pressMarks = marks.press || 0;
+  const llmMarks = marks.llm || 0;
+  const socialMarks = marks.social || 10;
+  const earnedMarks = d.total + llmMentions + socialScore;
+  const totalMarks = pressMarks + llmMarks + socialMarks;
+  const tot = totalMarks ? Math.round((earnedMarks / totalMarks) * 100) : 0;
   return {
     ...d,
     aeo: aeoScore,
+    llmMentions,
     social: socialScore,
+    marks: { press: pressMarks, llm: llmMarks, social: socialMarks },
+    earnedMarks,
+    totalMarks,
     score: tot,
     grade:
       tot >= 80
@@ -1031,12 +1030,27 @@ ${batchText}`;
   // ── STEP 5: Aggregate + Score ─────────────────────────────
   cb(`\nSTEP 5/6 — Aggregating and scoring...`, "head");
   const data = {};
+  const baseByOrg = Object.fromEntries(
+    ORGS.map((org) => [org, aggregateOrg(arts[org], cls[org], DATE_FROM)]),
+  );
+  const scoreMarks = {
+    press: ORGS.reduce((sum, org) => sum + baseByOrg[org].total, 0),
+    llm: ORGS.length
+      ? Object.values(aeoResults[ORGS[0]].llmBreakdown || {}).reduce(
+          (sum, result) => sum + (result.total || 0),
+          0,
+        )
+      : 0,
+    social: 10,
+  };
   for (const org of ORGS) {
-    const base = aggregateOrg(arts[org], cls[org], DATE_FROM);
+    const base = baseByOrg[org];
     data[org] = computeScore(
       base,
       aeoResults[org].score,
+      aeoResults[org].mentions || 0,
       erScoreByOrg[org] || 0,
+      scoreMarks,
     );
     cb(
       `  ${org}: ${data[org].total} arts | ${data[org].authPct}% auth | ${data[org].dataPct}% data | AEO ${data[org].aeo} | Social ${data[org].social} | score ${data[org].score} (${data[org].grade})`,
@@ -2489,7 +2503,7 @@ async function buildPPTX(
           fontFace: "Cambria",
           align: "center",
         });
-        sl.addText(`${d.score} / 100`, {
+        sl.addText(`${d.score}%`, {
           x,
           y: 2.72,
           w: cw,
@@ -2500,13 +2514,13 @@ async function buildPPTX(
           align: "center",
         });
         const bars = [
-          { l: "Press", v: d.sov },
-          { l: "Narrative", v: d.authPct },
-          { l: "Citation", v: d.dataPct },
-          { l: "LLM", v: d.aeo },
+          { l: "Press", earned: d.total, total: d.marks.press },
+          { l: "LLM", earned: d.llmMentions, total: d.marks.llm },
+          { l: "Social", earned: d.social, total: d.marks.social },
         ];
         bars.forEach((b, bi) => {
-          const by = 3.14 + bi * 0.62;
+          const by = 3.35 + bi * 0.72;
+          const sectionPct = b.total ? (b.earned / b.total) * 100 : 0;
           sl.addText(b.l, {
             x: x + 0.15,
             y: by,
@@ -2524,17 +2538,17 @@ async function buildPPTX(
             fill: { color: CARD2 },
             line: { color: BORD, width: 0 },
           });
-          if (b.v > 0)
+          if (b.earned > 0)
             sl.addShape(pres.shapes.RECTANGLE, {
               x: x + 0.15,
               y: by + 0.24,
-              w: ((cw - 0.3) * b.v) / 100,
+              w: ((cw - 0.3) * sectionPct) / 100,
               h: 0.1,
               fill: { color: orgPptx(entry.idx) },
               line: { color: orgPptx(entry.idx), width: 0 },
             });
           sl.addText(
-            b.v > 0 ? String(b.v) : b.l === "LLM" ? "N/A" : String(b.v),
+            `${b.earned}/${b.total}`,
             {
               x: x + cw - 0.55,
               y: by,
@@ -2542,7 +2556,7 @@ async function buildPPTX(
               h: 0.22,
               fontSize: 10,
               bold: true,
-              color: b.v > 0 ? orgPptx(entry.idx) : MUTED,
+              color: b.earned > 0 ? orgPptx(entry.idx) : MUTED,
               fontFace: "Calibri",
               align: "right",
             },
@@ -2550,7 +2564,7 @@ async function buildPPTX(
         });
       });
       sl.addText(
-        "Score = (SoV×0.25) + (Narrative×0.25) + (Citation×0.20) + (AEO mentions×0.30)",
+        "Score = (Press articles + LLM mentions + Social points) / total available marks × 100",
         {
           x: 0.5,
           y: 6.98,
@@ -3268,39 +3282,23 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
     const d   = data[org];
     const col = orgHex(i);
     const socialScore = d.social || 0;
-    const socialCell = socialScore > 0
-      ? `<span style="font-family:monospace;font-size:18px;font-weight:600;color:${col}">${socialScore}<span style="font-size:15px;font-weight:400;color:var(--muted)">/10</span></span>`
-      : `<span style="font-family:monospace;font-size:16px;color:var(--muted)">—</span>`;
-
-    // One single calculation path per component: raw value (on its own
-    // natural scale) -> its share of the final score. Social is internally
-    // scaled x10 to the 0-100 range Press/LLM already use before the
-    // equal-weight (33% each) average — that intermediate step is real but
-    // isn't shown as a separate number here, since a reader only needs the
-    // input and its resulting contribution, not the normalization arithmetic
-    // in between.
-    const pressCont = +(d.sov / 3).toFixed(1);
-    const llmCont   = +((d.aeo || 0) / 3).toFixed(1);
-    const socCont   = +((socialScore * 10) / 3).toFixed(1);
+    const socialCell = `<span style="font-family:monospace;font-size:18px;font-weight:600;color:${col}">${socialScore}<span style="font-size:15px;font-weight:400;color:var(--muted)">/${d.marks.social}</span></span>`;
     const uid = `sc_${org.replace(/\W/g,'_')}`;
 
     const components = [
-      { label:'Press',   desc:'AQ article volume score (articles × 2.5, max 100)', display: `${d.sov}`,          contrib: pressCont },
-      { label:'LLM',     desc:'AI-citation rate, already normalized to 0–100 — not the raw mention count (which maxes at 45: 15 questions × 3 LLMs)', display: `${d.aeo || 0}`,     contrib: llmCont   },
-      { label:'Social',  desc:'Cross-platform AQ presence score, out of 10',        display: `${socialScore}/10`, contrib: socCont   },
+      { label:'Press',  desc:'Articles listed out of all articles in Press Analytics', display: `${d.total}/${d.marks.press}` },
+      { label:'LLM',    desc:'Raw mentions out of all available LLM responses',       display: `${d.llmMentions}/${d.marks.llm}` },
+      { label:'Social', desc:'Cross-platform AQ presence points',                       display: `${socialScore}/${d.marks.social}` },
     ];
 
-    const cards = components.map(({ label, desc, display, contrib }) => `
+    const cards = components.map(({ label, desc, display }) => `
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2)">${label}</span>
-          <span style="font-family:monospace;font-size:15px;color:var(--muted);background:var(--surface2);padding:2px 6px;border-radius:3px">33%</span>
         </div>
         <div style="font-size:16px;color:var(--muted);line-height:1.4">${desc}</div>
         <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px">
           <span style="font-family:monospace;font-size:25px;font-weight:700;color:${col}">${display}</span>
-          <span style="font-family:monospace;font-size:17px;color:var(--muted)">→</span>
-          <span style="font-family:monospace;font-size:20px;font-weight:600;color:var(--amber)">+${contrib}</span>
         </div>
       </div>`).join('');
 
@@ -3309,9 +3307,9 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
         <div style="border-left:3px solid ${col};background:var(--surface2);padding:20px 24px">
           <div style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${col};margin-bottom:14px">${esc(org)} — Score Breakdown</div>
           <div style="display:flex;align-items:center;gap:12px;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid var(--border);flex-wrap:wrap">
-            <span style="font-family:monospace;font-size:17px;color:var(--muted)">${pressCont} + ${llmCont} + ${socCont}</span>
+            <span style="font-family:monospace;font-size:17px;color:var(--muted)">(${d.total} + ${d.llmMentions} + ${socialScore}) / (${d.marks.press} + ${d.marks.llm} + ${d.marks.social}) × 100</span>
             <span style="font-family:monospace;font-size:17px;color:var(--muted)">=</span>
-            <span style="font-family:monospace;font-size:31px;font-weight:700;color:${col}">${d.score}</span>
+            <span style="font-family:monospace;font-size:31px;font-weight:700;color:${col}">${d.score}%</span>
           </div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">${cards}</div>
         </div>
@@ -3321,10 +3319,10 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
     return `<tr style="cursor:pointer;transition:background .15s" onclick="td('${uid}')" onmouseenter="this.style.background='rgba(255,255,255,.03)'" onmouseleave="this.style.background=''">
       <td style="text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:${rankCol(rank)}">${ordinal(rank)}</td>
       <td><span style="font-size:17px;font-weight:700;color:${col};letter-spacing:.04em">${esc(org)}</span></td>
-      <td>${inlineBar(d.sov, maxSov, col)}</td>
-      <td>${d.aeo > 0 ? inlineBar(d.aeo, maxAeo, col) : `<span style="font-family:monospace;font-size:16px;color:var(--muted)">—</span>`}</td>
+      <td>${inlineBar(`${d.total}/${d.marks.press}`, maxSov, col)}</td>
+      <td>${inlineBar(`${d.llmMentions}/${d.marks.llm}`, maxAeo, col)}</td>
       <td style="text-align:center">${socialCell}</td>
-      <td>${inlineBar(d.score, maxScr, col)}</td>
+      <td>${inlineBar(`${d.score}%`, maxScr, col)}</td>
     </tr>${breakdown}`;
   }).join("");
 
@@ -3756,7 +3754,7 @@ ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
 <section class="sec" id="social"><div class="sh"><div class="se">Section 08 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Live social data from official org handles — LinkedIn (LinkedIn API), X/Twitter (X API v2), Instagram (Graph API), and YouTube (Data API v3). Posts are date-filtered to the report window using smart pagination (stops fetching once posts fall outside the window). ER = Engagement Rate.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd"><ul style="margin:0;padding-left:20px;line-height:2"><li><strong>Press</strong>: AQ article volume score (articles × 2.5, max 100)</li><li><strong>LLM</strong>: Times cited by AI models across probing questions</li><li><strong>Social</strong>: Cross-platform AQ presence score (0–10)</li><li>Each dimension counts equally toward the final score — <strong>33% Press, 33% LLM, 33% Social</strong> (no published/industry-standard scoring scheme is used). Click any row to see the breakdown.</li></ul></div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd"><ul style="margin:0;padding-left:20px;line-height:2"><li><strong>Press</strong>: Organisation articles / all articles listed in Press Analytics</li><li><strong>LLM</strong>: Organisation mentions / all available LLM responses</li><li><strong>Social</strong>: Organisation presence points / 10 available points</li><li><strong>Final percentage</strong>: total marks earned across all three sections / total marks available × 100. Click any row to see the calculation.</li></ul></div><div class="sdiv"></div></div>
 ${scorecards}</section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
