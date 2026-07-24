@@ -16,12 +16,19 @@ import {
 import { requireAuth } from "../middleware/require-auth.js";
 
 const _require = createRequire(import.meta.url);
-const { authenticator } = _require("otplib") as {
-  authenticator: {
-    generateSecret: () => string;
-    keyuri: (accountName: string, service: string, secret: string) => string;
-    verify: (opts: { token: string; secret: string }) => boolean;
-  };
+const otplib = _require("otplib") as {
+  generateSecret: () => string;
+  generateURI: (opts: { strategy: string; issuer: string; label: string; secret: string }) => string;
+  verify: (opts: { strategy: string; token: string; secret: string }) => Promise<boolean>;
+};
+
+// Convenience wrappers matching the old authenticator API shape
+const authenticator = {
+  generateSecret: (): string => otplib.generateSecret(),
+  keyuri: (label: string, issuer: string, secret: string): string =>
+    otplib.generateURI({ strategy: "totp", issuer, label, secret }),
+  verify: (opts: { token: string; secret: string }): Promise<boolean> =>
+    otplib.verify({ strategy: "totp", token: opts.token, secret: opts.secret }),
 };
 
 const router = Router();
@@ -108,7 +115,7 @@ router.post("/auth/verify-totp", async (req: Request, res: Response) => {
   if (!user || !user.totpSecret)
     return res.status(401).json({ error: "2FA not configured" });
 
-  const isValid = authenticator.verify({ token: String(token), secret: user.totpSecret });
+  const isValid = await authenticator.verify({ token: String(token), secret: user.totpSecret });
 
   if (!isValid) return res.status(401).json({ error: "Invalid TOTP code" });
 
@@ -162,7 +169,7 @@ router.post("/auth/totp-confirm", async (req: Request, res: Response) => {
   if (!user || !user.totpSecret)
     return res.status(400).json({ error: "TOTP secret not generated yet" });
 
-  const isValid = authenticator.verify({ token: String(token), secret: user.totpSecret });
+  const isValid = await authenticator.verify({ token: String(token), secret: user.totpSecret });
   if (!isValid) return res.status(401).json({ error: "Invalid TOTP code" });
 
   await db
