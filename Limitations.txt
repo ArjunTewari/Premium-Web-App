@@ -1,0 +1,34 @@
+1. Render
+
+Deployment limits: Runs as persistent services (web service, background worker, cron job, static site) — not per-request serverless. Single region per service (no built-in multi-region/edge).
+Timeout behavior: No request timeout in the serverless sense — it's a long-running process, so it behaves like a normal server. Free-tier web services spin down after inactivity and cold-start on the next request (~30s+ delay).
+Cost scaling: Flat per-service pricing (Starter ~$7/mo/service) — you pay for uptime, not per-request. Predictable, but you're paying even during idle time on paid tiers.
+Other constraints: No GPU. Ephemeral filesystem by default (add a persistent disk if you need to cache/store files across deploys). No true global CDN edge — fine for most apps, not for latency-sensitive global audiences.
+
+2. Modal
+
+Deployment limits: Python-native, function-decorator model (@app.function()). Per-function limits: 2,000 pending inputs, 25,000 total inputs at once (higher for async .spawn() jobs); 1,000 concurrent inputs per .map() call.
+Timeout behavior: Configurable per function, up to 24 hours (86,400s) max — very generous for long GPU jobs. Sandboxes default to a 5-minute lifetime, configurable up to 24h.
+Cost scaling: Pure per-second billing, scale-to-zero, no idle charges — great for bursty AI workloads. Watch the multipliers: non-preemptible ("guaranteed") execution costs 3x base rate, specific regions add 1.25–2.5x, Sandbox CPU is ~3x standard Function CPU rate. These stack.
+Other constraints: No BYOC/self-host — you're fully on Modal's infra. GPU availability varies by type/region; H100/H200 need explicit selection. No web/static hosting — compute only, exactly why it pairs with Vercel/Render for UI.
+
+3. Vercel
+
+Deployment limits: Function bundle size caps, 4.5MB max request/response payload per function (bypass needed for larger uploads). 1,000 files max for CLI deployments; builds fail past 45 min.
+Timeout behavior: With Fluid Compute (on by default), up to 800s on Pro/Enterprise; 30-min extended max still in beta and needs explicit per-function config. Hobby plan is much lower (~60s–300s depending on config). Edge runtime functions must start responding within 25s.
+Cost scaling: Usage-based — Active CPU time, bandwidth, function invocations, plus $20/user/month on Pro. Cost is genuinely unpredictable under traffic spikes; this is the most-cited complaint about the platform.
+Other constraints: No GPU, no persistent container/Docker support — anything beyond serverless functions needs a separate platform (this is exactly why you're pairing it with Modal/Supabase). Free tier prohibits commercial use.
+
+4. Claude API (Anthropic)
+
+Deployment limits: N/A in the hosting sense — it's an API you call, not something you deploy. But you're bound by per-model context windows (Claude models 4.6+ support 1M tokens at flat pricing) and max output tokens (128K on Sonnet 5).
+Timeout behavior: No fixed platform timeout, but long agentic sessions (Agent SDK) can run extended tool loops — your own infra's timeout (Vercel/Render/Modal) is usually the real constraint, not Anthropic's.
+Cost scaling: Pure per-token, input/output priced separately (output ~5x input cost). Batch API gives 50% off for async/non-real-time work. Prompt caching cuts repeated input cost up to 90% — genuinely worth implementing early if you're reprocessing similar context often.
+Other constraints: Rate limits are tiered (RPM/TPM/daily token caps) and scale automatically with spend history — new accounts start conservative. Monthly spend cap per tier; hit it and API calls pause until next cycle or you request an increase. For your 3-agent pipeline, this is the constraint to watch under concurrent client load — request a tier bump proactively rather than discovering it mid-production.
+
+5. Replit
+
+Deployment limits: Autoscale deployments cap at 8 vCPU / 16GB RAM per deployment on standard plans — workloads needing more can't run there.
+Timeout behavior: Free/Starter tier deployments cold-start (2–3s delay) after inactivity; Core/Teams paid tiers offer always-on, no cold start.
+Cost scaling: Credit-based, not flat — Core ~$20/month (billed annually) with a monthly credit pool that Agent usage burns through; heavy AI-assisted dev work can exhaust monthly credits well before month-end (commonly reported issue). Teams jumps to $35/user/month.
+Other constraints: No GPU. Being IDE-first, it's better suited to build-and-prototype than to be your production system of record for a client-facing app at scale — fine for internal tools or MVPs, less ideal as the permanent home for something enterprise-grade.

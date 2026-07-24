@@ -1,0 +1,181 @@
+{
+  "input_url": "https://www.linkedin.com/company/teriin/",
+  "label": "TERI - The Energy and Resources Institute",
+  "fetched_at": "2026-07-11T11:03:59.747Z",
+  "range": {
+    "from": "2026-02-01T00:00:00.000Z",
+    "to": "2026-04-01T23:59:59.000Z"
+  },
+  "total_matched": 10,
+  "posts": [
+    {
+      "url": "https://www.linkedin.com/posts/teriin_teriwebdesk-activity-7438479500134281216-dd2r?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGsJNV4BoqBf2Y82HtoD2uY_cunT1zyV_o0",
+      "date": "2026-03-14 07:01:53",
+      "keywords_found": [
+        "ncap"
+      ],
+      "metrics": {
+        "likes": 14,
+        "comments": 0,
+        "shares": 2,
+        "reactions": {
+          "like": 14
+        }
+      }
+    },
+    {
+      "url": "https://www.linkedin.com/posts/teriin_cleanairzones-urbanairquality-ncap-activity-7424414828620066816-ActP?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGsJNV4BoqBf2Y82HtoD2uY_cunT1zyV_o0",
+      "date": "2026-02-03 11:33:54",
+      "keywords_found": [
+        "ncap"
+      ],
+      "metrics": {
+        "likes": 34,
+        "comments": 0,
+        "shares": 2,
+        "reactions": {
+          "like": 33,
+          "praise": 1
+        }
+      }
+    },
+    {
+      "url": "https://www.linkedin.com/posts/teriin_wsds2026-thematictracks-wsds2026-activity-7435279139210739712-G01r?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGr-juIBesdFD31kSwSulpYhda_uS8Rqg_E",
+      "date": "2026-03-05 11:04:47",
+      "keywords_found": [
+        "policy regulations"
+      ],
+      "metrics": {
+        "likes": 82,
+        "comments": 0,
+        "shares": 7,
+        "reactions": {
+          "appreciation": 1,
+          "empathy": 2,
+          "like": 75,
+          "praise": 4
+        }
+      }
+    },
+    {
+      "url": "https://www.linkedin.com/posts/teriin_wsds2026-thematictracks-activity-7434524992454918144-4Okz?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGr-juIBesdFD31kSwSulpYhda_uS8Rqg_E",
+      "date": "2026-03-03 09:08:04",
+      "keywords_found": [
+        "policy regulations"
+      ],
+      "metrics": {
+        "likes": 142,
+        "comments": 3,
+        "shares": 16,
+        "reactions": {
+          "appreciation": 1,
+          "like": 137,
+          "praise": 4
+        }
+      }
+    },
+    {
+      "url": "https://www.linkedin.com/posts/teriin_carbonstock-carbonassessment-carbonfinance-activity-7429116272489115648--1J5?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGsKaMAB-iNUfJl3YUywY4nspC3PohHB00Y",
+      "date": "2026-02-16 10:55:45",
+      "keywords_found": [
+        "exposure mapping"
+      ],
+      "metrics": {
+        "likes": 77,
+        "comments": 0,
+        "shares": 2,
+        "reactions": {
+          "like": 76,
+          "praise": 1
+        }
+      }
+    },
+    {
+      "url": "https://www.linkedin.com/posts/teriin_wsds2026-day2-wsds2026-activity-7432663977622413312-QUg4?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGsKaMAB-iNUfJl3YUywY4nspC3PohHB00Y",
+      "date": "2026-02-26 05:53:04",
+      "keywords_found": [
+        "clean air finance"
+      ],
+      "metrics": {
+        "likes": 163,
+        "comments": 2,
+        "shares": 15,
+        "reactions": {
+          "appreciation": 2,
+          "empathy": 2,
+          "like": 157,
+          "praise": 2
+        }
+      }
+    },
+    {
+      "url": "https://www.linkedin.com/posts/teriin_cleanairzones-urbanairquality-ncap-activity-7424414828620066816-ActP?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGsKaMAB-iNUfJl3YUywY4nspC3PohHB00Y",
+      "date": "2026-02-03 11:33:54",
+      "keywords_found": [
+        "clean air finance"
+      ],
+      "metrics": {
+        "likes": 34,
+        "comments": 0,
+        "shares": 2,
+        "reactions": {
+          "like": 33,
+          "praise": 1
+        }
+      }
+    },
+    {
+      "url": "https://www.linkedin.com/posts/teriin_wsds2026-thematictracks-wsds2026-activity-7434169753662865408-hzG_?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGsJNV4BoqBf2Y82HtoD2uY_cunT1zyV_o0",
+      "date": "2026-03-02 09:36:29",
+      "keywords_found": [
+        "health impact"
+      ],
+      "metrics": {
+        "likes": 177,
+        "comments": 2,
+        "shares": 6,
+        "reactions": {
+          "appreciation": 3,
+          "interest": 1,
+          "like": 172,
+          "praise": 1
+        }
+      }
+    },
+    {
+      "url": "https://www.linkedin.com/posts/teriin_wsds2026-himconnect-himalayanstudies-activity-7433190452348067840-LvYK?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGsJNV4BoqBf2Y82HtoD2uY_cunT1zyV_o0",
+      "date": "2026-02-27 16:45:05",
+      "keywords_found": [
+        "health impact"
+      ],
+      "metrics": {
+        "likes": 127,
+        "comments": 1,
+        "shares": 8,
+        "reactions": {
+          "appreciation": 1,
+          "empathy": 3,
+          "like": 121,
+          "praise": 2
+        }
+      }
+    },
+    {
+      "url": "https://www.linkedin.com/posts/teriin_urbanemobility-activity-7436999014572556289-xoij?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAGsJNV4BoqBf2Y82HtoD2uY_cunT1zyV_o0",
+      "date": "2026-03-10 04:58:57",
+      "keywords_found": [
+        "diesel emission"
+      ],
+      "metrics": {
+        "likes": 46,
+        "comments": 2,
+        "shares": 5,
+        "reactions": {
+          "empathy": 1,
+          "like": 44,
+          "praise": 1
+        }
+      }
+    }
+  ]
+}
