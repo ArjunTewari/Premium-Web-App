@@ -3751,7 +3751,7 @@ ${appendixSections}</section>
 <div id="em-body">${emergingCards}</div></section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
-<section class="sec" id="social"><div class="sh"><div class="se">Section 08 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Live social data from official org handles — LinkedIn (LinkedIn API), X/Twitter (X API v2), Instagram (Graph API), and YouTube (Data API v3). Posts are date-filtered to the report window using smart pagination (stops fetching once posts fall outside the window). ER = Engagement Rate.</div><div class="sdiv"></div></div>
+<section class="sec" id="social"><div class="sh"><div class="se">Section 08 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">An overview of each organisation's air-quality posts and engagement across LinkedIn, X/Twitter, Instagram, and YouTube. ER means Engagement Rate.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
 <section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd"><ul style="margin:0;padding-left:20px;line-height:2"><li><strong>Press</strong>: Organisation articles / all articles listed in Press Analytics</li><li><strong>LLM</strong>: Organisation mentions / all available LLM responses</li><li><strong>Social</strong>: Organisation presence points / 10 available points</li><li><strong>Final percentage</strong>: total marks earned across all three sections / total marks available × 100. Click any row to see the calculation.</li></ul></div><div class="sdiv"></div></div>
