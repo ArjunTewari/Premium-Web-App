@@ -3240,13 +3240,15 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
     score: data[org].score,
   })).sort((a, b) => b.score - a.score);
   let _lastScore = null,
-    _lastRank = 0;
-  rankedOrgs.forEach((o, idx) => {
+    _lastRank = 0,
+    _denseRank = 0;
+  rankedOrgs.forEach((o) => {
     if (o.score === _lastScore) {
       o.rank = _lastRank;
     } else {
-      o.rank = idx + 1;
-      _lastRank = idx + 1;
+      _denseRank++;
+      o.rank = _denseRank;
+      _lastRank = _denseRank;
       _lastScore = o.score;
     }
   });
@@ -3285,9 +3287,9 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
     const uid = `sc_${org.replace(/\W/g,'_')}`;
 
     const components = [
-      { label:'Press',   desc:'AQ article volume score (articles × 2.5, max 100)', display: `${d.sov}`,          contrib: pressCont },
-      { label:'LLM',     desc:'AI-citation rate, already normalized to 0–100 — not the raw mention count (which maxes at 45: 15 questions × 3 LLMs)', display: `${d.aeo || 0}`,     contrib: llmCont   },
-      { label:'Social',  desc:'Cross-platform AQ presence score, out of 10',        display: `${socialScore}/10`, contrib: socCont   },
+      { label:'Press',   desc:"This org's article count as a share of all articles across all orgs.", display: `${d.sov}`,          contrib: pressCont },
+      { label:'LLM',     desc:"This org's AI citations as a share of all citations across all orgs.", display: `${d.aeo || 0}`,     contrib: llmCont   },
+      { label:'Social',  desc:"This org's social media presence score out of 10.",                    display: `${socialScore}/10`, contrib: socCont   },
     ];
 
     const cards = components.map(({ label, desc, display, contrib }) => `
@@ -3756,7 +3758,7 @@ ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
 <section class="sec" id="social"><div class="sh"><div class="se">Section 08 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Shows how active each organisation is on social media during the report period — how many followers they have, how often they post about air quality, and how much engagement that content receives across LinkedIn, X/Twitter, Instagram, and YouTube.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd"><ul style="margin:0;padding-left:20px;line-height:2"><li><strong>Press</strong>: AQ article volume score (articles × 2.5, max 100)</li><li><strong>LLM</strong>: Times cited by AI models across probing questions</li><li><strong>Social</strong>: Cross-platform AQ presence score (0–10)</li><li>Each dimension counts equally toward the final score — <strong>33% Press, 33% LLM, 33% Social</strong> (no published/industry-standard scoring scheme is used). Click any row to see the breakdown.</li></ul></div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd">Each org is scored on three sections — Press, LLM, and Social. For each section, the org's count or mentions are divided by the total across all orgs to get a share score. The three share scores are then added together for the final score. Click any row to see the breakdown.</div><div class="sdiv"></div></div>
 ${scorecards}</section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
