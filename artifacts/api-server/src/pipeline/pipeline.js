@@ -387,6 +387,10 @@ function aggregateOrg(artList, clsList, dateFrom) {
 }
 
 function computeScore(d, aeoScore, socialScore = 0) {
+  // NOTE: the averaged `score`/`grade` below are legacy/intermediate — the
+  // final scorecard score is recomputed downstream as each org's Overall
+  // Share of Voice (see "STEP 5 (cont)"). This still attaches the raw
+  // components (sov / aeo / social) every renderer reads.
   // Equal weighting, properly normalized — the previous 0.25/0.30/2
   // multipliers were an ad hoc scale-normalization, not a published or
   // industry-standard scoring scheme. A flat ×1 sum isn't equal weighting
@@ -1039,7 +1043,31 @@ ${batchText}`;
       erScoreByOrg[org] || 0,
     );
     cb(
-      `  ${org}: ${data[org].total} arts | ${data[org].authPct}% auth | ${data[org].dataPct}% data | AEO ${data[org].aeo} | Social ${data[org].social} | score ${data[org].score} (${data[org].grade})`,
+      `  ${org}: ${data[org].total} arts | ${data[org].authPct}% auth | ${data[org].dataPct}% data | AEO ${data[org].aeo} | Social ${data[org].social}`,
+      "ok",
+    );
+  }
+
+  // ── STEP 5 (cont): Overall Share of Voice — final score ────────────────
+  // Each dimension is first converted to its share of that channel's cohort
+  // total — Press score, LLM mentions and Social points each sum to 100%
+  // across orgs. That normalisation puts all three on the same 0–100 footing
+  // so they carry EQUAL weight regardless of raw scale (Press maxes at 100,
+  // LLM at 45, Social at 10), then the three shares are averaged. The final
+  // score is a true share of voice: it sums to ~100% across the tracked orgs.
+  const sumPress  = ORGS.reduce((s, o) => s + (data[o].sov || 0), 0) || 1;
+  const sumLLM    = ORGS.reduce((s, o) => s + (data[o].aeo || 0), 0) || 1;
+  const sumSocial = ORGS.reduce((s, o) => s + (data[o].social || 0), 0) || 1;
+  for (const org of ORGS) {
+    const pShare = ((data[org].sov || 0)    / sumPress)  * 100;
+    const lShare = ((data[org].aeo || 0)    / sumLLM)    * 100;
+    const sShare = ((data[org].social || 0) / sumSocial) * 100;
+    data[org].pressShare  = +pShare.toFixed(1);
+    data[org].llmShare    = +lShare.toFixed(1);
+    data[org].socialShare = +sShare.toFixed(1);
+    data[org].score = +((pShare + lShare + sShare) / 3).toFixed(1);
+    cb(
+      `  ${org}: SoV ${data[org].score}% (P ${data[org].pressShare}% · L ${data[org].llmShare}% · S ${data[org].socialShare}%)`,
       "ok",
     );
   }
@@ -2489,7 +2517,7 @@ async function buildPPTX(
           fontFace: "Cambria",
           align: "center",
         });
-        sl.addText(`${d.score} / 100`, {
+        sl.addText(`${d.score}% SoV`, {
           x,
           y: 2.72,
           w: cw,
@@ -3258,51 +3286,41 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
         ORGS.reduce((s, o) => s + (data[o].dataPct || 0), 0) / ORGS.length,
       )
     : 0;
-  // Pre-compute max values for bar scaling
-  const maxSov  = Math.max(...ORGS.map((o) => data[o].sov     || 0), 1);
-  const maxAeo  = Math.max(...ORGS.map((o) => data[o].aeo     || 0), 1);
-  const maxScr  = Math.max(...ORGS.map((o) => data[o].score   || 0), 1);
-
-  const inlineBar = (val, _max, col) =>
-    `<span style="font-family:monospace;font-size:18px;font-weight:600;color:${col}">${val}</span>`;
 
   const scorecardRows = rankedOrgs.map(({ org, i, rank }) => {
     const d   = data[org];
     const col = orgHex(i);
     const socialScore = d.social || 0;
-    const socialCell = socialScore > 0
-      ? `<span style="font-family:monospace;font-size:18px;font-weight:600;color:${col}">${socialScore}<span style="font-size:15px;font-weight:400;color:var(--muted)">/10</span></span>`
-      : `<span style="font-family:monospace;font-size:16px;color:var(--muted)">—</span>`;
+    // Per-channel SoV cell: share % on top, raw component value beneath.
+    const sovCell = (share, raw) =>
+      `<span style="font-family:monospace;font-size:18px;font-weight:600;color:${col}">${share}%</span>` +
+      `<div style="font-family:monospace;font-size:14px;font-weight:400;color:var(--muted);margin-top:2px">${raw}</div>`;
+    const socialCell = sovCell(d.socialShare, `${socialScore}/10`);
 
-    // One single calculation path per component: raw value (on its own
-    // natural scale) -> its share of the final score. Social is internally
-    // scaled x10 to the 0-100 range Press/LLM already use before the
-    // equal-weight (33% each) average — that intermediate step is real but
-    // isn't shown as a separate number here, since a reader only needs the
-    // input and its resulting contribution, not the normalization arithmetic
-    // in between.
-    const pressCont = +(d.sov / 3).toFixed(1);
-    const llmCont   = +((d.aeo || 0) / 3).toFixed(1);
-    const socCont   = +((socialScore * 10) / 3).toFixed(1);
+    // Each dimension's per-channel share (its value ÷ that channel's cohort
+    // total). All three sum to 100% down their column, so they carry equal
+    // weight; the org's final SoV is the average of the three.
+    const pressCont = d.pressShare;
+    const llmCont   = d.llmShare;
+    const socCont   = d.socialShare;
     const uid = `sc_${org.replace(/\W/g,'_')}`;
 
     const components = [
-      { label:'Press',   desc:"This org's article count as a share of all articles across all orgs.", display: `${d.sov}`,          contrib: pressCont },
-      { label:'LLM',     desc:"This org's AI citations as a share of all citations across all orgs.", display: `${d.aeo || 0}`,     contrib: llmCont   },
-      { label:'Social',  desc:"This org's social media presence score out of 10.",                    display: `${socialScore}/10`, contrib: socCont   },
+      { label:'Press',   desc:"Press score (articles × 2.5) as a share of all orgs’ press — equal-weighted",   display: `${d.sov}`,          contrib: pressCont },
+      { label:'LLM',     desc:"LLM mentions (max 45: 15 questions × 3 LLMs) as a share of all orgs’ mentions",  display: `${d.aeo || 0}`,     contrib: llmCont   },
+      { label:'Social',  desc:"Social presence (0–10) as a share of all orgs’ presence — normalised to match",  display: `${socialScore}/10`, contrib: socCont   },
     ];
 
     const cards = components.map(({ label, desc, display, contrib }) => `
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2)">${label}</span>
-          <span style="font-family:monospace;font-size:15px;color:var(--muted);background:var(--surface2);padding:2px 6px;border-radius:3px">33%</span>
         </div>
         <div style="font-size:16px;color:var(--muted);line-height:1.4">${desc}</div>
         <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px">
           <span style="font-family:monospace;font-size:25px;font-weight:700;color:${col}">${display}</span>
           <span style="font-family:monospace;font-size:17px;color:var(--muted)">→</span>
-          <span style="font-family:monospace;font-size:20px;font-weight:600;color:var(--amber)">+${contrib}</span>
+          <span style="font-family:monospace;font-size:20px;font-weight:600;color:var(--amber)">${contrib}%</span>
         </div>
       </div>`).join('');
 
@@ -3311,9 +3329,9 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
         <div style="border-left:3px solid ${col};background:var(--surface2);padding:20px 24px">
           <div style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${col};margin-bottom:14px">${esc(org)} — Score Breakdown</div>
           <div style="display:flex;align-items:center;gap:12px;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid var(--border);flex-wrap:wrap">
-            <span style="font-family:monospace;font-size:17px;color:var(--muted)">${pressCont} + ${llmCont} + ${socCont}</span>
+            <span style="font-family:monospace;font-size:17px;color:var(--muted)">(${d.pressShare}% + ${d.llmShare}% + ${d.socialShare}%) / 3</span>
             <span style="font-family:monospace;font-size:17px;color:var(--muted)">=</span>
-            <span style="font-family:monospace;font-size:31px;font-weight:700;color:${col}">${d.score}</span>
+            <span style="font-family:monospace;font-size:31px;font-weight:700;color:${col}">${d.score}%</span>
           </div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">${cards}</div>
         </div>
@@ -3323,10 +3341,10 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
     return `<tr style="cursor:pointer;transition:background .15s" onclick="td('${uid}')" onmouseenter="this.style.background='rgba(255,255,255,.03)'" onmouseleave="this.style.background=''">
       <td style="text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:${rankCol(rank)}">${ordinal(rank)}</td>
       <td><span style="font-size:17px;font-weight:700;color:${col};letter-spacing:.04em">${esc(org)}</span></td>
-      <td>${inlineBar(d.sov, maxSov, col)}</td>
-      <td>${d.aeo > 0 ? inlineBar(d.aeo, maxAeo, col) : `<span style="font-family:monospace;font-size:16px;color:var(--muted)">—</span>`}</td>
+      <td>${sovCell(d.pressShare, d.sov)}</td>
+      <td>${sovCell(d.llmShare, d.aeo || 0)}</td>
       <td style="text-align:center">${socialCell}</td>
-      <td>${inlineBar(d.score, maxScr, col)}</td>
+      <td><span style="font-family:monospace;font-size:18px;font-weight:600;color:${col}">${d.score}%</span></td>
     </tr>${breakdown}`;
   }).join("");
 
@@ -3336,10 +3354,10 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
       <tr style="border-bottom:2px solid var(--border)">
         <th style="padding:10px 12px;text-align:center;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Rank</th>
         <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Organisation</th>
-        <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Press</th>
-        <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">LLM Mentions</th>
-        <th style="padding:10px 12px;text-align:center;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Social /10</th>
-        <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Score</th>
+        <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Press SoV</th>
+        <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">LLM SoV</th>
+        <th style="padding:10px 12px;text-align:center;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap">Social SoV</th>
+        <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);white-space:nowrap">Overall SoV</th>
       </tr>
     </thead>
     <tbody>
@@ -3758,7 +3776,7 @@ ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
 <section class="sec" id="social"><div class="sh"><div class="se">Section 08 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Shows how active each organisation is on social media during the report period — how many followers they have, how often they post about air quality, and how much engagement that content receives across LinkedIn, X/Twitter, Instagram, and YouTube.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd">Each org is scored on three sections — Press, LLM, and Social. For each section, the org's count or mentions are divided by the total across all orgs to get a share score. The three share scores are then added together for the final score. Click any row to see the breakdown.</div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd">Share of voice across Press, LLM, and Social. Each channel is normalised to its own cohort share so all three carry equal weight; the Overall SoV is their average, and orgs are ranked by it. Click any row to see the breakdown.</div><div class="sdiv"></div></div>
 ${scorecards}</section>
 
 <section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
