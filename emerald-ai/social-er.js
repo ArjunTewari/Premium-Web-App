@@ -168,12 +168,16 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
       if (pd?.failed) fetchFailures.push({ org: r.org, platform: pName, reason: pd.failReason || 'unknown' });
     }
   }
+  // Plain-language note: one clause per affected platform, e.g.
+  // "4 organisations don't have an Instagram channel".
+  const failClauses = [...new Set(fetchFailures.map((f) => f.platform))].map((p) => {
+    const n = fetchFailures.filter((f) => f.platform === p).length;
+    const article = /^[aeioux]/i.test(p) ? 'an' : 'a';
+    return `${n} organisation${n === 1 ? '' : 's'} ${n === 1 ? "doesn't" : "don't"} have ${article} ${p} channel`;
+  });
   const healthBanner = fetchFailures.length
-    ? `<div class="sentinel-note" style="background:rgba(224,92,92,.08);border:1px solid rgba(224,92,92,.35);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:16px;color:#e05c5c;line-height:1.7">
-        <strong>&#9888; SENTINEL · DATA COLLECTION INCOMPLETE</strong> — ${fetchFailures.length} platform fetch(es) failed (${[...new Set(fetchFailures.map(f => f.reason))].join(', ')}).
-        Affected cells show <strong>✕</strong> and are excluded from totals — they are <strong>not</strong> zeros.
-        <span style="color:#c9922a">${[...new Set(fetchFailures.map(f => f.platform))].map(p => `${p}: ${fetchFailures.filter(f => f.platform === p).length} org(s)`).join(' · ')}</span>
-        Every other zero-valued cell below has been checked and carries a hover tooltip explaining why it's genuinely zero.
+    ? `<div class="sentinel-note" style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:16px;color:#8fa3b8;line-height:1.7">
+        <strong style="color:#c9922a">&#9432; NOTE</strong> — ${failClauses.join('; ')}, so those cells show <strong>✕</strong> (not a zero) and are left out of the totals.
       </div>`
     : `<div class="sentinel-note" style="background:rgba(74,175,116,.08);border:1px solid rgba(74,175,116,.3);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:16px;color:#4caf74;line-height:1.7">
         <strong>&#9432; SENTINEL</strong> — All social fetches across ${erResults.length} orgs (LinkedIn · X · Instagram · YouTube) completed; every zero-valued cell below has been individually checked and carries a hover tooltip confirming it's a verified absence, not a collection failure.
