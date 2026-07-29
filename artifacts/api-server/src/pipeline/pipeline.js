@@ -3713,12 +3713,14 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
 <table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_HINDI.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
 ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_HINDI.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const kwPills = (kws) => kws && kws.length ? `<div style="margin-top:3px;line-height:1.9">${kws.map(kw => `<span style="display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.3);border-radius:3px;padding:0 4px;font-size:11px;font-family:monospace;margin:1px">${esc(kw)}</span>`).join('')}</div>` : ''; const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px;display:block" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>${kwPills(a.foundKeywords)}`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
 </tbody></table></div>
-${(() => {
-  const hindiTotal = ORGS.reduce((s, org) => s + (arts[org] || []).filter(a => TV_CHANNELS_HINDI.includes(canonOutlet(a.source || '') || '')).length, 0);
-  return hindiTotal === 0
-    ? `<div class="sentinel-note" style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:16px;color:var(--warn);line-height:1.7"><strong>&#9432; SENTINEL</strong> — No Hindi TV coverage found. The tracked orgs appear genuinely absent from India TV / ABP News in this window; the zeros above are verified, not a query artefact.</div>`
-    : '';
-})()}
+<!-- Hindi TV sentinel note removed: it fired purely on hindiTotal === 0 and
+     asserted the zeros were "verified, not a query artefact" without running
+     any verification. The claim was also unsupportable — the Firecrawl query
+     is English ('air quality "Org"') and every one of the 51 AQ keywords is
+     ASCII English, so a Hindi-language article matches nothing and is filtered
+     out even when returned. Hindi zeros are therefore exactly the query
+     artefact the note denied. Restore only alongside Hindi query terms and a
+     Devanagari keyword list. -->
 <div style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06)">
 <div id="topic-focus" style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">What These Orgs Actually Covered on TV</div>
 <div style="font-size:15px;color:var(--muted2);margin-bottom:12px;line-height:1.6">Independent check on the TV zeros above: each org's top subtopics from ITS OWN verified TV coverage only (NDTV, News18, India Today, India TV, ABP News) — articles that already passed the org-presence filter (STEP 1d) and the Haiku citation filter (STEP 1e), narrowed here to the six TV outlets. If an org shows real topics and headlines here, the pipeline is genuinely tracking its TV presence; a specific channel still showing zero above is then a finding about that channel, not a broken query. Full topic breakdown across all outlets (TV + print/online): <a href="#topics" style="color:var(--amber)">§03 Topic Ownership Map</a>.</div>
