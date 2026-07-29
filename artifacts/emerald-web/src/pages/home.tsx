@@ -17,6 +17,10 @@ const LOADING_QUOTES = [
   { text: "What gets measured gets managed.", author: "Peter Drucker" },
 ];
 
+// Bump whenever the ORG_TW/IG/YT/LI_HANDLES defaults below change, so cached
+// localStorage handles from a prior version don't shadow the new defaults.
+const HANDLES_DEFAULTS_VERSION = 2;
+
 const DEFAULT_ORGS = [
   "WRI India",
   "Air Pollution Action Group",
@@ -268,7 +272,11 @@ export default function Home() {
   const [orgCustomInput, setOrgCustomInput] = useState("");
   const [orgYtHandleInput, setOrgYtHandleInput] = useState("");
 
-  // Unified social handles — pre-populated from hardcoded defaults, user-editable
+  // Unified social handles — pre-populated from hardcoded defaults, user-editable.
+  // HANDLES_DEFAULTS_VERSION must be bumped whenever the ORG_*_HANDLES constants
+  // above change, so a stale localStorage cache (from a previous defaults version)
+  // doesn't shadow the updated values — otherwise code edits to these handles
+  // silently never reach users with a saved cache.
   const [handlesOpen, setHandlesOpen] = useState(false);
   const [orgHandleOverrides, setOrgHandleOverrides] = useState<Record<string, { twitter: string; instagram: string; youtube: string; linkedin: string }>>(() => {
     const defaults: Record<string, { twitter: string; instagram: string; youtube: string; linkedin: string }> = {};
@@ -282,9 +290,20 @@ export default function Home() {
     }
     try {
       const saved = localStorage.getItem("emerald_handles");
-      if (saved) {
+      const savedVersion = localStorage.getItem("emerald_handles_version");
+      if (saved && savedVersion === String(HANDLES_DEFAULTS_VERSION)) {
+        // Cache matches the current code defaults — merge in any custom orgs /
+        // user edits on top of the (unchanged) defaults.
         const parsed = JSON.parse(saved) as Record<string, { twitter: string; instagram: string; youtube: string; linkedin: string }>;
         return { ...defaults, ...parsed };
+      }
+      if (saved) {
+        // Defaults changed since this cache was written — keep entries for orgs
+        // NOT in the current default set (custom orgs the user added), but let
+        // freshly-updated code defaults win for known orgs.
+        const parsed = JSON.parse(saved) as Record<string, { twitter: string; instagram: string; youtube: string; linkedin: string }>;
+        const customOnly = Object.fromEntries(Object.entries(parsed).filter(([org]) => !DEFAULT_ORGS.includes(org)));
+        return { ...defaults, ...customOnly };
       }
     } catch {}
     return defaults;
@@ -385,7 +404,10 @@ export default function Home() {
 
   // Auto-save handles to localStorage whenever they change
   useEffect(() => {
-    try { localStorage.setItem("emerald_handles", JSON.stringify(orgHandleOverrides)); } catch {}
+    try {
+      localStorage.setItem("emerald_handles", JSON.stringify(orgHandleOverrides));
+      localStorage.setItem("emerald_handles_version", String(HANDLES_DEFAULTS_VERSION));
+    } catch {}
   }, [orgHandleOverrides]);
 
   useEffect(() => {
