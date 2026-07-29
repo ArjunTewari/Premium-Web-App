@@ -66,6 +66,21 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
 /** A short all-caps token (CEEW, HEI, SFC) must match case-sensitively. */
 const isAcronym = (s) => /^[A-Z][A-Z0-9-]{1,6}$/.test(s);
 
+// Names that are also ordinary phrases. Multi-word names are otherwise matched
+// case-insensitively (outlets mangle capitalisation constantly), but for these
+// that costs precision: "scientists studying long-term climate trends" would be
+// counted as coverage of Climate Trends the organisation. Requiring exact
+// capitalisation separates the proper noun from the common phrase.
+//
+// The recall cost is small for these outlets, whose headlines are Title Case
+// ("Delhi Was Most Polluted City...") rather than ALL CAPS, so a genuine
+// mention still reads "Climate Trends" either way.
+const STRICT_CASE = new Set([
+  "Climate Trends",
+  "Sustainable Futures Collaborative",
+  "Chintan",
+]);
+
 /**
  * True when `text` actually names the org (or one of its aliases).
  *
@@ -79,7 +94,8 @@ function orgMentioned(text, org) {
   if (!text) return false;
   for (const name of [org, ...(ORG_ALIASES[org] || [])]) {
     if (!name) continue;
-    const re = new RegExp(`\\b${escapeRe(name)}\\b`, isAcronym(name) ? "" : "i");
+    const caseSensitive = isAcronym(name) || STRICT_CASE.has(name);
+    const re = new RegExp(`\\b${escapeRe(name)}\\b`, caseSensitive ? "" : "i");
     if (re.test(text)) return true;
   }
   return false;
