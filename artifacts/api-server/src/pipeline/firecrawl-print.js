@@ -7,8 +7,20 @@
 // Approach:
 //   • One Firecrawl /v2/search call per org — query: '"OrgName" air quality'
 //   • includeDomains hardcoded to the 4 print outlet domains
-//   • Local 21-keyword relevance gate (same topic columns as TV + social)
-//   • scrapeOptions.summary so articles arrive pre-extracted (no re-scrape)
+//   • Attribution gate — the org (or an alias) must actually be named
+//   • AQ relevance gate — now the SAME 51-term taxonomy firecrawl-tv.js uses
+//   • scrapeOptions summary+markdown so articles arrive pre-extracted
+//
+// The keyword list used to be a 21-term subset that omitted "air pollution",
+// "aqi", "smog" and "pm10", so a headline like "Delhi air pollution worsens as
+// AQI crosses 400" passed the TV gate and was rejected here — the two sections
+// disagreed on what counted as air-quality coverage. Both now share one list,
+// and matched keywords are recorded on each article as `foundKeywords` (the
+// field the report renderer reads) so print rows show keyword pills like TV.
+
+const {
+  AQ_KEYWORDS, orgMentioned, articleText, matchedKeywords, buildOutletMatcher,
+} = require("./firecrawl-common");
 
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/search";
 
@@ -22,38 +34,13 @@ const PRINT_OUTLET_DOMAINS = {
 
 const INCLUDE_DOMAINS = Object.values(PRINT_OUTLET_DOMAINS);
 
-// Domain → outlet name (reverse lookup, strips www.)
-const DOMAIN_TO_OUTLET = {
-  ...Object.fromEntries(Object.entries(PRINT_OUTLET_DOMAINS).map(([name, d]) => [d, name])),
-  "www.hindustantimes.com": "Hindustan Times",
-  "www.thehindu.com":       "The Hindu",
-  "www.indianexpress.com":  "Indian Express",
-};
+// Domain → outlet name. Subdomains handled by the shared suffix matcher, so the
+// old per-host www. aliases are no longer needed.
+const DOMAIN_TO_OUTLET = Object.fromEntries(
+  Object.entries(PRINT_OUTLET_DOMAINS).map(([name, d]) => [d, name]),
+);
 
-// 21 hardcoded AQ topic columns — one per report column, same list across all modules
-const AQ_KEYWORDS = [
-  "ncap",
-  "policy regulations",
-  "pm2.5",
-  "stubble burning",
-  "clean air finance",
-  "vehicular pollution",
-  "health impact",
-  "industrial pollution",
-  "heat-aqi",
-  "brick kiln",
-  "petrol emission",
-  "diesel emission",
-  "super emitter",
-  "thermal power",
-  "household pollution",
-  "indoor pollution",
-  "biomass",
-  "rice residue",
-  "wheat residue",
-  "road dust",
-  "air quality",
-];
+const outletForUrl = buildOutletMatcher(DOMAIN_TO_OUTLET);
 
 /** YYYY-MM-DD → M/D/YYYY for Firecrawl tbs param */
 function toTbsDate(iso) {
@@ -61,41 +48,9 @@ function toTbsDate(iso) {
   return `${parseInt(m)}/${parseInt(d)}/${y}`;
 }
 
-// Most-specific-first, so a longer configured domain wins over a shorter one
-// that is also a suffix of the hostname.
-const OUTLET_MATCHERS = Object.entries(DOMAIN_TO_OUTLET)
-  .sort(([a], [b]) => b.length - a.length);
-
-/**
- * Map an article URL to its outlet, matching subdomains.
- *
- * Replaces a www.-stripping exact lookup that silently discarded every other
- * subdomain (m.*, epaper.*, regional and language editions). Returns null when
- * the host is genuinely off-network.
- */
-function outletForUrl(url) {
-  let host;
-  try {
-    host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
-  } catch {
-    return null;
-  }
-  for (const [domain, outlet] of OUTLET_MATCHERS) {
-    if (host === domain || host.endsWith(`.${domain}`)) return outlet;
-  }
-  return null;
-}
-
-/** True if any of the 21 AQ keywords appear in the article text */
-function matchesAQ(item) {
-  const text = `${item.title || ""} ${item.description || ""} ${item.snippet || ""} ${item.summary || ""}`.toLowerCase();
-  return AQ_KEYWORDS.some(kw => text.includes(kw));
-}
-
-/** Which of the 21 keywords matched */
+/** Which AQ keywords matched (shared 51-term taxonomy) */
 function foundKeywords(item) {
-  const text = `${item.title || ""} ${item.description || ""} ${item.snippet || ""} ${item.summary || ""}`.toLowerCase();
-  return AQ_KEYWORDS.filter(kw => text.includes(kw));
+  return matchedKeywords(item);
 }
 
 async function firecrawlSearch(query, tbs, apiKey, retries = 2) {
@@ -109,7 +64,8 @@ async function firecrawlSearch(query, tbs, apiKey, retries = 2) {
         includeDomains: INCLUDE_DOMAINS,
         tbs,
         limit:          15,
-        scrapeOptions:  { formats: ["summary"] },
+        // markdown is required for the attribution gate — see firecrawl-tv.js.
+        scrapeOptions:  { formats: ["summary", "markdown"] },
       }),
       signal: AbortSignal.timeout(120_000),
     });
@@ -152,6 +108,9 @@ async function fetchPrintCoverage(cfg, cb = () => {}) {
     try {
       const items = await firecrawlSearch(query, tbs, FIRECRAWL_KEY);
       const seen  = new Set();
+      let skipped = 0;
+      let offNetwork = 0;
+      let unattributed = 0;
 
       for (const item of items) {
         const key = item.url || item.title;
@@ -159,9 +118,14 @@ async function fetchPrintCoverage(cfg, cb = () => {}) {
         seen.add(key);
 
         const outlet = outletForUrl(item.url || "");
-        if (!outlet) continue; // not one of our print domains
+        if (!outlet) { offNetwork++; continue; } // not one of our print domains
 
-        if (!matchesAQ(item)) continue; // 21-keyword relevance gate
+        // Gate 1 — attribution: the org must actually be named in the article.
+        if (!orgMentioned(articleText(item), org)) { unattributed++; continue; }
+
+        // Gate 2 — AQ relevance (shared taxonomy).
+        const kws = foundKeywords(item);
+        if (kws.length === 0) { skipped++; continue; }
 
         out[org].push({
           title:          item.title   || "",
@@ -169,7 +133,9 @@ async function fetchPrintCoverage(cfg, cb = () => {}) {
           source:         outlet,
           url:            item.url     || "",
           date:           item.date    || "",
-          keywords_found: foundKeywords(item),
+          // Canonical field name — previously `keywords_found`, which nothing
+          // downstream read, so print rows rendered without keyword pills.
+          foundKeywords:  kws.slice(0, 8),
           fullText:       item.summary
             ? item.summary
             : `TITLE: ${item.title}\nSNIPPET: ${item.snippet || item.description || ""}`,
@@ -178,7 +144,9 @@ async function fetchPrintCoverage(cfg, cb = () => {}) {
       }
 
       cb(
-        `  [firecrawl-print] ${org}: ${out[org].length} print article(s) matched`,
+        `  [firecrawl-print] ${org}: ${out[org].length} kept of ${items.length} returned ` +
+          `(${unattributed} never mentioned the org, ${skipped} failed the AQ keyword gate, ` +
+          `${offNetwork} off-network)`,
         out[org].length > 0 ? "ok" : "warn",
       );
     } catch (e) {

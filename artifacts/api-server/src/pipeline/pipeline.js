@@ -808,6 +808,12 @@ ${batchText}`;
     const tvSet = new Set(ALL_TV_CHANNELS.map(c => c.toLowerCase()));
     for (const org of ORGS) {
       for (const a of arts[org]) {
+        // The Firecrawl TV/print collectors already tag their articles against
+        // the shared 51-term AQ taxonomy, using the scraped markdown that only
+        // they hold. Re-deriving here from title+snippet+fullText would be
+        // strictly worse (and, for print, would silently swap in the narrower
+        // SCOPE_KEYWORDS list), so keep whatever a collector already set.
+        if (a.foundKeywords?.length) continue;
         const text = `${a.title || ''} ${a.snippet || ''} ${a.fullText || ''}`.toLowerCase();
         const isTV = tvSet.has((a.source || '').toLowerCase());
         const kwList = isTV ? AQ_KEYWORDS : SCOPE_KEYWORDS;

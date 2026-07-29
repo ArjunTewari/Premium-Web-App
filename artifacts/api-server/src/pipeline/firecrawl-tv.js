@@ -2,9 +2,18 @@
 
 // ── TV Channel Coverage via Firecrawl ────────────────────────────────────────
 // One Firecrawl query per org across all TV domains using a short query
-// (`air quality "Org Name"`). Results are post-filtered: only articles where
-// at least one AQ keyword appears in title+description+snippet+summary are kept.
+// (`air quality "Org Name"`). Each result must then pass TWO gates:
+//   1. attribution — the org (or an alias) is actually named in the article
+//   2. relevance   — at least one AQ keyword appears
+// Gate 1 is new. The query's quoted org name is only a soft relevance signal to
+// Firecrawl, not an exact-phrase requirement, so results routinely came back
+// with no mention of the org at all and were attributed to it anyway. See
+// firecrawl-common.js for the measured false-positive rate.
 // Failed requests are retried up to 3 times with exponential backoff.
+
+const {
+  AQ_KEYWORDS, orgMentioned, articleText, matchedKeywords, buildOutletMatcher,
+} = require("./firecrawl-common");
 
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/search";
 
@@ -25,68 +34,13 @@ const DOMAIN_TO_OUTLET = Object.fromEntries(
   Object.entries(TV_CHANNEL_DOMAINS).map(([name, d]) => [d, name]),
 );
 
-// Most-specific-first, so a longer configured domain wins over a shorter one
-// that is also a suffix of the hostname.
-const OUTLET_MATCHERS = Object.entries(DOMAIN_TO_OUTLET)
-  .sort(([a], [b]) => b.length - a.length);
-
-// 51 hardcoded AQ keywords — used as a post-fetch filter, NOT in the query string
-const AQ_KEYWORDS = [
-  // Original taxonomy
-  "ncap", "pm2.5", "exposure mapping", "stubble burn", "clean air finance",
-  "vehicular pollution", "health impact", "industrial pollution", "heat-aqi",
-  "brick kiln", "petrol emission", "diesel emission", "super emitter",
-  "thermal power", "household pollution", "indoor pollution", "biomass",
-  "rice residue", "wheat residue", "road dust", "air quality",
-  // Pollutants & metrics
-  "pm10", "aqi", "smog", "air pollution", "particulate matter",
-  "nitrogen dioxide", "no2", "sulfur dioxide", "so2", "nox",
-  "ozone pollution", "black carbon", "fly ash",
-  // India-specific AQ mechanisms
-  "grap", "caqm", "odd-even", "bs6", "emission norms",
-  "smog tower", "dg set", "pollution hotspot",
-  // Burning sources
-  "paddy burning", "crop fire", "farm fire", "crop residue",
-  "open burning", "garbage burning", "waste burning", "firecracker",
-  // Weather-linked AQ
-  "dust storm",
-];
+// Subdomain-aware resolver (shared with firecrawl-print.js).
+const outletForUrl = buildOutletMatcher(DOMAIN_TO_OUTLET);
 
 /** Convert YYYY-MM-DD → M/D/YYYY for Firecrawl's tbs param */
 function toTbsDate(iso) {
   const [y, m, d] = iso.split("-");
   return `${parseInt(m)}/${parseInt(d)}/${y}`;
-}
-
-/**
- * Map an article URL to its outlet, matching subdomains.
- *
- * The previous implementation only stripped a leading "www." and then did an
- * exact map lookup, so every other subdomain fell through and was silently
- * discarded — including swachhindia.ndtv.com (NDTV's environment desk, where
- * most air-quality reporting actually lives) and the Hindi properties
- * khabar.ndtv.com and hindi.news18.com. Those drops were invisible: no counter,
- * no log, just a zero in the report.
- *
- * Returns the outlet name, or null when the host is genuinely off-network.
- */
-function outletForUrl(url) {
-  let host;
-  try {
-    host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
-  } catch {
-    return null;
-  }
-  for (const [domain, outlet] of OUTLET_MATCHERS) {
-    if (host === domain || host.endsWith(`.${domain}`)) return outlet;
-  }
-  return null;
-}
-
-/** Return AQ keywords that appear in the article's combined text fields */
-function matchedKeywords(item) {
-  const text = `${item.title || ""} ${item.description || ""} ${item.snippet || ""} ${item.summary || ""}`.toLowerCase();
-  return AQ_KEYWORDS.filter(kw => text.includes(kw));
 }
 
 /**
@@ -151,7 +105,11 @@ async function fetchTvCoverage(cfg, cb = () => {}) {
     includeDomains,
     tbs,
     limit: 15,
-    scrapeOptions: { formats: ["summary"] },
+    // markdown is required for the attribution gate: on a sample of genuine
+    // Health Effects Institute articles the org appeared in the summary for
+    // only 1 of 3, but in the markdown for 3 of 3. Gating on summary alone
+    // would drop real coverage. Both formats come back in the same request.
+    scrapeOptions: { formats: ["summary", "markdown"] },
   };
 
   for (const org of ORGS) {
@@ -163,6 +121,7 @@ async function fetchTvCoverage(cfg, cb = () => {}) {
       const seen = new Set();
       let skipped = 0;
       let offNetwork = 0;
+      let unattributed = 0;
 
       for (const item of items) {
         const key = item.url || item.title;
@@ -172,17 +131,26 @@ async function fetchTvCoverage(cfg, cb = () => {}) {
         const outlet = outletForUrl(item.url || "");
         if (!outlet) { offNetwork++; continue; }
 
+        // Gate 1 — attribution. Firecrawl treats the quoted org name as a soft
+        // relevance hint, so an article can come back without naming the org at
+        // all. Counting those inflates coverage with articles the org had no
+        // part in, which is worse than reporting a zero.
+        if (!orgMentioned(articleText(item), org)) { unattributed++; continue; }
+
+        // Gate 2 — AQ relevance.
         const kws = matchedKeywords(item);
         if (kws.length === 0) { skipped++; continue; }
 
         out[org].push({
-          title:       item.title   || "",
-          snippet:     item.snippet || item.description || "",
-          source:      outlet,
-          url:         item.url     || "",
-          date:        item.date    || "",
-          keywords:    kws,
-          fullText:    item.summary
+          title:         item.title   || "",
+          snippet:       item.snippet || item.description || "",
+          source:        outlet,
+          url:           item.url     || "",
+          date:          item.date    || "",
+          // Canonical field name, shared with firecrawl-print.js and read
+          // directly by the report renderer.
+          foundKeywords: kws.slice(0, 8),
+          fullText:      item.summary
             ? item.summary
             : `TITLE: ${item.title}\nSNIPPET: ${item.snippet || item.description || ""}`,
           snippetOnly: !item.summary,
@@ -191,7 +159,8 @@ async function fetchTvCoverage(cfg, cb = () => {}) {
 
       cb(
         `  [firecrawl-tv] ${org}: ${out[org].length} kept of ${items.length} returned ` +
-          `(${skipped} failed the AQ keyword gate, ${offNetwork} off-network)`,
+          `(${unattributed} never mentioned the org, ${skipped} failed the AQ keyword gate, ` +
+          `${offNetwork} off-network)`,
         out[org].length > 0 ? "ok" : "warn",
       );
     } catch (e) {
