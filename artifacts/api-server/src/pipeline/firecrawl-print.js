@@ -61,10 +61,29 @@ function toTbsDate(iso) {
   return `${parseInt(m)}/${parseInt(d)}/${y}`;
 }
 
-/** Strip www. from hostname */
-function rootDomain(url) {
-  try { return new URL(url).hostname.replace(/^www\./, ""); }
-  catch { return ""; }
+// Most-specific-first, so a longer configured domain wins over a shorter one
+// that is also a suffix of the hostname.
+const OUTLET_MATCHERS = Object.entries(DOMAIN_TO_OUTLET)
+  .sort(([a], [b]) => b.length - a.length);
+
+/**
+ * Map an article URL to its outlet, matching subdomains.
+ *
+ * Replaces a www.-stripping exact lookup that silently discarded every other
+ * subdomain (m.*, epaper.*, regional and language editions). Returns null when
+ * the host is genuinely off-network.
+ */
+function outletForUrl(url) {
+  let host;
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+  for (const [domain, outlet] of OUTLET_MATCHERS) {
+    if (host === domain || host.endsWith(`.${domain}`)) return outlet;
+  }
+  return null;
 }
 
 /** True if any of the 21 AQ keywords appear in the article text */
@@ -139,8 +158,7 @@ async function fetchPrintCoverage(cfg, cb = () => {}) {
         if (seen.has(key)) continue;
         seen.add(key);
 
-        const domain = rootDomain(item.url || "");
-        const outlet = DOMAIN_TO_OUTLET[domain] || DOMAIN_TO_OUTLET[`www.${domain}`];
+        const outlet = outletForUrl(item.url || "");
         if (!outlet) continue; // not one of our print domains
 
         if (!matchesAQ(item)) continue; // 21-keyword relevance gate

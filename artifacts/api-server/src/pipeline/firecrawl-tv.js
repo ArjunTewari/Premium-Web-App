@@ -17,12 +17,18 @@ const TV_CHANNEL_DOMAINS = {
   "ABP News":    "abplive.com",
 };
 
-// Domain → outlet name (built from the map above + subdomain aliases)
-const DOMAIN_TO_OUTLET = {
-  ...Object.fromEntries(Object.entries(TV_CHANNEL_DOMAINS).map(([name, d]) => [d, name])),
-  "news.abplive.com":    "ABP News",
-  "www.indiatvnews.com": "India TV",
-};
+// Domain → outlet name. Subdomains are handled by outletForUrl()'s suffix
+// match, so no per-subdomain aliases are needed (the old map listed
+// news.abplive.com and www.indiatvnews.com explicitly and still missed
+// everything else).
+const DOMAIN_TO_OUTLET = Object.fromEntries(
+  Object.entries(TV_CHANNEL_DOMAINS).map(([name, d]) => [d, name]),
+);
+
+// Most-specific-first, so a longer configured domain wins over a shorter one
+// that is also a suffix of the hostname.
+const OUTLET_MATCHERS = Object.entries(DOMAIN_TO_OUTLET)
+  .sort(([a], [b]) => b.length - a.length);
 
 // 51 hardcoded AQ keywords — used as a post-fetch filter, NOT in the query string
 const AQ_KEYWORDS = [
@@ -52,13 +58,29 @@ function toTbsDate(iso) {
   return `${parseInt(m)}/${parseInt(d)}/${y}`;
 }
 
-/** Extract root domain from a URL, stripping www. prefix */
-function rootDomain(url) {
+/**
+ * Map an article URL to its outlet, matching subdomains.
+ *
+ * The previous implementation only stripped a leading "www." and then did an
+ * exact map lookup, so every other subdomain fell through and was silently
+ * discarded — including swachhindia.ndtv.com (NDTV's environment desk, where
+ * most air-quality reporting actually lives) and the Hindi properties
+ * khabar.ndtv.com and hindi.news18.com. Those drops were invisible: no counter,
+ * no log, just a zero in the report.
+ *
+ * Returns the outlet name, or null when the host is genuinely off-network.
+ */
+function outletForUrl(url) {
+  let host;
   try {
-    return new URL(url).hostname.replace(/^www\./, "");
+    host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
   } catch {
-    return "";
+    return null;
   }
+  for (const [domain, outlet] of OUTLET_MATCHERS) {
+    if (host === domain || host.endsWith(`.${domain}`)) return outlet;
+  }
+  return null;
 }
 
 /** Return AQ keywords that appear in the article's combined text fields */
@@ -140,15 +162,15 @@ async function fetchTvCoverage(cfg, cb = () => {}) {
       const items = await firecrawlSearch(query, sharedParams, FIRECRAWL_KEY, cb);
       const seen = new Set();
       let skipped = 0;
+      let offNetwork = 0;
 
       for (const item of items) {
         const key = item.url || item.title;
         if (seen.has(key)) continue;
         seen.add(key);
 
-        const domain = rootDomain(item.url || "");
-        const outlet = DOMAIN_TO_OUTLET[domain];
-        if (!outlet) continue;
+        const outlet = outletForUrl(item.url || "");
+        if (!outlet) { offNetwork++; continue; }
 
         const kws = matchedKeywords(item);
         if (kws.length === 0) { skipped++; continue; }
@@ -168,7 +190,8 @@ async function fetchTvCoverage(cfg, cb = () => {}) {
       }
 
       cb(
-        `  [firecrawl-tv] ${org}: ${out[org].length} kept (${skipped} filtered out)`,
+        `  [firecrawl-tv] ${org}: ${out[org].length} kept of ${items.length} returned ` +
+          `(${skipped} failed the AQ keyword gate, ${offNetwork} off-network)`,
         out[org].length > 0 ? "ok" : "warn",
       );
     } catch (e) {
