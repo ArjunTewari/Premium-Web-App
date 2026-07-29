@@ -856,13 +856,6 @@ export default function Home() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 7 }}>
                 {allOrgs.map((org) => {
                   const on = selectedOrgs.includes(org);
-                  const ov = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "", linkedin: "" };
-                  const chips: { label: string; val: string; color: string }[] = [
-                    { label: "in", val: ov.linkedin  || "",                      color: "#0a8fd4" },
-                    { label: "𝕏",  val: ov.twitter   ? `@${ov.twitter}`  : "", color: "#4a9fd4" },
-                    { label: "IG", val: ov.instagram  ? `@${ov.instagram}` : "", color: "#e05c9c" },
-                    { label: "YT", val: ov.youtube   || "",                      color: "#e53935" },
-                  ].filter(c => c.val);
                   return (
                     <button
                       key={org}
@@ -888,19 +881,6 @@ export default function Home() {
                         }} />
                         <span style={{ minWidth: 0, overflowWrap: "break-word" }}>{org}</span>
                       </span>
-                      {chips.length > 0 && (
-                        <span style={{ display: "flex", flexWrap: "wrap", gap: "3px 6px", paddingLeft: 14 }}>
-                          {chips.map(c => (
-                            <span key={c.label} style={{
-                              fontSize: 9, fontFamily: "'DM Mono', monospace",
-                              color: on ? c.color : "rgba(74,96,112,.8)",
-                              lineHeight: 1.3,
-                            }}>
-                              <span style={{ opacity: .5, marginRight: 2 }}>{c.label}</span>{c.val}
-                            </span>
-                          ))}
-                        </span>
-                      )}
                     </button>
                   );
                 })}
