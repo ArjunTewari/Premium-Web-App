@@ -1,1 +1,68 @@
-{}
+{
+  "https://www.linkedin.com/company/the-international-council-on-clean-transportation": {
+    "company_id": 768303,
+    "name": "The International Council on Clean Transportation",
+    "followers": 33348,
+    "cachedAt": "2026-07-29T05:19:19.688Z"
+  },
+  "https://www.linkedin.com/company/apag": {
+    "company_id": 40873339,
+    "name": "A-PAG",
+    "followers": 10862,
+    "cachedAt": "2026-07-29T05:20:17.713Z"
+  },
+  "https://www.linkedin.com/company/wri-india": {
+    "company_id": 13709887,
+    "name": "WRI India",
+    "followers": 108848,
+    "cachedAt": "2026-07-29T05:20:17.742Z"
+  },
+  "https://www.linkedin.com/company/chintan-environmental-research-and-actiann-group-": {
+    "company_id": 3961755,
+    "name": "Chintan (Environmental Research and Action Group)",
+    "followers": 29048,
+    "cachedAt": "2026-07-29T05:20:19.276Z"
+  },
+  "https://www.linkedin.com/company/cstep": {
+    "company_id": 271770,
+    "name": "Center for Study of Science, Technology and Policy",
+    "followers": 26229,
+    "cachedAt": "2026-07-29T05:21:21.470Z"
+  },
+  "https://www.linkedin.com/company/epic-india": {
+    "company_id": 71220413,
+    "name": "Energy Policy Institute at the University of Chicago (EPIC India)",
+    "followers": 21378,
+    "cachedAt": "2026-07-29T05:22:21.023Z"
+  },
+  "https://www.linkedin.com/company/health-effects-institute": {
+    "company_id": 427746,
+    "name": "Health Effects Institute",
+    "followers": 4600,
+    "cachedAt": "2026-07-29T05:22:21.137Z"
+  },
+  "https://www.linkedin.com/company/council-on-energy-environment-and-water": {
+    "company_id": 2280803,
+    "name": "Council on Energy, Environment and Water (CEEW)",
+    "followers": 153476,
+    "cachedAt": "2026-07-29T05:23:23.722Z"
+  },
+  "https://www.linkedin.com/company/centre-for-science-and-environment-new-delhi": {
+    "company_id": 1310961,
+    "name": "Centre for Science and Environment, New Delhi",
+    "followers": 106364,
+    "cachedAt": "2026-07-29T05:23:23.964Z"
+  },
+  "https://www.linkedin.com/company/climatetrends": {
+    "company_id": 66238674,
+    "name": "Climate Trends",
+    "followers": 9733,
+    "cachedAt": "2026-07-29T05:23:25.314Z"
+  },
+  "https://www.linkedin.com/company/sustainable-futures-collaborative": {
+    "company_id": 101193213,
+    "name": "Sustainable Futures Collaborative",
+    "followers": 14236,
+    "cachedAt": "2026-07-29T05:24:32.700Z"
+  }
+}

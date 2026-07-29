@@ -33,12 +33,14 @@ const DEFAULT_ORGS = [
   "Sustainable Futures Collaborative",
 ];
 
+// Verified live (2026-07-29): every channel ID resolved and its og:title checked
+// against the org. All 11 pre-existing IDs were correct; CSTEP's was missing.
 const ORG_YT_HANDLES: Record<string, string> = {
   "WRI India":                                        "https://www.youtube.com/channel/UCYoSZhQQR6Pc9lFJjR5e18g",
-  "Air Pollution Action Group":                       "",
+  "Air Pollution Action Group":                       "https://www.youtube.com/channel/UCj2uQfsw-u7yrp6WStsgZoQ",  // youtube.com/@A-PAG
   "Chintan Environmental Research and Action Group":  "https://www.youtube.com/channel/UCg-HN_sFTRBNDDOWxEt138g",
   "IIT Kanpur":                                       "https://www.youtube.com/channel/UCIdajcgyfqnD9PwDnv_xqmg",
-  "CSTEP":                                            "",
+  "CSTEP":                                            "https://www.youtube.com/channel/UCROj7dD9PqkZj4My5En829A",  // cstep.in
   "IIT Delhi":                                        "https://www.youtube.com/channel/UCJX9RwRoVAEFLWlhrNF3Lqg",
   "Health Effects Institute":                         "https://www.youtube.com/channel/UCPli-nivc67QzWoW1nRumIw",
   "ICCT":                                             "https://www.youtube.com/channel/UCjbSjAMN6yiGhczNwSgTJ6Q",
@@ -49,6 +51,9 @@ const ORG_YT_HANDLES: Record<string, string> = {
   "Sustainable Futures Collaborative":                "https://www.youtube.com/channel/UCZcWNjwTwQK48D7z8oWAKCA",
 };
 
+// Verified live (2026-07-29): every handle resolved and its profile NAME checked
+// against the org. Empty = the org has no such account (confirmed by the absence
+// of a link on its own website), which the pipeline renders as "–", not a zero.
 const ORG_TW_HANDLES: Record<string, string> = {
   "Council on Energy, Environment and Water":         "CEEWIndia",
   "Centre for Science and Environment":               "cseindia",
@@ -60,9 +65,11 @@ const ORG_TW_HANDLES: Record<string, string> = {
   "IIT Kanpur":                                       "IITKanpur",
   "Health Effects Institute":                         "",
   "ICCT":                                             "theicct",
-  "EPIC India":                                       "epiccampglobal",
-  "Climate Trends":                                   "ClimateTrendsIN",
-  "Sustainable Futures Collaborative":                "SFC_India",
+  // Was "epiccampglobal" — that account is "CAMP Epic Global", an unrelated org.
+  // EPIC India links x.com/EPIC_India from epic.uchicago.in.
+  "EPIC India":                                       "EPIC_India",       // 3,110 flw
+  "Climate Trends":                                   "ClimateTrendsIN",  // 2,731 flw
+  "Sustainable Futures Collaborative":                "SFC_India",        // 2,396 flw
 };
 
 const ORG_IG_HANDLES: Record<string, string> = {
@@ -70,31 +77,45 @@ const ORG_IG_HANDLES: Record<string, string> = {
   "Centre for Science and Environment":               "cseindia",
   "WRI India":                                        "wri_india",
   "CSTEP":                                            "cstep_ind",
-  "Air Pollution Action Group":                       "",
+  "Air Pollution Action Group":                       "apagindia",
   "Chintan Environmental Research and Action Group":  "chintan.india",
   "IIT Delhi":                                        "iitdelhi",
   "IIT Kanpur":                                       "iit.kanpur",
-  "Health Effects Institute":                         "",
-  "ICCT":                                             "",
-  "EPIC India":                                       "campepicglobal",
-  "Climate Trends":                                   "climatrendsin",
+  "Health Effects Institute":                         "",  // no IG account (healtheffects.org links LinkedIn only)
+  "ICCT":                                             "",  // no IG account (theicct.org links LI/X/YT only)
+  // Was "campepicglobal" — "CAMP Epic Global", an unrelated org.
+  "EPIC India":                                       "epicindia.uchicago",       // epic.uchicago.in
+  // Was "climatrendsin" — typo, that handle does not exist.
+  "Climate Trends":                                   "climatetrendsin",
   "Sustainable Futures Collaborative":                "sustainablefuturescollab",
 };
 
+// Every slug below was verified live (2026-07-29) by resolving the page and
+// checking the resolved NAME matches the org — existence alone is not enough.
+// Two failure modes this caught, both of which silently poison a report:
+//   · dead slugs (404) → rendered as a red ✕ "API failed" cell, e.g. ICCT
+//   · squatter/duplicate stubs and same-acronym impostors that resolve fine but
+//     belong to someone else, e.g. /company/cseindia is The Calcutta Stock
+//     Exchange, /company/iit-kanpur is IIT Kanpur's E-Cell (not the institute),
+//     /company/ceew is a 5-follower stub, /company/icct a 165-follower stub.
+// Where possible the value is the URL the org links from its OWN website.
+// IIT Delhi/Kanpur use /school/ pages: fetchLinkedIn() detects those and marks
+// them noHandle ("–", unsupported) rather than failing — recording the real URL
+// is better than "" because it documents the page and stays future-proof.
 const ORG_LI_HANDLES: Record<string, string> = {
-  "Council on Energy, Environment and Water":         "ceew-council-on-energy-environment-and-water",
-  "Centre for Science and Environment":               "centre-for-science-and-environment",
-  "WRI India":                                        "wri-india",
-  "CSTEP":                                            "",
-  "Air Pollution Action Group":                       "",
-  "Chintan Environmental Research and Action Group":  "chintan-environmental-research-and-action-group",
-  "IIT Delhi":                                        "indian-institute-of-technology-delhi",
-  "IIT Kanpur":                                       "iit-kanpur",
-  "Health Effects Institute":                         "health-effects-institute",
-  "ICCT":                                             "international-council-on-clean-transportation",
-  "EPIC India":                                       "",
-  "Climate Trends":                                   "",
-  "Sustainable Futures Collaborative":                "",
+  "Council on Energy, Environment and Water":         "council-on-energy-environment-and-water",           // ceew.in · 153,474 flw
+  "Centre for Science and Environment":               "centre-for-science-and-environment-new-delhi",      // cseindia.org
+  "WRI India":                                        "wri-india",                                         // wri-india.org · 108,847 flw
+  "CSTEP":                                            "cstep",                                             // cstep.in · 26,229 flw
+  "Air Pollution Action Group":                       "apag",                                              // a-pag.org
+  "Chintan Environmental Research and Action Group":  "chintan-environmental-research-and-actiann-group-", // chintan-india.org (slug typo is theirs)
+  "IIT Delhi":                                        "https://www.linkedin.com/school/iitdelhi",          // iitd.ac.in · school page → unsupported
+  "IIT Kanpur":                                       "https://www.linkedin.com/school/indian-institute-of-technology-kanpur", // iitk.ac.in · school page → unsupported
+  "Health Effects Institute":                         "health-effects-institute",                          // healtheffects.org · 4,600 flw
+  "ICCT":                                             "the-international-council-on-clean-transportation", // theicct.org · 33,348 flw
+  "EPIC India":                                       "epic-india",                                        // epic.uchicago.in · 21,378 flw
+  "Climate Trends":                                   "climatetrends",                                     // 9,733 flw
+  "Sustainable Futures Collaborative":                "sustainable-futures-collaborative",                 // 14,235 flw
 };
 
 const DEFAULT_SCOPE = [
