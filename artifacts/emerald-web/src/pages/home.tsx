@@ -214,6 +214,30 @@ const inputStyle: React.CSSProperties = {
   transition: "border-color .2s",
 };
 
+/* ── Module-level card/label components (must be outside Home to avoid remount on re-render) ── */
+function Card({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: 14,
+      padding: "20px 22px",
+      transition: "border-color .3s",
+      ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: C.gold, marginBottom: 14 }}>
+      {children}
+    </div>
+  );
+}
+
 export default function Home() {
   const { user, logout } = useAuth();
   const [, navigate] = useLocation();
@@ -608,28 +632,8 @@ export default function Home() {
     return C.muted;
   }
 
-  /* ── Card wrapper ─────────────────────────────────────────────────────── */
-  const Card = ({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) => (
-    <div style={{
-      background: C.surface,
-      border: `1px solid ${C.border}`,
-      borderRadius: 14,
-      padding: "20px 22px",
-      transition: "border-color .3s",
-      ...style,
-    }}>
-      {children}
-    </div>
-  );
-
-  const SectionLabel = ({ children }: { children: React.ReactNode }) => (
-    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".18em", textTransform: "uppercase", color: C.gold, marginBottom: 14 }}>
-      {children}
-    </div>
-  );
-
   return (
-    <div style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", background: C.bg, minHeight: "100vh", color: C.text, position: "relative", overflow: "hidden" }}>
+    <div style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", background: C.bg, minHeight: "100vh", color: C.text, position: "relative", overflowX: "hidden" }}>
 
       {/* ── Confirmation dialog ─────────────────────────────────────────── */}
       {confirmState && (
