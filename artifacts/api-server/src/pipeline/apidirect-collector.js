@@ -57,28 +57,38 @@ function normaliseLiUrl(url) {
 }
 
 /**
- * Resolve a LinkedIn company URL to { company_id, name }.
- * Returns the cached value immediately if already known; otherwise calls the
- * APIdirect linkedin/company endpoint, stores the result, and returns it.
+ * Resolve a LinkedIn company URL to { company_id, name, followers }.
+ * Returns the cached value immediately if already known (and it already has a
+ * followers count); otherwise calls the APIdirect linkedin/company endpoint,
+ * stores the result, and returns it.
+ *
+ * Follower counts are cached alongside company_id (same $0.006 call — no
+ * extra cost). Entries cached before this field existed are missing
+ * `followers`, so they're transparently re-fetched once to backfill it.
  */
 async function resolveCompanyId(companyUrl, apiKey, cb) {
   const cache = loadCompanyIdCache();
   const key   = normaliseLiUrl(companyUrl);
 
-  if (cache[key]) {
-    cb?.(`  [APIdirect/LI] company_id=${cache[key].company_id} (${cache[key].name}) — from cache`);
+  if (cache[key] && typeof cache[key].followers === 'number') {
+    cb?.(`  [APIdirect/LI] company_id=${cache[key].company_id} (${cache[key].name}), ${cache[key].followers.toLocaleString()} followers — from cache`);
     return cache[key];
   }
 
   const data = await apiFetch('linkedin/company', { url: companyUrl }, apiKey);
   if (!data.company_id) throw new Error('linkedin/company returned no company_id');
 
-  const entry = { company_id: data.company_id, name: data.name || companyUrl, cachedAt: new Date().toISOString() };
+  const entry = {
+    company_id: data.company_id,
+    name: data.name || companyUrl,
+    followers: typeof data.followers === 'number' ? data.followers : 0,
+    cachedAt: new Date().toISOString(),
+  };
   cache[key] = entry;
   _companyIdCache = cache;
   saveCompanyIdCache();
 
-  cb?.(`  [APIdirect/LI] company_id=${entry.company_id} (${entry.name}) — resolved & cached`);
+  cb?.(`  [APIdirect/LI] company_id=${entry.company_id} (${entry.name}), ${entry.followers.toLocaleString()} followers — resolved & cached`);
   return entry;
 }
 // Base AQ keywords. 'pollution' removed — bare substring matches water/noise/soil/light
@@ -304,17 +314,22 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
     return { ...EMPTY, noHandle: true };
   }
   let filterParam;
+  let followers = 0;
   try {
     if (isPersonUrl) {
       const profileUrl = handle.startsWith('http') ? handle : `https://www.linkedin.com/in/${handle}`;
       filterParam = { author: profileUrl };
       cb?.(`  [APIdirect/LI] ${org}: person profile detected, using author filter`);
+      // linkedin/company only resolves company pages — person profiles have
+      // no follower count available via this endpoint, so ER falls back to
+      // avg-engagement-per-post for these.
     } else {
       const companyUrl = handle.startsWith('http') ? handle : `https://www.linkedin.com/company/${handle}`;
-      const { company_id, name } = await resolveCompanyId(companyUrl, apiKey,
+      const { company_id, name, followers: liFollowers } = await resolveCompanyId(companyUrl, apiKey,
         (msg) => cb?.(`  [APIdirect/LI] ${org}: ${msg.replace(/^\s+\[APIdirect\/LI\]\s*/, '')}`));
       filterParam = { from_company: String(company_id) };
-      cb?.(`  [APIdirect/LI] ${org}: using company_id=${company_id} (${name})`);
+      followers = liFollowers || 0;
+      cb?.(`  [APIdirect/LI] ${org}: using company_id=${company_id} (${name}), ${followers.toLocaleString()} followers`);
     }
   } catch (e) {
     cb?.(`  [APIdirect/LI] ${org}: could not resolve profile — ${e.message}`, 'warn');
@@ -377,9 +392,9 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
       keywords_found: [...keywords],
     }));
 
-  const erVal = er(totalEngage, 0, posts.length);
-  cb?.(`  [APIdirect/LI] ${org}: ${posts.length} AQ posts (${AQ_KEYWORDS_SEARCH.length} keyword searches), ${totalEngage} engagements`, posts.length > 0 ? 'ok' : 'warn');
-  return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers: 0, er: erVal, topPosts, fetched: posts.length, inRangeCount: posts.length };
+  const erVal = er(totalEngage, followers, posts.length);
+  cb?.(`  [APIdirect/LI] ${org}: ${posts.length} AQ posts (${AQ_KEYWORDS_SEARCH.length} keyword searches), ${totalEngage} engagements${followers > 0 ? `, ${followers.toLocaleString()} followers` : ''}, ER=${erVal}${followers > 0 ? '%' : ''}`, posts.length > 0 ? 'ok' : 'warn');
+  return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers, er: erVal, topPosts, fetched: posts.length, inRangeCount: posts.length };
 }
 
 // ── Twitter / X ───────────────────────────────────────────────────────────────

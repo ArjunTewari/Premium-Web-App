@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 /**
  * social-er.js — Social AQ Presence (APIdirect.io)
  *
@@ -108,7 +108,7 @@ async function run(cfg, selectedOrgs, cb) {
       youtubePosts:   0,
       totalPosts,
       insight: totalPosts > 0
-        ? `${liCount} LinkedIn (${d.li.totalLikes}♥ ${d.li.totalComments}💬 ${d.li.totalShares}↗) · ${xCount} X (${d.tw.followers?.toLocaleString?.() || 0} followers, ER ${d.tw.er}%) · ${igCount} IG (${d.ig.followers?.toLocaleString?.() || 0} followers, ER ${d.ig.er}%)`
+        ? `${liCount} LinkedIn (${d.li.followers?.toLocaleString?.() || 0} followers, ER ${d.li.er}%, ${d.li.totalLikes}♥ ${d.li.totalComments}💬 ${d.li.totalShares}↗) · ${xCount} X (${d.tw.followers?.toLocaleString?.() || 0} followers, ER ${d.tw.er}%) · ${igCount} IG (${d.ig.followers?.toLocaleString?.() || 0} followers, ER ${d.ig.er}%)`
         : 'No AQ social posts found via APIdirect in this period',
       // Rich APIdirect data (used in HTML)
       liData:  d.li,
@@ -310,7 +310,8 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8;white-space:nowrap">#</th>
         <th style="padding:8px 12px;text-align:left;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8">Org</th>
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI posts</th>
-        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap;cursor:help" title="LinkedIn engagement rate = (likes+comments+shares) / post count (follower count not available from keyword search)">LI ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap;cursor:help" title="LinkedIn engagement rate = (likes+comments+shares) / (posts × followers) × 100, via the LinkedIn company API. Falls back to avg engagement/post when followers are unavailable (e.g. person profiles).">LI ER%</th>
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI flw</th>
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X posts</th>
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X ER%</th>
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a9fd4;white-space:nowrap">X flw</th>
@@ -326,6 +327,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
       <tr style="background:#0f1422;border-top:1px solid #252d40">
         <td colspan="2" style="padding:5px 12px;font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7e9a">COHORT</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4a7fd4">${colTotals.li}</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4a9fd4">${colTotals.x}</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
@@ -345,6 +347,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         const sov  = cohortTotal > 0 ? ((total / cohortTotal) * 100).toFixed(1) : '0.0';
         const barW = Math.round((total / (unifiedRows[0].total || 1)) * 100);
         const col  = total >= 10 ? '#4caf74' : total >= 5 ? '#c9922a' : total >= 1 ? '#4a9fd4' : '#5e7494';
+        const liFollowers = r.liData?.followers || 0;
         const twFollowers = r.twData?.followers || 0;
         const igFollowers = r.igData?.followers || 0;
         const ytER   = yt.avgER || yt.avgViewER || 0;
@@ -358,6 +361,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
               : `<span style="color:#6b7e9a" title="ER unreliable — follower count too low (${igFollowers}) for meaningful ER">~</span>`)
           : '<span style="color:#6b7e9a">—</span>';
         const ytERCell = ytER > 0 ? `<span style="color:#e53935">${ytER}%</span>` : '<span style="color:#6b7e9a">—</span>';
+        const liFlwCell = liFollowers > 0 ? `<span style="color:#4a7fd4;font-size:18px">${fmtNum(liFollowers)}</span>` : '<span style="color:#6b7e9a">—</span>';
         const twFlwCell = twFollowers > 0 ? `<span style="color:#4a9fd4;font-size:18px">${fmtNum(twFollowers)}</span>` : '<span style="color:#6b7e9a">—</span>';
         const igFlwCell = igFollowers > 0 ? `<span style="color:#e05c9c;font-size:18px">${fmtNum(igFollowers)}</span>` : '<span style="color:#6b7e9a">—</span>';
         const ytSubsCell = ytSubs > 0 ? `<span style="color:#e53935;font-size:18px">${fmtNum(ytSubs)}</span>` : '<span style="color:#6b7e9a">—</span>';
@@ -366,6 +370,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
           <td style="padding:8px 12px"><span style="font-family:monospace;font-size:18px;font-weight:700;color:${orgColorMap[r.org]}">${escHtml(r.org)}</span></td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.linkedinPosts, r.liData, '#4a7fd4', 'LinkedIn')}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${liER}</td>
+          <td style="padding:8px 12px;text-align:center;font-family:monospace">${liFlwCell}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.twitterPosts, r.twData, '#4a9fd4', 'X/Twitter')}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${twER}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace">${twFlwCell}</td>
@@ -391,7 +396,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   <strong style="color:#e05c9c">IG</strong> = Instagram posts from official handle &nbsp;·&nbsp;
   <strong style="color:#e53935">YT</strong> = YouTube videos via Data API v3 &nbsp;·&nbsp;
   <span style="color:#5e7494">flw = follower count &nbsp;·&nbsp; subs = subscriber count</span><br>
-  ER% = Engagement Rate — X: (likes+replies+retweets)÷followers×100 &nbsp;·&nbsp; IG: (likes+comments)÷followers×100 (shown as <strong>~</strong> when followers &lt; 500, unreliable) &nbsp;·&nbsp; YT: (likes+comments)÷subscribers×100, falls back to ÷views &nbsp;·&nbsp;
+  ER% = Engagement Rate — LI: (likes+comments+shares)÷(posts×followers)×100 via LinkedIn company API, falls back to avg engagement/post when followers unavailable &nbsp;·&nbsp; X: (likes+replies+retweets)÷followers×100 &nbsp;·&nbsp; IG: (likes+comments)÷followers×100 (shown as <strong>~</strong> when followers &lt; 500, unreliable) &nbsp;·&nbsp; YT: (likes+comments)÷subscribers×100, falls back to ÷views &nbsp;·&nbsp;
   SoV% = org total ÷ cohort total &nbsp;·&nbsp; Data: LinkedIn API · X API v2 · Instagram Graph API · YouTube Data API v3<br>
   <strong style="color:#5e7494;letter-spacing:.06em">CELL VALUES</strong> &nbsp;·&nbsp;
   <strong style="color:#4caf74">0</strong> = fetch completed, verified no AQ posts in this window (hover any 0 for the specific reason) &nbsp;·&nbsp;
@@ -416,12 +421,13 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const col = scoreColor(r.presenceScore);
 
     // LinkedIn block
-    const li = r.liData || { postCount: 0, totalLikes: 0, totalComments: 0, totalShares: 0, topPosts: [] };
+    const li = r.liData || { postCount: 0, totalLikes: 0, totalComments: 0, totalShares: 0, followers: 0, er: 0, topPosts: [] };
     const liHtml = li.postCount > 0 ? `
       <div style="margin-top:8px">
         <div style="font-size:14px;color:#7d90aa;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
           LinkedIn — <span style="color:#4a7fd4">${li.postCount} AQ post${li.postCount === 1 ? '' : 's'}</span>
-          ${li.er > 0 ? `&middot; <span style="color:#4a7fd4;background:rgba(74,127,212,.1);border:1px solid rgba(74,127,212,.25);border-radius:3px;padding:1px 5px">ER ${li.er}</span>` : ''}
+          ${li.followers ? `&middot; ${fmtNum(li.followers)} followers` : ''}
+          ${li.er > 0 ? `&middot; <span style="color:#4a7fd4;background:rgba(74,127,212,.1);border:1px solid rgba(74,127,212,.25);border-radius:3px;padding:1px 5px">ER ${li.er}${li.followers ? '%' : ''}</span>` : ''}
           &middot; ♥ ${li.totalLikes} &middot; 💬 ${li.totalComments} &middot; ↗ ${li.totalShares}
         </div>
         ${topPostsHtml(li.topPosts, '#4a7fd4', ['likes', 'comments', 'shares'])}

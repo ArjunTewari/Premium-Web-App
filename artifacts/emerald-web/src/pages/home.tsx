@@ -788,7 +788,7 @@ export default function Home() {
 
         {/* Stat bar */}
         <SlideUp delay={130}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, margin: "24px 0 0" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, margin: "24px 0 0" }}>
             {[
               { label: "Orgs available",  val: allOrgs.length,       suffix: "" },
               { label: "Orgs selected",   val: orgCount,             suffix: `/ ${allOrgs.length}` },
@@ -820,10 +820,10 @@ export default function Home() {
         </SlideUp>
 
         {/* ── Config grid ──────────────────────────────────────────────── */}
-        <div style={{ display: "flex", gap: 16, marginTop: 24, alignItems: "flex-start" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginTop: 24, alignItems: "flex-start" }}>
 
           {/* Left — Org selector */}
-          <SlideUp delay={240} style={{ flex: 2 }}>
+          <SlideUp delay={240} style={{ flex: "2 1 480px", minWidth: 0 }}>
             <div className="mo-card" style={{
               background: C.surface, border: `1px solid ${C.border}`,
               borderRadius: 14, padding: "20px 22px",
@@ -853,7 +853,7 @@ export default function Home() {
                   </span>
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 7 }}>
                 {allOrgs.map((org) => {
                   const on = selectedOrgs.includes(org);
                   const ov = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "", linkedin: "" };
@@ -876,16 +876,17 @@ export default function Home() {
                         color: on ? C.gold : C.muted,
                         fontSize: 18, fontFamily: "'Space Grotesk', sans-serif",
                         textAlign: "left", transition: "all .2s",
+                        minWidth: 0, width: "100%", boxSizing: "border-box",
                       }}
                     >
-                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                         <span className="mo-org-dot" style={{
                           width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
                           background: on ? C.gold : "var(--text-muted)",
                           boxShadow: on ? `0 0 6px ${C.gold}` : "none",
                           transition: "background .2s, box-shadow .2s",
                         }} />
-                        {org}
+                        <span style={{ minWidth: 0, overflowWrap: "break-word" }}>{org}</span>
                       </span>
                       {chips.length > 0 && (
                         <span style={{ display: "flex", flexWrap: "wrap", gap: "3px 6px", paddingLeft: 14 }}>
@@ -935,7 +936,7 @@ export default function Home() {
           </SlideUp>
 
           {/* Right column */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ flex: "1 1 320px", minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>
 
             {/* Date range */}
             <SlideUp delay={290}>
@@ -1418,7 +1419,7 @@ export default function Home() {
             <SlideUp delay={80}>
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
                 {/* Table header */}
-                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr 1fr", gap: 0, borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)", gap: 0, borderBottom: `1px solid ${C.border}` }}>
                   {[
                     { label: "Organisation", color: C.muted },
                     { label: "LinkedIn",     color: "#0a8fd4" },
@@ -1448,7 +1449,7 @@ export default function Home() {
                     transition: "border-color .2s",
                   };
                   return (
-                    <div key={org} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr 1fr", gap: 0, background: rowBg, borderBottom: `1px solid var(--border-col)` }}>
+                    <div key={org} style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)", gap: 0, background: rowBg, borderBottom: `1px solid var(--border-col)` }}>
                       {/* Org name */}
                       <div style={{ padding: "10px 16px", display: "flex", alignItems: "center" }}>
                         <span style={{ fontSize: 12, fontFamily: "'Space Grotesk', sans-serif", color: C.text }}>{org}</span>
@@ -1495,7 +1496,7 @@ export default function Home() {
 
                 {/* Add new org row */}
                 <div style={{ borderTop: `1px solid ${C.border}`, background: "rgba(201,146,42,.04)" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr 1fr", gap: 0 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)", gap: 0 }}>
                     <div style={{ padding: "10px 10px" }}>
                       <input
                         value={hNewOrg}
