@@ -244,6 +244,19 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
     orgs.flatMap(o => Object.keys(aeoResults[o]?.llmBreakdown || {}))
   )];
 
+  // Cohort totals — sum of every org's mentions overall and per LLM
+  const cohortTotal = orgs.reduce((s, o) => s + (aeoResults[o]?.mentions || 0), 0);
+  const cohortByLlm = {};
+  allLlms.forEach(llm => {
+    cohortByLlm[llm] = orgs.reduce((s, o) => s + (aeoResults[o]?.llmBreakdown?.[llm]?.mentions || 0), 0);
+  });
+  const cohortRow = `<tr style="background:#0d1117;border-bottom:1px solid #252d40">
+          <td style="padding:10px 14px;text-align:center"><span style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8fa3b8">COHORT</span></td>
+          <td style="padding:10px 14px"><span style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#8fa3b8">COHORT</span></td>
+          <td style="padding:10px 14px;text-align:center"><span style="font-family:monospace;font-size:17px;font-weight:700;color:#c9922a">${cohortTotal}</span></td>
+          ${allLlms.map(llm => `<td style="padding:10px 14px;text-align:center"><span style="font-family:monospace;font-size:17px;font-weight:700;color:#e8d4a0">${cohortByLlm[llm]}</span></td>`).join('')}
+        </tr>`;
+
   const summaryTable = `<div style="border:1px solid #252d40;border-radius:8px;margin-bottom:20px;overflow:hidden"><div style="overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;font-size:17px">
     <thead>
@@ -255,6 +268,7 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
       </tr>
     </thead>
     <tbody>
+      ${cohortRow}
       ${sortedOrgs.map(({ org, oi, m, rank }) => {
         const col = orgColorList[oi % orgColorList.length];
         const d = aeoResults[org] || { llmBreakdown: {} };
@@ -357,7 +371,7 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
   return `
 <section style="margin-bottom:56px;scroll-margin-top:24px" id="aeo">
   <div style="margin-bottom:24px">
-    <div style="font-family:'JetBrains Mono',monospace;font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:#5e7494;margin-bottom:6px">Section 07 — LLM Visibility</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:#5e7494;margin-bottom:6px">Section 06 — LLM Visibility</div>
     <h2 style="font-family:'DM Serif Display',serif;font-size:33px;font-weight:400;color:#d8e4f0;line-height:1.2">LLM Visibility</h2>
     <div style="margin-top:8px;font-size:18px;color:#8fa3b8;max-width:680px;line-height:1.65">When someone asks an AI model about Indian air quality, which organisations does it cite? ${queriesUsed.length} questions sent to ${allLlms.length} LLMs. Each time an org is named in a response, it counts as one mention. ✓ = cited · ✗ = not cited.</div>
     <div style="width:40px;height:2px;background:#c9922a;margin:14px 0 0"></div>
