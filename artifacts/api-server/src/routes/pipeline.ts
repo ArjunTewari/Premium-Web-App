@@ -118,8 +118,12 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   if (!cfg.ORGS.length) cfg.ORGS = ["Council on Energy, Environment and Water", "CSTEP"];
   if (cfg.ORGS.length > 20) cfg.ORGS = cfg.ORGS.slice(0, 20);
 
-  if (!cfg.SERPER_KEY)
-    return res.status(400).json({ error: "Serper API key is required." });
+  // Firecrawl is the primary source for print + TV coverage. Serper is now only
+  // a best-effort article-text scraper (STEP 1c) and the white-space gap search
+  // (STEP 5a); both degrade gracefully to Firecrawl summaries / an empty gap
+  // section when SERPER_KEY is absent, so it is optional.
+  if (!cfg.FIRECRAWL_KEY)
+    return res.status(400).json({ error: "Firecrawl API key is required." });
   if (!cfg.CLAUDE_KEY)
     return res.status(400).json({ error: "Claude API key is required." });
 
