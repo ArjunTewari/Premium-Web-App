@@ -12,10 +12,17 @@
 // Failed requests are retried up to 3 times with exponential backoff.
 
 const {
-  AQ_KEYWORDS, orgMentioned, articleText, matchedKeywords, buildOutletMatcher,
+  AQ_KEYWORDS, orgMentioned, articleText, matchedKeywords, buildOutletMatcher, mapWithConcurrency,
 } = require("./firecrawl-common");
 
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/search";
+
+// Per-org Firecrawl searches to run concurrently (see firecrawl-print.js).
+const FIRECRAWL_CONCURRENCY = Math.max(1, parseInt(process.env.FIRECRAWL_CONCURRENCY || "5", 10) || 5);
+
+// Cache window for Firecrawl page scrapes — report windows are historical, so a
+// 2-day cache is safe and makes re-runs much faster/cheaper. 0 disables.
+const FIRECRAWL_MAX_AGE_MS = Math.max(0, parseInt(process.env.FIRECRAWL_MAX_AGE_MS || String(2 * 24 * 60 * 60 * 1000), 10) || 0);
 
 // Outlet name → domain (drives includeDomains + reverse lookup)
 const TV_CHANNEL_DOMAINS = {
@@ -109,10 +116,14 @@ async function fetchTvCoverage(cfg, cb = () => {}) {
     // Health Effects Institute articles the org appeared in the summary for
     // only 1 of 3, but in the markdown for 3 of 3. Gating on summary alone
     // would drop real coverage. Both formats come back in the same request.
-    scrapeOptions: { formats: ["summary", "markdown"] },
+    scrapeOptions: {
+      formats: ["summary", "markdown"],
+      ...(FIRECRAWL_MAX_AGE_MS > 0 ? { maxAge: FIRECRAWL_MAX_AGE_MS } : {}),
+    },
   };
 
-  for (const org of ORGS) {
+  cb(`  [firecrawl-tv] querying ${ORGS.length} org(s), ${FIRECRAWL_CONCURRENCY} at a time...`);
+  await mapWithConcurrency(ORGS, FIRECRAWL_CONCURRENCY, async (org) => {
     const query = `air quality "${org}"`;
     cb(`  [firecrawl-tv] ${org}: querying TV channels...`);
 
@@ -166,7 +177,7 @@ async function fetchTvCoverage(cfg, cb = () => {}) {
     } catch (e) {
       cb(`  [firecrawl-tv] Error for "${org}": ${e.message}`, "warn");
     }
-  }
+  });
 
   return out;
 }

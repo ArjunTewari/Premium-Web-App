@@ -138,6 +138,35 @@ function buildOutletMatcher(domainToOutlet) {
   };
 }
 
+/**
+ * Run `fn` over every item of `items` with at most `concurrency` in flight.
+ * Results come back in input order. Never rejects — a failing `fn` yields
+ * `{ status: "rejected", reason }` in that slot, matching Promise.allSettled,
+ * so one org erroring can't abort the whole batch.
+ *
+ * Used by the TV + print collectors to fan the per-org Firecrawl search out
+ * instead of awaiting them one at a time (16 orgs × ~30-90s serial was the
+ * dominant cost of a multi-org run).
+ */
+async function mapWithConcurrency(items, concurrency, fn) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  const worker = async () => {
+    while (cursor < items.length) {
+      const i = cursor++;
+      try {
+        results[i] = { status: "fulfilled", value: await fn(items[i], i) };
+      } catch (reason) {
+        results[i] = { status: "rejected", reason };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: workerCount }, worker));
+  return results;
+}
+
 module.exports = {
   AQ_KEYWORDS, ORG_ALIASES, orgMentioned, articleText, matchedKeywords, buildOutletMatcher,
+  mapWithConcurrency,
 };

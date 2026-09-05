@@ -1093,16 +1093,16 @@ ${batchText}`;
       `India air pollution research study ${orgExclusions}`,
       `India smog pollution news ${orgExclusions}`,
     ];
+    // Fire all five general queries at once — they share no state and Serper
+    // handles this fan-out trivially. Serial + 200ms sleeps cost ~3-5s here.
     const rawGeneral = [];
-    for (const q of generalQueries) {
-      try {
-        const res = await serperSearch(q, cfg.SERPER_KEY);
-        rawGeneral.push(...res);
-        await sleep(200);
-      } catch (e) {
-        cb(`  general query error: ${e.message}`, "warn");
-      }
-    }
+    const generalSettled = await Promise.allSettled(
+      generalQueries.map((q) => serperSearch(q, cfg.SERPER_KEY)),
+    );
+    generalSettled.forEach((r, i) => {
+      if (r.status === "fulfilled") rawGeneral.push(...r.value);
+      else cb(`  general query error (${generalQueries[i].slice(0, 40)}…): ${r.reason?.message || r.reason}`, "warn");
+    });
     const seen = new Set();
     const deduped = rawGeneral.filter((a) => {
       const u = a.link || a.url || "";

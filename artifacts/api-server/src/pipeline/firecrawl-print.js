@@ -19,10 +19,20 @@
 // field the report renderer reads) so print rows show keyword pills like TV.
 
 const {
-  AQ_KEYWORDS, orgMentioned, articleText, matchedKeywords, buildOutletMatcher,
+  AQ_KEYWORDS, orgMentioned, articleText, matchedKeywords, buildOutletMatcher, mapWithConcurrency,
 } = require("./firecrawl-common");
 
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/search";
+
+// How many per-org Firecrawl searches to run at once. Firecrawl's Standard
+// plan allows well above this for /search; 5 keeps us clear of the limit while
+// cutting a 16-org fetch from ~16 serial calls to ~4 waves. Override per deploy.
+const FIRECRAWL_CONCURRENCY = Math.max(1, parseInt(process.env.FIRECRAWL_CONCURRENCY || "5", 10) || 5);
+
+// Serve a cached scrape when Firecrawl already fetched the page this recently.
+// Report windows are weeks in the past, so a 2-day cache is safe and makes
+// re-runs (and near-duplicate org sets) far faster and cheaper. 0 disables.
+const FIRECRAWL_MAX_AGE_MS = Math.max(0, parseInt(process.env.FIRECRAWL_MAX_AGE_MS || String(2 * 24 * 60 * 60 * 1000), 10) || 0);
 
 // Hardcoded print outlet domains — extraction is scoped to these URLs only
 const PRINT_OUTLET_DOMAINS = {
@@ -65,7 +75,10 @@ async function firecrawlSearch(query, tbs, apiKey, retries = 2) {
         tbs,
         limit:          15,
         // markdown is required for the attribution gate — see firecrawl-tv.js.
-        scrapeOptions:  { formats: ["summary", "markdown"] },
+        scrapeOptions:  {
+          formats: ["summary", "markdown"],
+          ...(FIRECRAWL_MAX_AGE_MS > 0 ? { maxAge: FIRECRAWL_MAX_AGE_MS } : {}),
+        },
       }),
       signal: AbortSignal.timeout(120_000),
     });
@@ -101,7 +114,8 @@ async function fetchPrintCoverage(cfg, cb = () => {}) {
   const tbs = `cdr:1,cd_min:${toTbsDate(DATE_FROM)},cd_max:${toTbsDate(DATE_TO)}`;
   const out  = Object.fromEntries(ORGS.map(o => [o, []]));
 
-  for (const org of ORGS) {
+  cb(`  [firecrawl-print] searching ${ORGS.length} org(s), ${FIRECRAWL_CONCURRENCY} at a time...`);
+  await mapWithConcurrency(ORGS, FIRECRAWL_CONCURRENCY, async (org) => {
     const query = `"${org}" air quality`;
     cb(`  [firecrawl-print] ${org}: searching print outlets...`);
 
@@ -152,7 +166,7 @@ async function fetchPrintCoverage(cfg, cb = () => {}) {
     } catch (e) {
       cb(`  [firecrawl-print] ${org}: ${e.message}`, "warn");
     }
-  }
+  });
 
   return out;
 }

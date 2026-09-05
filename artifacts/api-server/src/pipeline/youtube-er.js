@@ -33,6 +33,12 @@
 
 const axios = require('axios');
 const APIdirect = require('./apidirect-collector'); // reused for parseDate() and isAQ() only — no API calls to APIdirect from this module
+const { mapWithConcurrency } = require('./firecrawl-common'); // ordered, non-throwing concurrency helper
+
+// How many orgs to resolve+scan in parallel. Each org is 2-4 YouTube Data API
+// calls; the API tolerates this fine and it turns a 16-org serial scan (~16×
+// round-trips) into ~4 waves. Quota is unchanged (same total calls).
+const YT_CONCURRENCY = Math.max(1, parseInt(process.env.YT_CONCURRENCY || '4', 10) || 4);
 
 const YT_AQ_BASE = ['air quality', 'air pollution', 'aqi', 'pm2.5', 'ncap', 'smog', 'clean air', 'particulate', 'emission', 'pollution'];
 
@@ -185,16 +191,13 @@ async function run(cfg, selectedOrgs, cb) {
   const aqKw = buildYtAqTerms(cfg.SCOPE_KEYWORDS);
   const dateRange = { from: APIdirect.parseDate(cfg.DATE_FROM), to: APIdirect.parseDate(cfg.DATE_TO) };
 
-  const orgResults = [];
-
-  for (const orgName of selectedOrgs) {
+  const settled = await mapWithConcurrency(selectedOrgs, YT_CONCURRENCY, async (orgName) => {
     cb?.(`  [YouTubeER] "${orgName}"...`);
     const orgHandle = ORG_HANDLES[orgName] || null;
 
     if (!orgHandle) {
       cb?.(`  [YouTubeER] ${orgName}: no YT handle configured — skipping`, 'warn');
-      orgResults.push({ org: orgName, ...EMPTY_RESULT, noHandle: true });
-      continue;
+      return { org: orgName, ...EMPTY_RESULT, noHandle: true };
     }
 
     // ── Step 1: resolve official channel + subscriber count ──────────────
@@ -203,13 +206,11 @@ async function run(cfg, selectedOrgs, cb) {
       channel = await resolveChannel(orgHandle, YOUTUBE_KEY);
     } catch (e) {
       const { failReason, failMessage } = classifyYtError(e, cb);
-      orgResults.push({ org: orgName, ...EMPTY_RESULT, failed: true, failReason, failMessage });
-      continue;
+      return { org: orgName, ...EMPTY_RESULT, failed: true, failReason, failMessage };
     }
     if (!channel) {
       cb?.(`  [YouTubeER] ${orgName}: could not resolve channel for handle ${orgHandle}`, 'warn');
-      orgResults.push({ org: orgName, ...EMPTY_RESULT, handleUnresolved: true });
-      continue;
+      return { org: orgName, ...EMPTY_RESULT, handleUnresolved: true };
     }
     cb?.(`  [YouTubeER] ${orgName}: resolved channel "${channel.channelTitle}" (${channel.subscribers.toLocaleString()} subscribers)`, 'ok');
 
@@ -219,8 +220,7 @@ async function run(cfg, selectedOrgs, cb) {
       ({ videos: discoveredVideos, truncated } = await discoverChannelVideos(channel.channelId, dateRange, YOUTUBE_KEY));
     } catch (e) {
       const { failReason, failMessage } = classifyYtError(e, cb);
-      orgResults.push({ org: orgName, ...EMPTY_RESULT, discovered: 0, failed: true, failReason, failMessage });
-      continue;
+      return { org: orgName, ...EMPTY_RESULT, discovered: 0, failed: true, failReason, failMessage };
     }
     if (truncated) {
       cb?.(`  [YouTubeER] ${orgName}: hit the ${MAX_SEARCH_PAGES}-page video-search cap while still inside the date window — org uploads frequently, older in-range videos may exist beyond this cap`, 'warn');
@@ -235,8 +235,7 @@ async function run(cfg, selectedOrgs, cb) {
         ? 'no videos found on this channel within the report date window'
         : `${discoveredCount} video(s) found in the date window but none matched the AQ keywords — zero is genuine`;
       cb?.(`  [YouTubeER] ${orgName}: 0 videos — ${diag}`, 'warn');
-      orgResults.push({ org: orgName, ...EMPTY_RESULT, discovered: discoveredCount, truncated });
-      continue;
+      return { org: orgName, ...EMPTY_RESULT, discovered: discoveredCount, truncated };
     }
 
     // ── Step 4: per-video stats (views/likes/comments) ────────────────────
@@ -294,15 +293,23 @@ async function run(cfg, selectedOrgs, cb) {
 
     cb?.(`  [YouTubeER] ${orgName}: ${videos.length} AQ videos in window | avgER=${avgER}% (${erMethod}) | views=${totalViews.toLocaleString()}`, videos.length > 0 ? 'ok' : 'warn');
 
-    orgResults.push({
+    return {
       org: orgName,
       videos, videoCount: videos.length,
       avgER, avgViewER, erMethod,
       totalViews, totalLikes, totalComments,
       discovered: discoveredCount, truncated,
       failed: statsFailed, failReason: statsFailed ? statsFailReason : null, failMessage: statsFailed ? statsFailMessage : null,
-    });
-  }
+    };
+  });
+
+  // Unwrap ordered settlements — a thrown org (should be rare; inner steps catch
+  // their own errors) becomes a failed row rather than aborting the batch.
+  const orgResults = settled.map((r, i) =>
+    r.status === 'fulfilled'
+      ? r.value
+      : { org: selectedOrgs[i], ...EMPTY_RESULT, failed: true, failReason: 'exception', failMessage: r.reason?.message || String(r.reason) },
+  );
 
   // Rank by avgER (subscriber-based), then avgViewER, then videoCount
   orgResults.sort((a, b) =>
