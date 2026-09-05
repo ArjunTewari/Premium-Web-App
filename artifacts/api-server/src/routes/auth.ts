@@ -1,35 +1,14 @@
 import { Router, type Request, type Response } from "express";
-import { createRequire } from "node:module";
 import bcrypt from "bcryptjs";
-import qrcode from "qrcode";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import {
   signFullToken,
-  signPendingToken,
-  verifyToken,
   COOKIE_NAME,
   COOKIE_PENDING,
   COOKIE_OPTS,
-  PENDING_COOKIE_OPTS,
 } from "../lib/auth.js";
 import { requireAuth } from "../middleware/require-auth.js";
-
-const _require = createRequire(import.meta.url);
-const otplib = _require("otplib") as {
-  generateSecret: () => string;
-  generateURI: (opts: { strategy: string; issuer: string; label: string; secret: string }) => string;
-  verify: (opts: { strategy: string; token: string; secret: string }) => Promise<boolean>;
-};
-
-// Convenience wrappers matching the old authenticator API shape
-const authenticator = {
-  generateSecret: (): string => otplib.generateSecret(),
-  keyuri: (label: string, issuer: string, secret: string): string =>
-    otplib.generateURI({ strategy: "totp", issuer, label, secret }),
-  verify: (opts: { token: string; secret: string }): Promise<boolean> =>
-    otplib.verify({ strategy: "totp", token: opts.token, secret: opts.secret }),
-};
 
 const router = Router();
 
@@ -49,21 +28,14 @@ router.post("/auth/login", async (req: Request, res: Response) => {
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) return res.status(401).json({ error: "Invalid credentials" });
 
-  const pendingPayload = {
+  const fullToken = signFullToken({
     userId: user.id,
     username: user.username,
     role: user.role,
-  };
-
-  if (!user.totpEnabled) {
-    const pending = signPendingToken(pendingPayload);
-    res.cookie(COOKIE_PENDING, pending, PENDING_COOKIE_OPTS);
-    return res.json({ status: "2fa_setup_required" });
-  }
-
-  const pending = signPendingToken(pendingPayload);
-  res.cookie(COOKIE_PENDING, pending, PENDING_COOKIE_OPTS);
-  return res.json({ status: "2fa_required" });
+  });
+  res.clearCookie(COOKIE_PENDING);
+  res.cookie(COOKIE_NAME, fullToken, COOKIE_OPTS);
+  return res.json({ status: "ok", user: { username: user.username, role: user.role } });
 });
 
 router.post("/auth/signup", async (req: Request, res: Response) => {
@@ -89,102 +61,14 @@ router.post("/auth/signup", async (req: Request, res: Response) => {
     .values({ username, passwordHash: hash, role: "user", totpEnabled: false })
     .returning();
 
-  const pendingPayload = { userId: newUser.id, username: newUser.username, role: newUser.role };
-  const pending = signPendingToken(pendingPayload);
-  res.cookie(COOKIE_PENDING, pending, PENDING_COOKIE_OPTS);
-  return res.json({ status: "2fa_setup_required" });
-});
-
-router.post("/auth/verify-totp", async (req: Request, res: Response) => {
-  const { token } = req.body || {};
-  if (!token) return res.status(400).json({ error: "TOTP token required" });
-
-  const pendingToken = req.cookies?.[COOKIE_PENDING];
-  if (!pendingToken) return res.status(401).json({ error: "No pending auth" });
-
-  const payload = verifyToken(pendingToken);
-  if (!payload || payload.stage !== "pending")
-    return res.status(401).json({ error: "Invalid or expired session" });
-
-  const [user] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.id, payload.userId))
-    .limit(1);
-
-  if (!user || !user.totpSecret)
-    return res.status(401).json({ error: "2FA not configured" });
-
-  const isValid = await authenticator.verify({ token: String(token), secret: user.totpSecret });
-
-  if (!isValid) return res.status(401).json({ error: "Invalid TOTP code" });
-
   const fullToken = signFullToken({
-    userId: user.id,
-    username: user.username,
-    role: user.role,
+    userId: newUser.id,
+    username: newUser.username,
+    role: newUser.role,
   });
   res.clearCookie(COOKIE_PENDING);
   res.cookie(COOKIE_NAME, fullToken, COOKIE_OPTS);
-  return res.json({ status: "ok", user: { username: user.username, role: user.role } });
-});
-
-router.get("/auth/totp-setup", async (req: Request, res: Response) => {
-  const pendingToken = req.cookies?.[COOKIE_PENDING];
-  if (!pendingToken) return res.status(401).json({ error: "No pending auth" });
-
-  const payload = verifyToken(pendingToken);
-  if (!payload || payload.stage !== "pending")
-    return res.status(401).json({ error: "Invalid or expired session" });
-
-  const secret = authenticator.generateSecret();
-  const otpauth = authenticator.keyuri(payload.username, "Emerald AI", secret);
-  const qrDataUrl = await qrcode.toDataURL(otpauth);
-
-  await db
-    .update(usersTable)
-    .set({ totpSecret: secret })
-    .where(eq(usersTable.id, payload.userId));
-
-  return res.json({ secret, qrDataUrl });
-});
-
-router.post("/auth/totp-confirm", async (req: Request, res: Response) => {
-  const { token } = req.body || {};
-  if (!token) return res.status(400).json({ error: "TOTP token required" });
-
-  const pendingToken = req.cookies?.[COOKIE_PENDING];
-  if (!pendingToken) return res.status(401).json({ error: "No pending auth" });
-
-  const payload = verifyToken(pendingToken);
-  if (!payload || payload.stage !== "pending")
-    return res.status(401).json({ error: "Invalid or expired session" });
-
-  const [user] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.id, payload.userId))
-    .limit(1);
-
-  if (!user || !user.totpSecret)
-    return res.status(400).json({ error: "TOTP secret not generated yet" });
-
-  const isValid = await authenticator.verify({ token: String(token), secret: user.totpSecret });
-  if (!isValid) return res.status(401).json({ error: "Invalid TOTP code" });
-
-  await db
-    .update(usersTable)
-    .set({ totpEnabled: true })
-    .where(eq(usersTable.id, payload.userId));
-
-  const fullToken = signFullToken({
-    userId: user.id,
-    username: user.username,
-    role: user.role,
-  });
-  res.clearCookie(COOKIE_PENDING);
-  res.cookie(COOKIE_NAME, fullToken, COOKIE_OPTS);
-  return res.json({ status: "ok", user: { username: user.username, role: user.role } });
+  return res.json({ status: "ok", user: { username: newUser.username, role: newUser.role } });
 });
 
 router.post("/auth/logout", (_req: Request, res: Response) => {
