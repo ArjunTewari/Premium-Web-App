@@ -40,7 +40,7 @@ Required:
 | Var | Notes |
 |---|---|
 | `NODE_ENV` | `production` |
-| `DATABASE_URL` | Postgres. Add a Railway Postgres and reference `${{Postgres.DATABASE_URL}}`, or paste the existing external URL. |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — references the Railway Postgres service in the same project. (Or paste an external Postgres URL.) |
 | `JWT_SECRET` | any long random string — **required in production** (`lib/auth.ts` throws without it) |
 | `SERPER_KEY` | |
 | `CLAUDE_KEY` | |
@@ -50,8 +50,10 @@ Used when present (report sections degrade gracefully if missing):
 `OPENAI_KEY`, `PERPLEXITY_KEY`, `GEMINI_KEY`, `YOUTUBE_KEY`, `X_BEARER_TOKEN`,
 `APIDIRECT_KEY`, `META_ACCESS_TOKEN`, `IG_BUSINESS_ACCOUNT_ID`.
 
-Admin seed (first deploy only): `SEED_ADMIN=true` + `ADMIN_INITIAL_PASSWORD=...`
-then remove both after the admin user exists.
+Admin seed (first deploy against an **empty** database): set
+`SEED_ADMIN=true` + `ADMIN_INITIAL_PASSWORD=<pick one>`. On boot the server
+creates its tables (`src/lib/ensure-schema.ts`) and then inserts the `admin`
+user. Remove both vars once you've logged in and changed the password.
 
 Performance tuning (optional — sensible defaults baked in):
 | Var | Default | Effect |
@@ -77,10 +79,19 @@ also logs each run to Postgres, so metadata is safe regardless.)
 3. Point any existing DNS / bookmarks at the Railway domain. The Vercel project
    can be paused once traffic is cut over.
 
+## Schema bootstrap
+
+There is **no separate migration step**. `src/index.ts` calls `ensureSchema()`
+before the server accepts traffic — plain `CREATE TABLE IF NOT EXISTS`, a no-op
+on an existing database. A real schema *change* later still goes through
+`pnpm --filter @workspace/db run push` against the database; `drizzle` stays the
+source of truth (`lib/db/src/schema/index.ts`), and `ensure-schema.ts` mirrors it.
+
 ## Note on the pre-existing Railway project
 
-`agile-enthusiasm` already contains 5 auto-imported workspace services, all in
-`FAILED` state (build command `pnpm --filter @workspace/api-server build` with no
-frontend build and no env vars). Reconfigure **`@workspace/api-server`** with the
-commands above (it's already linked to the GitHub repo) and ignore/delete the
-other four.
+`agile-enthusiasm` (project `6df68010-8e7a-4773-a6a5-1300cba2fbab`) is already set
+up: the **`@workspace/api-server`** service (`aace5646-…`) has the build/start/
+healthcheck config above and domain
+`workspaceapi-server-production-79c5.up.railway.app`, and a **`Postgres`** service
+(`ed62e6bd-…`) is provisioned with a managed volume. The 4 other auto-imported
+workspace services are all `FAILED` — ignore or delete them.
