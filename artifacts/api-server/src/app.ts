@@ -7,7 +7,6 @@ import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
-import { seedAdminIfNeeded } from "./lib/seed.js";
 
 const app: Express = express();
 
@@ -71,7 +70,5 @@ if (fs.existsSync(WEB_INDEX)) {
 } else {
   logger.warn({ WEB_INDEX }, "No static frontend bundle found — serving API only");
 }
-
-seedAdminIfNeeded();
 
 export default app;
