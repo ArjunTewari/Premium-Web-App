@@ -635,7 +635,7 @@ export default function Home() {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
 
-      // Remove Action Matrix and Executive Summary from commercial version
+      // Remove Action Matrix and Executive Summary from the Client View version
       doc.getElementById("actions")?.remove();
       doc.getElementById("exec")?.remove();
 
@@ -1415,20 +1415,20 @@ export default function Home() {
               )}
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              {/* Commercial report (strips Action Matrix) */}
+              {/* Client View report (strips Action Matrix) */}
               <button
                 onClick={() => downloadClientReport(result.htmlName)}
                 style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.green, color: C.bg, fontFamily: "'Space Grotesk', sans-serif", border: "none" }}
-              >⬇ Commercial</button>
-              {/* Personal report (includes Action Matrix) */}
+              >⬇ Client View</button>
+              {/* Restricted report (includes Action Matrix) */}
               <a
                 href={`/api/download/${encodeURIComponent(result.htmlName)}`}
-                download={result.htmlName}
+                download={result.htmlName.replace(/\.html$/i, "-restricted.html")}
                 style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: "rgba(76,175,116,.15)", color: C.green, border: `1px solid rgba(76,175,116,.35)`, fontFamily: "'Space Grotesk', sans-serif" }}
-              >⬇ Personal</a>
+              >⬇ Restricted</a>
             </div>
             <div style={{ fontSize: 10, color: C.muted, marginTop: 8, fontFamily: "'DM Mono', monospace" }}>
-              Commercial excludes AI Executive Summary &amp; Action Matrix · Personal includes everything
+              Client View excludes AI Executive Summary &amp; Action Matrix · Restricted includes everything
             </div>
           </div>
         )}
@@ -1497,11 +1497,11 @@ export default function Home() {
                               fontSize: 18, fontWeight: 600, cursor: "pointer",
                               fontFamily: "'Space Grotesk', sans-serif",
                             }}
-                          >⬇ Commercial</button>
+                          >⬇ Client View</button>
                         )}
                         <a
                           href={`/api/download/${encodeURIComponent(f.name)}`}
-                          download={f.name}
+                          download={f.name.replace(/\.html$/i, "-restricted.html")}
                           style={{
                             padding: "7px 14px", borderRadius: 8,
                             background: "rgba(201,146,42,.12)", color: C.gold,
@@ -1509,7 +1509,7 @@ export default function Home() {
                             fontSize: 18, fontWeight: 600, textDecoration: "none",
                             fontFamily: "'Space Grotesk', sans-serif",
                           }}
-                        >⬇ Personal</a>
+                        >⬇ Restricted</a>
                       </div>
                     </div>
                   ))}
