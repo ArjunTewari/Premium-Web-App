@@ -55,3 +55,18 @@ export const reportLogsTable = pgTable("report_logs", {
 });
 
 export type ReportLog = typeof reportLogsTable.$inferSelect;
+
+// Shared, org-keyed social handles. One global list, readable and editable by
+// every signed-in account — a report run reads the current rows so every
+// account always uses the latest handles. Seeded once on first boot.
+export const orgHandlesTable = pgTable("org_handles", {
+  org: text("org").primaryKey(),
+  linkedin: text("linkedin").notNull().default(""),
+  twitter: text("twitter").notNull().default(""),
+  instagram: text("instagram").notNull().default(""),
+  youtube: text("youtube").notNull().default(""),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: text("updated_by"),
+});
+
+export type OrgHandle = typeof orgHandlesTable.$inferSelect;
