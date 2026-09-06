@@ -18,25 +18,17 @@
 // orgMentioned() below is the gate that fixes it.
 
 // ── AQ keyword taxonomy (single source of truth for TV and print) ────────────
+// These are the 21 categories of the Topic Ownership Map. The gate was briefly
+// widened to ~51 terms (adding broad ones like "air pollution", "smog", "aqi"),
+// which let in loosely-related environment stories and inflated the counts.
+// Back to the 21 specific AQ concepts — an article must be about one of these
+// to count as coverage.
 const AQ_KEYWORDS = [
-  // Original taxonomy
   "ncap", "pm2.5", "exposure mapping", "stubble burn", "clean air finance",
   "vehicular pollution", "health impact", "industrial pollution", "heat-aqi",
   "brick kiln", "petrol emission", "diesel emission", "super emitter",
   "thermal power", "household pollution", "indoor pollution", "biomass",
   "rice residue", "wheat residue", "road dust", "air quality",
-  // Pollutants & metrics
-  "pm10", "aqi", "smog", "air pollution", "particulate matter",
-  "nitrogen dioxide", "no2", "sulfur dioxide", "so2", "nox",
-  "ozone pollution", "black carbon", "fly ash",
-  // India-specific AQ mechanisms
-  "grap", "caqm", "odd-even", "bs6", "emission norms",
-  "smog tower", "dg set", "pollution hotspot",
-  // Burning sources
-  "paddy burning", "crop fire", "farm fire", "crop residue",
-  "open burning", "garbage burning", "waste burning", "firecracker",
-  // Weather-linked AQ
-  "dust storm",
 ];
 
 // ── Org aliases ──────────────────────────────────────────────────────────────
@@ -59,6 +51,10 @@ const ORG_ALIASES = {
   "EPIC India":                               ["EPIC", "Energy Policy Institute at the University of Chicago"],
   "Climate Trends":                           [],
   "Sustainable Futures Collaborative":        ["SFC"],
+  "CREA":                                     ["Centre for Research on Energy and Clean Air",
+                                               "Center for Research on Energy and Clean Air"],
+  "EnviroCatalysts":                          ["Envirocatalyst", "Enviro Catalysts", "Sunil Dahiya"],
+  "TERI":                                     ["The Energy and Resources Institute"],
 };
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
@@ -118,17 +114,20 @@ function articleText(item) {
  */
 function articleDate(item) {
   const m = item.metadata || {};
+  // ONLY genuine publish-date fields. Deliberately NOT `modifiedTime` /
+  // `m.date` / `dc.date` — for a re-crawled evergreen page those hold the
+  // crawl/last-edit date (often "today"), which made the pipeline's date-window
+  // filter drop every article as "in the future". When none of these are
+  // present the article is treated as undated and its date is recovered from
+  // the scraped body later (STEP 1c-date).
   return (
     item.date ||
     m.publishedTime ||
     m["article:published_time"] ||
+    m["article:published"] ||
     m.publishedDate ||
     m.datePublished ||
     m["og:published_time"] ||
-    m.date ||
-    m["dc.date"] ||
-    m.dcDate ||
-    m.modifiedTime ||
     ""
   );
 }

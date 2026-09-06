@@ -109,4 +109,18 @@ export const ORG_HANDLE_SEEDS: OrgHandleSeed[] = [
     instagram: "sustainablefuturescollab",
     youtube: "https://www.youtube.com/channel/UCZcWNjwTwQK48D7z8oWAKCA",
   },
+  {
+    org: "CREA",
+    linkedin: "centre-for-research-on-energy-and-clean-air",
+    twitter: "CREACleanAir",
+    instagram: "",
+    youtube: "",
+  },
+  {
+    org: "EnviroCatalysts",
+    linkedin: "envirocatalysts",
+    twitter: "",
+    instagram: "",
+    youtube: "",
+  },
 ];

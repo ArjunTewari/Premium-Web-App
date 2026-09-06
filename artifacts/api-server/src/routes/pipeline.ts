@@ -99,7 +99,7 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     OPENAI_KEY: body.openaiKey || process.env.OPENAI_KEY || "",
     PERPLEXITY_KEY: body.perplexityKey || process.env.PERPLEXITY_KEY || "",
     GEMINI_KEY: body.geminiKey || process.env.GEMINI_KEY || "",
-    FIRECRAWL_KEY: process.env.FIRECRAWL_KEY || "",
+    EXA_API_KEY: process.env.EXA_API_KEY || "",
     YOUTUBE_KEY: process.env.YOUTUBE_KEY || "",
     TWITTER_KEY: process.env.X_BEARER_TOKEN || "",
     APIDIRECT_KEY: process.env.APIDIRECT_KEY || "",
@@ -144,12 +144,10 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   mergeOverride(cfg.ORG_IG_HANDLES, body.orgIgHandles);
   mergeOverride(cfg.ORG_LI_HANDLES, body.orgLiHandles);
 
-  // Firecrawl is the primary source for print + TV coverage. Serper is now only
-  // a best-effort article-text scraper (STEP 1c) and the white-space gap search
-  // (STEP 5a); both degrade gracefully to Firecrawl summaries / an empty gap
-  // section when SERPER_KEY is absent, so it is optional.
-  if (!cfg.FIRECRAWL_KEY)
-    return res.status(400).json({ error: "Firecrawl API key is required." });
+  // Article discovery is Exa-only (corpus-first). The legacy per-org
+  // Firecrawl/Serper search path has been removed.
+  if (!cfg.EXA_API_KEY)
+    return res.status(400).json({ error: "EXA_API_KEY is required for article discovery." });
   if (!cfg.CLAUDE_KEY)
     return res.status(400).json({ error: "Claude API key is required." });
 

@@ -42,9 +42,14 @@ Required:
 | `NODE_ENV` | `production` |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — references the Railway Postgres service in the same project. (Or paste an external Postgres URL.) |
 | `JWT_SECRET` | any long random string — **required in production** (`lib/auth.ts` throws without it) |
-| `SERPER_KEY` | |
 | `CLAUDE_KEY` | |
-| `FIRECRAWL_KEY` | |
+| `EXA_API_KEY` | **article discovery** — from dashboard.exa.ai. Required. |
+
+Article discovery is **Exa-only** (corpus-first): one Exa `/search` per keyword
+cluster over the fixed outlet list + published-date window, each article assigned
+to the tracked orgs it names, articles naming none feeding Emerging Narratives.
+The legacy per-org Firecrawl/Serper search path was removed — `DISCOVERY`,
+`FIRECRAWL_KEY`, and `SERPER_KEY` no longer do anything.
 
 Used when present (report sections degrade gracefully if missing):
 `OPENAI_KEY`, `PERPLEXITY_KEY`, `GEMINI_KEY`, `YOUTUBE_KEY`, `X_BEARER_TOKEN`,
@@ -52,14 +57,21 @@ Used when present (report sections degrade gracefully if missing):
 
 Report cost emails (per generated report — admin gets the real API cost + client
 billing; the generating account gets its client-cost email at the address it
-entered at signup). Gmail SMTP:
+entered at signup).
+
+**Railway blocks outbound SMTP (ports 25/465/587)**, so Gmail via nodemailer
+times out. Use Resend (HTTPS):
 | Var | Notes |
 |---|---|
-| `EMAIL_USER` | Gmail address that sends the mail |
-| `EMAIL_PASS` | a Gmail **app password** for that account (not the login password) |
+| `RESEND_API_KEY` | from resend.com (free tier: 100/day). Preferred — sends over HTTPS. |
+| `EMAIL_FROM` | sender address. Use `onboarding@resend.dev` to start; switch to an address on a domain you've verified in Resend for real delivery. |
 
-Without these two, report generation still works — the emails are just skipped
-(a warning is logged). The admin recipient is hardcoded to
+SMTP still works as a fallback where the host allows it: set `EMAIL_USER` +
+`EMAIL_PASS` (a Gmail **app password**), optionally `EMAIL_HOST` / `EMAIL_PORT`
+(defaults `smtp.gmail.com` / `465`). Resend is tried first when its key is set.
+
+Without any transport configured, report generation still works — the emails
+are just skipped (a warning is logged). The admin recipient is hardcoded to
 `arjuntewari0505@gmail.com` in `src/lib/mailer.ts`.
 
 Admin seed (first deploy against an **empty** database): set
@@ -70,8 +82,6 @@ user. Remove both vars once you've logged in and changed the password.
 Performance tuning (optional — sensible defaults baked in):
 | Var | Default | Effect |
 |---|---|---|
-| `FIRECRAWL_CONCURRENCY` | `5` | Per-org Firecrawl searches in flight (print + TV steps) |
-| `FIRECRAWL_MAX_AGE_MS` | `172800000` (2 days) | Serve cached page scrapes this fresh — big win on re-runs; set `0` to disable |
 | `YT_CONCURRENCY` | `4` | Orgs scanned in parallel in the YouTube ER step |
 
 Railway injects `PORT` at runtime; `src/index.ts` reads it.
