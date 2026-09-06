@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { ensureSchema } from "./lib/ensure-schema.js";
 import { seedAdminIfNeeded } from "./lib/seed.js";
+import { seedSampleReports } from "./lib/seed-sample-reports.js";
 
 const rawPort = process.env["PORT"];
 
@@ -27,6 +28,10 @@ try {
   logger.error({ err }, "Startup database bootstrap failed");
   process.exit(1);
 }
+
+// Copy the curated sample report(s) into outputs/ so every account's Reports
+// tab has one to open. Non-fatal — the app runs fine without it.
+seedSampleReports();
 
 app.listen(port, (err) => {
   if (err) {
