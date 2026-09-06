@@ -522,6 +522,32 @@ export default function Home() {
     } catch { /* offline — local state still updated */ }
   }
 
+  // Delete one org from the shared table (e.g. a mistyped name), then refetch
+  // so the row disappears for every account. Local working state is pruned too
+  // so "Save Handles" can't re-add it.
+  function removeHandleOrg(org: string) {
+    withConfirm(
+      `Remove "${org}" from the shared handle list?\n\nThis deletes the row for every account.`,
+      async () => {
+        try {
+          await fetch(`/api/handles/${encodeURIComponent(org)}`, {
+            method: "DELETE",
+            credentials: "include",
+          });
+        } catch { /* offline — still prune locally */ }
+        setOrgHandleOverrides((prev) => {
+          const next = { ...prev };
+          delete next[org];
+          return next;
+        });
+        setHandleOrgList((prev) => prev.filter((o) => o !== org));
+        setCustomOrgs((prev) => prev.filter((o) => o.name !== org));
+        setSelectedOrgs((prev) => prev.filter((o) => o !== org));
+        await refreshHandles();
+      },
+    );
+  }
+
   function addCustomOrg() {
     const val = orgCustomInput.trim();
     const handle = orgYtHandleInput.trim();
@@ -1576,8 +1602,13 @@ export default function Home() {
                   return (
                     <div key={org} style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)", gap: 0, background: rowBg, borderBottom: `1px solid var(--border-col)` }}>
                       {/* Org name */}
-                      <div style={{ padding: "10px 16px", display: "flex", alignItems: "center" }}>
+                      <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                         <span style={{ fontSize: 12, fontFamily: "'Space Grotesk', sans-serif", color: C.text }}>{org}</span>
+                        <button
+                          onClick={() => removeHandleOrg(org)}
+                          title={`Remove ${org} from the shared list`}
+                          style={{ background: "transparent", border: "none", color: C.muted, cursor: "pointer", fontSize: 15, lineHeight: 1, padding: "0 2px", opacity: 0.5, flexShrink: 0 }}
+                        >×</button>
                       </div>
                       {/* LinkedIn */}
                       <div style={{ padding: "10px 10px" }}>
