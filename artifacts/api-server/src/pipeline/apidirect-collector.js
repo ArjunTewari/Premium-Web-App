@@ -146,6 +146,13 @@ function isAQ(text, aqKw) {
 const START_CONCURRENCY = 2;
 const MIN_CONCURRENCY = 1;
 const RATE_RETRY_DELAYS = [1500, 4000, 8000]; // backoff on 429 before giving up
+// Non-429 transient failures — request timeouts, dropped sockets, 5xx — get their
+// own short backoff retries. APIdirect's Instagram/LinkedIn scrapers occasionally
+// blow past the per-request ceiling or reset the connection mid-response; one or
+// two retries clears almost all of these, and it's the difference between an org
+// showing real numbers and an "unavailable" cell. 429s keep the throttle-down
+// path above (retrying those without backing off just burns quota).
+const TRANSIENT_RETRY_DELAYS = [2000, 5000];
 const endpointGates = new Map(); // endpoint -> { active, limit, queue }
 
 let _log = null;
@@ -182,8 +189,13 @@ function throttleDown(endpoint) {
   }
 }
 
-async function apiFetch(endpoint, params, apiKey) {
+async function apiFetch(endpoint, params, apiKey, opts = {}) {
   const url = `${BASE}/${endpoint}`;
+  // Per-request ceiling. Defaults to 30s; callers raise it for known-slow
+  // endpoints (instagram/user/posts pulling several pages in one shot). Covers
+  // only the HTTP call — gate-queue waiting happens before axios starts, so it
+  // isn't counted here.
+  const timeout = opts.timeout || 30000;
   await acquireGate(endpoint);
   try {
     for (let attempt = 0; ; attempt++) {
@@ -191,10 +203,7 @@ async function apiFetch(endpoint, params, apiKey) {
         const { data } = await axios.get(url, {
           params,
           headers: { 'X-API-Key': apiKey },
-          // Generous per-request ceiling: under adaptive serial throttling the
-          // API can be slower to respond. Note this covers only the HTTP call —
-          // gate-queue waiting happens before axios starts, so it isn't counted.
-          timeout: 30000,
+          timeout,
         });
         costTracker.apidirectCalls++;
         return data;
@@ -205,6 +214,18 @@ async function apiFetch(endpoint, params, apiKey) {
           throttleDown(endpoint); // adapt globally, not just retry this one call
           if (attempt < RATE_RETRY_DELAYS.length) {
             await new Promise(r => setTimeout(r, RATE_RETRY_DELAYS[attempt]));
+            continue;
+          }
+        } else {
+          // Retry timeouts / dropped sockets / 5xx a couple of times before
+          // giving up — these are transient and usually clear on the next try.
+          const isTimeout = e.code === 'ECONNABORTED' || /timeout|timed out/i.test(msg);
+          const isNet = ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'EAI_AGAIN', 'ENOTFOUND', 'EPIPE'].includes(e.code);
+          const is5xx = typeof status === 'number' && status >= 500 && status <= 599;
+          if ((isTimeout || isNet || is5xx) && attempt < TRANSIENT_RETRY_DELAYS.length) {
+            const wait = TRANSIENT_RETRY_DELAYS[attempt];
+            _log?.(`  [APIdirect] /${endpoint} ${status || e.code || 'timeout'} — retry ${attempt + 1}/${TRANSIENT_RETRY_DELAYS.length} in ${wait}ms`, 'warn');
+            await new Promise(r => setTimeout(r, wait));
             continue;
           }
         }
@@ -494,6 +515,35 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
 // fetches that many pages (12 posts each, up to 120) in ONE call from the
 // start, so there's no cheaper way to "paginate until old enough" than
 // requesting the max in a single shot and checking how far back it reaches.
+//
+// The catch: requesting all 10 pages (120 posts) at once is the single slowest
+// APIdirect call in the pipeline — it's the one that times out. So we ask for
+// IG_FIRST_PAGES first (enough posts to cover a normal quarter of activity for
+// nearly every org) under a longer-than-default ceiling, and only escalate to
+// the 10-page max when that smaller pull hit its cap AND still hadn't reached
+// the start of the report window.
+const IG_FIRST_PAGES   = parseInt(process.env.IG_FIRST_PAGES  || '6', 10);   // 72 posts
+const IG_MAX_PAGES     = 10;                                                  // API ceiling — 120 posts
+const IG_POSTS_TIMEOUT = parseInt(process.env.IG_POSTS_TIMEOUT || '75000', 10);
+
+async function fetchInstagramPosts(org, handle, apiKey, dateRange, cb) {
+  let pages = Math.min(Math.max(IG_FIRST_PAGES, 1), IG_MAX_PAGES);
+  let data  = await apiFetch('instagram/user/posts', { username: handle, pages }, apiKey, { timeout: IG_POSTS_TIMEOUT });
+  let posts = data?.posts || [];
+  let hitCeiling = posts.length >= pages * 12;
+  let oldest = oldestInBatch(posts, 'date');
+
+  const needMore = hitCeiling && pages < IG_MAX_PAGES && !!dateRange?.from && (!oldest || oldest >= dateRange.from);
+  if (needMore) {
+    cb?.(`  [APIdirect/IG] ${org}: ${pages * 12} posts still inside the window — escalating to ${IG_MAX_PAGES} pages`, 'warn');
+    pages = IG_MAX_PAGES;
+    data  = await apiFetch('instagram/user/posts', { username: handle, pages }, apiKey, { timeout: IG_POSTS_TIMEOUT });
+    posts = data?.posts || [];
+    hitCeiling = posts.length >= pages * 12;
+  }
+  return { posts, reqPages: pages, hitCeiling };
+}
+
 async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
   const EMPTY = { postCount: 0, totalLikes: 0, totalComments: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
   if (!igHandle) {
@@ -501,10 +551,9 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
     return { ...EMPTY, noHandle: true };
   }
   const handle = igHandle.replace(/^@/, '').trim();
-  const MAX_PAGES = 10; // API ceiling — 120 posts, the most this endpoint can return in one call
   try {
     const [postsRes, userRes] = await Promise.allSettled([
-      apiFetch('instagram/user/posts', { username: handle, pages: MAX_PAGES }, apiKey),
+      fetchInstagramPosts(org, handle, apiKey, dateRange, cb),
       apiFetch('instagram/user', { username: handle }, apiKey),
     ]);
     const followers = (userRes.status === 'fulfilled' && userRes.value) ? (userRes.value?.user?.follower_count || 0) : 0;
@@ -517,16 +566,15 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
       return { ...EMPTY, followers, failed: true, failReason: e.code || require('./sentinel').classifyError(e), failMessage: e.message };
     }
 
-    const allPosts = postsRes.value?.posts || [];
+    const { posts: allPosts, reqPages, hitCeiling } = postsRes.value;
     const fetched = allPosts.length;
     const oldest = oldestInBatch(allPosts, 'date');
-    // Only a coverage gap if we hit the full 120-post ceiling AND still
+    // Only a coverage gap if we hit the requested-page ceiling AND still
     // hadn't reached back before the report window — if the account has
     // fewer posts than the ceiling, we've genuinely seen its entire history.
-    const hitCeiling = fetched >= MAX_PAGES * 12;
     const truncated = hitCeiling && !!dateRange?.from && (!oldest || oldest >= dateRange.from);
     if (truncated) {
-      cb?.(`  [APIdirect/IG] ${org}: hit the ${MAX_PAGES}-page/${MAX_PAGES * 12}-post ceiling while still inside the date window — org posts frequently, older in-range posts may exist beyond this cap`, 'warn');
+      cb?.(`  [APIdirect/IG] ${org}: hit the ${reqPages}-page/${reqPages * 12}-post ceiling while still inside the date window — org posts frequently, older in-range posts may exist beyond this cap`, 'warn');
     }
 
     // 1) date range — no authorship filter needed, this is the account's own feed
