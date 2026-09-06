@@ -116,4 +116,11 @@ export const ORG_HANDLE_SEEDS: OrgHandleSeed[] = [
     instagram: "",
     youtube: "",
   },
+  {
+    org: "EnviroCatalysts",
+    linkedin: "envirocatalysts",
+    twitter: "",
+    instagram: "",
+    youtube: "",
+  },
 ];

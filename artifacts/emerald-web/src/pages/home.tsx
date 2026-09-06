@@ -36,6 +36,7 @@ const DEFAULT_ORGS = [
   "Climate Trends",
   "Sustainable Futures Collaborative",
   "CREA",
+  "EnviroCatalysts",
 ];
 
 // Verified live (2026-07-29): every channel ID resolved and its og:title checked
@@ -55,6 +56,7 @@ const ORG_YT_HANDLES: Record<string, string> = {
   "Climate Trends":                                   "https://www.youtube.com/channel/UCed9gfyM-3SAGIAYpvSz8ig",
   "Sustainable Futures Collaborative":                "https://www.youtube.com/channel/UCZcWNjwTwQK48D7z8oWAKCA",
   "CREA":                                             "",
+  "EnviroCatalysts":                                  "",  // no YouTube channel
 };
 
 // Verified live (2026-07-29): every handle resolved and its profile NAME checked
@@ -77,6 +79,10 @@ const ORG_TW_HANDLES: Record<string, string> = {
   "Climate Trends":                                   "ClimateTrendsIN",  // 2,731 flw
   "Sustainable Futures Collaborative":                "SFC_India",        // 2,396 flw
   "CREA":                                             "CREACleanAir",
+  // Org accounts @Envirocatalyst / @EnviroCatalysts both exist but have 0 posts /
+  // 0 followers. Founder Sunil Dahiya (@Sunil_S_Dahiya) is the active voice —
+  // left blank so the org row isn't fed his personal timeline.
+  "EnviroCatalysts":                                  "",
 };
 
 const ORG_IG_HANDLES: Record<string, string> = {
@@ -96,6 +102,7 @@ const ORG_IG_HANDLES: Record<string, string> = {
   "Climate Trends":                                   "climatetrendsin",
   "Sustainable Futures Collaborative":                "sustainablefuturescollab",
   "CREA":                                             "",
+  "EnviroCatalysts":                                  "",  // no Instagram account
 };
 
 // Every slug below was verified live (2026-07-29) by resolving the page and
@@ -125,6 +132,7 @@ const ORG_LI_HANDLES: Record<string, string> = {
   "Climate Trends":                                   "climatetrends",                                     // 9,733 flw
   "Sustainable Futures Collaborative":                "sustainable-futures-collaborative",                 // 14,235 flw
   "CREA":                                             "centre-for-research-on-energy-and-clean-air",
+  "EnviroCatalysts":                                  "envirocatalysts",                                   // envirocatalysts.com · ~2,000 flw
 };
 
 const DEFAULT_SCOPE = [
