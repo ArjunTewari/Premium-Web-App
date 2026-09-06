@@ -309,6 +309,11 @@ export default function Home() {
     return defaults;
   });
   const [handlesSaved, setHandlesSaved] = useState(false);
+  // The shared org list, loaded from the server (single source of truth for
+  // every account). Falls back to the compiled-in defaults until the fetch
+  // resolves / if the API is unreachable.
+  const [handleOrgList, setHandleOrgList] = useState<string[]>(DEFAULT_ORGS);
+  const [handlesSyncing, setHandlesSyncing] = useState(false);
 
   const [dateFrom, setDateFrom] = useState("2026-03-08");
   const [dateTo, setDateTo] = useState("2026-06-08");
@@ -368,7 +373,10 @@ export default function Home() {
     return "Processing data…";
   }
 
-  const allOrgs = [...DEFAULT_ORGS, ...customOrgs.map(o => o.name)];
+  const allOrgs = [
+    ...handleOrgList,
+    ...customOrgs.map(o => o.name).filter(n => !handleOrgList.includes(n)),
+  ];
   const orgCount = selectedOrgs.length;
 
   // Derived handle maps — read from orgHandleOverrides (user-editable)
@@ -402,13 +410,69 @@ export default function Home() {
 
   useEffect(() => { loadPrev(); }, [loadPrev]);
 
-  // Auto-save handles to localStorage whenever they change
+  // ── Shared org handles (server-backed) ────────────────────────────────────
+  // The org_handles table is the single source of truth: any account can edit
+  // it and every account sees the latest. Loaded on mount and whenever the
+  // Handles tab is opened, so edits made elsewhere show up without a reload.
+  type HandleRow = { org: string; linkedin: string; twitter: string; instagram: string; youtube: string };
+  const refreshHandles = useCallback(async () => {
+    try {
+      const res = await fetch("/api/handles", { credentials: "include" });
+      if (!res.ok) return;
+      const rows = (await res.json()) as HandleRow[];
+      if (!Array.isArray(rows) || rows.length === 0) return;
+      const map: Record<string, { twitter: string; instagram: string; youtube: string; linkedin: string }> = {};
+      for (const r of rows) {
+        map[r.org] = {
+          twitter: r.twitter || "",
+          instagram: r.instagram || "",
+          youtube: r.youtube || "",
+          linkedin: r.linkedin || "",
+        };
+      }
+      setHandleOrgList(rows.map((r) => r.org));
+      // Server values win; keep any local-only orgs the user just added.
+      setOrgHandleOverrides((prev) => ({ ...prev, ...map }));
+      try { localStorage.setItem("emerald_handles", JSON.stringify(map)); } catch {}
+    } catch {
+      /* offline — keep whatever's in state */
+    }
+  }, []);
+
+  useEffect(() => { refreshHandles(); }, [refreshHandles]);
+  useEffect(() => {
+    if (activeTab === "handles") refreshHandles();
+  }, [activeTab, refreshHandles]);
+
+  // Mirror handles to localStorage as an offline fallback (server is authoritative).
   useEffect(() => {
     try {
       localStorage.setItem("emerald_handles", JSON.stringify(orgHandleOverrides));
       localStorage.setItem("emerald_handles_version", String(HANDLES_DEFAULTS_VERSION));
     } catch {}
   }, [orgHandleOverrides]);
+
+  // Persist the full working set to the shared table (used by "Save Handles").
+  const saveHandlesToServer = useCallback(async () => {
+    setHandlesSyncing(true);
+    try {
+      const res = await fetch("/api/handles", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(orgHandleOverrides),
+      });
+      if (res.ok) {
+        await refreshHandles();
+        setHandlesSaved(true);
+        setTimeout(() => setHandlesSaved(false), 2200);
+      }
+    } catch {
+      /* leave the local copy; user can retry */
+    } finally {
+      setHandlesSyncing(false);
+    }
+  }, [orgHandleOverrides, refreshHandles]);
 
   useEffect(() => {
     if (logBoxRef.current) {
@@ -431,35 +495,49 @@ export default function Home() {
     setSelectedOrgs([]);
   }
 
+  // Upsert one org into the shared table, then refetch so the new/updated row
+  // is visible to every account.
+  async function putHandleOrg(org: string, h: { twitter: string; instagram: string; youtube: string; linkedin: string }) {
+    try {
+      await fetch(`/api/handles/${encodeURIComponent(org)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(h),
+      });
+      await refreshHandles();
+    } catch { /* offline — local state still updated */ }
+  }
+
   function addCustomOrg() {
     const val = orgCustomInput.trim();
     const handle = orgYtHandleInput.trim();
-    if (!val || DEFAULT_ORGS.includes(val) || customOrgs.some(o => o.name === val)) {
+    if (!val || allOrgs.includes(val)) {
       setOrgCustomInput(""); setOrgYtHandleInput(""); return;
     }
     setCustomOrgs((prev) => [...prev, { name: val, ytHandle: handle }]);
     setSelectedOrgs((prev) => [...prev, val]);
-    setOrgHandleOverrides(prev => ({ ...prev, [val]: { twitter: "", instagram: "", youtube: handle, linkedin: "" } }));
+    const h = { twitter: "", instagram: "", youtube: handle, linkedin: "" };
+    setOrgHandleOverrides(prev => ({ ...prev, [val]: h }));
+    void putHandleOrg(val, h);
     setOrgCustomInput(""); setOrgYtHandleInput("");
   }
 
   function addHandleOrg() {
     const val = hNewOrg.trim();
     if (!val) return;
-    const alreadyExists = DEFAULT_ORGS.includes(val) || customOrgs.some(o => o.name === val);
-    if (!alreadyExists) {
+    if (!allOrgs.includes(val)) {
       setCustomOrgs(prev => [...prev, { name: val, ytHandle: hNewYt.trim() }]);
       setSelectedOrgs(prev => [...prev, val]);
     }
-    setOrgHandleOverrides(prev => ({
-      ...prev,
-      [val]: {
-        twitter:   hNewTw.trim().replace(/^@/, ""),
-        instagram: hNewIg.trim().replace(/^@/, ""),
-        youtube:   hNewYt.trim(),
-        linkedin:  hNewLi.trim().replace(/^\/company\//i, ""),
-      },
-    }));
+    const h = {
+      twitter:   hNewTw.trim().replace(/^@/, ""),
+      instagram: hNewIg.trim().replace(/^@/, ""),
+      youtube:   hNewYt.trim(),
+      linkedin:  hNewLi.trim().replace(/^\/company\//i, ""),
+    };
+    setOrgHandleOverrides(prev => ({ ...prev, [val]: h }));
+    void putHandleOrg(val, h);
     setHNewOrg(""); setHNewTw(""); setHNewIg(""); setHNewYt(""); setHNewLi("");
   }
 
@@ -1414,27 +1492,38 @@ export default function Home() {
                   <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 32, fontWeight: 700, letterSpacing: "-.02em", color: C.textHi, margin: 0 }}>
                     Organisation Handles
                   </h2>
-                  <button
-                    onClick={() => {
-                      try { localStorage.setItem("emerald_handles", JSON.stringify(orgHandleOverrides)); } catch {}
-                      setHandlesSaved(true);
-                      setTimeout(() => setHandlesSaved(false), 2200);
-                    }}
-                    style={{
-                      flexShrink: 0,
-                      padding: "10px 22px", borderRadius: 9,
-                      background: handlesSaved ? "rgba(76,175,116,.15)" : "rgba(201,146,42,.15)",
-                      border: `1px solid ${handlesSaved ? "rgba(76,175,116,.4)" : "rgba(201,146,42,.35)"}`,
-                      color: handlesSaved ? C.green : C.gold,
-                      fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, fontWeight: 600,
-                      cursor: "pointer", transition: "all .3s",
-                    }}
-                  >
-                    {handlesSaved ? "✓ Saved" : "Save Handles"}
-                  </button>
+                  <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+                    <button
+                      onClick={() => refreshHandles()}
+                      disabled={handlesSyncing}
+                      style={{
+                        padding: "10px 16px", borderRadius: 9,
+                        background: "transparent", border: `1px solid ${C.border}`,
+                        color: C.muted, fontFamily: "'Space Grotesk', sans-serif",
+                        fontSize: 13, fontWeight: 600, cursor: "pointer",
+                      }}
+                    >
+                      ↻ Refresh
+                    </button>
+                    <button
+                      onClick={() => { void saveHandlesToServer(); }}
+                      disabled={handlesSyncing}
+                      style={{
+                        padding: "10px 22px", borderRadius: 9,
+                        background: handlesSaved ? "rgba(76,175,116,.15)" : "rgba(201,146,42,.15)",
+                        border: `1px solid ${handlesSaved ? "rgba(76,175,116,.4)" : "rgba(201,146,42,.35)"}`,
+                        color: handlesSaved ? C.green : C.gold,
+                        fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, fontWeight: 600,
+                        cursor: handlesSyncing ? "wait" : "pointer", transition: "all .3s",
+                      }}
+                    >
+                      {handlesSyncing ? "Saving…" : handlesSaved ? "✓ Saved for everyone" : "Save Handles"}
+                    </button>
+                  </div>
                 </div>
                 <p style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>
-                  Changes auto-save in your browser. Click Save Handles to confirm.
+                  This list is shared across all accounts. Save Handles writes your edits
+                  to the shared list; Refresh pulls the latest from other accounts.
                 </p>
               </div>
             </SlideUp>
@@ -1459,7 +1548,7 @@ export default function Home() {
                 </div>
 
                 {/* Rows — all orgs */}
-                {[...DEFAULT_ORGS, ...customOrgs.map(o => o.name)].map((org, i) => {
+                {allOrgs.map((org, i) => {
                   const ov = orgHandleOverrides[org] || { twitter: "", instagram: "", youtube: "", linkedin: "" };
                   const rowBg = i % 2 === 0 ? "transparent" : "var(--elevate-1)";
                   const cellSty: React.CSSProperties = {

@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db, reportLogsTable, usersTable } from "@workspace/db";
+import { db, reportLogsTable, usersTable, orgHandlesTable } from "@workspace/db";
 import { calculateClientBilling } from "../lib/auth.js";
 import { requireAuth } from "../middleware/require-auth.js";
 import { run } from "../pipeline/index.js";
@@ -103,14 +103,13 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     YOUTUBE_KEY: process.env.YOUTUBE_KEY || "",
     TWITTER_KEY: process.env.X_BEARER_TOKEN || "",
     APIDIRECT_KEY: process.env.APIDIRECT_KEY || "",
-    ORG_YT_HANDLES: (body.orgYtHandles && typeof body.orgYtHandles === "object" && !Array.isArray(body.orgYtHandles))
-      ? body.orgYtHandles : {},
-    ORG_TW_HANDLES: (body.orgTwHandles && typeof body.orgTwHandles === "object" && !Array.isArray(body.orgTwHandles))
-      ? body.orgTwHandles : {},
-    ORG_IG_HANDLES: (body.orgIgHandles && typeof body.orgIgHandles === "object" && !Array.isArray(body.orgIgHandles))
-      ? body.orgIgHandles : {},
-    ORG_LI_HANDLES: (body.orgLiHandles && typeof body.orgLiHandles === "object" && !Array.isArray(body.orgLiHandles))
-      ? body.orgLiHandles : {},
+    // Social handles come from the shared org_handles table below (the single
+    // source of truth every account edits). Any handle maps in the request body
+    // are treated as a per-run override, merged on top.
+    ORG_YT_HANDLES: {} as Record<string, string>,
+    ORG_TW_HANDLES: {} as Record<string, string>,
+    ORG_IG_HANDLES: {} as Record<string, string>,
+    ORG_LI_HANDLES: {} as Record<string, string>,
     X_BEARER_TOKEN: process.env.X_BEARER_TOKEN || "",
     META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN || "",
     IG_BUSINESS_ACCOUNT_ID: process.env.IG_BUSINESS_ACCOUNT_ID || "",
@@ -119,6 +118,31 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
 
   if (!cfg.ORGS.length) cfg.ORGS = ["Council on Energy, Environment and Water", "CSTEP"];
   if (cfg.ORGS.length > 20) cfg.ORGS = cfg.ORGS.slice(0, 20);
+
+  // Load the shared handle list (latest for every account), then layer any
+  // per-run overrides from the request body on top.
+  try {
+    const rows = await db.select().from(orgHandlesTable);
+    for (const r of rows) {
+      if (r.youtube) cfg.ORG_YT_HANDLES[r.org] = r.youtube;
+      if (r.twitter) cfg.ORG_TW_HANDLES[r.org] = r.twitter;
+      if (r.instagram) cfg.ORG_IG_HANDLES[r.org] = r.instagram;
+      if (r.linkedin) cfg.ORG_LI_HANDLES[r.org] = r.linkedin;
+    }
+  } catch (e) {
+    console.error("Failed to load org_handles — proceeding with body handles only:", e);
+  }
+  const mergeOverride = (target: Record<string, string>, src: unknown) => {
+    if (src && typeof src === "object" && !Array.isArray(src)) {
+      for (const [k, v] of Object.entries(src as Record<string, unknown>)) {
+        if (typeof v === "string" && v.trim()) target[k] = v.trim();
+      }
+    }
+  };
+  mergeOverride(cfg.ORG_YT_HANDLES, body.orgYtHandles);
+  mergeOverride(cfg.ORG_TW_HANDLES, body.orgTwHandles);
+  mergeOverride(cfg.ORG_IG_HANDLES, body.orgIgHandles);
+  mergeOverride(cfg.ORG_LI_HANDLES, body.orgLiHandles);
 
   // Firecrawl is the primary source for print + TV coverage. Serper is now only
   // a best-effort article-text scraper (STEP 1c) and the white-space gap search
