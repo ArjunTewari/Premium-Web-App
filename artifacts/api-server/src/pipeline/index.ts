@@ -20,6 +20,7 @@ export interface RunConfig {
   GEMINI_KEY?: string;
   YOUTUBE_KEY?: string;
   FIRECRAWL_KEY?: string;
+  EXA_API_KEY?: string;
   APIDIRECT_KEY?: string;
   ORG_YT_HANDLES?: Record<string, string>;
   ORG_TW_HANDLES?: Record<string, string>;

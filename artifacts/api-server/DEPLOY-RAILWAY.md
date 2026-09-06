@@ -42,9 +42,15 @@ Required:
 | `NODE_ENV` | `production` |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — references the Railway Postgres service in the same project. (Or paste an external Postgres URL.) |
 | `JWT_SECRET` | any long random string — **required in production** (`lib/auth.ts` throws without it) |
-| `SERPER_KEY` | |
 | `CLAUDE_KEY` | |
-| `FIRECRAWL_KEY` | |
+| `EXA_API_KEY` | **article discovery** — from dashboard.exa.ai. Required unless `DISCOVERY=firecrawl`. |
+
+Discovery engine:
+| Var | Notes |
+|---|---|
+| `DISCOVERY` | `exa` (default) — corpus-first: one Exa `/search` per keyword cluster over the outlet list + published-date window; assigns each article to the orgs it names; articles naming none feed Emerging Narratives. `firecrawl` — legacy per-org path (needs `FIRECRAWL_KEY`). |
+| `FIRECRAWL_KEY` | required only when `DISCOVERY=firecrawl` |
+| `SERPER_KEY` | optional; only used by the `firecrawl` path (article text + white-space queries) |
 
 Used when present (report sections degrade gracefully if missing):
 `OPENAI_KEY`, `PERPLEXITY_KEY`, `GEMINI_KEY`, `YOUTUBE_KEY`, `X_BEARER_TOKEN`,

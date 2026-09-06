@@ -51,6 +51,10 @@ const ORG_ALIASES = {
   "EPIC India":                               ["EPIC", "Energy Policy Institute at the University of Chicago"],
   "Climate Trends":                           [],
   "Sustainable Futures Collaborative":        ["SFC"],
+  "CREA":                                     ["Centre for Research on Energy and Clean Air",
+                                               "Center for Research on Energy and Clean Air"],
+  "EnviroCatalysts":                          ["Envirocatalyst", "Enviro Catalysts", "Sunil Dahiya"],
+  "TERI":                                     ["The Energy and Resources Institute"],
 };
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");

@@ -35,6 +35,7 @@ const DEFAULT_ORGS = [
   "Centre for Science and Environment",
   "Climate Trends",
   "Sustainable Futures Collaborative",
+  "CREA",
 ];
 
 // Verified live (2026-07-29): every channel ID resolved and its og:title checked
@@ -53,6 +54,7 @@ const ORG_YT_HANDLES: Record<string, string> = {
   "Centre for Science and Environment":               "https://www.youtube.com/channel/UCPUL9ZjjcobQ6XlgTo6Mr2g",
   "Climate Trends":                                   "https://www.youtube.com/channel/UCed9gfyM-3SAGIAYpvSz8ig",
   "Sustainable Futures Collaborative":                "https://www.youtube.com/channel/UCZcWNjwTwQK48D7z8oWAKCA",
+  "CREA":                                             "",
 };
 
 // Verified live (2026-07-29): every handle resolved and its profile NAME checked
@@ -74,6 +76,7 @@ const ORG_TW_HANDLES: Record<string, string> = {
   "EPIC India":                                       "EPIC_India",       // 3,110 flw
   "Climate Trends":                                   "ClimateTrendsIN",  // 2,731 flw
   "Sustainable Futures Collaborative":                "SFC_India",        // 2,396 flw
+  "CREA":                                             "CREACleanAir",
 };
 
 const ORG_IG_HANDLES: Record<string, string> = {
@@ -92,6 +95,7 @@ const ORG_IG_HANDLES: Record<string, string> = {
   // Was "climatrendsin" — typo, that handle does not exist.
   "Climate Trends":                                   "climatetrendsin",
   "Sustainable Futures Collaborative":                "sustainablefuturescollab",
+  "CREA":                                             "",
 };
 
 // Every slug below was verified live (2026-07-29) by resolving the page and
@@ -120,6 +124,7 @@ const ORG_LI_HANDLES: Record<string, string> = {
   "EPIC India":                                       "epic-india",                                        // epic.uchicago.in · 21,378 flw
   "Climate Trends":                                   "climatetrends",                                     // 9,733 flw
   "Sustainable Futures Collaborative":                "sustainable-futures-collaborative",                 // 14,235 flw
+  "CREA":                                             "centre-for-research-on-energy-and-clean-air",
 };
 
 const DEFAULT_SCOPE = [

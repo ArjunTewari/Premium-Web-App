@@ -27,6 +27,7 @@ const costTracker = {
   openaiCalls: 0,          // OpenAI gpt-4o-mini AEO probes       ($0.0003 each)
   geminiCalls: 0,          // Gemini flash AEO probes             (~free tier)
   claudeAeoCalls: 0,       // Claude Haiku AEO probes (~300 tok)  ($0.0006 each)
+  exaSearches: 0,          // Exa /search corpus queries (+text)  (~$0.04 each)
 };
 
 function extractJsonArray(raw) {
