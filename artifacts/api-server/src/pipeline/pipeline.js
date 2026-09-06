@@ -2707,7 +2707,11 @@ function momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations = []) 
     });
   });
 
-  // Deduplicated "Press" total — unique articles across all orgs
+  // Top row = DISTINCT articles across all orgs (dedup by url/title). This is
+  // deliberately not the sum of the per-org rows below: a single story naming
+  // several tracked orgs is one article here but one mention in each of their
+  // rows, so the org column always sums to >= this. The caption under the table
+  // spells that out, and §02a shows both figures side by side.
   const pressSeenKeys = new Set();
   const pressBuckets = weeks.map(() => 0);
   let pressTotal = 0;
@@ -2724,6 +2728,9 @@ function momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations = []) 
       if (d >= weeks[wi] && d < wEnd) { pressBuckets[wi]++; break; }
     }
   });
+  // Per-org mention total (org rows sum to this) — shown next to the distinct
+  // count so the two are never mistaken for a miscalculation.
+  const pressMentionTotal = ORGS.reduce((s, o) => s + (arts[o] || []).length, 0);
   const PRESS_COLOR = "8492a6";
 
   const maxCount = Math.max(...buckets.flat(), ...pressBuckets, 1);
@@ -2795,7 +2802,7 @@ function momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations = []) 
       ${wkHeaders}
     </tr></thead><tbody>
       <tr style="background:var(--surface2)">
-        <td style="padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1"><span style="font-family:monospace;font-size:16px;font-weight:700;color:#${PRESS_COLOR}">Press (all orgs)</span></td>
+        <td style="padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1"><span style="font-family:monospace;font-size:16px;font-weight:700;color:#${PRESS_COLOR}">All orgs &middot; distinct articles</span></td>
         <td style="padding:6px 12px;text-align:center;border-left:1px solid var(--border);border-bottom:1px solid var(--border);font-family:monospace;font-size:17px;font-weight:700;color:#${PRESS_COLOR}">${pressTotal}</td>
         ${pressRowCells}
       </tr>
@@ -2825,7 +2832,7 @@ ${spikeAnnotations.sort((a, b) => b.count - a.count).map((s) => {
 <div class="sd">Weekly AQ article volume per organisation over the report period. Spikes are identified and traced to triggering events.</div><div class="sdiv"></div></div>
 <div class="mch"><div style="margin-bottom:12px"><div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:4px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:16px;color:var(--muted);margin-bottom:12px">${esc(DATE_FROM)} to ${esc(DATE_TO)}</div></div>
 ${hmTable}
-<div style="font-size:15px;color:var(--muted);margin-top:8px">Click any cell to see article links for that week &middot; Orgs sorted by total coverage &middot; Spikes annotated below</div>
+<div style="font-size:15px;color:var(--muted);margin-top:8px">Top row = <strong>${pressTotal} distinct article${pressTotal === 1 ? "" : "s"}</strong>; the org rows count per-org mentions and sum to <strong>${pressMentionTotal}</strong> &mdash; a story naming several tracked orgs is one article but a mention for each. &middot; Click any cell for that week's links &middot; Orgs sorted by total coverage${spikeAnnotations.length ? " &middot; Spikes annotated below" : ""}</div>
 </div>${spikeCards}</section>`;
 }
 
@@ -2850,7 +2857,12 @@ function buildHTML(
 ) {
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
   const now = new Date().toUTCString();
+  // `tot` counts per-org mentions (a story naming N tracked orgs adds N).
+  // `distinctTot` counts unique article URLs across all orgs.
   const tot = ORGS.reduce((s, o) => s + (data[o]?.total || 0), 0);
+  const distinctTot = new Set(
+    ORGS.flatMap((o) => (arts[o] || []).map((a) => a.url || a.title)).filter(Boolean),
+  ).size;
   const printTot = ORGS.reduce((s, o) => s + PRINT_OUTLETS.reduce((ps, outlet) => ps + (data[o]?.outletCounts[outlet] || 0), 0), 0);
   const tvTot = ORGS.reduce((s, o) => s + ALL_TV_CHANNELS.reduce((ts, ch) => ts + (data[o]?.outletCounts[ch] || 0), 0), 0);
 
@@ -3667,8 +3679,8 @@ ${execAudit.issues.length
   Only articles where the organisation is mentioned in scraped body text and classified as AQ-primary by Claude are included.
 </div>
 </section>
-<section class="sec" id="sov"><div class="sh"><div class="se">Section 02a</div><h2 class="st">Press Analytics</h2><div class="sd">AQ article counts per org, deduplicated, date-filtered.</div><div class="sdiv"></div></div>
-<div class="mch"><div class="ch-hdr"><div style="font-size:18px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${tot} articles</div><div style="font-size:16px;color:var(--muted2);margin-top:3px">${printTot} Print / Online &middot; ${tvTot} TV News</div></div>
+<section class="sec" id="sov"><div class="sh"><div class="se">Section 02a</div><h2 class="st">Press Analytics</h2><div class="sd">Per-org AQ article counts, date-filtered. A story naming several tracked orgs counts once for each.</div><div class="sdiv"></div></div>
+<div class="mch"><div class="ch-hdr"><div style="font-size:18px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${distinctTot} article${distinctTot === 1 ? "" : "s"}${tot !== distinctTot ? ` &middot; ${tot} org mention${tot === 1 ? "" : "s"}` : ""}</div><div style="font-size:16px;color:var(--muted2);margin-top:3px">${printTot} Print / Online &middot; ${tvTot} TV News${tot !== distinctTot ? " (by mention)" : ""}</div></div>
 ${sovBar()}
 <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:16px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o, i) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join("")}</div>
 </div>
