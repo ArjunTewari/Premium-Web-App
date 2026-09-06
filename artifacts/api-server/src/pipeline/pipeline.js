@@ -1480,7 +1480,6 @@ async function buildPPTX(
   {
     const sl = pres.addSlide();
     darkBg(sl);
-    eyebrow(sl, "Section 01");
     stitle(sl, "Executive Summary");
     const findings =
       execF.length > 0
@@ -2585,7 +2584,6 @@ async function buildPPTX(
   {
     const sl = pres.addSlide();
     darkBg(sl);
-    eyebrow(sl, "Section 10");
     stitle(sl, "Action Matrix");
     const priColors = {
       "Fix Now": WARN,
@@ -2828,7 +2826,7 @@ ${spikeAnnotations.sort((a, b) => b.count - a.count).map((s) => {
     : "";
 
   return `
-<section class="sec" id="momentum"><div class="sh"><div class="se">Section 02c</div><h2 class="st">Coverage Momentum</h2>
+<section class="sec" id="momentum"><div class="sh"><div class="se">Section 01c</div><h2 class="st">Coverage Momentum</h2>
 <div class="sd">Weekly AQ article volume per organisation over the report period. Spikes are identified and traced to triggering events.</div><div class="sdiv"></div></div>
 <div class="mch"><div style="margin-bottom:12px"><div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:4px">Weekly article volume &mdash; AQ-scoped</div><div style="font-size:16px;color:var(--muted);margin-bottom:12px">${esc(DATE_FROM)} to ${esc(DATE_TO)}</div></div>
 ${hmTable}
@@ -3644,7 +3642,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a>
-<div class="nav-lbl">Press</div><a href="#sov" class="nav-a">Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#topic-focus" class="nav-a">What Orgs Covered</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social Media</div><a href="#social" class="nav-a">Social Media</a>
+<div class="nav-lbl">Press</div><a href="#sov" class="nav-a">Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social Media</div><a href="#social" class="nav-a">Social Media</a>
 <div class="nav-lbl">LLM</div><a href="#aeo" class="nav-a">LLM Visibility</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>${navOrgs}CONFIDENTIAL<br><span style="display:inline-block;margin-top:6px;padding:4px 8px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.3);border-radius:4px;color:var(--amber);font-weight:700">&#8377;${52 * ORGS.length}/month</span></div></nav>
@@ -3657,7 +3655,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="dn"><strong>Publicly available data</strong> Insight linked to evidence &middot; ${now}</div>
 </header>
 
-<section class="sec" id="exec"><div class="sh"><div class="se">Section 01</div><h2 class="st">Executive Summary</h2><div class="sd">Headline comparative findings across ${ORGS.length} organisations — Press, LLM, and Social Media.</div><div class="sdiv"></div></div>
+<section class="sec" id="exec"><div class="sh"><h2 class="st">Executive Summary</h2><div class="sd">Headline comparative findings across ${ORGS.length} organisations — Press, LLM, and Social Media.</div><div class="sdiv"></div></div>
 <div style="background:rgba(212,160,23,.07);border:1px solid rgba(212,160,23,.2);border-radius:8px;overflow:hidden;margin-bottom:4px">
 <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;cursor:pointer;user-select:none" onclick="toggleExecDraft()">
 <span style="font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)">Draft Executive Summary <span style="font-weight:400;color:var(--muted2)">(AI-generated &mdash; review before sharing)</span></span>
@@ -3679,7 +3677,7 @@ ${execAudit.issues.length
   Only articles where the organisation is mentioned in scraped body text and classified as AQ-primary by Claude are included.
 </div>
 </section>
-<section class="sec" id="sov"><div class="sh"><div class="se">Section 02a</div><h2 class="st">Press Analytics</h2><div class="sd">Per-org AQ article counts, date-filtered. A story naming several tracked orgs counts once for each.</div><div class="sdiv"></div></div>
+<section class="sec" id="sov"><div class="sh"><div class="se">Section 01a</div><h2 class="st">Press Analytics</h2><div class="sd">Per-org AQ article counts, date-filtered. A story naming several tracked orgs counts once for each.</div><div class="sdiv"></div></div>
 <div class="mch"><div class="ch-hdr"><div style="font-size:18px;font-weight:600;color:var(--text)">All AQ coverage &mdash; ${distinctTot} article${distinctTot === 1 ? "" : "s"}${tot !== distinctTot ? ` &middot; ${tot} org mention${tot === 1 ? "" : "s"}` : ""}</div><div style="font-size:16px;color:var(--muted2);margin-top:3px">${printTot} Print / Online &middot; ${tvTot} TV News${tot !== distinctTot ? " (by mention)" : ""}</div></div>
 ${sovBar()}
 <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:16px;color:var(--muted2);margin-bottom:10px">${ORGS.map((o, i) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${orgHex(i)};margin-right:5px"></span>${esc(o)}: ${data[o].total}</div>`).join("")}</div>
@@ -3696,7 +3694,7 @@ ${(() => {
   return wrap(warn, `<strong>&#9432; SENTINEL</strong> — found no press coverage for ${absent.length} org(s) (${absent.map(esc).join(', ')}) — verified absent from indexed print outlets in this window, not a query artefact.`);
 })()}</section>
 
-<section class="sec" id="tv"><div class="sh"><div class="se">Section 02b</div><h2 class="st">TV Channel Coverage</h2>
+<section class="sec" id="tv"><div class="sh"><div class="se">Section 01b</div><h2 class="st">TV Channel Coverage</h2>
 <div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (India TV, ABP News) channels.</div><div class="sdiv"></div></div>
 <div style="margin-bottom:16px">
 <div style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">English TV</div>
@@ -3708,67 +3706,20 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
 <table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_HINDI.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
 ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_HINDI.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const kwPills = (kws) => kws && kws.length ? `<div style="margin-top:3px;line-height:1.9">${kws.map(kw => `<span style="display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.3);border-radius:3px;padding:0 4px;font-size:11px;font-family:monospace;margin:1px">${esc(kw)}</span>`).join('')}</div>` : ''; const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px;display:block" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>${kwPills(a.foundKeywords)}`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
 </tbody></table></div>
-<!-- Hindi TV sentinel note removed: it fired purely on hindiTotal === 0 and
-     asserted the zeros were "verified, not a query artefact" without running
-     any verification. The claim was also unsupportable — the Firecrawl query
-     is English ('air quality "Org"') and every one of the 51 AQ keywords is
-     ASCII English, so a Hindi-language article matches nothing and is filtered
-     out even when returned. Hindi zeros are therefore exactly the query
-     artefact the note denied. Restore only alongside Hindi query terms and a
-     Devanagari keyword list. -->
-<div style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06)">
-<div id="topic-focus" style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">What These Orgs Actually Covered on TV</div>
-<div style="font-size:15px;color:var(--muted2);margin-bottom:12px;line-height:1.6">Independent check on the TV zeros above: each org's top subtopics from ITS OWN verified TV coverage only (NDTV, News18, India Today, India TV, ABP News) — articles that already passed the org-presence filter (STEP 1d) and the Haiku citation filter (STEP 1e), narrowed here to the six TV outlets. If an org shows real topics and headlines here, the pipeline is genuinely tracking its TV presence; a specific channel still showing zero above is then a finding about that channel, not a broken query. Full topic breakdown across all outlets (TV + print/online): <a href="#topics" style="color:var(--amber)">§03 Topic Ownership Map</a>.</div>
-${(() => {
-  const TV_OUTLETS = [...TV_CHANNELS_ENGLISH, ...TV_CHANNELS_HINDI];
-  return ORGS.map((org, i) => {
-    // TV-only topic counts: filter this org's classifications (which carry
-    // .outlet and .index back into arts[org]) to the six TV outlets, then
-    // tally aq_subtopic the same way aggregateOrg() does for the all-outlet
-    // version — same join pattern the Topic Ownership Map uses (§03) below.
-    const tvCls = (data[org]?.classifications || []).filter(c => TV_OUTLETS.includes(canonOutlet(c.outlet || '')));
-    const tvTc = {};
-    tvCls.forEach(c => {
-      const t = (c.aq_subtopic || '').trim();
-      const match = TOPICS.find(tp => tp.toLowerCase() === t.toLowerCase() || t.toLowerCase().includes(tp.toLowerCase().split(' ')[0].toLowerCase()));
-      if (match) tvTc[match] = (tvTc[match] || 0) + 1;
-    });
-    const topTopics = Object.entries(tvTc).sort((a, b) => b[1] - a[1]).slice(0, 3);
-    const col = orgHex(i);
-    if (!topTopics.length) {
-      return `<div style="padding:12px 16px;border-left:3px solid ${col};background:var(--surface2);border-radius:0 6px 6px 0;margin-bottom:8px">
-        <span style="font-family:monospace;font-size:16px;font-weight:700;color:${col}">${esc(org)}</span>
-        <span style="font-size:15px;color:var(--muted);margin-left:8px">— no classified topics found in verified TV coverage (${tvCls.length} TV article${tvCls.length === 1 ? '' : 's'} this window). Genuinely low/no TV presence, not a broken query.</span>
-      </div>`;
-    }
-    const sampleHeadlines = tvCls.slice(0, 2).map(c => {
-      const art = arts[org]?.[c.index] || {};
-      return art.url
-        ? `<a href="${esc(art.url)}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4">↗ ${esc((art.title || '').slice(0, 90))}${(art.title || '').length > 90 ? '…' : ''}</a>`
-        : '';
-    }).join('');
-    return `<div style="padding:12px 16px;border-left:3px solid ${col};background:var(--surface2);border-radius:0 6px 6px 0;margin-bottom:8px">
-      <div><span style="font-family:monospace;font-size:16px;font-weight:700;color:${col}">${esc(org)}</span>
-      <span style="font-size:15px;color:var(--muted2);margin-left:8px">${topTopics.map(([t, c]) => `${esc(t)} (${c})`).join(' &middot; ')}</span></div>
-      ${sampleHeadlines}
-    </div>`;
-  }).join('');
-})()}
-</div>
 </section>
 
 ${momentumSection(arts, ORGS, DATE_FROM, DATE_TO, spikeAnnotations)}
 
-<section class="sec" id="topics"><div class="sh"><div class="se">Section 03 &mdash; ${TOPICS.length} topics</div><h2 class="st">Topic Ownership Map</h2>
+<section class="sec" id="topics"><div class="sh"><div class="se">Section 02 &mdash; ${TOPICS.length} topics</div><h2 class="st">Topic Ownership Map</h2>
 <div class="sd">Each article is classified into one of ${TOPICS.length} fixed AQ sub-topics by Claude Sonnet — used here because its larger context window and instruction-following accuracy consistently outperforms smaller models (GPT-4o mini, Gemini Flash) on nuanced Indian AQ sub-topic distinctions. Each cell shows article count and representative headlines. Position: <strong style="color:#4ade80">Leader</strong> (&ge;5 articles) &middot; <strong style="color:#fbbf24">Active</strong> (2&ndash;4 articles) &middot; <strong style="color:var(--muted)">Not Present</strong> (0&ndash;1).</div><div class="sdiv"></div></div>
 ${clsNotice}
 ${topicCards()}
 ${dynamicTopicTable()}</section>
 
-<section class="sec" id="appendix"><div class="sh"><div class="se">Section 05</div><h2 class="st">Citations</h2><div class="sd">All indexed articles from tracked outlets. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
+<section class="sec" id="appendix"><div class="sh"><div class="se">Section 03</div><h2 class="st">Citations</h2><div class="sd">All indexed articles from tracked outlets. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
 ${appendixSections}</section>
 
-<section class="sec" id="em"><div class="sh"><div class="se">Section 06</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations had <strong style="color:var(--warn)">no coverage in during this report period</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. <strong>Gap signal</strong> = evidence of the absence.</div><div class="sdiv"></div></div>
+<section class="sec" id="em"><div class="sh"><div class="se">Section 04</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations had <strong style="color:var(--warn)">no coverage in during this report period</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. <strong>Gap signal</strong> = evidence of the absence.</div><div class="sdiv"></div></div>
 <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 14px;cursor:pointer;user-select:none" onclick="toggleEm()">
 <span style="font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber)">${emerging.length} narrative gap${emerging.length !== 1 ? "s" : ""} identified</span>
 <span id="em-icon" style="font-family:monospace;font-size:17px;color:var(--amber)">&#9650; Collapse</span>
@@ -3776,13 +3727,13 @@ ${appendixSections}</section>
 <div id="em-body">${emergingCards}</div></section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
-<section class="sec" id="social"><div class="sh"><div class="se">Section 08 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Shows how active each organisation is on social media during the report period — how many followers they have, how often they post about air quality, and how much engagement that content receives across LinkedIn, X/Twitter, Instagram, and YouTube.</div><div class="sdiv"></div></div>
+<section class="sec" id="social"><div class="sh"><div class="se">Section 05 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Shows how active each organisation is on social media during the report period — how many followers they have, how often they post about air quality, and how much engagement that content receives across LinkedIn, X/Twitter, Instagram, and YouTube.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd">Share of voice across Press, LLM, and Social. Each channel is normalised to its own cohort share so all three carry equal weight; the Overall SoV is their average, and orgs are ranked by it. Click any row to see the breakdown.</div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 06</div><h2 class="st">Scorecard</h2><div class="sd">Share of voice across Press, LLM, and Social. Each channel is normalised to its own cohort share so all three carry equal weight; the Overall SoV is their average, and orgs are ranked by it. Click any row to see the breakdown.</div><div class="sdiv"></div></div>
 ${scorecards}</section>
 
-<section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
+<section class="sec" id="actions"><div class="sh"><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
 <table class="at"><thead><tr><th>Org</th><th>Priority</th><th>Area</th><th>Action</th><th>Data rationale</th></tr></thead><tbody>${actionRows}</tbody></table></section>
 
 <footer class="rf">Generated by Emerald AI &middot; AQ Intelligence Platform v7 &middot; ${now}<br>
