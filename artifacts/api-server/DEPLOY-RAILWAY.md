@@ -50,6 +50,18 @@ Used when present (report sections degrade gracefully if missing):
 `OPENAI_KEY`, `PERPLEXITY_KEY`, `GEMINI_KEY`, `YOUTUBE_KEY`, `X_BEARER_TOKEN`,
 `APIDIRECT_KEY`, `META_ACCESS_TOKEN`, `IG_BUSINESS_ACCOUNT_ID`.
 
+Report cost emails (per generated report — admin gets the real API cost + client
+billing; the generating account gets its client-cost email at the address it
+entered at signup). Gmail SMTP:
+| Var | Notes |
+|---|---|
+| `EMAIL_USER` | Gmail address that sends the mail |
+| `EMAIL_PASS` | a Gmail **app password** for that account (not the login password) |
+
+Without these two, report generation still works — the emails are just skipped
+(a warning is logged). The admin recipient is hardcoded to
+`arjuntewari0505@gmail.com` in `src/lib/mailer.ts`.
+
 Admin seed (first deploy against an **empty** database): set
 `SEED_ADMIN=true` + `ADMIN_INITIAL_PASSWORD=<pick one>`. On boot the server
 creates its tables (`src/lib/ensure-schema.ts`) and then inserts the `admin`

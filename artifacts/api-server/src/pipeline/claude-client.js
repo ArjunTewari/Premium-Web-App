@@ -12,7 +12,22 @@
 
 const axios = require("axios");
 
-const costTracker = { serperQueries: 0, claudeInputTokens: 0, claudeOutputTokens: 0 };
+// Shared usage counters for one pipeline run. pipeline.js resets these at the
+// top of run() and reads them back at the end to compute the real API cost of
+// the report (emailed to the admin). Every collector imports this same object
+// by reference and increments its own line.
+const costTracker = {
+  serperQueries: 0,        // Serper /news + /scrape calls        ($0.001 each)
+  claudeInputTokens: 0,    // Anthropic input tokens (metered)    ($1 / 1M)
+  claudeOutputTokens: 0,   // Anthropic output tokens (metered)   ($5 / 1M)
+  firecrawlSearches: 0,    // Firecrawl /v2/search (news+scrape)   (~$0.05 each)
+  apidirectCalls: 0,       // APIdirect.io endpoint calls         ($0.01 each)
+  youtubeApiCalls: 0,      // YouTube Data API v3 requests        (quota, ~free)
+  perplexityCalls: 0,      // Perplexity sonar AEO probes         ($0.001 each)
+  openaiCalls: 0,          // OpenAI gpt-4o-mini AEO probes       ($0.0003 each)
+  geminiCalls: 0,          // Gemini flash AEO probes             (~free tier)
+  claudeAeoCalls: 0,       // Claude Haiku AEO probes (~300 tok)  ($0.0006 each)
+};
 
 function extractJsonArray(raw) {
   if (!raw) return null;

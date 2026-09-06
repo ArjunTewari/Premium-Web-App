@@ -538,9 +538,18 @@ async function run(cfg, cb) {
   //         OPENAI_KEY?, PERPLEXITY_KEY?, GEMINI_KEY?, TWITTER_KEY?, YOUTUBE_KEY?, outDir }
   // cb(message, level) — streams log lines
 
+  // Reset every per-run usage counter (collectors increment their own line;
+  // the totals are read back at the end to compute the report's real API cost).
   costTracker.serperQueries = 0;
   costTracker.claudeInputTokens = 0;
   costTracker.claudeOutputTokens = 0;
+  costTracker.firecrawlSearches = 0;
+  costTracker.apidirectCalls = 0;
+  costTracker.youtubeApiCalls = 0;
+  costTracker.perplexityCalls = 0;
+  costTracker.openaiCalls = 0;
+  costTracker.geminiCalls = 0;
+  costTracker.claudeAeoCalls = 0;
 
   // Simple concurrency limiter — no extra npm dep needed
   function pLimit(concurrency) {
@@ -1272,27 +1281,59 @@ ${batchText}`;
 
   cb(`\n✓ Done — ${base}.html`, "ok");
 
-  const SERPER_COST_PER_QUERY = 0.001;
-  const CLAUDE_INPUT_COST_PER_M = 1.0;
-  const CLAUDE_OUTPUT_COST_PER_M = 5.0;
+  // ── Real API cost of this report ────────────────────────────────────────
+  // Claude + Serper are metered (token / query counts are exact). Firecrawl,
+  // APIdirect, YouTube and the AEO LLM probes are counted per call and priced
+  // at each provider's published unit rate. Emailed to the admin per report.
   const USD_TO_INR = 84;
-  const serperCostUSD = costTracker.serperQueries * SERPER_COST_PER_QUERY;
-  const claudeCostUSD =
-    (costTracker.claudeInputTokens / 1_000_000) * CLAUDE_INPUT_COST_PER_M +
-    (costTracker.claudeOutputTokens / 1_000_000) * CLAUDE_OUTPUT_COST_PER_M;
-  const totalUSD = serperCostUSD + claudeCostUSD;
-  const totalINR = totalUSD * USD_TO_INR;
-  cb("cost", {
-    serperQueries: costTracker.serperQueries,
-    serperCostUSD: serperCostUSD.toFixed(4),
-    claudeInputTokens: costTracker.claudeInputTokens,
-    claudeOutputTokens: costTracker.claudeOutputTokens,
-    claudeCostUSD: claudeCostUSD.toFixed(4),
-    totalUSD: totalUSD.toFixed(4),
-    totalINR: Math.round(totalINR),
-  });
+  const UNIT = {
+    serperQuery:      0.001,   // Serper /news + /scrape
+    claudeInPerM:     1.0,     // Anthropic input  $/1M tokens (Haiku/Sonnet blended)
+    claudeOutPerM:    5.0,     // Anthropic output $/1M tokens
+    firecrawlSearch:  0.05,    // /v2/search with scrape (news + ~15 page scrapes)
+    apidirectCall:    0.01,    // APIdirect.io per endpoint call
+    youtubeCall:      0.0,     // YouTube Data API v3 — quota-limited, no $ charge
+    perplexityCall:   0.001,   // sonar per query
+    openaiCall:       0.0003,  // gpt-4o-mini per short query
+    geminiCall:       0.0,     // free tier
+    claudeAeoCall:    0.0006,  // Haiku ~300-token probe
+  };
+  const c = costTracker;
+  const lines = {
+    claude: (c.claudeInputTokens / 1e6) * UNIT.claudeInPerM
+          + (c.claudeOutputTokens / 1e6) * UNIT.claudeOutPerM,
+    serper: c.serperQueries * UNIT.serperQuery,
+    firecrawl: c.firecrawlSearches * UNIT.firecrawlSearch,
+    apidirect: c.apidirectCalls * UNIT.apidirectCall,
+    youtube: c.youtubeApiCalls * UNIT.youtubeCall,
+    perplexity: c.perplexityCalls * UNIT.perplexityCall,
+    openai: c.openaiCalls * UNIT.openaiCall,
+    gemini: c.geminiCalls * UNIT.geminiCall,
+    claudeAeo: c.claudeAeoCalls * UNIT.claudeAeoCall,
+  };
+  const totalUSD = Object.values(lines).reduce((s, v) => s + v, 0);
+  const cost = {
+    counts: {
+      claudeInputTokens: c.claudeInputTokens,
+      claudeOutputTokens: c.claudeOutputTokens,
+      serperQueries: c.serperQueries,
+      firecrawlSearches: c.firecrawlSearches,
+      apidirectCalls: c.apidirectCalls,
+      youtubeApiCalls: c.youtubeApiCalls,
+      perplexityCalls: c.perplexityCalls,
+      openaiCalls: c.openaiCalls,
+      geminiCalls: c.geminiCalls,
+      claudeAeoCalls: c.claudeAeoCalls,
+    },
+    linesUSD: Object.fromEntries(Object.entries(lines).map(([k, v]) => [k, +v.toFixed(4)])),
+    unitRates: UNIT,
+    totalUSD: +totalUSD.toFixed(4),
+    totalINR: Math.round(totalUSD * USD_TO_INR * 100) / 100,
+    usdToInr: USD_TO_INR,
+  };
+  cb("cost", cost);
 
-  return { htmlFile, htmlName: `${base}.html`, pptxFile, pptxName };
+  return { htmlFile, htmlName: `${base}.html`, pptxFile, pptxName, cost };
 }
 
 // ══════════════════════════════════════════════════════════════════════════

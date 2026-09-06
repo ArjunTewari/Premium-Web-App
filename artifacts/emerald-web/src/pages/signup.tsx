@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 
 export default function Signup() {
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
@@ -14,6 +15,7 @@ export default function Signup() {
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("Enter a valid email address"); return; }
     if (password !== confirm) { setError("Passwords do not match"); return; }
     if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
     setLoading(true);
@@ -22,7 +24,7 @@ export default function Signup() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, email, password }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Signup failed"); return; }
@@ -75,6 +77,21 @@ export default function Signup() {
               required
               minLength={3}
             />
+          </div>
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={labelStyle}>Email</label>
+            <input
+              type="email"
+              style={inputStyle}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              placeholder="you@company.com"
+              required
+            />
+            <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 5 }}>
+              Report cost summaries are sent here.
+            </p>
           </div>
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={labelStyle}>Password</label>

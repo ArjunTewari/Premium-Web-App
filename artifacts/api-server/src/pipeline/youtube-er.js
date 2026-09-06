@@ -34,6 +34,7 @@
 const axios = require('axios');
 const APIdirect = require('./apidirect-collector'); // reused for parseDate() and isAQ() only — no API calls to APIdirect from this module
 const { mapWithConcurrency } = require('./firecrawl-common'); // ordered, non-throwing concurrency helper
+const { costTracker } = require('./claude-client'); // shared per-run usage counters
 
 // How many orgs to resolve+scan in parallel. Each org is 2-4 YouTube Data API
 // calls; the API tolerates this fine and it turns a 16-org serial scan (~16×
@@ -87,6 +88,7 @@ async function resolveChannel(ytHandle, apiKey) {
     ? { part: 'snippet,statistics', id: handle, key: apiKey }
     : { part: 'snippet,statistics', forHandle: `@${handle.replace(/^@/, '')}`, key: apiKey };
   const { data } = await axios.get(YT_CHANNELS_URL, { params, timeout: 20000 });
+  costTracker.youtubeApiCalls++;
   const item = (data.items || [])[0];
   if (!item) return null;
   const s = item.statistics || {};
@@ -119,6 +121,7 @@ async function discoverChannelVideos(channelId, dateRange, apiKey) {
       },
       timeout: 20000,
     });
+    costTracker.youtubeApiCalls++;
     const items = data.items || [];
     videos = videos.concat(items.map((it) => ({
       video_id: it.id?.videoId || '',
@@ -147,6 +150,7 @@ async function fetchVideoStats(videoIds, apiKey) {
       params: { part: 'statistics,snippet', id: batch.join(','), key: apiKey },
       timeout: 20000,
     });
+    costTracker.youtubeApiCalls++;
     for (const item of data.items || []) {
       const s = item.statistics || {};
       out[item.id] = {

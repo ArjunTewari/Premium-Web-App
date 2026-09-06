@@ -14,6 +14,7 @@
 const {
   AQ_KEYWORDS, orgMentioned, articleText, matchedKeywords, buildOutletMatcher, mapWithConcurrency,
 } = require("./firecrawl-common");
+const { costTracker } = require("./claude-client");
 
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/search";
 
@@ -75,6 +76,7 @@ async function firecrawlSearch(query, params, apiKey, cb) {
       if (!json.success) throw new Error(json.error ?? "unknown error");
       if (json.warning) cb(`  [firecrawl-tv] warning: ${json.warning}`, "warn");
 
+      costTracker.firecrawlSearches++;
       return json.data?.news ?? json.data?.web ?? [];
     } catch (e) {
       if (attempt < 3) {

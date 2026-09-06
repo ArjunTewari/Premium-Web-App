@@ -21,6 +21,7 @@
  */
 
 const axios = require('axios');
+const { costTracker } = require('./claude-client'); // shared per-run usage counters
 
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -81,6 +82,7 @@ async function runAEO(cfg, orgs, cb) {
           )
         )
       );
+      costTracker.openaiCalls += responses.filter(r => r.status === 'fulfilled').length;
       let gptErrors = 0;
       const texts = responses.map((r, i) => {
         if (r.status === 'rejected') {
@@ -119,6 +121,7 @@ async function runAEO(cfg, orgs, cb) {
           )
         )
       );
+      costTracker.perplexityCalls += responses.filter(r => r.status === 'fulfilled').length;
       let pplxErrors = 0;
       const texts = responses.map((r, i) => {
         if (r.status === 'rejected') {
@@ -157,6 +160,7 @@ async function runAEO(cfg, orgs, cb) {
           )
         )
       );
+      costTracker.claudeAeoCalls += responses.filter(r => r.status === 'fulfilled').length;
       let claudeErrors = 0;
       const texts = responses.map((r, i) => {
         if (r.status === 'rejected') {
