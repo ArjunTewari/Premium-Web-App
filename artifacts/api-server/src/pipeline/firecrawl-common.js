@@ -118,17 +118,20 @@ function articleText(item) {
  */
 function articleDate(item) {
   const m = item.metadata || {};
+  // ONLY genuine publish-date fields. Deliberately NOT `modifiedTime` /
+  // `m.date` / `dc.date` — for a re-crawled evergreen page those hold the
+  // crawl/last-edit date (often "today"), which made the pipeline's date-window
+  // filter drop every article as "in the future". When none of these are
+  // present the article is treated as undated and its date is recovered from
+  // the scraped body later (STEP 1c-date).
   return (
     item.date ||
     m.publishedTime ||
     m["article:published_time"] ||
+    m["article:published"] ||
     m.publishedDate ||
     m.datePublished ||
     m["og:published_time"] ||
-    m.date ||
-    m["dc.date"] ||
-    m.dcDate ||
-    m.modifiedTime ||
     ""
   );
 }

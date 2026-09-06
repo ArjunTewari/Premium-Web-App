@@ -7,6 +7,7 @@
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
+const PptxGen = require("pptxgenjs"); // used by buildPPTX() — was referenced but never required
 const SI = require("./social-intelligence");
 const Sentinel = require("./sentinel");
 const { fetchTvCoverage, AQ_KEYWORDS } = require("./firecrawl-tv");
@@ -621,16 +622,25 @@ async function run(cfg, cb) {
         "GRAP",
       ];
 
-  // Report window bounds. `rangeStart` is the first instant of DATE_FROM;
-  // `rangeEnd` is the last instant of DATE_TO (end-of-day, inclusive).
+  // Report window bounds. `rangeStart` / `rangeEnd` are the exact requested
+  // window (used for the "is this in the window" checks in the charts).
   const rangeStart = new Date(DATE_FROM + "T00:00:00");
   const rangeEnd = new Date(DATE_TO + "T23:59:59.999");
 
-  /** true when the string parses to a date strictly outside [DATE_FROM, DATE_TO]. */
+  // The DROP decision uses a slightly wider window: outlet timestamps carry
+  // timezones, "published" vs "updated" differ by a day or two, and a body-
+  // recovered date can be a few days off. A grace band keeps genuine
+  // boundary coverage while still cutting stories from the wrong month.
+  const GRACE_DAYS = Math.max(0, parseInt(process.env.DATE_WINDOW_GRACE_DAYS || "5", 10) || 0);
+  const dropBefore = new Date(rangeStart.getTime() - GRACE_DAYS * 86400000);
+  const dropAfter = new Date(rangeEnd.getTime() + GRACE_DAYS * 86400000);
+
+  /** true only when the string parses to a date clearly outside the window
+   *  (beyond the grace band). Undated → false (can't prove it's out). */
   const dateOutsideRange = (dateStr) => {
     const d = parseDateStr(dateStr);
-    if (!d) return false; // undated — can't prove it's out of range
-    return d < rangeStart || d > rangeEnd;
+    if (!d) return false;
+    return d < dropBefore || d > dropAfter;
   };
 
   cb(`\n=== Emerald AI · AQ Intelligence Report ===`, "head");
@@ -680,14 +690,32 @@ async function run(cfg, cb) {
   // article whose own published date parses to a point outside
   // [DATE_FROM, DATE_TO]. Articles with no parseable date are KEPT here and
   // re-checked after scraping (STEP 1c can recover a date from the body).
+  //
+  // Safety valve: if EVERY article for an org parses as out-of-window, that is
+  // almost always a bad date source (a metadata field holding the crawl date),
+  // not reality — so keep them all, flag it, and let the post-scrape body-date
+  // recheck (STEP 1c-date) sort it out. Better a warned report than an empty one.
   cb(`\nSTEP 1b-date/6 — Filtering to the ${DATE_FROM} → ${DATE_TO} window...`, "head");
   for (const org of ORGS) {
     const before = arts[org].length;
-    arts[org] = arts[org].filter((a) => !dateOutsideRange(a.date));
-    const dropped = before - arts[org].length;
+    if (!before) { cb(`  ${org}: 0 articles`, "warn"); continue; }
+    const kept = arts[org].filter((a) => !dateOutsideRange(a.date));
+    const droppedArts = arts[org].filter((a) => dateOutsideRange(a.date));
+    const sample = droppedArts.slice(0, 3).map((a) => JSON.stringify(a.date || "")).join(", ");
+
+    if (kept.length === 0 && before >= 3) {
+      cb(
+        `  ${org}: every one of ${before} article(s) parsed as out-of-window (dates: ${sample}) — ` +
+          `likely a bad date source; keeping all, will re-check against the scraped body`,
+        "warn",
+      );
+      continue; // leave arts[org] untouched
+    }
+
+    arts[org] = kept;
     const undated = arts[org].filter((a) => !parseDateStr(a.date)).length;
     cb(
-      `  ${org}: ${dropped > 0 ? `dropped ${dropped} out-of-window → ` : ""}${arts[org].length} in window` +
+      `  ${org}: ${droppedArts.length > 0 ? `dropped ${droppedArts.length} out-of-window (e.g. ${sample}) → ` : ""}${arts[org].length} in window` +
         (undated > 0 ? ` (${undated} undated, kept pending scrape)` : ""),
       arts[org].length > 0 ? "ok" : "warn",
     );
@@ -771,31 +799,41 @@ async function run(cfg, cb) {
     );
     const recoverDate = (text) => {
       if (!text) return null;
-      const head = text.slice(0, 2000);
+      // Publish date lives in the byline area — a wider scan just collects
+      // dates from the article prose ("...back in March 2019...").
+      const head = text.slice(0, 900);
       const cands = [];
       let m;
       DATE_TOKEN_RE.lastIndex = 0;
-      while ((m = DATE_TOKEN_RE.exec(head)) && cands.length < 12) {
+      while ((m = DATE_TOKEN_RE.exec(head)) && cands.length < 8) {
         const d = parseDateStr(m[0]);
-        if (d && d.getFullYear() >= 2015 && d <= new Date(Date.now() + 86400000)) cands.push(d);
+        if (d && d.getFullYear() >= 2018 && d <= new Date(Date.now() + 86400000)) cands.push(d);
       }
       if (!cands.length) return null;
-      const inWin = cands.find((d) => d >= rangeStart && d <= rangeEnd);
+      const inWin = cands.find((d) => d >= dropBefore && d <= dropAfter);
       return { date: inWin || cands[0], anyInWindow: !!inWin };
     };
 
     for (const org of ORGS) {
       const before = arts[org].length;
+      if (!before) continue;
       let recovered = 0;
-      arts[org] = arts[org].filter((a) => {
+      const decide = (a) => {
         if (parseDateStr(a.date)) return !dateOutsideRange(a.date); // already dated
         const r = recoverDate(a.fullText);
-        if (!r) return true; // genuinely undated — keep, tbs already filtered
+        if (!r) return true; // genuinely undated — keep
         recovered++;
         a.date = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}-${String(r.date.getDate()).padStart(2, "0")}`;
         a.dateRecovered = true;
-        return r.anyInWindow; // drop when every date found in the body is outside
-      });
+        return r.anyInWindow;
+      };
+      const kept = arts[org].filter(decide);
+
+      if (kept.length === 0 && before >= 3) {
+        cb(`  ${org}: all ${before} article(s) still resolve outside the window — keeping them, dates need a manual check`, "warn");
+        continue;
+      }
+      arts[org] = kept;
       const dropped = before - arts[org].length;
       const undated = arts[org].filter((a) => !parseDateStr(a.date)).length;
       if (dropped || recovered || undated) {

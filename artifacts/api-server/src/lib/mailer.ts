@@ -11,34 +11,83 @@ const rupee = (n: number) =>
 const esc = (s: string) =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+const FROM_NAME = "Emerald AI";
+const fromAddress = () =>
+  process.env.EMAIL_FROM || process.env.EMAIL_USER || "onboarding@resend.dev";
+
+// ── Resend (HTTP API) ──────────────────────────────────────────────────────
+// Preferred on Railway: outbound SMTP (25/465/587) is blocked, so nodemailer
+// to smtp.gmail.com times out. Resend goes over HTTPS. Set RESEND_API_KEY.
+async function sendViaResend(opts: { to: string; subject: string; text: string; html: string }): Promise<boolean> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return false;
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: `${FROM_NAME} <${fromAddress()}>`,
+        to: [opts.to],
+        subject: opts.subject,
+        text: opts.text,
+        html: opts.html,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { id?: string };
+      logger.info({ to: opts.to, id: body.id }, "Report email sent (Resend)");
+      return true;
+    }
+    logger.warn({ to: opts.to, status: res.status, body: await res.text().catch(() => "") }, "Resend send failed");
+    return false;
+  } catch (err) {
+    logger.warn({ err, to: opts.to }, "Resend send errored");
+    return false;
+  }
+}
+
+// ── SMTP fallback (Gmail) ──────────────────────────────────────────────────
 let transport: nodemailer.Transporter | null = null;
 function getTransport(): nodemailer.Transporter | null {
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASS;
-  if (!user || !pass) {
-    logger.warn("EMAIL_USER / EMAIL_PASS not set — report emails are disabled");
-    return null;
-  }
+  if (!user || !pass) return null;
   if (!transport) {
     transport = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
+      host: process.env.EMAIL_HOST || "smtp.gmail.com",
+      // 465 (implicit TLS) is more often reachable than 587 when a host filters
+      // SMTP. Override with EMAIL_PORT if needed.
+      port: parseInt(process.env.EMAIL_PORT || "465", 10),
+      secure: (process.env.EMAIL_PORT || "465") === "465",
       auth: { user, pass },
+      connectionTimeout: 15000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
     });
   }
   return transport;
 }
 
 async function send(opts: { to: string; subject: string; text: string; html: string }) {
+  if (await sendViaResend(opts)) return;
+
   const t = getTransport();
-  if (!t) return;
-  const from = `"Emerald AI" <${process.env.EMAIL_USER}>`;
+  if (!t) {
+    logger.warn(
+      { to: opts.to },
+      "No email transport — set RESEND_API_KEY (recommended on Railway) or EMAIL_USER/EMAIL_PASS",
+    );
+    return;
+  }
   try {
-    const info = await t.sendMail({ from, ...opts });
-    logger.info({ to: opts.to, messageId: info.messageId }, "Report email sent");
+    const info = await t.sendMail({ from: `"${FROM_NAME}" <${process.env.EMAIL_USER}>`, ...opts });
+    logger.info({ to: opts.to, messageId: info.messageId }, "Report email sent (SMTP)");
   } catch (err) {
-    logger.warn({ err, to: opts.to }, "Report email failed");
+    logger.warn(
+      { err: (err as Error)?.message, to: opts.to },
+      "SMTP send failed (host likely blocks outbound SMTP — use RESEND_API_KEY)",
+    );
   }
 }
 

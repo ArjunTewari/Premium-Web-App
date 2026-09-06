@@ -52,14 +52,21 @@ Used when present (report sections degrade gracefully if missing):
 
 Report cost emails (per generated report — admin gets the real API cost + client
 billing; the generating account gets its client-cost email at the address it
-entered at signup). Gmail SMTP:
+entered at signup).
+
+**Railway blocks outbound SMTP (ports 25/465/587)**, so Gmail via nodemailer
+times out. Use Resend (HTTPS):
 | Var | Notes |
 |---|---|
-| `EMAIL_USER` | Gmail address that sends the mail |
-| `EMAIL_PASS` | a Gmail **app password** for that account (not the login password) |
+| `RESEND_API_KEY` | from resend.com (free tier: 100/day). Preferred — sends over HTTPS. |
+| `EMAIL_FROM` | sender address. Use `onboarding@resend.dev` to start; switch to an address on a domain you've verified in Resend for real delivery. |
 
-Without these two, report generation still works — the emails are just skipped
-(a warning is logged). The admin recipient is hardcoded to
+SMTP still works as a fallback where the host allows it: set `EMAIL_USER` +
+`EMAIL_PASS` (a Gmail **app password**), optionally `EMAIL_HOST` / `EMAIL_PORT`
+(defaults `smtp.gmail.com` / `465`). Resend is tried first when its key is set.
+
+Without any transport configured, report generation still works — the emails
+are just skipped (a warning is logged). The admin recipient is hardcoded to
 `arjuntewari0505@gmail.com` in `src/lib/mailer.ts`.
 
 Admin seed (first deploy against an **empty** database): set
