@@ -108,6 +108,31 @@ function articleText(item) {
     .join("\n");
 }
 
+/**
+ * Best available published date for a Firecrawl search result.
+ *
+ * `item.date` is Firecrawl's own news-date guess and is often missing; the
+ * scraped page metadata usually carries a real ISO timestamp. Checked in
+ * order of trustworthiness. Returned as-is (a string) — pipeline.js's
+ * parseDateStr does the parsing.
+ */
+function articleDate(item) {
+  const m = item.metadata || {};
+  return (
+    item.date ||
+    m.publishedTime ||
+    m["article:published_time"] ||
+    m.publishedDate ||
+    m.datePublished ||
+    m["og:published_time"] ||
+    m.date ||
+    m["dc.date"] ||
+    m.dcDate ||
+    m.modifiedTime ||
+    ""
+  );
+}
+
 /** Which AQ keywords appear in the article. */
 function matchedKeywords(item) {
   const text = articleText(item).toLowerCase();
@@ -167,6 +192,6 @@ async function mapWithConcurrency(items, concurrency, fn) {
 }
 
 module.exports = {
-  AQ_KEYWORDS, ORG_ALIASES, orgMentioned, articleText, matchedKeywords, buildOutletMatcher,
-  mapWithConcurrency,
+  AQ_KEYWORDS, ORG_ALIASES, orgMentioned, articleText, articleDate, matchedKeywords,
+  buildOutletMatcher, mapWithConcurrency,
 };
