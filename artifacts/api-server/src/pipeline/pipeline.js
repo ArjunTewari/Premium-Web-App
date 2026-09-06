@@ -3683,21 +3683,21 @@ body.edit-mode .sec-x{display:flex}
 }`;
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AQ Intelligence &mdash; ${esc(ORGS.join(" vs "))}</title>
+<title>Triple Media Intelligence &mdash; ${esc(ORGS.join(" vs "))}</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>${CSS}</style></head><body>
 <div class="edit-bar" id="edit-bar"><button class="edit-btn" id="edit-btn" onclick="toggleEdit()">&#9998; Edit Mode</button><button class="edit-btn edit-dl" id="dl-btn" onclick="dlEdit()">&#8595; Download Edited</button></div>
 <div class="shell">
-<nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
+<nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">Triple Media Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a>
-<div class="nav-lbl">Press</div><a href="#sov" class="nav-a">Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#topic-focus" class="nav-a">What Orgs Covered</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social Media</div><a href="#social" class="nav-a">Social Media</a>
+<div class="nav-lbl">Press</div><a href="#sov" class="nav-a">Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#topic-focus" class="nav-a">What Orgs Covered</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">Emerging Narratives</a><div class="nav-lbl">Social Media</div><a href="#social" class="nav-a">Social Media</a>
 <div class="nav-lbl">LLM</div><a href="#aeo" class="nav-a">LLM Visibility</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>${navOrgs}CONFIDENTIAL<br><span style="display:inline-block;margin-top:6px;padding:4px 8px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.3);border-radius:4px;color:var(--amber);font-weight:700">&#8377;${52 * ORGS.length}/month</span></div></nav>
 <div class="mob-nav"><a href="#exec">Summary</a><a href="#sov">Press</a><a href="#tv">TV</a><a href="#momentum">Momentum</a><a href="#social">Social</a><a href="#aeo">LLM</a><a href="#score">Score</a><a href="#actions">Actions</a></div>
 <main class="main">
 <header class="rh" id="header"><div class="ey">Air Quality Media Intelligence &middot; India</div>
-<h1 class="rt">Air Quality<br><span class="rti">Triple Media Analytics</span></h1>
+<h1 class="rt">Triple Media<br><span class="rti">Intelligence Report</span></h1>
 <div class="rm">Period: ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)} &middot; ${now}</div>
 <div class="chips">${orgChips}</div>
 <div class="dn"><strong>Publicly available data</strong> Insight linked to evidence &middot; ${now}</div>
@@ -3811,27 +3811,27 @@ ${clsNotice}
 ${topicCards()}
 ${dynamicTopicTable()}</section>
 
-<section class="sec" id="appendix"><div class="sh"><div class="se">Section 05</div><h2 class="st">Citations</h2><div class="sd">All indexed articles from tracked outlets. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
+<section class="sec" id="appendix"><div class="sh"><div class="se">Section 04</div><h2 class="st">Citations</h2><div class="sd">All indexed articles from tracked outlets. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
 ${appendixSections}</section>
 
-<section class="sec" id="em"><div class="sh"><div class="se">Section 06</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations had <strong style="color:var(--warn)">no coverage in during this report period</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. <strong>Gap signal</strong> = evidence of the absence.</div><div class="sdiv"></div></div>
+<section class="sec" id="em"><div class="sh"><div class="se">Section 05</div><h2 class="st">Emerging Narratives</h2><div class="sd">AQ narrative topics with measurable media traction where <strong style="color:var(--warn)">none of the tracked organisations published coverage</strong> during this report period &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. <strong>Gap signal</strong> = evidence of the absence.</div><div class="sdiv"></div></div>
 <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 14px;cursor:pointer;user-select:none" onclick="toggleEm()">
-<span style="font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber)">${emerging.length} narrative gap${emerging.length !== 1 ? "s" : ""} identified</span>
+<span style="font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber)">${emerging.length} emerging narrative${emerging.length !== 1 ? "s" : ""} identified</span>
 <span id="em-icon" style="font-family:monospace;font-size:17px;color:var(--amber)">&#9650; Collapse</span>
 </div>
 <div id="em-body">${emergingCards}</div></section>
 
 ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
-<section class="sec" id="social"><div class="sh"><div class="se">Section 08 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Shows how active each organisation is on social media during the report period — how many followers they have, how often they post about air quality, and how much engagement that content receives across LinkedIn, X/Twitter, Instagram, and YouTube.</div><div class="sdiv"></div></div>
+<section class="sec" id="social"><div class="sh"><div class="se">Section 07 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Shows how active each organisation is on social media during the report period — how many followers they have, how often they post about air quality, and how much engagement that content receives across LinkedIn, X/Twitter, Instagram, and YouTube.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
 
-<section class="sec" id="score"><div class="sh"><div class="se">Section 09</div><h2 class="st">Scorecard</h2><div class="sd">Share of voice across Press, LLM, and Social. Each channel is normalised to its own cohort share so all three carry equal weight; the Overall SoV is their average, and orgs are ranked by it. Click any row to see the breakdown.</div><div class="sdiv"></div></div>
+<section class="sec" id="score"><div class="sh"><div class="se">Section 08</div><h2 class="st">Scorecard</h2><div class="sd">Share of voice across Press, LLM, and Social. Each channel is normalised to its own cohort share so all three carry equal weight; the Overall SoV is their average, and orgs are ranked by it. Click any row to see the breakdown.</div><div class="sdiv"></div></div>
 ${scorecards}</section>
 
-<section class="sec" id="actions"><div class="sh"><div class="se">Section 10</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
+<section class="sec" id="actions"><div class="sh"><div class="se">Section 09</div><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
 <table class="at"><thead><tr><th>Org</th><th>Priority</th><th>Area</th><th>Action</th><th>Data rationale</th></tr></thead><tbody>${actionRows}</tbody></table></section>
 
-<footer class="rf">Generated by Emerald AI &middot; AQ Intelligence Platform v7 &middot; ${now}<br>
+<footer class="rf">Generated by Emerald AI &middot; Triple Media Tracker v7 &middot; ${now}<br>
 Data: Serper News API &middot; Claude Haiku 4.5 &middot; LLM AEO probing &middot; ${tot} articles &middot; ${esc(DATE_FROM)} to ${esc(DATE_TO)}<br>
 <strong style="color:var(--text)">CONFIDENTIAL</strong> &mdash; prepared for ${esc(CLIENT_NAME || "client")}</footer>
 </main></div>
