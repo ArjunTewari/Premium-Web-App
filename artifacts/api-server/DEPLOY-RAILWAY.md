@@ -43,14 +43,13 @@ Required:
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — references the Railway Postgres service in the same project. (Or paste an external Postgres URL.) |
 | `JWT_SECRET` | any long random string — **required in production** (`lib/auth.ts` throws without it) |
 | `CLAUDE_KEY` | |
-| `EXA_API_KEY` | **article discovery** — from dashboard.exa.ai. Required unless `DISCOVERY=firecrawl`. |
+| `EXA_API_KEY` | **article discovery** — from dashboard.exa.ai. Required. |
 
-Discovery engine:
-| Var | Notes |
-|---|---|
-| `DISCOVERY` | `exa` (default) — corpus-first: one Exa `/search` per keyword cluster over the outlet list + published-date window; assigns each article to the orgs it names; articles naming none feed Emerging Narratives. `firecrawl` — legacy per-org path (needs `FIRECRAWL_KEY`). |
-| `FIRECRAWL_KEY` | required only when `DISCOVERY=firecrawl` |
-| `SERPER_KEY` | optional; only used by the `firecrawl` path (article text + white-space queries) |
+Article discovery is **Exa-only** (corpus-first): one Exa `/search` per keyword
+cluster over the fixed outlet list + published-date window, each article assigned
+to the tracked orgs it names, articles naming none feeding Emerging Narratives.
+The legacy per-org Firecrawl/Serper search path was removed — `DISCOVERY`,
+`FIRECRAWL_KEY`, and `SERPER_KEY` no longer do anything.
 
 Used when present (report sections degrade gracefully if missing):
 `OPENAI_KEY`, `PERPLEXITY_KEY`, `GEMINI_KEY`, `YOUTUBE_KEY`, `X_BEARER_TOKEN`,
@@ -83,8 +82,6 @@ user. Remove both vars once you've logged in and changed the password.
 Performance tuning (optional — sensible defaults baked in):
 | Var | Default | Effect |
 |---|---|---|
-| `FIRECRAWL_CONCURRENCY` | `5` | Per-org Firecrawl searches in flight (print + TV steps) |
-| `FIRECRAWL_MAX_AGE_MS` | `172800000` (2 days) | Serve cached page scrapes this fresh — big win on re-runs; set `0` to disable |
 | `YT_CONCURRENCY` | `4` | Orgs scanned in parallel in the YouTube ER step |
 
 Railway injects `PORT` at runtime; `src/index.ts` reads it.

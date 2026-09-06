@@ -10,8 +10,10 @@ const path = require("path");
 const PptxGen = require("pptxgenjs"); // used by buildPPTX() — was referenced but never required
 const SI = require("./social-intelligence");
 const Sentinel = require("./sentinel");
-const { fetchTvCoverage, AQ_KEYWORDS } = require("./firecrawl-tv");
-const { fetchPrintCoverage } = require("./firecrawl-print");
+// Discovery is Exa-only (corpus-first). The legacy per-org Firecrawl/Serper
+// search path was removed — AQ_KEYWORDS (the 21-term Topic-Ownership-Map
+// taxonomy) now lives in firecrawl-common.js alongside the org-matching helpers.
+const { AQ_KEYWORDS } = require("./firecrawl-common");
 const {
   callClaude,
   parseJ,
@@ -647,15 +649,13 @@ async function run(cfg, cb) {
   cb(`\n=== Emerald AI · AQ Intelligence Report ===`, "head");
   cb(`Orgs: ${ORGS.join(", ")} · ${DATE_FROM} to ${DATE_TO}`);
 
-  // Discovery engine: "exa" (default, corpus-first) or "firecrawl" (per-org).
-  const DISCOVERY = (process.env.DISCOVERY || "exa").toLowerCase();
   const arts = {};
   for (const o of ORGS) arts[o] = [];
   // The Exa corpus fetch also yields articles that name no tracked org —
   // reused directly as the white-space set in STEP 5a.
   let exaWhiteSpace = null;
 
-  if (DISCOVERY === "exa") {
+  {
     // ── STEP 1 (Exa): fetch the whole AQ corpus for the window, then assign
     //    each article to the tracked orgs it names. Naming none → white-space.
     cb(`\nSTEP 1/6 — Fetching AQ corpus (Exa)...`, "head");
@@ -673,207 +673,7 @@ async function run(cfg, cb) {
     for (const org of ORGS)
       cb(`  ${org}: ${arts[org].length} article(s)`, arts[org].length ? "ok" : "warn");
     cb(`  white-space (name no tracked org): ${exaWhiteSpace.length} → Emerging Narratives`, "ok");
-  } else {
-
-  // ── STEP 1: Fetch print articles via Firecrawl ────────────
-  // One call per org: query = '"OrgName" air quality', includeDomains hardcoded
-  // to 4 print outlets, local 21-keyword filter applied inside firecrawl-print.js.
-  cb(`\nSTEP 1/6 — Fetching print articles (Firecrawl)...`, "head");
-
-  {
-    const printResults = await fetchPrintCoverage(cfg, cb);
-    for (const org of ORGS) {
-      const seen = new Set();
-      for (const a of (printResults[org] || [])) {
-        const k = a.url || a.title;
-        if (!seen.has(k)) { seen.add(k); arts[org].push(a); }
-      }
-      cb(`  ${org}: ${arts[org].length} print article(s)`, arts[org].length > 0 ? "ok" : "warn");
-    }
   }
-
-  // Snapshot before TV so we know which articles are TV-only (for targeted scrape later)
-  const tvStartIdx = {};
-  for (const org of ORGS) tvStartIdx[org] = arts[org].length;
-
-  // ── STEP 1b: TV channel coverage via Firecrawl ─────────────
-  // One call per org: query = '"OrgName" air quality', includeDomains hardcoded
-  // to 6 TV channels, local 21-keyword filter applied inside firecrawl-tv.js.
-  cb(`\nSTEP 1b/6 — Fetching TV channel coverage (Firecrawl)...`, "head");
-  {
-    const fcTvResults = await fetchTvCoverage(cfg, cb);
-    for (const org of ORGS) {
-      const tvSeen = new Set(arts[org].map((a) => a.url || a.title));
-      for (const a of (fcTvResults[org] || [])) {
-        const k = a.url || a.title;
-        if (!tvSeen.has(k)) { tvSeen.add(k); arts[org].push(a); }
-      }
-    }
-  }
-
-  // ── STEP 1b-date: Enforce the requested date window ───────────
-  // Firecrawl's `tbs` date hint is applied best-effort by the upstream Google
-  // search and regularly leaks stories from outside the window. Drop every
-  // article whose own published date parses to a point outside
-  // [DATE_FROM, DATE_TO]. Articles with no parseable date are KEPT here and
-  // re-checked after scraping (STEP 1c can recover a date from the body).
-  //
-  // Safety valve: if EVERY article for an org parses as out-of-window, that is
-  // almost always a bad date source (a metadata field holding the crawl date),
-  // not reality — so keep them all, flag it, and let the post-scrape body-date
-  // recheck (STEP 1c-date) sort it out. Better a warned report than an empty one.
-  cb(`\nSTEP 1b-date/6 — Filtering to the ${DATE_FROM} → ${DATE_TO} window...`, "head");
-  for (const org of ORGS) {
-    const before = arts[org].length;
-    if (!before) { cb(`  ${org}: 0 articles`, "warn"); continue; }
-    const kept = arts[org].filter((a) => !dateOutsideRange(a.date));
-    const droppedArts = arts[org].filter((a) => dateOutsideRange(a.date));
-    const sample = droppedArts.slice(0, 3).map((a) => JSON.stringify(a.date || "")).join(", ");
-
-    if (kept.length === 0 && before >= 3) {
-      cb(
-        `  ${org}: every one of ${before} article(s) parsed as out-of-window (dates: ${sample}) — ` +
-          `likely a bad date source; keeping all, will re-check against the scraped body`,
-        "warn",
-      );
-      continue; // leave arts[org] untouched
-    }
-
-    arts[org] = kept;
-    const undated = arts[org].filter((a) => !parseDateStr(a.date)).length;
-    cb(
-      `  ${org}: ${droppedArts.length > 0 ? `dropped ${droppedArts.length} out-of-window (e.g. ${sample}) → ` : ""}${arts[org].length} in window` +
-        (undated > 0 ? ` (${undated} undated, kept pending scrape)` : ""),
-      arts[org].length > 0 ? "ok" : "warn",
-    );
-  }
-
-
-  // ── STEP 1b (TV scrape): Scrape TV articles separately ─────
-  // TV articles were appended after the print search so they fall beyond the
-  // main 16-article scrape window. Scrape up to 8 TV articles per org here.
-  {
-    const tvScrapeLimit = pLimit(8);
-    const tvScrapeJobs = ORGS.flatMap(org =>
-      arts[org].slice(tvStartIdx[org]).filter(a => !a.fullText).slice(0, 8)
-        .map((a, i) => ({ org, a, i }))
-    );
-    if (tvScrapeJobs.length) {
-      cb(`  Scraping ${tvScrapeJobs.length} TV article(s)...`);
-      await Promise.allSettled(tvScrapeJobs.map(({ org, a, i }) => tvScrapeLimit(async () => {
-        if (!a.url) {
-          a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet || ""}`;
-          a.snippetOnly = true;
-          return;
-        }
-        const txt = await serperScrape(a.url, cfg.SERPER_KEY);
-        if (txt && txt.length > 300) {
-          a.fullText = txt;
-          cb(`  [TV ${org} ${i + 1}] scraped ${txt.length} chars`, "ok");
-        } else {
-          a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet || ""}`;
-          a.snippetOnly = true;
-          cb(`  [TV ${org} ${i + 1}] snippet fallback`, "warn");
-        }
-      })));
-    }
-  }
-
-  // ── STEP 1c: Scrape print/news article text ─────────────────
-  cb(`\nSTEP 1c/6 — Scraping full article text (print/news)...`, "head");
-  {
-    // Scrape up to 16 per org (matches classification cap) — concurrently, 8 at a time
-    const scrapeLimit = pLimit(8);
-    const scrapeJobs = ORGS.flatMap(org =>
-      arts[org].slice(0, 16).map((a, i) => ({ org, a, i, total: Math.min(arts[org].length, 16) }))
-    );
-    await Promise.allSettled(scrapeJobs.map(({ org, a, i, total }) => scrapeLimit(async () => {
-      if (!a.url) return;
-      const txt = await serperScrape(a.url, cfg.SERPER_KEY);
-      if (txt && txt.length > 300) {
-        a.fullText = txt;
-        cb(`  [${org} ${i + 1}/${total}] scraped ${txt.length} chars`, "ok");
-      } else {
-        // Scrape failed — fall back to snippet so org mention can still be checked
-        a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet || ""}`;
-        cb(`  [${org} ${i + 1}/${total}] snippet fallback`, "warn");
-      }
-    })));
-  }
-  // Any article not in the scrape slice (e.g. TV articles added after the first 16)
-  // must still get a fallback fullText so they are not silently dropped by the filter below
-  for (const org of ORGS) {
-    arts[org].forEach(a => {
-      if (!a.fullText) {
-        a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet || ""}`;
-      }
-    });
-  }
-
-  // ── STEP 1c-date: Recover missing dates, then re-enforce the window ─────────
-  // Articles that arrived from Firecrawl without a parseable date were kept
-  // through STEP 1b-date. Now that we have the scraped body, pull the publish
-  // date out of it where possible and drop anything that turns out to be
-  // outside [DATE_FROM, DATE_TO]. Still-undated articles are kept (Firecrawl's
-  // tbs filter already targeted the window) but reported.
-  {
-    const DATE_TOKEN_RE = new RegExp(
-      "(\\d{4}[-/]\\d{1,2}[-/]\\d{1,2})" +
-      "|((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4})" +
-      "|(\\d{1,2}(?:st|nd|rd|th)?\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?,?\\s+\\d{4})" +
-      "|(\\b\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4}\\b)",
-      "gi",
-    );
-    const recoverDate = (text) => {
-      if (!text) return null;
-      // Publish date lives in the byline area — a wider scan just collects
-      // dates from the article prose ("...back in March 2019...").
-      const head = text.slice(0, 900);
-      const cands = [];
-      let m;
-      DATE_TOKEN_RE.lastIndex = 0;
-      while ((m = DATE_TOKEN_RE.exec(head)) && cands.length < 8) {
-        const d = parseDateStr(m[0]);
-        if (d && d.getFullYear() >= 2018 && d <= new Date(Date.now() + 86400000)) cands.push(d);
-      }
-      if (!cands.length) return null;
-      const inWin = cands.find((d) => d >= dropBefore && d <= dropAfter);
-      return { date: inWin || cands[0], anyInWindow: !!inWin };
-    };
-
-    for (const org of ORGS) {
-      const before = arts[org].length;
-      if (!before) continue;
-      let recovered = 0;
-      const decide = (a) => {
-        if (parseDateStr(a.date)) return !dateOutsideRange(a.date); // already dated
-        const r = recoverDate(a.fullText);
-        if (!r) return true; // genuinely undated — keep
-        recovered++;
-        a.date = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}-${String(r.date.getDate()).padStart(2, "0")}`;
-        a.dateRecovered = true;
-        return r.anyInWindow;
-      };
-      const kept = arts[org].filter(decide);
-
-      if (kept.length === 0 && before >= 3) {
-        cb(`  ${org}: all ${before} article(s) still resolve outside the window — keeping them, dates need a manual check`, "warn");
-        continue;
-      }
-      arts[org] = kept;
-      const dropped = before - arts[org].length;
-      const undated = arts[org].filter((a) => !parseDateStr(a.date)).length;
-      if (dropped || recovered || undated) {
-        cb(
-          `  ${org}: ${recovered ? `recovered ${recovered} date(s), ` : ""}${dropped ? `dropped ${dropped} out-of-window, ` : ""}${arts[org].length} kept` +
-            (undated ? ` (${undated} still undated)` : ""),
-          "ok",
-        );
-      }
-    }
-  }
-
-  } // ── end DISCOVERY branch (exa | firecrawl) ─────────────────────────────
 
   // ── STEP 1d: Require org name in scraped body text ───────────
   // Serper can return articles where the org name appears in page metadata,
@@ -986,19 +786,18 @@ ${batchText}`;
 
   // ── STEP 1f: Keyword tagging ─────────────────────────────────────────────
   // Tag each final article with the AQ keywords found in its text.
-  // TV articles (source matches a TV channel) → checked against the full 51-term
-  //   AQ_KEYWORDS taxonomy used by firecrawl-tv (the same list that drove the query).
+  // TV articles (source matches a TV channel) → checked against the full
+  //   AQ_KEYWORDS taxonomy (the 21-term Topic-Ownership-Map list).
   // Press / online articles → checked against the user's SCOPE_KEYWORDS so the
-  //   "keywords found" column in Press Analytics reflects what Serper was asked for.
+  //   "keywords found" column in Press Analytics reflects the configured scope.
   {
     const tvSet = new Set(ALL_TV_CHANNELS.map(c => c.toLowerCase()));
     for (const org of ORGS) {
       for (const a of arts[org]) {
-        // The Firecrawl TV/print collectors already tag their articles against
-        // the shared 51-term AQ taxonomy, using the scraped markdown that only
-        // they hold. Re-deriving here from title+snippet+fullText would be
-        // strictly worse (and, for print, would silently swap in the narrower
-        // SCOPE_KEYWORDS list), so keep whatever a collector already set.
+        // The Exa collector already tags each article with the AQ keywords it
+        // matched, off the full article text. Re-deriving here from
+        // title+snippet+fullText would be strictly worse (and would silently
+        // swap in the narrower SCOPE_KEYWORDS list), so keep what it set.
         if (a.foundKeywords?.length) continue;
         const text = `${a.title || ''} ${a.snippet || ''} ${a.fullText || ''}`.toLowerCase();
         const isTV = tvSet.has((a.source || '').toLowerCase());
@@ -1266,52 +1065,11 @@ ${batchText}`;
 
   // ── STEP 5a: General AQ landscape (white-space gap analysis) ──────────────
   cb(`\nSTEP 5a/6 — General AQ landscape (white-space gaps)...`, "head");
-  let whiteSpaceArticles = [];
-  if (exaWhiteSpace) {
-    // Exa discovery already produced this: corpus articles that name no tracked
-    // org. No extra queries needed — and it's guaranteed consistent with the
-    // press section (same corpus, same window).
-    whiteSpaceArticles = exaWhiteSpace.filter((a) => !dateOutsideRange(a.date));
-    cb(`  ${whiteSpaceArticles.length} in-window AQ articles with no tracked org (from the Exa corpus)`, whiteSpaceArticles.length ? "ok" : "warn");
-  } else try {
-    const orgExclusions = ORGS.map((o) => `-"${o}"`).join(" ");
-    const generalQueries = [
-      `air quality India ${orgExclusions}`,
-      `air pollution India policy ${orgExclusions}`,
-      `India AQI PM2.5 health ${orgExclusions}`,
-      `India air pollution research study ${orgExclusions}`,
-      `India smog pollution news ${orgExclusions}`,
-    ];
-    // Fire all five general queries at once — they share no state and Serper
-    // handles this fan-out trivially. Serial + 200ms sleeps cost ~3-5s here.
-    const rawGeneral = [];
-    const generalSettled = await Promise.allSettled(
-      generalQueries.map((q) => serperSearch(q, cfg.SERPER_KEY)),
-    );
-    generalSettled.forEach((r, i) => {
-      if (r.status === "fulfilled") rawGeneral.push(...r.value);
-      else cb(`  general query error (${generalQueries[i].slice(0, 40)}…): ${r.reason?.message || r.reason}`, "warn");
-    });
-    const seen = new Set();
-    const deduped = rawGeneral.filter((a) => {
-      const u = a.link || a.url || "";
-      if (!u || seen.has(u)) return false;
-      seen.add(u);
-      return true;
-    });
-    const orgLower = ORGS.map((o) => o.toLowerCase());
-    whiteSpaceArticles = deduped.filter((a) => {
-      if (dateOutsideRange(a.date)) return false; // keep the gap analysis in-window
-      const text = ((a.title || "") + " " + (a.snippet || "")).toLowerCase();
-      return !orgLower.some((o) => text.includes(o));
-    });
-    cb(
-      `  ${deduped.length} general AQ articles → ${whiteSpaceArticles.length} in-window & exclude tracked orgs`,
-      whiteSpaceArticles.length > 0 ? "ok" : "warn",
-    );
-  } catch (e) {
-    cb(`  general AQ fetch error: ${e.message}`, "warn");
-  }
+  // Exa discovery already produced this: corpus articles that name no tracked
+  // org. No extra queries needed — and it's guaranteed consistent with the
+  // press section (same corpus, same window).
+  const whiteSpaceArticles = exaWhiteSpace.filter((a) => !dateOutsideRange(a.date));
+  cb(`  ${whiteSpaceArticles.length} in-window AQ articles with no tracked org (from the Exa corpus)`, whiteSpaceArticles.length ? "ok" : "warn");
 
   // ── STEP 5b: AI analysis ───────────────────────────────────
   cb(
@@ -3922,7 +3680,7 @@ ${(() => {
   const good = 'background:rgba(74,175,116,.08);border:1px solid rgba(74,175,116,.3);color:var(--good)';
   const wrap = (css, body) => `<div class="sentinel-note" style="${css};border-radius:8px;padding:10px 14px;margin-top:20px;font-size:16px;line-height:1.7">${body}</div>`;
   if (!absent.length)
-    return wrap(good, `<strong>&#9432; SENTINEL</strong> — All ${ORGS.length} orgs returned press coverage via Firecrawl.`);
+    return wrap(good, `<strong>&#9432; SENTINEL</strong> — All ${ORGS.length} orgs returned press coverage from the Exa corpus.`);
   return wrap(warn, `<strong>&#9432; SENTINEL</strong> — found no press coverage for ${absent.length} org(s) (${absent.map(esc).join(', ')}) — verified absent from indexed print outlets in this window, not a query artefact.`);
 })()}</section>
 
