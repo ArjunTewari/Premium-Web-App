@@ -12,7 +12,7 @@
 // Failed requests are retried up to 3 times with exponential backoff.
 
 const {
-  AQ_KEYWORDS, orgMentioned, articleText, matchedKeywords, buildOutletMatcher, mapWithConcurrency,
+  AQ_KEYWORDS, orgMentioned, articleText, articleDate, matchedKeywords, buildOutletMatcher, mapWithConcurrency,
 } = require("./firecrawl-common");
 const { costTracker } = require("./claude-client");
 
@@ -159,7 +159,7 @@ async function fetchTvCoverage(cfg, cb = () => {}) {
           snippet:       item.snippet || item.description || "",
           source:        outlet,
           url:           item.url     || "",
-          date:          item.date    || "",
+          date:          articleDate(item),
           // Canonical field name, shared with firecrawl-print.js and read
           // directly by the report renderer.
           foundKeywords: kws.slice(0, 8),

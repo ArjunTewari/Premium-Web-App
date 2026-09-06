@@ -141,40 +141,75 @@ const dom = (url) => {
 
 function parseDateStr(s) {
   if (!s) return null;
+  s = String(s).trim();
   const now = new Date();
-  const ago = s.match(/(\d+)\s*(day|week|month|year)/i);
+
+  // "today" / "yesterday"
+  if (/^today\b/i.test(s)) return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (/^yesterday\b/i.test(s)) {
+    const d = new Date(now); d.setDate(d.getDate() - 1); return d;
+  }
+
+  // "3 days ago", "2 weeks ago", "5 hours ago", "a day ago", "an hour ago"
+  const ago = s.match(/(\d+|an?)\s*(hour|day|week|month|year)s?\s*ago/i);
   if (ago) {
-    const n = parseInt(ago[1]),
+    const n = /^\d+$/.test(ago[1]) ? parseInt(ago[1]) : 1,
       u = ago[2][0].toLowerCase(),
       d = new Date(now);
-    if (u === "d") d.setDate(d.getDate() - n);
+    if (u === "h") d.setHours(d.getHours() - n);
+    else if (u === "d") d.setDate(d.getDate() - n);
     else if (u === "w") d.setDate(d.getDate() - n * 7);
     else if (u === "m") d.setMonth(d.getMonth() - n);
     else d.setFullYear(d.getFullYear() - n);
     return d;
   }
+
   const mo = {
-    jan: 0,
-    feb: 1,
-    mar: 2,
-    apr: 3,
-    may: 4,
-    jun: 5,
-    jul: 6,
-    aug: 7,
-    sep: 8,
-    oct: 9,
-    nov: 10,
-    dec: 11,
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
   };
-  const m1 = s.match(/(\w+)\s+(\d{1,2}),?\s+(\d{4})/i);
-  if (m1) {
-    const mv = mo[m1[1].toLowerCase().slice(0, 3)];
-    if (mv != null) return new Date(parseInt(m1[3]), mv, parseInt(m1[2]));
+
+  // ISO first: 2026-06-15 or 2026-06-15T08:30:00Z or 2026/06/15
+  const iso = s.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (iso) {
+    const y = +iso[1], mm = +iso[2] - 1, dd = +iso[3];
+    if (mm >= 0 && mm <= 11 && dd >= 1 && dd <= 31) return new Date(y, mm, dd);
   }
-  const iso = s.match(/(\d{4})-(\d{2})-(\d{2})/);
-  if (iso)
-    return new Date(parseInt(iso[1]), parseInt(iso[2]) - 1, parseInt(iso[3]));
+
+  // "Jun 5, 2026" / "June 5 2026" / "5 Jun 2026" / "5 June 2026"
+  const monName = "(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*";
+  let m = s.match(new RegExp(`${monName}\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})`, "i"));
+  if (m) {
+    const mv = mo[m[1].toLowerCase().slice(0, 3)];
+    if (mv != null) return new Date(+m[3], mv, +m[2]);
+  }
+  m = s.match(new RegExp(`(\\d{1,2})(?:st|nd|rd|th)?\\s+${monName}\\.?,?\\s+(\\d{4})`, "i"));
+  if (m) {
+    const mv = mo[m[2].toLowerCase().slice(0, 3)];
+    if (mv != null) return new Date(+m[3], mv, +m[1]);
+  }
+
+  // Numeric slash/dot/dash: DD/MM/YYYY or MM/DD/YYYY. Indian outlets use
+  // day-first, so default to that; only flip to month-first when the first
+  // field can't be a day (>12) — matching Firecrawl's own M/D/YYYY tbs format.
+  const num = s.match(/\b(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})\b/);
+  if (num) {
+    let a = +num[1], b = +num[2];
+    let y = +num[3];
+    if (y < 100) y += y < 70 ? 2000 : 1900;
+    let dd, mm;
+    if (a > 12 && b <= 12) { dd = a; mm = b; }        // clearly day-first
+    else if (b > 12 && a <= 12) { dd = b; mm = a; }   // clearly month-first
+    else { dd = a; mm = b; }                          // ambiguous → day-first
+    if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) return new Date(y, mm - 1, dd);
+  }
+
+  // Last resort: native parser, but only trust a sane year.
+  const t = Date.parse(s);
+  if (!Number.isNaN(t)) {
+    const d = new Date(t);
+    if (d.getFullYear() >= 2000 && d.getFullYear() <= 2100) return d;
+  }
   return null;
 }
 
@@ -586,13 +621,16 @@ async function run(cfg, cb) {
         "GRAP",
       ];
 
-  const inRange = (dateStr) => {
+  // Report window bounds. `rangeStart` is the first instant of DATE_FROM;
+  // `rangeEnd` is the last instant of DATE_TO (end-of-day, inclusive).
+  const rangeStart = new Date(DATE_FROM + "T00:00:00");
+  const rangeEnd = new Date(DATE_TO + "T23:59:59.999");
+
+  /** true when the string parses to a date strictly outside [DATE_FROM, DATE_TO]. */
+  const dateOutsideRange = (dateStr) => {
     const d = parseDateStr(dateStr);
-    if (!d) return false; // exclude articles with no parseable date
-    const f = new Date(DATE_FROM),
-      t = new Date(DATE_TO);
-    t.setDate(t.getDate() + 1);
-    return d >= f && d <= t;
+    if (!d) return false; // undated — can't prove it's out of range
+    return d < rangeStart || d > rangeEnd;
   };
 
   cb(`\n=== Emerald AI · AQ Intelligence Report ===`, "head");
@@ -634,6 +672,25 @@ async function run(cfg, cb) {
         if (!tvSeen.has(k)) { tvSeen.add(k); arts[org].push(a); }
       }
     }
+  }
+
+  // ── STEP 1b-date: Enforce the requested date window ───────────
+  // Firecrawl's `tbs` date hint is applied best-effort by the upstream Google
+  // search and regularly leaks stories from outside the window. Drop every
+  // article whose own published date parses to a point outside
+  // [DATE_FROM, DATE_TO]. Articles with no parseable date are KEPT here and
+  // re-checked after scraping (STEP 1c can recover a date from the body).
+  cb(`\nSTEP 1b-date/6 — Filtering to the ${DATE_FROM} → ${DATE_TO} window...`, "head");
+  for (const org of ORGS) {
+    const before = arts[org].length;
+    arts[org] = arts[org].filter((a) => !dateOutsideRange(a.date));
+    const dropped = before - arts[org].length;
+    const undated = arts[org].filter((a) => !parseDateStr(a.date)).length;
+    cb(
+      `  ${org}: ${dropped > 0 ? `dropped ${dropped} out-of-window → ` : ""}${arts[org].length} in window` +
+        (undated > 0 ? ` (${undated} undated, kept pending scrape)` : ""),
+      arts[org].length > 0 ? "ok" : "warn",
+    );
   }
 
 
@@ -696,6 +753,59 @@ async function run(cfg, cb) {
         a.fullText = `TITLE: ${a.title}\nSNIPPET: ${a.snippet || ""}`;
       }
     });
+  }
+
+  // ── STEP 1c-date: Recover missing dates, then re-enforce the window ─────────
+  // Articles that arrived from Firecrawl without a parseable date were kept
+  // through STEP 1b-date. Now that we have the scraped body, pull the publish
+  // date out of it where possible and drop anything that turns out to be
+  // outside [DATE_FROM, DATE_TO]. Still-undated articles are kept (Firecrawl's
+  // tbs filter already targeted the window) but reported.
+  {
+    const DATE_TOKEN_RE = new RegExp(
+      "(\\d{4}[-/]\\d{1,2}[-/]\\d{1,2})" +
+      "|((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4})" +
+      "|(\\d{1,2}(?:st|nd|rd|th)?\\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?,?\\s+\\d{4})" +
+      "|(\\b\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4}\\b)",
+      "gi",
+    );
+    const recoverDate = (text) => {
+      if (!text) return null;
+      const head = text.slice(0, 2000);
+      const cands = [];
+      let m;
+      DATE_TOKEN_RE.lastIndex = 0;
+      while ((m = DATE_TOKEN_RE.exec(head)) && cands.length < 12) {
+        const d = parseDateStr(m[0]);
+        if (d && d.getFullYear() >= 2015 && d <= new Date(Date.now() + 86400000)) cands.push(d);
+      }
+      if (!cands.length) return null;
+      const inWin = cands.find((d) => d >= rangeStart && d <= rangeEnd);
+      return { date: inWin || cands[0], anyInWindow: !!inWin };
+    };
+
+    for (const org of ORGS) {
+      const before = arts[org].length;
+      let recovered = 0;
+      arts[org] = arts[org].filter((a) => {
+        if (parseDateStr(a.date)) return !dateOutsideRange(a.date); // already dated
+        const r = recoverDate(a.fullText);
+        if (!r) return true; // genuinely undated — keep, tbs already filtered
+        recovered++;
+        a.date = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, "0")}-${String(r.date.getDate()).padStart(2, "0")}`;
+        a.dateRecovered = true;
+        return r.anyInWindow; // drop when every date found in the body is outside
+      });
+      const dropped = before - arts[org].length;
+      const undated = arts[org].filter((a) => !parseDateStr(a.date)).length;
+      if (dropped || recovered || undated) {
+        cb(
+          `  ${org}: ${recovered ? `recovered ${recovered} date(s), ` : ""}${dropped ? `dropped ${dropped} out-of-window, ` : ""}${arts[org].length} kept` +
+            (undated ? ` (${undated} still undated)` : ""),
+          "ok",
+        );
+      }
+    }
   }
 
   // ── STEP 1d: Require org name in scraped body text ───────────
@@ -1121,11 +1231,12 @@ ${batchText}`;
     });
     const orgLower = ORGS.map((o) => o.toLowerCase());
     whiteSpaceArticles = deduped.filter((a) => {
+      if (dateOutsideRange(a.date)) return false; // keep the gap analysis in-window
       const text = ((a.title || "") + " " + (a.snippet || "")).toLowerCase();
       return !orgLower.some((o) => text.includes(o));
     });
     cb(
-      `  ${deduped.length} general AQ articles → ${whiteSpaceArticles.length} exclude tracked orgs`,
+      `  ${deduped.length} general AQ articles → ${whiteSpaceArticles.length} in-window & exclude tracked orgs`,
       whiteSpaceArticles.length > 0 ? "ok" : "warn",
     );
   } catch (e) {

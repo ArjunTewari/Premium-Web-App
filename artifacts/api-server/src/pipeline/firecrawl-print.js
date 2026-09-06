@@ -19,7 +19,7 @@
 // field the report renderer reads) so print rows show keyword pills like TV.
 
 const {
-  AQ_KEYWORDS, orgMentioned, articleText, matchedKeywords, buildOutletMatcher, mapWithConcurrency,
+  AQ_KEYWORDS, orgMentioned, articleText, articleDate, matchedKeywords, buildOutletMatcher, mapWithConcurrency,
 } = require("./firecrawl-common");
 const { costTracker } = require("./claude-client");
 
@@ -148,7 +148,7 @@ async function fetchPrintCoverage(cfg, cb = () => {}) {
           snippet:        item.snippet || item.description || "",
           source:         outlet,
           url:            item.url     || "",
-          date:           item.date    || "",
+          date:           articleDate(item),
           // Canonical field name — previously `keywords_found`, which nothing
           // downstream read, so print rows rendered without keyword pills.
           foundKeywords:  kws.slice(0, 8),
