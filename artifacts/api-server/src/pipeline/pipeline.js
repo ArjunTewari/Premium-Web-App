@@ -586,6 +586,7 @@ async function run(cfg, cb) {
   costTracker.openaiCalls = 0;
   costTracker.geminiCalls = 0;
   costTracker.claudeAeoCalls = 0;
+  costTracker.exaSearches = 0;
 
   // Simple concurrency limiter — no extra npm dep needed
   function pLimit(concurrency) {
@@ -646,12 +647,38 @@ async function run(cfg, cb) {
   cb(`\n=== Emerald AI · AQ Intelligence Report ===`, "head");
   cb(`Orgs: ${ORGS.join(", ")} · ${DATE_FROM} to ${DATE_TO}`);
 
+  // Discovery engine: "exa" (default, corpus-first) or "firecrawl" (per-org).
+  const DISCOVERY = (process.env.DISCOVERY || "exa").toLowerCase();
+  const arts = {};
+  for (const o of ORGS) arts[o] = [];
+  // The Exa corpus fetch also yields articles that name no tracked org —
+  // reused directly as the white-space set in STEP 5a.
+  let exaWhiteSpace = null;
+
+  if (DISCOVERY === "exa") {
+    // ── STEP 1 (Exa): fetch the whole AQ corpus for the window, then assign
+    //    each article to the tracked orgs it names. Naming none → white-space.
+    cb(`\nSTEP 1/6 — Fetching AQ corpus (Exa)...`, "head");
+    const { fetchCorpus } = require("./exa-collector");
+    const { orgMentioned } = require("./firecrawl-common");
+    const corpus = await fetchCorpus(cfg, cb);
+    exaWhiteSpace = [];
+    for (const a of corpus) {
+      const matched = ORGS.filter(
+        (org) => orgMentioned(a.fullText || "", org) || orgMentioned(a.title || "", org),
+      );
+      if (matched.length) for (const org of matched) arts[org].push({ ...a });
+      else exaWhiteSpace.push(a);
+    }
+    for (const org of ORGS)
+      cb(`  ${org}: ${arts[org].length} article(s)`, arts[org].length ? "ok" : "warn");
+    cb(`  white-space (name no tracked org): ${exaWhiteSpace.length} → Emerging Narratives`, "ok");
+  } else {
+
   // ── STEP 1: Fetch print articles via Firecrawl ────────────
   // One call per org: query = '"OrgName" air quality', includeDomains hardcoded
   // to 4 print outlets, local 21-keyword filter applied inside firecrawl-print.js.
   cb(`\nSTEP 1/6 — Fetching print articles (Firecrawl)...`, "head");
-  const arts = {};
-  for (const o of ORGS) arts[o] = [];
 
   {
     const printResults = await fetchPrintCoverage(cfg, cb);
@@ -845,6 +872,8 @@ async function run(cfg, cb) {
       }
     }
   }
+
+  } // ── end DISCOVERY branch (exa | firecrawl) ─────────────────────────────
 
   // ── STEP 1d: Require org name in scraped body text ───────────
   // Serper can return articles where the org name appears in page metadata,
@@ -1235,13 +1264,16 @@ ${batchText}`;
     );
   }
 
-  // ── STEP 5a: General AQ landscape fetch (white-space gap analysis) ────────
-  cb(
-    `\nSTEP 5a/6 — Fetching general AQ landscape (white-space gaps)...`,
-    "head",
-  );
+  // ── STEP 5a: General AQ landscape (white-space gap analysis) ──────────────
+  cb(`\nSTEP 5a/6 — General AQ landscape (white-space gaps)...`, "head");
   let whiteSpaceArticles = [];
-  try {
+  if (exaWhiteSpace) {
+    // Exa discovery already produced this: corpus articles that name no tracked
+    // org. No extra queries needed — and it's guaranteed consistent with the
+    // press section (same corpus, same window).
+    whiteSpaceArticles = exaWhiteSpace.filter((a) => !dateOutsideRange(a.date));
+    cb(`  ${whiteSpaceArticles.length} in-window AQ articles with no tracked org (from the Exa corpus)`, whiteSpaceArticles.length ? "ok" : "warn");
+  } else try {
     const orgExclusions = ORGS.map((o) => `-"${o}"`).join(" ");
     const generalQueries = [
       `air quality India ${orgExclusions}`,
@@ -1440,6 +1472,7 @@ ${batchText}`;
     claudeInPerM:     1.0,     // Anthropic input  $/1M tokens (Haiku/Sonnet blended)
     claudeOutPerM:    5.0,     // Anthropic output $/1M tokens
     firecrawlSearch:  0.05,    // /v2/search with scrape (news + ~15 page scrapes)
+    exaSearch:        0.04,    // Exa /search, 40 results + full text (~$0.007 + extras)
     apidirectCall:    0.01,    // APIdirect.io per endpoint call
     youtubeCall:      0.0,     // YouTube Data API v3 — quota-limited, no $ charge
     perplexityCall:   0.001,   // sonar per query
@@ -1453,6 +1486,7 @@ ${batchText}`;
           + (c.claudeOutputTokens / 1e6) * UNIT.claudeOutPerM,
     serper: c.serperQueries * UNIT.serperQuery,
     firecrawl: c.firecrawlSearches * UNIT.firecrawlSearch,
+    exa: (c.exaSearches || 0) * UNIT.exaSearch,
     apidirect: c.apidirectCalls * UNIT.apidirectCall,
     youtube: c.youtubeApiCalls * UNIT.youtubeCall,
     perplexity: c.perplexityCalls * UNIT.perplexityCall,
@@ -1467,6 +1501,7 @@ ${batchText}`;
       claudeOutputTokens: c.claudeOutputTokens,
       serperQueries: c.serperQueries,
       firecrawlSearches: c.firecrawlSearches,
+      exaSearches: c.exaSearches || 0,
       apidirectCalls: c.apidirectCalls,
       youtubeApiCalls: c.youtubeApiCalls,
       perplexityCalls: c.perplexityCalls,
