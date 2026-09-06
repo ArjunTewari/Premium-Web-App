@@ -18,25 +18,17 @@
 // orgMentioned() below is the gate that fixes it.
 
 // ── AQ keyword taxonomy (single source of truth for TV and print) ────────────
+// These are the 21 categories of the Topic Ownership Map. The gate was briefly
+// widened to ~51 terms (adding broad ones like "air pollution", "smog", "aqi"),
+// which let in loosely-related environment stories and inflated the counts.
+// Back to the 21 specific AQ concepts — an article must be about one of these
+// to count as coverage.
 const AQ_KEYWORDS = [
-  // Original taxonomy
   "ncap", "pm2.5", "exposure mapping", "stubble burn", "clean air finance",
   "vehicular pollution", "health impact", "industrial pollution", "heat-aqi",
   "brick kiln", "petrol emission", "diesel emission", "super emitter",
   "thermal power", "household pollution", "indoor pollution", "biomass",
   "rice residue", "wheat residue", "road dust", "air quality",
-  // Pollutants & metrics
-  "pm10", "aqi", "smog", "air pollution", "particulate matter",
-  "nitrogen dioxide", "no2", "sulfur dioxide", "so2", "nox",
-  "ozone pollution", "black carbon", "fly ash",
-  // India-specific AQ mechanisms
-  "grap", "caqm", "odd-even", "bs6", "emission norms",
-  "smog tower", "dg set", "pollution hotspot",
-  // Burning sources
-  "paddy burning", "crop fire", "farm fire", "crop residue",
-  "open burning", "garbage burning", "waste burning", "firecracker",
-  // Weather-linked AQ
-  "dust storm",
 ];
 
 // ── Org aliases ──────────────────────────────────────────────────────────────
