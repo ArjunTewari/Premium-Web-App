@@ -2,10 +2,12 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import path from "node:path";
 import fs from "node:fs";
 import crypto from "node:crypto";
-import { db, reportLogsTable } from "@workspace/db";
-import { calculateReportCosts } from "../lib/auth.js";
+import { eq } from "drizzle-orm";
+import { db, reportLogsTable, usersTable } from "@workspace/db";
+import { calculateClientBilling } from "../lib/auth.js";
 import { requireAuth } from "../middleware/require-auth.js";
 import { run } from "../pipeline/index.js";
+import { sendAdminReportEmail, sendClientReportEmail } from "../lib/mailer.js";
 
 const ALERT_TO = "+918588098882";
 
@@ -170,26 +172,69 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await run(cfg as any, cb);
-    const costs = calculateReportCosts(cfg.ORGS, cfg.DATE_FROM, cfg.DATE_TO);
+
+    // Client billing: random ₹52–53 per org per month, this report.
+    const billing = calculateClientBilling(cfg.ORGS, cfg.DATE_FROM, cfg.DATE_TO);
+    // Real API cost of producing the report (from the pipeline's usage counters).
+    const apiCost = result.cost;
+    const apiCostInr = apiCost?.totalINR ?? 0;
 
     // Always persist result — the client may already be disconnected.
-    runStore.set(runId, { status: "done", htmlName: result.htmlName, costInr: costs.costInr });
+    runStore.set(runId, { status: "done", htmlName: result.htmlName, costInr: billing.costInr });
 
-    send("done", { runId, htmlName: result.htmlName, costInr: costs.costInr });
-    sendReportSms(costs.costInr, cfg.ORGS, result.htmlName ?? "").catch(() => {});
+    send("done", { runId, htmlName: result.htmlName, costInr: billing.costInr });
+    sendReportSms(billing.costInr, cfg.ORGS, result.htmlName ?? "").catch(() => {});
+
+    // ── Cost emails ────────────────────────────────────────────────────────
+    // The generating account is "the client". Look up its email (captured at
+    // signup) so it receives the client-cost email; the admin always receives
+    // the real-API-cost + client-cost email.
+    (async () => {
+      let clientEmail: string | null = null;
+      const uid = (req.user as { userId?: number } | undefined)?.userId;
+      if (uid != null) {
+        try {
+          const [u] = await db
+            .select({ email: usersTable.email })
+            .from(usersTable)
+            .where(eq(usersTable.id, uid))
+            .limit(1);
+          clientEmail = u?.email ?? null;
+        } catch (e) {
+          console.error("client email lookup failed:", e);
+        }
+      }
+      const emailCtx = {
+        orgs: cfg.ORGS,
+        dateFrom: cfg.DATE_FROM,
+        dateTo: cfg.DATE_TO,
+        htmlName: result.htmlName ?? "",
+        clientName: cfg.CLIENT_NAME,
+        billing,
+      };
+      await sendAdminReportEmail({ ...emailCtx, apiCost, generatedByEmail: clientEmail });
+      if (clientEmail) await sendClientReportEmail(clientEmail, emailCtx);
+    })().catch((e: unknown) => console.error("Report email dispatch failed:", e));
+
     db.insert(reportLogsTable).values({
       organizations: cfg.ORGS,
       dateFrom: cfg.DATE_FROM,
       dateTo: cfg.DATE_TO,
       htmlName: result.htmlName ?? null,
       clientName: cfg.CLIENT_NAME,
-      costInr: costs.costInr.toFixed(2),
-      costSerperInr: costs.costSerperInr.toFixed(2),
-      costLlmAeoInr: costs.costLlmAeoInr.toFixed(2),
-      costClaudeInr: costs.costClaudeInr.toFixed(2),
-      costYoutubeInr: costs.costYoutubeInr.toFixed(2),
-      costStorageInr: costs.costStorageInr.toFixed(2),
-      costDeploymentInr: costs.costDeploymentInr.toFixed(2),
+      generatedBy: (req.user as { username?: string } | undefined)?.username ?? null,
+      costInr: billing.costInr.toFixed(2),
+      perOrgMonthInr: billing.perOrgMonthInr.toFixed(2),
+      apiCostInr: apiCostInr.toFixed(2),
+      // Per-service real cost (INR) mapped onto the existing columns for the
+      // admin dashboard. usdToInr defaults to 84 when the pipeline didn't
+      // return a breakdown (older run path).
+      costClaudeInr: (((apiCost?.linesUSD.claude ?? 0) + (apiCost?.linesUSD.claudeAeo ?? 0)) * (apiCost?.usdToInr ?? 84)).toFixed(2),
+      costSerperInr: ((apiCost?.linesUSD.serper ?? 0) * (apiCost?.usdToInr ?? 84)).toFixed(2),
+      costLlmAeoInr: (((apiCost?.linesUSD.perplexity ?? 0) + (apiCost?.linesUSD.openai ?? 0) + (apiCost?.linesUSD.gemini ?? 0)) * (apiCost?.usdToInr ?? 84)).toFixed(2),
+      costYoutubeInr: ((apiCost?.linesUSD.youtube ?? 0) * (apiCost?.usdToInr ?? 84)).toFixed(2),
+      costStorageInr: ((apiCost?.linesUSD.firecrawl ?? 0) * (apiCost?.usdToInr ?? 84)).toFixed(2),
+      costDeploymentInr: ((apiCost?.linesUSD.apidirect ?? 0) * (apiCost?.usdToInr ?? 84)).toFixed(2),
     }).catch((e: unknown) => console.error("Failed to log report:", e));
   } catch (e: unknown) {
     const msg = (e as Error).message;

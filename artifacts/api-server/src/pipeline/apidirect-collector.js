@@ -20,6 +20,7 @@
 const axios = require('axios');
 const fs    = require('fs');
 const path  = require('path');
+const { costTracker } = require('./claude-client');
 
 const BASE = 'https://apidirect.io/v1';
 
@@ -195,6 +196,7 @@ async function apiFetch(endpoint, params, apiKey) {
           // gate-queue waiting happens before axios starts, so it isn't counted.
           timeout: 30000,
         });
+        costTracker.apidirectCalls++;
         return data;
       } catch (e) {
         const status = e.response?.status;

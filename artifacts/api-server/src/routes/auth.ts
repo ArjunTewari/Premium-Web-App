@@ -40,12 +40,17 @@ router.post("/auth/login", async (req: Request, res: Response) => {
 
 router.post("/auth/signup", async (req: Request, res: Response) => {
   const { username, password } = req.body || {};
+  const email = typeof req.body?.email === "string" ? req.body.email.trim() : "";
   if (!username || !password)
     return res.status(400).json({ error: "Username and password required" });
   if (username.length < 3)
     return res.status(400).json({ error: "Username must be at least 3 characters" });
   if (password.length < 6)
     return res.status(400).json({ error: "Password must be at least 6 characters" });
+  // Email is captured so the account (the client) receives its cost email per
+  // report. Optional at the API level, but validate the format when present.
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ error: "Enter a valid email address" });
 
   const [existing] = await db
     .select({ id: usersTable.id })
@@ -58,7 +63,7 @@ router.post("/auth/signup", async (req: Request, res: Response) => {
   const hash = await bcrypt.hash(password, 10);
   const [newUser] = await db
     .insert(usersTable)
-    .values({ username, passwordHash: hash, role: "user", totpEnabled: false })
+    .values({ username, email: email || null, passwordHash: hash, role: "user", totpEnabled: false })
     .returning();
 
   const fullToken = signFullToken({

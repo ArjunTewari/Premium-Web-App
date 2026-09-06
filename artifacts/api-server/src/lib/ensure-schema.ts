@@ -19,12 +19,14 @@ export async function ensureSchema(): Promise<void> {
     CREATE TABLE IF NOT EXISTS "users" (
       "id" serial PRIMARY KEY,
       "username" text NOT NULL UNIQUE,
+      "email" text,
       "password_hash" text NOT NULL,
       "totp_secret" text,
       "totp_enabled" boolean NOT NULL DEFAULT false,
       "role" text NOT NULL DEFAULT 'admin',
       "created_at" timestamp NOT NULL DEFAULT now()
     );
+    ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email" text;
 
     CREATE TABLE IF NOT EXISTS "report_logs" (
       "id" serial PRIMARY KEY,
@@ -42,8 +44,12 @@ export async function ensureSchema(): Promise<void> {
       "cost_youtube_inr" numeric(10, 2) NOT NULL DEFAULT '0',
       "cost_storage_inr" numeric(10, 2) NOT NULL,
       "cost_deployment_inr" numeric(10, 2) NOT NULL,
+      "api_cost_inr" numeric(10, 2) NOT NULL DEFAULT '0',
+      "per_org_month_inr" numeric(10, 2) NOT NULL DEFAULT '0',
       "created_at" timestamp NOT NULL DEFAULT now()
     );
+    ALTER TABLE "report_logs" ADD COLUMN IF NOT EXISTS "api_cost_inr" numeric(10, 2) NOT NULL DEFAULT '0';
+    ALTER TABLE "report_logs" ADD COLUMN IF NOT EXISTS "per_org_month_inr" numeric(10, 2) NOT NULL DEFAULT '0';
   `;
   try {
     await pool.query(ddl);

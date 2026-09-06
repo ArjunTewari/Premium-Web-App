@@ -30,9 +30,19 @@ export interface RunConfig {
   IG_BUSINESS_ACCOUNT_ID?: string;
   outDir: string;
 }
+export interface ReportApiCost {
+  counts: Record<string, number>;
+  linesUSD: Record<string, number>;
+  unitRates: Record<string, number>;
+  totalUSD: number;
+  totalINR: number;
+  usdToInr: number;
+}
 export interface RunResult {
   htmlName: string;
   pptxName: string;
+  /** Real metered/estimated API cost of producing this report. */
+  cost?: ReportApiCost;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
