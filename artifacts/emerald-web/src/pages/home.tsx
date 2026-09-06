@@ -131,7 +131,7 @@ const ORG_LI_HANDLES: Record<string, string> = {
   "EPIC India":                                       "epic-india",                                        // epic.uchicago.in · 21,378 flw
   "Climate Trends":                                   "climatetrends",                                     // 9,733 flw
   "Sustainable Futures Collaborative":                "sustainable-futures-collaborative",                 // 14,235 flw
-  "CREA":                                             "centre-for-research-on-energy-and-clean-air",
+  "CREA":                                             "energyandcleanair",                                 // linkedin.com/company/energyandcleanair · 11,580 flw
   "EnviroCatalysts":                                  "envirocatalysts",                                   // envirocatalysts.com · ~2,000 flw
 };
 

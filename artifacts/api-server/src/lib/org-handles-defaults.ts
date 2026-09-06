@@ -111,7 +111,7 @@ export const ORG_HANDLE_SEEDS: OrgHandleSeed[] = [
   },
   {
     org: "CREA",
-    linkedin: "centre-for-research-on-energy-and-clean-air",
+    linkedin: "energyandcleanair",
     twitter: "CREACleanAir",
     instagram: "",
     youtube: "",
