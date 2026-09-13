@@ -20,6 +20,14 @@ interface ReportLog {
   createdAt: string;
 }
 
+interface AdminUser {
+  id: number;
+  username: string;
+  email: string | null;
+  role: string;
+  createdAt: string;
+}
+
 interface MonthlyCost {
   month: string;
   count: number;
@@ -60,12 +68,22 @@ export default function Admin() {
   const [, navigate] = useLocation();
   const [reports, setReports] = useState<ReportLog[]>([]);
   const [months, setMonths] = useState<MonthlyCost[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [expanded, setExpanded] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [resettingUser, setResettingUser] = useState<string | null>(null);
+  const [resetResult, setResetResult] = useState<{ username: string; newPassword: string; email: string | null; emailed: boolean } | null>(null);
   useEffect(() => {
     if (user && user.role !== "admin") navigate("/");
   }, [user, navigate]);
+
+  function loadUsers() {
+    fetch("/api/admin/users", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setUsers(d.users || []))
+      .catch(console.error);
+  }
 
   useEffect(() => {
     Promise.all([
@@ -78,7 +96,26 @@ export default function Admin() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+    loadUsers();
   }, []);
+
+  async function handleResetPassword(username: string) {
+    if (!confirm(`Reset the password for "${username}"?\n\nThis immediately invalidates their current password. A new one is generated and, if they have an email on file, sent to them.`)) return;
+    setResettingUser(username);
+    try {
+      const res = await fetch(`/api/admin/users/${encodeURIComponent(username)}/reset-password`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || "Reset failed."); return; }
+      setResetResult({ username, newPassword: data.newPassword, email: data.email, emailed: data.emailed });
+    } catch {
+      alert("Network error — please try again.");
+    } finally {
+      setResettingUser(null);
+    }
+  }
 
   const filtered =
     selectedMonth === "all"
@@ -299,9 +336,88 @@ export default function Admin() {
                 </div>
               )}
             </div>
+
+            {/* User Accounts */}
+            <div style={card}>
+              <h2 style={sectionTitle}>User Accounts</h2>
+              {users.length === 0 ? (
+                <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "2rem" }}>No accounts found.</p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={tableStyle}>
+                    <thead>
+                      <tr>
+                        {["Username", "Email", "Role", "Created", ""].map((h) => (
+                          <th key={h} style={thStyle}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((u) => (
+                        <tr key={u.id} style={{ borderBottom: "1px solid var(--border-col)" }}>
+                          <td style={{ ...tdStyle, fontWeight: 600 }}>{u.username}</td>
+                          <td style={tdStyle}>{u.email ?? "—"}</td>
+                          <td style={tdStyle}>{u.role}</td>
+                          <td style={tdStyle}>{new Date(u.createdAt).toLocaleDateString("en-IN")}</td>
+                          <td style={tdStyle}>
+                            <button
+                              onClick={() => handleResetPassword(u.username)}
+                              disabled={resettingUser === u.username}
+                              style={{ ...ghostBtn, fontSize: 14, padding: "5px 10px", cursor: resettingUser === u.username ? "wait" : "pointer" }}
+                            >
+                              {resettingUser === u.username ? "Resetting…" : "Reset Password"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p style={{ margin: "12px 0 0", fontSize: 14, color: "var(--text-dim)" }}>
+                There is no self-service password recovery — bcrypt hashes can&apos;t be reversed. Resetting generates a new password, saves it immediately, and emails it to the account if it has an email on file.
+              </p>
+            </div>
           </>
         )}
       </div>
+
+      {/* Password reset result */}
+      {resetResult && (
+        <div
+          onClick={() => setResetResult(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "var(--bg-card)", border: "1px solid var(--border-col)", borderRadius: 14, padding: "28px", maxWidth: 440, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.55)" }}
+          >
+            <h3 style={{ margin: "0 0 10px", fontSize: 18, color: "var(--accent-amber)" }}>Password reset — {resetResult.username}</h3>
+            <p style={{ margin: "0 0 6px", fontSize: 15, color: "var(--text-muted)" }}>
+              {resetResult.emailed
+                ? `Emailed to ${resetResult.email}. It's also shown below in case delivery fails.`
+                : resetResult.email
+                  ? `Email send was not confirmed — hand this to them directly.`
+                  : `No email on file — hand this to them directly.`}
+            </p>
+            <div style={{ background: "var(--bg-app)", border: "1px solid var(--border-col)", borderRadius: 8, padding: "12px 16px", margin: "14px 0", fontFamily: "monospace", fontSize: 20, fontWeight: 700, color: "var(--text-main)", textAlign: "center", userSelect: "all" }}>
+              {resetResult.newPassword}
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => {
+                  navigator.clipboard?.writeText(resetResult.newPassword).catch(() => {});
+                }}
+                style={ghostBtn}
+              >Copy</button>
+              <button
+                onClick={() => setResetResult(null)}
+                style={{ ...ghostBtn, background: "var(--accent-amber)", color: "#0f1923", border: "none", fontWeight: 600 }}
+              >Done</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
