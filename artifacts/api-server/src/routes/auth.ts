@@ -86,4 +86,30 @@ router.get("/auth/me", requireAuth, (req: Request, res: Response) => {
   return res.json({ user: req.user });
 });
 
+// Self-service password change — for an account to move off a temp password
+// an admin reset it to (see POST /admin/users/:username/reset-password).
+// Requires the current password, same as any "change password" flow.
+router.post("/auth/change-password", requireAuth, async (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword)
+    return res.status(400).json({ error: "Current and new password required" });
+  if (newPassword.length < 6)
+    return res.status(400).json({ error: "New password must be at least 6 characters" });
+
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user!.userId))
+    .limit(1);
+  if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) return res.status(401).json({ error: "Current password is incorrect" });
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, user.id));
+
+  return res.json({ status: "ok" });
+});
+
 export default router;

@@ -256,3 +256,43 @@ export async function sendAdminReportEmail(
     html,
   });
 }
+
+// ── Password reset — admin-triggered, since there is no self-service reset
+// flow (bcrypt hashes can't be reversed, so a lost password can only be
+// replaced, not recovered) ───────────────────────────────────────────────
+export async function sendPasswordResetEmail(
+  to: string,
+  ctx: { username: string; newPassword: string },
+): Promise<void> {
+  const { username, newPassword } = ctx;
+
+  const text = [
+    `Emerald AI — your password was reset`,
+    ``,
+    `Username     : ${username}`,
+    `New password : ${newPassword}`,
+    ``,
+    `Sign in with this password, then change it from your account menu as soon as you can.`,
+  ].join("\n");
+
+  const html = `
+<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;color:#1a2232">
+  <div style="background:#0f1923;padding:18px 22px;border-radius:8px 8px 0 0">
+    <h2 style="margin:0;color:#c9922a;font-size:17px">Emerald AI — Password Reset</h2>
+  </div>
+  <div style="border:1px solid #dde3ef;border-top:none;padding:22px;border-radius:0 0 8px 8px">
+    <p style="margin:0 0 14px;font-size:14px;color:#3a4a60">Your password was reset by an administrator. Sign in with the password below, then change it from your account menu as soon as you can.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+      <tr><td style="padding:5px 0;color:#5a6a80;width:110px">Username</td><td style="padding:5px 0;font-weight:600">${esc(username)}</td></tr>
+      <tr><td style="padding:5px 0;color:#5a6a80">New password</td><td style="padding:5px 0;font-weight:700;font-family:monospace;font-size:16px;color:#0f1923">${esc(newPassword)}</td></tr>
+    </table>
+  </div>
+</div>`;
+
+  await send({
+    to,
+    subject: "Emerald AI — your password was reset",
+    text,
+    html,
+  });
+}

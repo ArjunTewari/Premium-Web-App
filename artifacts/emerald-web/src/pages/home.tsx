@@ -345,6 +345,44 @@ export default function Home() {
   const [confirmState, setConfirmState] = useState<{ message: string; onConfirm: () => void } | null>(null);
   function withConfirm(message: string, action: () => void) { setConfirmState({ message, onConfirm: action }); }
 
+  // Change-password modal — self-service, for moving off a temp password an
+  // admin reset (there's no other way to change a password once logged in).
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwSaved, setPwSaved] = useState(false);
+
+  function closePwModal() {
+    setPwOpen(false); setPwCurrent(""); setPwNew(""); setPwConfirm(""); setPwError(""); setPwSaved(false);
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwError("");
+    if (pwNew.length < 6) { setPwError("New password must be at least 6 characters"); return; }
+    if (pwNew !== pwConfirm) { setPwError("New passwords do not match"); return; }
+    setPwSaving(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ currentPassword: pwCurrent, newPassword: pwNew }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPwError(data.error || "Could not change password."); return; }
+      setPwSaved(true);
+      setPwCurrent(""); setPwNew(""); setPwConfirm("");
+    } catch {
+      setPwError("Network error — please try again.");
+    } finally {
+      setPwSaving(false);
+    }
+  }
+
   const [activeTab, setActiveTab] = useState<"dashboard" | "reports" | "handles">("dashboard");
 
   // Handles tab — new org add form
@@ -826,6 +864,64 @@ export default function Home() {
         </div>
       )}
 
+      {/* ── Change Password dialog ──────────────────────────────────────── */}
+      {pwOpen && (
+        <div
+          onClick={closePwModal}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px" }}
+        >
+          <form
+            onSubmit={handleChangePassword}
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "var(--elevate-2)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "28px 28px 22px", maxWidth: 400, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column", gap: 16 }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: C.gold }}>Change Password</div>
+
+            {pwSaved ? (
+              <>
+                <div style={{ fontSize: 15, color: C.green, lineHeight: 1.6 }}>✓ Password changed. Use it next time you sign in.</div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    type="button"
+                    onClick={closePwModal}
+                    style={{ background: C.gold, color: "var(--bg-app)", border: "none", borderRadius: 8, padding: "8px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+                  >Done</button>
+                </div>
+              </>
+            ) : (
+              <>
+                {["Current password", "New password", "Confirm new password"].map((label, i) => (
+                  <div key={label} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    <label style={{ fontSize: 13, color: C.muted }}>{label}</label>
+                    <input
+                      type="password"
+                      autoComplete={i === 0 ? "current-password" : "new-password"}
+                      value={i === 0 ? pwCurrent : i === 1 ? pwNew : pwConfirm}
+                      onChange={(e) => (i === 0 ? setPwCurrent : i === 1 ? setPwNew : setPwConfirm)(e.target.value)}
+                      required
+                      style={{ background: "var(--elevate-1)", border: `1px solid var(--border-col)`, borderRadius: 7, padding: "8px 10px", fontSize: 15, color: C.text, fontFamily: "'DM Mono', monospace" }}
+                    />
+                  </div>
+                ))}
+                {pwError && <div style={{ fontSize: 14, color: "#e05353" }}>{pwError}</div>}
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+                  <button
+                    type="button"
+                    onClick={closePwModal}
+                    style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+                  >Cancel</button>
+                  <button
+                    type="submit"
+                    disabled={pwSaving}
+                    style={{ background: C.gold, color: "var(--bg-app)", border: "none", borderRadius: 8, padding: "8px 22px", fontSize: 14, fontWeight: 700, cursor: pwSaving ? "wait" : "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+                  >{pwSaving ? "Saving…" : "Save"}</button>
+                </div>
+              </>
+            )}
+          </form>
+        </div>
+      )}
+
       {/* Animated background blobs */}
       <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
         <div style={{
@@ -906,6 +1002,11 @@ export default function Home() {
 
         {/* Right */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={() => setPwOpen(true)}
+            className="mo-icon-btn"
+            style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: 7, color: C.muted, padding: "5px 12px", fontSize: 18, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif", transition: "background .2s, color .2s" }}
+          >Change Password</button>
           <button
             onClick={async () => { await logout(); navigate("/login"); }}
             className="mo-icon-btn"
