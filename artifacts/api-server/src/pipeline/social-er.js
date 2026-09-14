@@ -127,7 +127,20 @@ async function run(cfg, selectedOrgs, cb) {
   });
 
   orgResults.sort((a, b) => b.presenceScore - a.presenceScore);
-  orgResults.forEach((r, i) => { r.rank = i + 1; });
+  // Dense rank: tied orgs share a rank, and the next DISTINCT score is only
+  // one rank below — not `i + 1`, which used array position and let ties
+  // "use up" rank numbers nothing occupied (e.g. four orgs tied at 10/10
+  // rendered as #1/#2/#3/#4 instead of all #1).
+  {
+    let _lastScore = null, _lastRank = 0;
+    orgResults.forEach((r) => {
+      if (r.presenceScore !== _lastScore) {
+        _lastRank += 1;
+        _lastScore = r.presenceScore;
+      }
+      r.rank = _lastRank;
+    });
+  }
 
   cb?.('  Social Presence (APIdirect) complete', 'ok');
   return orgResults;
@@ -293,10 +306,14 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     })
     .sort((a, b) => b.total - a.total);
 
+  // Dense rank: `_lastRank = idx + 1` on a new value used the row's array
+  // position, so a tie group of N rows "used up" N rank numbers nothing
+  // occupied — a 3-way tie at #9 was followed by #12, not #10. Increment the
+  // rank by exactly 1 on each new value instead, so ties never skip.
   let _lastTotal = null, _lastRank = 0;
   unifiedRows.forEach(({ total }, idx) => {
-    if (total === _lastTotal) { unifiedRows[idx].unifiedRank = _lastRank; }
-    else { _lastRank = idx + 1; unifiedRows[idx].unifiedRank = _lastRank; _lastTotal = total; }
+    if (total !== _lastTotal) { _lastRank += 1; _lastTotal = total; }
+    unifiedRows[idx].unifiedRank = _lastRank;
   });
 
   const orgColorMap = Object.fromEntries(
