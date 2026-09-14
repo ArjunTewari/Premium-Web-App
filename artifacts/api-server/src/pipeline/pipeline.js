@@ -2881,12 +2881,12 @@ function buildHTML(
     const bars = ORGS.map((org, i) => {
       const count = data[org]?.total || 0;
       if (count === 0) {
-        return `<div style="background:#2a3548;width:26px;flex:0 0 26px;display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:15px;font-weight:500;color:#5e7494">0</div>`;
+        return `<div style="background:var(--surface3);width:26px;flex:0 0 26px;display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:15px;font-weight:500;color:var(--muted)">0</div>`;
       }
       const pct = tot > 0 ? Math.round((count / tot) * 100) : 0;
       return `<div style="background:${orgHex(i)};width:${pct}%;display:flex;align-items:center;padding-left:9px;font-family:monospace;font-size:16px;font-weight:500;color:#fff;min-width:0;overflow:hidden">${count}</div>`;
     }).join("");
-    return `<div style="height:28px;background:#1e2638;border-radius:4px;overflow:hidden;display:flex;margin-bottom:12px">${bars}</div>`;
+    return `<div style="height:28px;background:var(--surface3);border-radius:4px;overflow:hidden;display:flex;margin-bottom:12px">${bars}</div>`;
   }
 
   function sovByOrgTable() {
@@ -3185,7 +3185,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
   function donut(pct, color) {
     const da = ((pct / 100) * 163.4).toFixed(1),
       db = (163.4 - da).toFixed(1);
-    return `<svg width="64" height="64" viewBox="0 0 64 64" style="flex-shrink:0"><circle cx="32" cy="32" r="26" fill="none" stroke="#1e2638" stroke-width="10"/><circle cx="32" cy="32" r="26" fill="none" stroke="${color}" stroke-width="10" stroke-dasharray="${da} ${db}" stroke-dashoffset="41" stroke-linecap="round"/><text x="32" y="37" text-anchor="middle" fill="${color}" font-size="13" font-family="Inter" font-weight="700">${pct}%</text></svg>`;
+    return `<svg width="64" height="64" viewBox="0 0 64 64" style="flex-shrink:0"><circle cx="32" cy="32" r="26" fill="none" style="stroke:var(--surface3)" stroke-width="10"/><circle cx="32" cy="32" r="26" fill="none" stroke="${color}" stroke-width="10" stroke-dasharray="${da} ${db}" stroke-dashoffset="41" stroke-linecap="round"/><text x="32" y="37" text-anchor="middle" fill="${color}" font-size="13" font-family="Inter" font-weight="700">${pct}%</text></svg>`;
   }
 
   // AEO Section HTML
@@ -3251,7 +3251,7 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
     : "";
 
   function scRow(label, val, color, barPct) {
-    return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:17px"><span style="color:var(--muted2)">${label}</span><div style="flex:1;margin:0 9px;height:4px;background:#1e2638;border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:${color};width:${barPct !== undefined ? Math.min(barPct, 100) : val}%"></div></div><span style="font-family:monospace;font-size:16px;font-weight:600;width:30px;text-align:right;color:${color}">${val}</span></div>`;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:17px"><span style="color:var(--muted2)">${label}</span><div style="flex:1;margin:0 9px;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden"><div style="height:100%;border-radius:2px;background:${color};width:${barPct !== undefined ? Math.min(barPct, 100) : val}%"></div></div><span style="font-family:monospace;font-size:16px;font-weight:600;width:30px;text-align:right;color:${color}">${val}</span></div>`;
   }
 
   const topicCols = `175px ${ORGS.map(() => "1fr").join(" ")}`;
@@ -3476,8 +3476,9 @@ ${articleLinks ? `<div style="margin-top:10px;border-top:1px solid var(--border)
           .join("");
 
   const CSS = `:root{--ink:#0a0e17;--surface:#111520;--surface2:#181e2e;--surface3:#1e2638;--border:#252d40;--border2:#6b7e9a;--text:#d8e4f0;--muted:#5e7494;--muted2:#8fa3b8;--amber:#c9922a;--amber-dim:rgba(201,146,42,.12);--amber-glow:rgba(201,146,42,.06);--good:#4caf74;--warn:#d4a017;--bad:#e05c5c}
+:root[data-theme="light"]{--ink:#f1f5f9;--surface:#ffffff;--surface2:#ffffff;--surface3:#f8fafc;--border:#e2e8f0;--border2:#cbd5e1;--text:#0f172a;--muted:#64748b;--muted2:#475569;--amber:#b07020;--amber-dim:rgba(176,112,32,.12);--amber-glow:rgba(176,112,32,.06);--good:#2d8a52;--warn:#a8710b;--bad:#dc2626}
 *{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
-body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line-height:1.65;font-size:19px}
+body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line-height:1.65;font-size:19px;transition:background .2s ease,color .2s ease}
 .shell{display:flex;min-height:100vh}
 .sidenav{width:220px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:28px 0;display:flex;flex-direction:column}
 .sidenav-logo{padding:0 20px 24px;border-bottom:1px solid var(--border);margin-bottom:16px}
@@ -3579,7 +3580,7 @@ body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line
 .apt td{font-family:monospace;color:var(--muted2);font-size:16px}.apt td a{color:var(--amber);text-decoration:none}
 .rf{border-top:1px solid var(--border);padding:28px 0 0;font-family:monospace;font-size:15px;color:var(--muted);line-height:2}
 .edit-bar{position:fixed;top:14px;right:18px;z-index:2000;display:flex;gap:8px;align-items:center}
-.edit-btn{background:#1e2638;border:1px solid var(--border2);border-radius:5px;padding:6px 13px;font-family:monospace;font-size:16px;color:var(--muted2);cursor:pointer;transition:all .15s;line-height:1.4}
+.edit-btn{background:var(--surface3);border:1px solid var(--border2);border-radius:5px;padding:6px 13px;font-family:monospace;font-size:16px;color:var(--muted2);cursor:pointer;transition:all .15s;line-height:1.4}
 .edit-btn:hover,.edit-btn.on{background:rgba(201,146,42,.15);border-color:rgba(201,146,42,.4);color:var(--amber)}
 .edit-dl{color:var(--good)!important;border-color:rgba(76,175,116,.3)!important;background:rgba(76,175,116,.07)!important;display:none}
 body.edit-mode .edit-dl{display:inline-block}
@@ -3647,8 +3648,10 @@ body.edit-mode .sec-x{display:flex}
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AQ Intelligence &mdash; ${esc(ORGS.join(" vs "))}</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>${CSS}</style></head><body>
-<div class="edit-bar" id="edit-bar"><button class="edit-btn" id="edit-btn" onclick="toggleEdit()">&#9998; Edit Mode</button><button class="edit-btn edit-dl" id="dl-btn" onclick="dlEdit()">&#8595; Download Edited</button></div>
+<style>${CSS}</style>
+<script>try{if(localStorage.getItem('emerald-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
+</head><body>
+<div class="edit-bar" id="edit-bar"><button class="edit-btn" id="theme-btn" onclick="toggleTheme()">&#9728; Light Mode</button><button class="edit-btn" id="edit-btn" onclick="toggleEdit()">&#9998; Edit Mode</button><button class="edit-btn edit-dl" id="dl-btn" onclick="dlEdit()">&#8595; Download Edited</button></div>
 <div class="shell">
 <nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a>
@@ -3751,6 +3754,9 @@ Data: Serper News API &middot; Claude Haiku 4.5 &middot; LLM AEO probing &middot
 <strong style="color:var(--text)">CONFIDENTIAL</strong> &mdash; prepared for ${esc(CLIENT_NAME || "client")}</footer>
 </main></div>
 <script>
+function applyThemeBtn(){var btn=document.getElementById('theme-btn');if(!btn)return;var isLight=document.documentElement.getAttribute('data-theme')==='light';btn.innerHTML=isLight?'&#9789; Dark Mode':'&#9728; Light Mode';}
+function toggleTheme(){var isLight=document.documentElement.getAttribute('data-theme')==='light';if(isLight){document.documentElement.removeAttribute('data-theme');}else{document.documentElement.setAttribute('data-theme','light');}try{localStorage.setItem('emerald-theme',isLight?'dark':'light');}catch(e){}applyThemeBtn();}
+applyThemeBtn();
 function td(id){var e=document.getElementById(id);if(!e)return;if(e.classList.contains('evd')){e.classList.toggle('open');}else{e.style.display=e.style.display==='none'?'block':'none';}}
 var secs=document.querySelectorAll('.sec[id],header[id]');
 var nis=document.querySelectorAll('.nav-a');
