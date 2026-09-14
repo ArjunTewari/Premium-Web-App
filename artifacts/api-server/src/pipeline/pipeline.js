@@ -1156,14 +1156,23 @@ ${batchText}`;
 
   // ── STEP 6: Build outputs ─────────────────────────────────
   cb(`\nSTEP 6/6 — Building report files...`, "head");
-  // Filename: TMP-<timestamp>-<org count>orgs — short, sortable, and
-  // filesystem-safe. The old scheme embedded org names ("aq-report-OrgA-vs-
-  // OrgB-vs-OrgC-and-13-more-2026-09-06") and became unreadable past 3 orgs;
-  // minute-precision keeps same-day reruns distinct without needing that.
-  const pad2 = (n) => String(n).padStart(2, "0");
-  const now = new Date();
-  const stamp = `${now.getUTCFullYear()}${pad2(now.getUTCMonth() + 1)}${pad2(now.getUTCDate())}-${pad2(now.getUTCHours())}${pad2(now.getUTCMinutes())}`;
-  const base = `TMP-${stamp}-${ORGS.length}orgs`;
+  // Filename: TMP-<report period>-<org count>orgs. The period is the report's
+  // own DATE_FROM→DATE_TO window (not the generation time) and always spells
+  // the month out — "Aug2026", or "Aug-Sep2026" when the window crosses a
+  // calendar month — never a numeric month. Short, sortable, filesystem-safe,
+  // and no org names — the old scheme ("aq-report-OrgA-vs-OrgB-vs-OrgC-and-
+  // 13-more-2026-09-06") became unreadable past 3 orgs.
+  const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthLabel = (fromStr, toStr) => {
+    const from = new Date(fromStr);
+    const to = new Date(toStr);
+    const fm = MONTH_NAMES[from.getUTCMonth()], fy = from.getUTCFullYear();
+    const tm = MONTH_NAMES[to.getUTCMonth()], ty = to.getUTCFullYear();
+    if (fy === ty && fm === tm) return `${fm}${fy}`;
+    if (fy === ty) return `${fm}-${tm}${ty}`;
+    return `${fm}${fy}-${tm}${ty}`;
+  };
+  const base = `TMP-${monthLabel(DATE_FROM, DATE_TO)}-${ORGS.length}orgs`;
   const htmlFile = path.join(cfg.outDir, `${base}.html`);
   let html;
   try {
