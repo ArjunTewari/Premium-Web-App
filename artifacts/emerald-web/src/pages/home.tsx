@@ -690,16 +690,23 @@ export default function Home() {
       // Strip internal SENTINEL data-health notes
       doc.querySelectorAll(".sentinel-note").forEach((el) => el.remove());
 
-      // Remove Executive Summary nav link
-      const execNavLink = doc.querySelector('a[href="#exec"]');
-      if (execNavLink) {
-        const prev = execNavLink.previousElementSibling;
-        const next = execNavLink.nextElementSibling;
-        if (prev?.classList.contains("nav-lbl") && (!next || next.classList.contains("nav-lbl"))) {
-          prev.remove();
-        }
-        execNavLink.remove();
-      }
+      // Remove every nav link pointing at a section just deleted — both the
+      // desktop sidebar and the mobile bottom nav carry their own "Executive
+      // Summary"/"Action Matrix" entries, and a dangling link to a removed
+      // section is worse than no link at all. Also drops a sidebar nav-lbl
+      // group (e.g. "Report") that's left with no link under it.
+      const removeNavLink = (href: string) => {
+        doc.querySelectorAll(`a[href="${href}"]`).forEach((link) => {
+          const prev = link.previousElementSibling;
+          const next = link.nextElementSibling;
+          if (prev?.classList.contains("nav-lbl") && (!next || next.classList.contains("nav-lbl"))) {
+            prev.remove();
+          }
+          link.remove();
+        });
+      };
+      removeNavLink("#exec");
+      removeNavLink("#actions");
 
       // Renumber remaining section eyebrows sequentially
       doc.querySelectorAll(".se").forEach((el, idx) => {
