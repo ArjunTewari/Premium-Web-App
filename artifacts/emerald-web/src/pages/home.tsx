@@ -135,6 +135,16 @@ const ORG_LI_HANDLES: Record<string, string> = {
   "EnviroCatalysts":                                  "envirocatalysts",                                   // envirocatalysts.com · ~2,000 flw
 };
 
+// Report period defaults to a rolling window ending today — computed fresh on
+// every load instead of a fixed date, so it never goes stale.
+function defaultDateRange(): { from: string; to: string } {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const to = new Date();
+  const from = new Date(to);
+  from.setMonth(from.getMonth() - 1);
+  return { from: iso(from), to: iso(to) };
+}
+
 const DEFAULT_SCOPE = [
   "AQI", "PM2.5", "PM10", "air pollution", "air quality", "smog",
   "clean air", "NCAP", "GRAP", "Black Carbon", "Ozone", "Ammonia",
@@ -328,8 +338,8 @@ export default function Home() {
   const [handleOrgList, setHandleOrgList] = useState<string[]>(DEFAULT_ORGS);
   const [handlesSyncing, setHandlesSyncing] = useState(false);
 
-  const [dateFrom, setDateFrom] = useState("2026-03-08");
-  const [dateTo, setDateTo] = useState("2026-06-08");
+  const [dateFrom, setDateFrom] = useState(() => defaultDateRange().from);
+  const [dateTo, setDateTo] = useState(() => defaultDateRange().to);
   const [clientName, setClientName] = useState("Chetan Bhattacharji");
 
   const [scopeOpen, setScopeOpen] = useState(false);

@@ -11,6 +11,17 @@ import { sendAdminReportEmail, sendClientReportEmail } from "../lib/mailer.js";
 
 const ALERT_TO = "+918588098882";
 
+// Fallback report period when the client doesn't send one — a rolling month
+// ending today, computed fresh on every request instead of a fixed date. The
+// web app always sends real dates now; this only guards direct API calls.
+function defaultDateRange(): { from: string; to: string } {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const to = new Date();
+  const from = new Date(to);
+  from.setMonth(from.getMonth() - 1);
+  return { from: iso(from), to: iso(to) };
+}
+
 async function sendReportSms(costInr: number, orgs: string[], htmlName: string) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,8 +100,8 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     ORGS: Array.isArray(body.orgs)
       ? body.orgs.filter(Boolean)
       : (body.orgs || "").split(",").map((s: string) => s.trim()).filter(Boolean),
-    DATE_FROM: body.dateFrom || "2026-03-08",
-    DATE_TO: body.dateTo || "2026-06-08",
+    DATE_FROM: body.dateFrom || defaultDateRange().from,
+    DATE_TO: body.dateTo || defaultDateRange().to,
     CLIENT_NAME: body.clientName || "Chetan Bhattacharji",
     SCOPE_KEYWORDS: Array.isArray(body.scopeKeywords) ? body.scopeKeywords : [],
     AEO_QUERIES: Array.isArray(body.aeoQueries) && body.aeoQueries.length > 0 ? body.aeoQueries.filter(Boolean) : [],
