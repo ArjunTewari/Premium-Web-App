@@ -1593,7 +1593,7 @@ export default function Home() {
                             {f.name}
                           </div>
                           <div style={{ color: C.muted, fontFamily: "'DM Mono', monospace", fontSize: 10, marginTop: 3 }}>
-                            {f.size} KB · {f.mtime}{f.costInr ? <span style={{ color: C.gold }}> · ₹{parseFloat(f.costInr).toFixed(2)}</span> : null}
+                            {f.size} KB · {f.mtime}
                           </div>
                         </div>
                       </div>
