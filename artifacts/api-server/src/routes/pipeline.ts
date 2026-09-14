@@ -72,9 +72,16 @@ if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
 type RunStatus =
   | { status: "running" }
   | { status: "done"; htmlName: string; costInr: number }
-  | { status: "error"; msg: string };
+  | { status: "error"; msg: string }
+  | { status: "cancelled" };
 
 const runStore = new Map<string, RunStatus>();
+
+// One AbortController per in-flight run, keyed by runId — lets the /run/cancel
+// route signal the pipeline to stop. Removed as soon as the run ends (success,
+// error, or cancellation), so this never holds more entries than runStore's
+// "running" rows.
+const runControllers = new Map<string, AbortController>();
 
 // Evict entries older than 2 hours to prevent unbounded memory growth.
 setInterval(() => {
@@ -90,6 +97,15 @@ router.get("/run/status/:runId", requireAuth, (req: Request, res: Response) => {
   const entry = runStore.get(req.params.runId);
   if (!entry) return res.status(404).json({ status: "not_found" });
   res.json(entry);
+});
+
+// ── POST /run/cancel/:runId — stop an in-flight report generation ────────────
+router.post("/run/cancel/:runId", requireAuth, (req: Request, res: Response) => {
+  const runId = String(req.params.runId || "").trim();
+  const controller = runControllers.get(runId);
+  if (!controller) return res.status(404).json({ error: "Run not found or already finished" });
+  controller.abort();
+  return res.json({ status: "ok" });
 });
 
 // ── POST /run ─────────────────────────────────────────────────────────────────
@@ -165,6 +181,10 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   // Generate a stable run ID: hex-encoded seconds + random suffix.
   const runId = Math.floor(Date.now() / 1000).toString(16) + "-" + crypto.randomBytes(8).toString("hex");
   runStore.set(runId, { status: "running" });
+
+  const controller = new AbortController();
+  runControllers.set(runId, controller);
+  (cfg as { signal?: AbortSignal }).signal = controller.signal;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -270,12 +290,18 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
       costDeploymentInr: ((apiCost?.linesUSD.apidirect ?? 0) * (apiCost?.usdToInr ?? 84)).toFixed(2),
     }).catch((e: unknown) => console.error("Failed to log report:", e));
   } catch (e: unknown) {
-    const msg = (e as Error).message;
-    runStore.set(runId, { status: "error", msg });
-    send("error", { msg });
-    console.error("Pipeline error:", e);
+    if ((e as { code?: string } | undefined)?.code === "CANCELLED") {
+      runStore.set(runId, { status: "cancelled" });
+      send("cancelled", { runId });
+    } else {
+      const msg = (e as Error).message;
+      runStore.set(runId, { status: "error", msg });
+      send("error", { msg });
+      console.error("Pipeline error:", e);
+    }
   } finally {
     clearInterval(heartbeat);
+    runControllers.delete(runId);
   }
 
   if (!clientDisconnected && !res.writableEnded) res.end();
