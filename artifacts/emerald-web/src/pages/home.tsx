@@ -403,6 +403,8 @@ export default function Home() {
   const [hNewLi,  setHNewLi]    = useState("");
 
   const [running, setRunning] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const runIdRef = useRef<string | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [progress, setProgress] = useState(0);
   const [trendStatus, setTrendStatus] = useState<{ text: string; ok: boolean } | null>(null);
@@ -731,7 +733,8 @@ export default function Home() {
 
   async function startRun() {
     if (!selectedOrgs.length) { alert("Select at least one organisation."); return; }
-    setRunning(true); setLogs([]); setProgress(0); setResult(null); setTrendStatus(null);
+    setRunning(true); setStopping(false); setLogs([]); setProgress(0); setResult(null); setTrendStatus(null);
+    runIdRef.current = null;
 
     const payload = { orgs: selectedOrgs, orgYtHandles: allOrgHandles, orgTwHandles: allTwHandles, orgIgHandles: allIgHandles, orgLiHandles: allLiHandles, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries };
     const TOTAL_STEPS = 60;
@@ -776,6 +779,7 @@ export default function Home() {
 
           if (event === "runId") {
             runId = parsed.runId ?? null;
+            runIdRef.current = runId;
           } else if (event === "log") {
             const level = (parsed.level || "") as LogLevel;
             setLogs((prev) => [...prev, { msg: parsed.msg || "", level }]);
@@ -799,6 +803,9 @@ export default function Home() {
           } else if (event === "error") {
             gotDone = true;
             setLogs((prev) => [...prev, { msg: "✗ Fatal error: " + parsed.msg, level: "err" }]);
+          } else if (event === "cancelled") {
+            gotDone = true;
+            setLogs((prev) => [...prev, { msg: "⏹ Stopped by user", level: "warn" }]);
           }
         }
       }
@@ -836,7 +843,25 @@ export default function Home() {
       }
     }
 
+    runIdRef.current = null;
     setRunning(false);
+    setStopping(false);
+  }
+
+  // Ask the server to stop the in-flight pipeline. The server checks for this
+  // between pipeline stages, so the run halts within roughly one stage/batch
+  // rather than instantly — the SSE stream then sends a `cancelled` event and
+  // closes, which is what actually flips `running` (and `stopping`) back off.
+  async function stopRun() {
+    if (!runIdRef.current || stopping) return;
+    setStopping(true);
+    try {
+      await fetch(`/api/run/cancel/${runIdRef.current}`, { method: "POST", credentials: "include" });
+      setLogs((prev) => [...prev, { msg: "⏳ Stop requested — finishing the current step…", level: "warn" }]);
+    } catch {
+      setLogs((prev) => [...prev, { msg: "✗ Stop request failed — the run may still be going.", level: "err" }]);
+      setStopping(false); // allow retrying the stop click
+    }
   }
 
   function logColor(level: LogLevel) {
@@ -1386,38 +1411,60 @@ export default function Home() {
 
         {/* ── Generate button ─────────────────────────────────────────── */}
         <SlideUp delay={430}>
-          <button
-            onClick={startRun}
-            disabled={running}
-            className="mo-gen-btn"
-            style={{
-              width: "100%", marginTop: 20,
-              padding: "16px 0", borderRadius: 12,
-              background: "linear-gradient(135deg, var(--accent-amber) 0%, #8b5e15 100%)",
-              color: "#fff", fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: 18, fontWeight: 600, letterSpacing: "-.01em",
-              border: "none", cursor: running ? "not-allowed" : "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              position: "relative", overflow: "hidden",
-              opacity: running ? 0.7 : 1,
-              boxShadow: "0 4px 24px rgba(201,146,42,.35)",
-              transition: "transform .2s, box-shadow .2s, opacity .2s",
-            }}
-          >
-            <span className="mo-shine" style={{
-              position: "absolute", top: 0, left: "-60%", width: "40%", height: "100%",
-              background: "linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent)",
-              transform: "skewX(-20deg)", pointerEvents: "none",
-            }} />
-            {running ? (
-              <>
-                <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,.3)", borderTopColor: "#fff", display: "inline-block", animation: "ring-spin .7s linear infinite" }} />
-                Generating Report…
-              </>
-            ) : (
-              <>▶&nbsp; Generate Report</>
+          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+            <button
+              onClick={startRun}
+              disabled={running}
+              className="mo-gen-btn"
+              style={{
+                flex: 1,
+                padding: "16px 0", borderRadius: 12,
+                background: "linear-gradient(135deg, var(--accent-amber) 0%, #8b5e15 100%)",
+                color: "#fff", fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: 18, fontWeight: 600, letterSpacing: "-.01em",
+                border: "none", cursor: running ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                position: "relative", overflow: "hidden",
+                opacity: running ? 0.7 : 1,
+                boxShadow: "0 4px 24px rgba(201,146,42,.35)",
+                transition: "transform .2s, box-shadow .2s, opacity .2s",
+              }}
+            >
+              <span className="mo-shine" style={{
+                position: "absolute", top: 0, left: "-60%", width: "40%", height: "100%",
+                background: "linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent)",
+                transform: "skewX(-20deg)", pointerEvents: "none",
+              }} />
+              {running ? (
+                <>
+                  <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,.3)", borderTopColor: "#fff", display: "inline-block", animation: "ring-spin .7s linear infinite" }} />
+                  Generating Report…
+                </>
+              ) : (
+                <>▶&nbsp; Generate Report</>
+              )}
+            </button>
+            {running && (
+              <button
+                onClick={stopRun}
+                disabled={stopping}
+                title="Stop report generation"
+                style={{
+                  padding: "16px 22px", borderRadius: 12,
+                  background: "rgba(224,83,83,.1)",
+                  color: "#e05353", fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: 16, fontWeight: 600, letterSpacing: "-.01em",
+                  border: "1px solid rgba(224,83,83,.35)", cursor: stopping ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  opacity: stopping ? 0.6 : 1,
+                  transition: "background .15s, opacity .2s",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ■&nbsp; {stopping ? "Stopping…" : "Stop"}
+              </button>
             )}
-          </button>
+          </div>
         </SlideUp>
 
         {/* Trend status */}

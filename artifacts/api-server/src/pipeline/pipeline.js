@@ -590,6 +590,17 @@ async function run(cfg, cb) {
   costTracker.claudeAeoCalls = 0;
   costTracker.exaSearches = 0;
 
+  // Cooperative cancellation — checked between pipeline stages (and inside
+  // the heaviest per-batch loop in STEP 2) so a user-triggered stop halts
+  // the run within roughly one stage/batch instead of running to completion.
+  function checkAbort() {
+    if (cfg.signal?.aborted) {
+      const e = new Error("Report generation cancelled");
+      e.code = "CANCELLED";
+      throw e;
+    }
+  }
+
   // Simple concurrency limiter — no extra npm dep needed
   function pLimit(concurrency) {
     let active = 0;
@@ -648,6 +659,7 @@ async function run(cfg, cb) {
 
   cb(`\n=== Emerald AI · AQ Intelligence Report ===`, "head");
   cb(`Orgs: ${ORGS.join(", ")} · ${DATE_FROM} to ${DATE_TO}`);
+  checkAbort();
 
   const arts = {};
   for (const o of ORGS) arts[o] = [];
@@ -659,6 +671,7 @@ async function run(cfg, cb) {
     // ── STEP 1 (Exa): fetch the whole AQ corpus for the window, then assign
     //    each article to the tracked orgs it names. Naming none → white-space.
     cb(`\nSTEP 1/6 — Fetching AQ corpus (Exa)...`, "head");
+    checkAbort();
     const { fetchCorpus } = require("./exa-collector");
     const { orgMentioned } = require("./firecrawl-common");
     const corpus = await fetchCorpus(cfg, cb);
@@ -681,6 +694,7 @@ async function run(cfg, cb) {
   // drops those without an API call. Snippet-only articles (scrape failed)
   // bypass and proceed to Haiku which can handle partial context.
   cb(`\nSTEP 1d/6 — Filtering by org presence in scraped text...`, "head");
+  checkAbort();
   for (const org of ORGS) {
     const before = arts[org].length;
     const orgLower = org.toLowerCase();
@@ -712,6 +726,7 @@ async function run(cfg, cb) {
 
   // ── STEP 1e: Haiku citation filter — drop incidental mentions ─
   cb(`\nSTEP 1e/6 — Haiku citation filter (contributor mentions only)...`, "head");
+  checkAbort();
   if (cfg.CLAUDE_KEY) {
     const limit1e = pLimit(2); // 2 orgs in parallel — Haiku RPM is tight under concurrent load
     await Promise.allSettled(ORGS.map(org => limit1e(async () => {
@@ -810,6 +825,7 @@ ${batchText}`;
 
   // ── STEP 2: Classify with Claude ──────────────────────────
   cb(`\nSTEP 2/6 — Classifying with Claude (batches of 8)...`, "head");
+  checkAbort();
   const cls = {};
   for (const o of ORGS) cls[o] = [];
 
@@ -822,6 +838,7 @@ ${batchText}`;
     for (let i = 0; i < al.length; i += 8) batches.push(al.slice(i, i + 8));
 
     for (let bi = 0; bi < batches.length; bi++) {
+      checkAbort();
       const batch = batches[bi];
 
       // Every article here has the org (or its abbreviation) in its text
@@ -889,6 +906,7 @@ ${txt}`;
 
   // ── STEP 2b: Filter unverified and off-topic articles ─────────
   cb(`\nSTEP 2b/6 — Filtering unverified and off-topic articles...`, "head");
+  checkAbort();
   for (const org of ORGS) {
     const pairs = arts[org].map((a, i) => ({ art: a, cls: cls[org][i] }));
     const kept = pairs.filter(({ cls: c }) => {
@@ -908,6 +926,7 @@ ${txt}`;
 
   // ── STEP 2c: Citation verification (Claude Haiku) ────────────────────────
   cb(`\nSTEP 2c/6 — Citation verification (Claude Haiku)...`, "head");
+  checkAbort();
   {
     const citLimit = pLimit(4);
     await Promise.allSettled(ORGS.map(org => citLimit(async () => {
@@ -960,6 +979,7 @@ ${batchText}`;
 
   // ── STEP 3: AEO Visibility (via Social Intelligence module) ──
   cb(`\nSTEP 3/6 — AEO / LLM Visibility...`, "head");
+  checkAbort();
   let aeoResults = {};
   let aeoQueriesUsed;
   for (const org of ORGS)
@@ -984,6 +1004,7 @@ ${batchText}`;
 
   // ── STEP 4: Social Presence (APIdirect.io) ─────────────────────────────
   cb(`\nSTEP 4/6 — Social Presence (APIdirect.io: LI + X + IG)...`, "head");
+  checkAbort();
   const SocialER = require("./social-er");
   let socialERResults = [];
   let socialERHtml = "";
@@ -999,6 +1020,7 @@ ${batchText}`;
 
   // ── YouTube ER ────────────────────────────────────────────
   cb(`\nSTEP 4b/6 — YouTube ER (YouTube Data API v3)...`, "head");
+  checkAbort();
   const YoutubeER = require("./youtube-er");
   let youtubeERResults = [];
   try {
@@ -1025,6 +1047,7 @@ ${batchText}`;
 
   // ── STEP 5: Aggregate + Score ─────────────────────────────
   cb(`\nSTEP 5/6 — Aggregating and scoring...`, "head");
+  checkAbort();
   const data = {};
   for (const org of ORGS) {
     const base = aggregateOrg(arts[org], cls[org], DATE_FROM);
@@ -1065,6 +1088,7 @@ ${batchText}`;
 
   // ── STEP 5a: General AQ landscape (white-space gap analysis) ──────────────
   cb(`\nSTEP 5a/6 — General AQ landscape (white-space gaps)...`, "head");
+  checkAbort();
   // Exa discovery already produced this: corpus articles that name no tracked
   // org. No extra queries needed — and it's guaranteed consistent with the
   // press section (same corpus, same window).
@@ -1076,6 +1100,7 @@ ${batchText}`;
     `\nSTEP 5b/6 — AI analysis (executive summary, gap narratives, actions)...`,
     "head",
   );
+  checkAbort();
   const orgSummary = ORGS.map((o) => {
     const er = socialERResults.find((r) => r.org === o);
     const yt = youtubeERResults.find((r) => r.org === o);
@@ -1156,6 +1181,7 @@ ${batchText}`;
 
   // ── STEP 6: Build outputs ─────────────────────────────────
   cb(`\nSTEP 6/6 — Building report files...`, "head");
+  checkAbort();
   // Filename: TMP-<report period>-<org count>orgs. The period is the report's
   // own DATE_FROM→DATE_TO window (not the generation time) and always spells
   // the month out — "Aug2026", or "Aug-Sep2026" when the window crosses a
