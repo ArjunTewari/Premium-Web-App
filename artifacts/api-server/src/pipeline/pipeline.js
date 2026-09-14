@@ -1156,13 +1156,14 @@ ${batchText}`;
 
   // ── STEP 6: Build outputs ─────────────────────────────────
   cb(`\nSTEP 6/6 — Building report files...`, "head");
-  const stamp = new Date().toISOString().slice(0, 10);
-  // Truncate filename for large org sets — max 3 names + count
-  const orgLabel =
-    ORGS.length <= 3
-      ? ORGS.join("-vs-")
-      : ORGS.slice(0, 3).join("-vs-") + `-and-${ORGS.length - 3}-more`;
-  const base = `aq-report-${orgLabel}-${stamp}`;
+  // Filename: TMP-<timestamp>-<org count>orgs — short, sortable, and
+  // filesystem-safe. The old scheme embedded org names ("aq-report-OrgA-vs-
+  // OrgB-vs-OrgC-and-13-more-2026-09-06") and became unreadable past 3 orgs;
+  // minute-precision keeps same-day reruns distinct without needing that.
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const now = new Date();
+  const stamp = `${now.getUTCFullYear()}${pad2(now.getUTCMonth() + 1)}${pad2(now.getUTCDate())}-${pad2(now.getUTCHours())}${pad2(now.getUTCMinutes())}`;
+  const base = `TMP-${stamp}-${ORGS.length}orgs`;
   const htmlFile = path.join(cfg.outDir, `${base}.html`);
   let html;
   try {
