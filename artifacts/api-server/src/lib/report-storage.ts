@@ -156,3 +156,22 @@ export async function getReportContent(name: string): Promise<string | null> {
   if (!res || !res.ok) return null;
   return await res.text();
 }
+
+// ── Per-report trend data (small JSON, one per report, alongside its HTML) ──
+// Not tracked in manifest.json — that file only backs the Reports tab's HTML
+// listing. The trends dashboard instead lists reports/*.json directly.
+export async function uploadReportData(name: string, data: unknown): Promise<boolean> {
+  if (!isConfigured()) return false;
+  return putFile(`reports/${name}`, JSON.stringify(data, null, 2), `Add report data: ${name}`);
+}
+
+export async function listReportDataFiles(): Promise<string[]> {
+  if (!isConfigured()) return [];
+  const res = await githubRequest(`/contents/reports?ref=${branch()}`);
+  if (!res || !res.ok) return [];
+  const body = (await res.json().catch(() => null)) as { name?: string; type?: string }[] | null;
+  if (!Array.isArray(body)) return [];
+  return body
+    .filter((f) => f.type === "file" && typeof f.name === "string" && f.name.endsWith(".json"))
+    .map((f) => f.name as string);
+}

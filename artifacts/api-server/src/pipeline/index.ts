@@ -38,11 +38,29 @@ export interface ReportApiCost {
   totalINR: number;
   usdToInr: number;
 }
+export interface ReportTrendScores {
+  sovScore: number;
+  pressShare: number;
+  llmShare: number;
+  socialShare: number;
+  articles: number;
+  aeo: number;
+  social: number;
+}
+export interface ReportTrendSummary {
+  dateFrom: string;
+  dateTo: string;
+  generatedAt: string;
+  orgs: string[];
+  scores: Record<string, ReportTrendScores>;
+}
 export interface RunResult {
   htmlName: string;
   pptxName: string;
   /** Real metered/estimated API cost of producing this report. */
   cost?: ReportApiCost;
+  /** Per-org SoV/AEO/social scores for this report — feeds the trends dashboard. */
+  trendSummary?: ReportTrendSummary;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

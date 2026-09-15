@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const LOADING_QUOTES = [
   { text: "Clean air is not a privilege — it is a right.", author: "UN Environment Programme" },
@@ -175,6 +176,40 @@ interface ReportFile {
   mtime: string;
   costInr: string | null;
 }
+
+interface TrendScores {
+  sovScore: number;
+  pressShare: number;
+  llmShare: number;
+  socialShare: number;
+  articles: number;
+  aeo: number;
+  social: number;
+}
+
+interface TrendReport {
+  dateFrom: string;
+  dateTo: string;
+  generatedAt: string;
+  orgs: string[];
+  scores: Record<string, TrendScores>;
+}
+
+// Same 13-colour palette the report HTML itself uses per org slot, so an
+// org's line color is consistent between the report and this dashboard.
+const ORG_COLORS = [
+  "#3d8ef0", "#e05c3a", "#4caf74", "#c9922a", "#a371f7",
+  "#e05c5c", "#14b8a6", "#f97316", "#8b5cf6", "#06b6d4",
+  "#84cc16", "#ef4444", "#ec4899",
+];
+
+const TREND_METRICS = [
+  { key: "sovScore" as const, label: "SoV Score" },
+  { key: "pressShare" as const, label: "Press Share" },
+  { key: "llmShare" as const, label: "LLM Share" },
+  { key: "socialShare" as const, label: "Social Share" },
+  { key: "articles" as const, label: "Articles" },
+];
 
 type LogLevel = "head" | "ok" | "warn" | "err" | "";
 
@@ -393,7 +428,7 @@ export default function Home() {
     }
   }
 
-  const [activeTab, setActiveTab] = useState<"dashboard" | "reports" | "handles">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "reports" | "trends" | "handles">("dashboard");
 
   // Handles tab — new org add form
   const [hNewOrg, setHNewOrg]   = useState("");
@@ -411,6 +446,10 @@ export default function Home() {
 
   const [result, setResult] = useState<{ htmlName: string; costInr?: number } | null>(null);
   const [prevReports, setPrevReports] = useState<ReportFile[]>([]);
+  const [trendReports, setTrendReports] = useState<TrendReport[]>([]);
+  const [trendsLoading, setTrendsLoading] = useState(false);
+  const [trendMetric, setTrendMetric] = useState<typeof TREND_METRICS[number]["key"]>("sovScore");
+  const [hiddenTrendOrgs, setHiddenTrendOrgs] = useState<Set<string>>(new Set());
 
   const logBoxRef = useRef<HTMLDivElement>(null);
   const [quoteIdx, setQuoteIdx] = useState(0);
@@ -442,6 +481,26 @@ export default function Home() {
   ];
   const orgCount = selectedOrgs.length;
 
+  // ── Trends tab — derived chart data ───────────────────────────────────────
+  const trendOrgs = Array.from(new Set(trendReports.flatMap((r) => r.orgs)));
+  const trendChartData = trendReports.map((r) => {
+    const row: Record<string, string | number> = {
+      period: new Date(r.dateFrom).toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+    };
+    for (const org of trendOrgs) {
+      const s = r.scores[org];
+      if (s) row[org] = s[trendMetric];
+    }
+    return row;
+  });
+  function toggleTrendOrg(org: string) {
+    setHiddenTrendOrgs((prev) => {
+      const next = new Set(prev);
+      if (next.has(org)) next.delete(org); else next.add(org);
+      return next;
+    });
+  }
+
   // Derived handle maps — read from orgHandleOverrides (user-editable)
   const allOrgHandles: Record<string, string> = Object.fromEntries(
     Object.entries(orgHandleOverrides).map(([org, h]) => [org, h.youtube]).filter(([, v]) => v)
@@ -472,6 +531,19 @@ export default function Home() {
   }, []);
 
   useEffect(() => { loadPrev(); }, [loadPrev]);
+
+  const loadTrends = useCallback(async () => {
+    setTrendsLoading(true);
+    try {
+      const res = await fetch("/api/trends", { credentials: "include" });
+      const body = (await res.json()) as { reports: TrendReport[] };
+      setTrendReports(body.reports || []);
+    } catch {} finally {
+      setTrendsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { if (activeTab === "trends") loadTrends(); }, [activeTab, loadTrends]);
 
   // ── Shared org handles (server-backed) ────────────────────────────────────
   // The org_handles table is the single source of truth: any account can edit
@@ -1036,6 +1108,7 @@ export default function Home() {
         <nav style={{ display: "flex", gap: 4 }}>
           <a onClick={() => setActiveTab("dashboard")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "dashboard" ? C.goldLight : C.muted, background: activeTab === "dashboard" ? "var(--elevate-2)" : "transparent" }}>Dashboard</a>
           <a onClick={() => setActiveTab("reports")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "reports" ? C.goldLight : C.muted, background: activeTab === "reports" ? "var(--elevate-2)" : "transparent" }}>Reports</a>
+          <a onClick={() => setActiveTab("trends")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "trends" ? C.goldLight : C.muted, background: activeTab === "trends" ? "var(--elevate-2)" : "transparent" }}>Trends</a>
           <a onClick={() => setActiveTab("handles")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "handles" ? C.goldLight : C.muted, background: activeTab === "handles" ? "var(--elevate-2)" : "transparent" }}>Handles</a>
           {user?.role === "admin" && (
             <a onClick={() => navigate("/admin")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, color: C.muted, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s" }}>Admin</a>
@@ -1679,6 +1752,117 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
+              </SlideUp>
+            )}
+          </div>
+        )}
+
+        {/* ── Trends tab ──────────────────────────────────────────────── */}
+        {activeTab === "trends" && (
+          <div style={{ paddingTop: 40 }}>
+            <SlideUp delay={40}>
+              <div style={{ marginBottom: 28, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: C.gold, marginBottom: 10 }}>
+                    Trends
+                  </div>
+                  <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: "-.02em", color: C.textHi, margin: 0 }}>
+                    Share of Voice Over Time
+                  </h2>
+                  <p style={{ fontSize: 15, color: C.muted, marginTop: 6 }}>
+                    Every generated report's scores, plotted by organisation across report periods.
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {TREND_METRICS.map((m) => (
+                    <button
+                      key={m.key}
+                      onClick={() => setTrendMetric(m.key)}
+                      style={{
+                        padding: "7px 14px", borderRadius: 8,
+                        background: trendMetric === m.key ? "rgba(201,146,42,.15)" : "transparent",
+                        color: trendMetric === m.key ? C.gold : C.muted,
+                        border: `1px solid ${trendMetric === m.key ? "rgba(201,146,42,.35)" : C.border}`,
+                        fontSize: 14, fontWeight: 600, cursor: "pointer",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        transition: "background .2s, color .2s, border-color .2s",
+                      }}
+                    >{m.label}</button>
+                  ))}
+                </div>
+              </div>
+            </SlideUp>
+
+            {trendsLoading ? (
+              <SlideUp delay={80}>
+                <div style={{ textAlign: "center", padding: "60px 0", color: C.muted, fontSize: 16 }}>Loading trend data…</div>
+              </SlideUp>
+            ) : trendReports.length === 0 ? (
+              <SlideUp delay={80}>
+                <div style={{
+                  textAlign: "center", padding: "60px 0",
+                  background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: 14,
+                }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>📈</div>
+                  <div style={{ fontSize: 18, color: C.muted }}>No trend data yet — generate a report to start tracking.</div>
+                </div>
+              </SlideUp>
+            ) : (
+              <SlideUp delay={80}>
+                <Card style={{ padding: "24px 20px 12px" }}>
+                  <div style={{ width: "100%", height: 380 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={trendChartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
+                        <XAxis dataKey="period" tick={{ fill: C.muted, fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: C.border }} tickLine={false} />
+                        <YAxis tick={{ fill: C.muted, fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: C.border }} tickLine={false} />
+                        <Tooltip
+                          contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, fontFamily: "'DM Mono', monospace" }}
+                          labelStyle={{ color: C.text, fontWeight: 600 }}
+                        />
+                        {trendOrgs.map((org, i) => (
+                          hiddenTrendOrgs.has(org) ? null : (
+                            <Line
+                              key={org}
+                              type="monotone"
+                              dataKey={org}
+                              stroke={ORG_COLORS[i % ORG_COLORS.length]}
+                              strokeWidth={2}
+                              dot={{ r: 3 }}
+                              connectNulls
+                            />
+                          )
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "12px 4px 16px" }}>
+                    {trendOrgs.map((org, i) => {
+                      const hidden = hiddenTrendOrgs.has(org);
+                      return (
+                        <button
+                          key={org}
+                          onClick={() => toggleTrendOrg(org)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 6,
+                            padding: "5px 10px", borderRadius: 20,
+                            background: hidden ? "transparent" : "var(--elevate-1)",
+                            border: `1px solid ${C.border}`,
+                            color: hidden ? C.muted : C.text,
+                            opacity: hidden ? 0.5 : 1,
+                            fontSize: 13, cursor: "pointer",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                            transition: "opacity .15s",
+                          }}
+                        >
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: ORG_COLORS[i % ORG_COLORS.length], flexShrink: 0 }} />
+                          {org}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Card>
               </SlideUp>
             )}
           </div>

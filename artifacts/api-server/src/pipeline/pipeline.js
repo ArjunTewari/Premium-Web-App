@@ -1311,7 +1311,33 @@ ${batchText}`;
   };
   cb("cost", cost);
 
-  return { htmlFile, htmlName: `${base}.html`, pptxFile, pptxName, cost };
+  // Small structured summary alongside the HTML — a trends dashboard reads
+  // these instead of re-parsing report HTML. Composite SoV (`score`) is the
+  // headline share-of-voice metric; it's normalized to sum to ~100% across
+  // the tracked orgs, so it's directly comparable across reports even when
+  // the org line-up changes between runs.
+  const trendSummary = {
+    dateFrom: DATE_FROM,
+    dateTo: DATE_TO,
+    generatedAt: new Date().toISOString(),
+    orgs: ORGS,
+    scores: Object.fromEntries(
+      ORGS.map((o) => [
+        o,
+        {
+          sovScore: data[o].score,
+          pressShare: data[o].pressShare,
+          llmShare: data[o].llmShare,
+          socialShare: data[o].socialShare,
+          articles: data[o].total,
+          aeo: data[o].aeo,
+          social: data[o].social,
+        },
+      ]),
+    ),
+  };
+
+  return { htmlFile, htmlName: `${base}.html`, pptxFile, pptxName, cost, trendSummary };
 }
 
 // ══════════════════════════════════════════════════════════════════════════

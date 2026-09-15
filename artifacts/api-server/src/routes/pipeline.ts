@@ -6,9 +6,16 @@ import { eq } from "drizzle-orm";
 import { db, reportLogsTable, usersTable, orgHandlesTable } from "@workspace/db";
 import { calculateClientBilling } from "../lib/auth.js";
 import { requireAuth } from "../middleware/require-auth.js";
-import { run } from "../pipeline/index.js";
+import { run, type ReportTrendSummary } from "../pipeline/index.js";
 import { sendAdminReportEmail, sendClientReportEmail } from "../lib/mailer.js";
-import { uploadReport, listReports, getReportContent, isConfigured as isGithubStorageConfigured } from "../lib/report-storage.js";
+import {
+  uploadReport,
+  uploadReportData,
+  listReports,
+  listReportDataFiles,
+  getReportContent,
+  isConfigured as isGithubStorageConfigured,
+} from "../lib/report-storage.js";
 
 const ALERT_TO = "+918588098882";
 
@@ -71,8 +78,14 @@ if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
 // uploads it and only deletes the local copy once the upload actually
 // succeeded — an upload hiccup leaves the report on disk (still servable,
 // still listed) rather than losing a report that real API money paid for.
-// No-op if GITHUB_REPORTS_TOKEN isn't set.
-async function persistReportToGithub(htmlName: string, cb: (msg: string, level?: string) => void): Promise<void> {
+// Also uploads the report's small trend-data JSON (same base name) if run()
+// produced one — that's what the Trends tab reads. No-op if
+// GITHUB_REPORTS_TOKEN isn't set.
+async function persistReportToGithub(
+  htmlName: string,
+  trendSummary: ReportTrendSummary | undefined,
+  cb: (msg: string, level?: string) => void,
+): Promise<void> {
   if (!isGithubStorageConfigured()) return;
   const fpath = path.join(OUT_DIR, htmlName);
   let content: string;
@@ -82,11 +95,20 @@ async function persistReportToGithub(htmlName: string, cb: (msg: string, level?:
     return;
   }
   const ok = await uploadReport(htmlName, content);
-  if (ok) {
-    fs.rmSync(fpath, { force: true });
-    cb(`  Moved to GitHub storage — freed ${Math.round(content.length / 1024)}KB of local disk`, "ok");
-  } else {
+  if (!ok) {
     cb(`  GitHub upload failed — report stays on local disk for now`, "warn");
+    return;
+  }
+  fs.rmSync(fpath, { force: true });
+  cb(`  Moved to GitHub storage — freed ${Math.round(content.length / 1024)}KB of local disk`, "ok");
+
+  if (trendSummary) {
+    const dataName = htmlName.replace(/\.html$/i, ".json");
+    const dataOk = await uploadReportData(dataName, trendSummary);
+    cb(
+      dataOk ? `  Trend data saved (${dataName})` : `  Trend data upload failed for ${dataName}`,
+      dataOk ? "ok" : "warn",
+    );
   }
 }
 
@@ -257,7 +279,7 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     const apiCost = result.cost;
     const apiCostInr = apiCost?.totalINR ?? 0;
 
-    await persistReportToGithub(result.htmlName, cb);
+    await persistReportToGithub(result.htmlName, result.trendSummary, cb);
 
     // Always persist result — the client may already be disconnected.
     runStore.set(runId, { status: "done", htmlName: result.htmlName, costInr: billing.costInr });
@@ -379,6 +401,43 @@ router.get("/download/:file", requireAuth, async (req: Request, res: Response) =
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
   return res.send(content);
+});
+
+// ── GET /trends — per-org SoV history for the Trends tab ─────────────────────
+// One JSON file per report, uploaded alongside its HTML (see
+// persistReportToGithub). Listing the directory + fetching each file is a
+// GitHub API call per report — fine at today's volume, so it's kept simple
+// with a short cache rather than a second manifest to keep in sync.
+let trendsCache: { at: number; reports: ReportTrendSummary[] } | null = null;
+const TRENDS_CACHE_MS = 60_000;
+
+router.get("/trends", requireAuth, async (_req: Request, res: Response) => {
+  try {
+    if (trendsCache && Date.now() - trendsCache.at < TRENDS_CACHE_MS) {
+      return res.json({ reports: trendsCache.reports });
+    }
+
+    const names = await listReportDataFiles();
+    const parsed = await Promise.all(
+      names.map(async (name) => {
+        const raw = await getReportContent(name);
+        if (!raw) return null;
+        try {
+          return JSON.parse(raw) as ReportTrendSummary;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const reports = parsed
+      .filter((r): r is ReportTrendSummary => r != null)
+      .sort((a, b) => a.dateFrom.localeCompare(b.dateFrom));
+
+    trendsCache = { at: Date.now(), reports };
+    return res.json({ reports });
+  } catch {
+    return res.json({ reports: [] });
+  }
 });
 
 export default router;
