@@ -8,6 +8,7 @@ import { calculateClientBilling } from "../lib/auth.js";
 import { requireAuth } from "../middleware/require-auth.js";
 import { run } from "../pipeline/index.js";
 import { sendAdminReportEmail, sendClientReportEmail } from "../lib/mailer.js";
+import { uploadReport, listReports, getReportContent, isConfigured as isGithubStorageConfigured } from "../lib/report-storage.js";
 
 const ALERT_TO = "+918588098882";
 
@@ -64,6 +65,30 @@ const router: IRouter = Router();
 
 const OUT_DIR = path.join(process.cwd(), "outputs");
 if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
+
+// Move a just-generated report off local disk and into GitHub storage. Local
+// disk is a write-through cache here: run() already wrote the file, this
+// uploads it and only deletes the local copy once the upload actually
+// succeeded — an upload hiccup leaves the report on disk (still servable,
+// still listed) rather than losing a report that real API money paid for.
+// No-op if GITHUB_REPORTS_TOKEN isn't set.
+async function persistReportToGithub(htmlName: string, cb: (msg: string, level?: string) => void): Promise<void> {
+  if (!isGithubStorageConfigured()) return;
+  const fpath = path.join(OUT_DIR, htmlName);
+  let content: string;
+  try {
+    content = fs.readFileSync(fpath, "utf8");
+  } catch {
+    return;
+  }
+  const ok = await uploadReport(htmlName, content);
+  if (ok) {
+    fs.rmSync(fpath, { force: true });
+    cb(`  Moved to GitHub storage — freed ${Math.round(content.length / 1024)}KB of local disk`, "ok");
+  } else {
+    cb(`  GitHub upload failed — report stays on local disk for now`, "warn");
+  }
+}
 
 // ── In-memory run result store ────────────────────────────────────────────────
 // Survives the SSE connection being killed by the 5-min proxy timeout.
@@ -232,6 +257,8 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     const apiCost = result.cost;
     const apiCostInr = apiCost?.totalINR ?? 0;
 
+    await persistReportToGithub(result.htmlName, cb);
+
     // Always persist result — the client may already be disconnected.
     runStore.set(runId, { status: "done", htmlName: result.htmlName, costInr: billing.costInr });
 
@@ -309,15 +336,25 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
 
 router.get("/outputs", requireAuth, async (_req: Request, res: Response) => {
   try {
-    const files = fs
+    const localFiles = fs
       .readdirSync(OUT_DIR)
       .filter((f) => f.endsWith(".html"))
       .map((f) => ({
         name: f,
         size: Math.round(fs.statSync(path.join(OUT_DIR, f)).size / 1024),
         mtime: fs.statSync(path.join(OUT_DIR, f)).mtime.toISOString().slice(0, 16),
-      }))
-      .sort((a, b) => b.mtime.localeCompare(a.mtime));
+      }));
+
+    // Most reports now live in GitHub storage (see persistReportToGithub) —
+    // local disk only ever holds the sample reports plus anything mid-upload
+    // or that failed to migrate. Merge both, local taking priority on a name
+    // clash (shouldn't happen — a report is removed locally only once the
+    // GitHub upload has already succeeded).
+    const githubFiles = await listReports();
+    const localNames = new Set(localFiles.map((f) => f.name));
+    const files = [...localFiles, ...githubFiles.filter((f) => !localNames.has(f.name))].sort((a, b) =>
+      b.mtime.localeCompare(a.mtime),
+    );
 
     const logs = await db.select({ htmlName: reportLogsTable.htmlName, costInr: reportLogsTable.costInr }).from(reportLogsTable);
     const costMap: Record<string, string> = {};
@@ -331,11 +368,17 @@ router.get("/outputs", requireAuth, async (_req: Request, res: Response) => {
   }
 });
 
-router.get("/download/:file", requireAuth, (req: Request, res: Response) => {
-  const fname = path.basename(req.params.file);
+router.get("/download/:file", requireAuth, async (req: Request, res: Response) => {
+  const fname = path.basename(String(req.params.file || "").trim());
   const fpath = path.join(OUT_DIR, fname);
-  if (!fs.existsSync(fpath)) return res.status(404).send("File not found");
-  res.download(fpath, fname);
+  if (fs.existsSync(fpath)) return res.download(fpath, fname);
+
+  // Not on local disk — most reports live in GitHub storage now.
+  const content = await getReportContent(fname);
+  if (content == null) return res.status(404).send("File not found");
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
+  return res.send(content);
 });
 
 export default router;

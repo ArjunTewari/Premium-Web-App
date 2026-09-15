@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { ensureSchema } from "./lib/ensure-schema.js";
 import { seedAdminIfNeeded } from "./lib/seed.js";
 import { seedSampleReports } from "./lib/seed-sample-reports.js";
+import { migrateLocalReportsToGithub } from "./lib/migrate-reports-to-github.js";
 
 const rawPort = process.env["PORT"];
 
@@ -32,6 +33,11 @@ try {
 // Copy the curated sample report(s) into outputs/ so every account's Reports
 // tab has one to open. Non-fatal — the app runs fine without it.
 seedSampleReports();
+
+// Push any previously-generated reports still sitting on local disk to
+// GitHub storage and free the space. No-op if GITHUB_REPORTS_TOKEN isn't
+// set. Runs in the background — doesn't delay accepting traffic.
+migrateLocalReportsToGithub().catch((err) => logger.warn({ err }, "Report migration failed"));
 
 app.listen(port, (err) => {
   if (err) {
