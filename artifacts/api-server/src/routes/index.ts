@@ -5,6 +5,7 @@ import adminRouter from "./admin.js";
 import pipelineRouter from "./pipeline.js";
 import pdfRouter from "./pdf.js";
 import handlesRouter from "./handles.js";
+import schedulesRouter from "./schedules.js";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(adminRouter);
 router.use(pipelineRouter);
 router.use(pdfRouter);
 router.use(handlesRouter);
+router.use(schedulesRouter);
 
 export default router;

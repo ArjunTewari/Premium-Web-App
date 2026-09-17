@@ -61,6 +61,22 @@ export async function ensureSchema(): Promise<void> {
       "updated_at" timestamp NOT NULL DEFAULT now(),
       "updated_by" text
     );
+
+    CREATE TABLE IF NOT EXISTS "report_schedules" (
+      "id" serial PRIMARY KEY,
+      "label" text NOT NULL,
+      "orgs" text[] NOT NULL,
+      "client_name" text NOT NULL,
+      "scope_keywords" text[],
+      "recipient_email" text,
+      "run_hour_ist" integer NOT NULL DEFAULT 5,
+      "run_minute_ist" integer NOT NULL DEFAULT 0,
+      "active" boolean NOT NULL DEFAULT true,
+      "last_run_at" timestamp,
+      "last_run_status" text,
+      "created_by" text,
+      "created_at" timestamp NOT NULL DEFAULT now()
+    );
   `;
   try {
     await pool.query(ddl);

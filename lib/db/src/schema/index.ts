@@ -5,6 +5,7 @@ import {
   boolean,
   timestamp,
   numeric,
+  integer,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -70,3 +71,27 @@ export const orgHandlesTable = pgTable("org_handles", {
 });
 
 export type OrgHandle = typeof orgHandlesTable.$inferSelect;
+
+// A recurring weekly report: always a full Monday 00:00 -> Sunday 23:59 (IST)
+// window for the week that just ended, fired every Monday at runHourIst:
+// runMinuteIst. One row per client/org-set combination the account wants on
+// autopilot — created, edited, paused, and deleted from the Scheduler tab.
+export const reportSchedulesTable = pgTable("report_schedules", {
+  id: serial("id").primaryKey(),
+  label: text("label").notNull(),
+  orgs: text("orgs").array().notNull(),
+  clientName: text("client_name").notNull(),
+  scopeKeywords: text("scope_keywords").array(),
+  // Who the finished report is emailed to. The admin cost email always goes
+  // out regardless; this is the client-facing copy.
+  recipientEmail: text("recipient_email"),
+  runHourIst: integer("run_hour_ist").notNull().default(5),
+  runMinuteIst: integer("run_minute_ist").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  lastRunAt: timestamp("last_run_at"),
+  lastRunStatus: text("last_run_status"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type ReportSchedule = typeof reportSchedulesTable.$inferSelect;

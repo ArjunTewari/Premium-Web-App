@@ -211,6 +211,26 @@ const TREND_METRICS = [
   { key: "articles" as const, label: "Articles" },
 ];
 
+interface Schedule {
+  id: number;
+  label: string;
+  orgs: string[];
+  clientName: string;
+  scopeKeywords: string[] | null;
+  recipientEmail: string | null;
+  runHourIst: number;
+  runMinuteIst: number;
+  active: boolean;
+  lastRunAt: string | null;
+  lastRunStatus: string | null;
+}
+
+function formatIstTime(hour: number, minute: number): string {
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  const ampm = hour < 12 ? "AM" : "PM";
+  return `${h12}:${String(minute).padStart(2, "0")} ${ampm} IST`;
+}
+
 type LogLevel = "head" | "ok" | "warn" | "err" | "";
 
 interface LogEntry {
@@ -428,7 +448,7 @@ export default function Home() {
     }
   }
 
-  const [activeTab, setActiveTab] = useState<"dashboard" | "reports" | "trends" | "handles">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "reports" | "trends" | "scheduler" | "handles">("dashboard");
 
   // Handles tab — new org add form
   const [hNewOrg, setHNewOrg]   = useState("");
@@ -450,6 +470,19 @@ export default function Home() {
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendMetric, setTrendMetric] = useState<typeof TREND_METRICS[number]["key"]>("sovScore");
   const [hiddenTrendOrgs, setHiddenTrendOrgs] = useState<Set<string>>(new Set());
+
+  // ── Scheduler tab ──────────────────────────────────────────────────────────
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(false);
+  const [scheduleFormOpen, setScheduleFormOpen] = useState<"new" | number | null>(null);
+  const [scheduleFormOrgs, setScheduleFormOrgs] = useState<string[]>([]);
+  const [scheduleFormLabel, setScheduleFormLabel] = useState("");
+  const [scheduleFormClientName, setScheduleFormClientName] = useState("");
+  const [scheduleFormEmail, setScheduleFormEmail] = useState("");
+  const [scheduleFormScope, setScheduleFormScope] = useState("");
+  const [scheduleFormHour, setScheduleFormHour] = useState(5);
+  const [scheduleFormMinute, setScheduleFormMinute] = useState(0);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
 
   const logBoxRef = useRef<HTMLDivElement>(null);
   const [quoteIdx, setQuoteIdx] = useState(0);
@@ -544,6 +577,102 @@ export default function Home() {
   }, []);
 
   useEffect(() => { if (activeTab === "trends") loadTrends(); }, [activeTab, loadTrends]);
+
+  const loadSchedules = useCallback(async () => {
+    setSchedulesLoading(true);
+    try {
+      const res = await fetch("/api/schedules", { credentials: "include" });
+      const body = (await res.json()) as { schedules: Schedule[] };
+      setSchedules(body.schedules || []);
+    } catch {} finally {
+      setSchedulesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { if (activeTab === "scheduler") loadSchedules(); }, [activeTab, loadSchedules]);
+
+  function openNewScheduleForm() {
+    setScheduleFormOrgs([]);
+    setScheduleFormLabel("");
+    setScheduleFormClientName("");
+    setScheduleFormEmail("");
+    setScheduleFormScope("");
+    setScheduleFormHour(5);
+    setScheduleFormMinute(0);
+    setScheduleFormOpen("new");
+  }
+
+  function openEditScheduleForm(s: Schedule) {
+    setScheduleFormOrgs(s.orgs);
+    setScheduleFormLabel(s.label);
+    setScheduleFormClientName(s.clientName);
+    setScheduleFormEmail(s.recipientEmail || "");
+    setScheduleFormScope((s.scopeKeywords || []).join(", "));
+    setScheduleFormHour(s.runHourIst);
+    setScheduleFormMinute(s.runMinuteIst);
+    setScheduleFormOpen(s.id);
+  }
+
+  function toggleScheduleFormOrg(org: string) {
+    setScheduleFormOrgs((prev) => (prev.includes(org) ? prev.filter((o) => o !== org) : [...prev, org]));
+  }
+
+  async function saveSchedule() {
+    if (!scheduleFormOrgs.length) { alert("Select at least one organisation."); return; }
+    if (!scheduleFormClientName.trim()) { alert("Client name is required."); return; }
+    setScheduleSaving(true);
+    const payload = {
+      orgs: scheduleFormOrgs,
+      label: scheduleFormLabel.trim() || scheduleFormClientName.trim(),
+      clientName: scheduleFormClientName.trim(),
+      recipientEmail: scheduleFormEmail.trim() || null,
+      scopeKeywords: scheduleFormScope.split(",").map((s) => s.trim()).filter(Boolean),
+      runHourIst: scheduleFormHour,
+      runMinuteIst: scheduleFormMinute,
+    };
+    try {
+      const isNew = scheduleFormOpen === "new";
+      const url = isNew ? "/api/schedules" : `/api/schedules/${scheduleFormOpen}`;
+      const res = await fetch(url, {
+        method: isNew ? "POST" : "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}) as { error?: string });
+        alert("Error: " + (err.error || res.status));
+        return;
+      }
+      setScheduleFormOpen(null);
+      await loadSchedules();
+    } catch (e) {
+      alert("Could not save schedule: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setScheduleSaving(false);
+    }
+  }
+
+  function deleteSchedule(s: Schedule) {
+    withConfirm(`Delete the "${s.label}" weekly schedule?\n\nThis stops future auto-generated reports for it — it can't be undone.`, async () => {
+      try {
+        await fetch(`/api/schedules/${s.id}`, { method: "DELETE", credentials: "include" });
+        await loadSchedules();
+      } catch {}
+    });
+  }
+
+  async function toggleScheduleActive(s: Schedule) {
+    try {
+      await fetch(`/api/schedules/${s.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ active: !s.active }),
+      });
+      await loadSchedules();
+    } catch {}
+  }
 
   // ── Shared org handles (server-backed) ────────────────────────────────────
   // The org_handles table is the single source of truth: any account can edit
@@ -1117,6 +1246,7 @@ export default function Home() {
           <a onClick={() => setActiveTab("dashboard")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "dashboard" ? C.goldLight : C.muted, background: activeTab === "dashboard" ? "var(--elevate-2)" : "transparent" }}>Dashboard</a>
           <a onClick={() => setActiveTab("reports")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "reports" ? C.goldLight : C.muted, background: activeTab === "reports" ? "var(--elevate-2)" : "transparent" }}>Reports</a>
           <a onClick={() => setActiveTab("trends")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "trends" ? C.goldLight : C.muted, background: activeTab === "trends" ? "var(--elevate-2)" : "transparent" }}>Trends</a>
+          <a onClick={() => setActiveTab("scheduler")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "scheduler" ? C.goldLight : C.muted, background: activeTab === "scheduler" ? "var(--elevate-2)" : "transparent" }}>Scheduler</a>
           <a onClick={() => setActiveTab("handles")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "handles" ? C.goldLight : C.muted, background: activeTab === "handles" ? "var(--elevate-2)" : "transparent" }}>Handles</a>
           {user?.role === "admin" && (
             <a onClick={() => navigate("/admin")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, color: C.muted, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s" }}>Admin</a>
@@ -1871,6 +2001,180 @@ export default function Home() {
                     })}
                   </div>
                 </Card>
+              </SlideUp>
+            )}
+          </div>
+        )}
+
+        {/* ── Scheduler tab ───────────────────────────────────────────── */}
+        {activeTab === "scheduler" && (
+          <div style={{ paddingTop: 40 }}>
+            <SlideUp delay={40}>
+              <div style={{ marginBottom: 28, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: C.gold, marginBottom: 10 }}>
+                    Scheduler
+                  </div>
+                  <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: "-.02em", color: C.textHi, margin: 0 }}>
+                    Weekly Reports
+                  </h2>
+                  <p style={{ fontSize: 15, color: C.muted, marginTop: 6 }}>
+                    Auto-generates every Monday for the week just ended (Mon 00:00 – Sun 23:59 IST) and emails the result.
+                  </p>
+                </div>
+                {scheduleFormOpen === null && (
+                  <button
+                    onClick={openNewScheduleForm}
+                    style={{
+                      padding: "10px 18px", borderRadius: 10,
+                      background: "linear-gradient(135deg, var(--accent-amber) 0%, #8b5e15 100%)",
+                      color: "#fff", border: "none", cursor: "pointer",
+                      fontSize: 15, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >+ New Schedule</button>
+                )}
+              </div>
+            </SlideUp>
+
+            {scheduleFormOpen !== null && (
+              <SlideUp delay={60}>
+                <Card style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: C.text, marginBottom: 16 }}>
+                    {scheduleFormOpen === "new" ? "New weekly schedule" : "Edit schedule"}
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ display: "block", fontSize: 13, color: C.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".08em" }}>Organisations</label>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6, maxHeight: 200, overflowY: "auto", padding: 10, background: "var(--elevate-1)", borderRadius: 8, border: `1px solid ${C.border}` }}>
+                      {allOrgs.map((org) => (
+                        <label key={org} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 14, color: C.text, cursor: "pointer" }}>
+                          <input type="checkbox" checked={scheduleFormOrgs.includes(org)} onChange={() => toggleScheduleFormOrg(org)} />
+                          {org}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: 13, color: C.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".08em" }}>Client name</label>
+                      <input value={scheduleFormClientName} onChange={(e) => setScheduleFormClientName(e.target.value)} placeholder="Chetan Bhattacharji" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 13, color: C.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".08em" }}>Label <span style={{ opacity: .6 }}>(optional)</span></label>
+                      <input value={scheduleFormLabel} onChange={(e) => setScheduleFormLabel(e.target.value)} placeholder="Defaults to client name" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 13, color: C.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".08em" }}>Recipient email</label>
+                      <input value={scheduleFormEmail} onChange={(e) => setScheduleFormEmail(e.target.value)} placeholder="client@example.com" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 13, color: C.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".08em" }}>Run time (Mondays, IST)</label>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <select value={scheduleFormHour} onChange={(e) => setScheduleFormHour(Number(e.target.value))} style={{ ...inputStyle, width: "auto" }}>
+                          {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}</option>)}
+                        </select>
+                        <span style={{ color: C.muted }}>:</span>
+                        <select value={scheduleFormMinute} onChange={(e) => setScheduleFormMinute(Number(e.target.value))} style={{ ...inputStyle, width: "auto" }}>
+                          {[0, 15, 30, 45].map((m) => <option key={m} value={m}>{String(m).padStart(2, "0")}</option>)}
+                        </select>
+                        <span style={{ fontSize: 13, color: C.muted }}>{formatIstTime(scheduleFormHour, scheduleFormMinute)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 18 }}>
+                    <label style={{ display: "block", fontSize: 13, color: C.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".08em" }}>Scope keywords <span style={{ opacity: .6 }}>(optional, comma-separated)</span></label>
+                    <input value={scheduleFormScope} onChange={(e) => setScheduleFormScope(e.target.value)} placeholder="Leave blank for the default AQ keyword set" style={inputStyle} />
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      onClick={saveSchedule}
+                      disabled={scheduleSaving}
+                      style={{
+                        padding: "9px 20px", borderRadius: 8,
+                        background: "linear-gradient(135deg, var(--accent-amber) 0%, #8b5e15 100%)",
+                        color: "#fff", border: "none", cursor: scheduleSaving ? "not-allowed" : "pointer",
+                        opacity: scheduleSaving ? .7 : 1,
+                        fontSize: 15, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >{scheduleSaving ? "Saving…" : "Save schedule"}</button>
+                    <button
+                      onClick={() => setScheduleFormOpen(null)}
+                      style={{
+                        padding: "9px 20px", borderRadius: 8,
+                        background: "transparent", color: C.muted, border: `1px solid ${C.border}`,
+                        cursor: "pointer", fontSize: 15, fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >Cancel</button>
+                  </div>
+                </Card>
+              </SlideUp>
+            )}
+
+            {schedulesLoading ? (
+              <SlideUp delay={80}>
+                <div style={{ textAlign: "center", padding: "60px 0", color: C.muted, fontSize: 16 }}>Loading schedules…</div>
+              </SlideUp>
+            ) : schedules.length === 0 && scheduleFormOpen === null ? (
+              <SlideUp delay={80}>
+                <div style={{
+                  textAlign: "center", padding: "60px 0",
+                  background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: 14,
+                }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>🗓️</div>
+                  <div style={{ fontSize: 18, color: C.muted }}>No weekly schedules yet — create one to put report generation on autopilot.</div>
+                </div>
+              </SlideUp>
+            ) : (
+              <SlideUp delay={80}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {schedules.map((s) => (
+                    <div key={s.id} style={{
+                      padding: "16px 18px",
+                      background: C.surface, border: `1px solid ${C.border}`,
+                      borderRadius: 12,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 17, fontWeight: 600, color: C.text }}>{s.label}</span>
+                            <span style={{
+                              fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase",
+                              padding: "2px 8px", borderRadius: 20,
+                              color: s.active ? C.green : C.muted,
+                              background: s.active ? "rgba(76,175,116,.12)" : "var(--elevate-1)",
+                              border: `1px solid ${s.active ? "rgba(76,175,116,.3)" : C.border}`,
+                            }}>{s.active ? "Active" : "Paused"}</span>
+                          </div>
+                          <div style={{ fontSize: 13, color: C.muted, marginTop: 4, fontFamily: "'DM Mono', monospace" }}>
+                            {s.clientName} · {s.orgs.length} org{s.orgs.length !== 1 ? "s" : ""} · Mondays at {formatIstTime(s.runHourIst, s.runMinuteIst)}
+                          </div>
+                          <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+                            {s.recipientEmail ? `→ ${s.recipientEmail}` : "No recipient email set — admin copy only"}
+                            {s.lastRunAt && <> · last run {new Date(s.lastRunAt).toLocaleDateString()} ({s.lastRunStatus?.startsWith("error") ? "failed" : "done"})</>}
+                          </div>
+                          <div style={{ fontSize: 12, color: C.muted, marginTop: 6, maxWidth: 620, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {s.orgs.join(", ")}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                          <button onClick={() => toggleScheduleActive(s)} style={{ padding: "6px 12px", borderRadius: 7, background: "transparent", color: C.muted, border: `1px solid ${C.border}`, cursor: "pointer", fontSize: 13, fontFamily: "'Space Grotesk', sans-serif" }}>
+                            {s.active ? "Pause" : "Resume"}
+                          </button>
+                          <button onClick={() => openEditScheduleForm(s)} style={{ padding: "6px 12px", borderRadius: 7, background: "transparent", color: C.muted, border: `1px solid ${C.border}`, cursor: "pointer", fontSize: 13, fontFamily: "'Space Grotesk', sans-serif" }}>
+                            Edit
+                          </button>
+                          <button onClick={() => deleteSchedule(s)} style={{ padding: "6px 12px", borderRadius: 7, background: "rgba(224,92,92,.1)", color: "#e05353", border: "1px solid rgba(224,92,92,.25)", cursor: "pointer", fontSize: 13, fontFamily: "'Space Grotesk', sans-serif" }}>
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </SlideUp>
             )}
           </div>

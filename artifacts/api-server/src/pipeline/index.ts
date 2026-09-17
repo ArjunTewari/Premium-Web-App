@@ -13,6 +13,7 @@ export interface RunConfig {
   DATE_TO: string;
   CLIENT_NAME: string;
   SCOPE_KEYWORDS: string[];
+  AEO_QUERIES?: string[];
   SERPER_KEY: string;
   CLAUDE_KEY: string;
   OPENAI_KEY?: string;
@@ -29,6 +30,8 @@ export interface RunConfig {
   META_ACCESS_TOKEN?: string;
   IG_BUSINESS_ACCOUNT_ID?: string;
   outDir: string;
+  /** Cooperative-cancellation signal — checked between pipeline stages. */
+  signal?: AbortSignal;
 }
 export interface ReportApiCost {
   counts: Record<string, number>;
