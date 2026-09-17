@@ -617,6 +617,9 @@ export default function Home() {
     setScheduleFormOrgs((prev) => (prev.includes(org) ? prev.filter((o) => o !== org) : [...prev, org]));
   }
 
+  function selectAllScheduleOrgs() { setScheduleFormOrgs([...allOrgs]); }
+  function deselectAllScheduleOrgs() { setScheduleFormOrgs([]); }
+
   async function saveSchedule() {
     if (!scheduleFormOrgs.length) { alert("Select at least one organisation."); return; }
     if (!scheduleFormClientName.trim()) { alert("Client name is required."); return; }
@@ -2044,7 +2047,20 @@ export default function Home() {
                   </div>
 
                   <div style={{ marginBottom: 14 }}>
-                    <label style={{ display: "block", fontSize: 13, color: C.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".08em" }}>Organisations</label>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                      <label style={{ fontSize: 13, color: C.muted, textTransform: "uppercase", letterSpacing: ".08em" }}>Organisations</label>
+                      <button
+                        onClick={scheduleFormOrgs.length === allOrgs.length ? deselectAllScheduleOrgs : selectAllScheduleOrgs}
+                        style={{
+                          fontFamily: "'DM Mono', monospace", fontSize: 13,
+                          padding: "3px 10px", borderRadius: 6, cursor: "pointer",
+                          background: "rgba(76,175,116,.1)", color: "var(--accent-green)",
+                          border: `1px solid rgba(76,175,116,.25)`,
+                        }}
+                      >
+                        {scheduleFormOrgs.length === allOrgs.length ? "Deselect All" : `Select All (${allOrgs.length})`}
+                      </button>
+                    </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6, maxHeight: 200, overflowY: "auto", padding: 10, background: "var(--elevate-1)", borderRadius: 8, border: `1px solid ${C.border}` }}>
                       {allOrgs.map((org) => (
                         <label key={org} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 14, color: C.text, cursor: "pointer" }}>
