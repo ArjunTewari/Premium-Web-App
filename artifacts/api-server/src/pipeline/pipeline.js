@@ -3534,8 +3534,13 @@ body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line
 .shell{display:flex;min-height:100vh}
 .sidenav{width:220px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:28px 0;display:flex;flex-direction:column}
 .sidenav-logo{padding:0 20px 24px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.sidenav-logo-link{display:block;text-decoration:none;color:inherit;cursor:pointer;transition:background .15s}
+.sidenav-logo-link:hover .sidenav-logo{background:var(--surface2)}
 .sidenav-logo-name{font-size:16px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
 .sidenav-logo-sub{font-size:15px;color:var(--muted);margin-top:2px;font-family:monospace}
+.badge-type{display:inline-block;font-family:monospace;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);background:var(--surface3);border:1px solid var(--border2);border-radius:3px;padding:2px 8px;margin-bottom:10px}
+.badge-type.client{color:#3d8ef0;background:rgba(61,142,240,.12);border-color:rgba(61,142,240,.3)}
+.org-count-badge{font-family:monospace;font-size:14px;color:var(--muted2);background:var(--surface3);border:1px solid var(--border2);border-radius:5px;padding:6px 13px;line-height:1.4;white-space:nowrap}
 .nav-lbl{font-size:14px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:12px 20px 6px}
 .nav-a{display:block;padding:7px 20px;font-size:17px;color:var(--muted2);text-decoration:none;border-left:2px solid transparent}
 .nav-a:hover{color:var(--text);background:var(--surface2)}.nav-a.active{color:var(--amber);border-left-color:var(--amber);background:var(--amber-glow)}
@@ -3703,9 +3708,9 @@ body.edit-mode .sec-x{display:flex}
 <style>${CSS}</style>
 <script>try{if(localStorage.getItem('emerald-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 </head><body>
-<div class="edit-bar" id="edit-bar"><button class="edit-btn" id="theme-btn" onclick="toggleTheme()">&#9728; Light Mode</button><button class="edit-btn" id="edit-btn" onclick="toggleEdit()">&#9998; Edit Mode</button><button class="edit-btn edit-dl" id="dl-btn" onclick="dlEdit()">&#8595; Download Edited</button></div>
+<div class="edit-bar" id="edit-bar"><span class="org-count-badge">${ORGS.length} org${ORGS.length !== 1 ? "s" : ""} analysed</span><button class="edit-btn" id="theme-btn" onclick="toggleTheme()">&#9728; Light Mode</button><button class="edit-btn" id="edit-btn" onclick="toggleEdit()">&#9998; Edit Mode</button><button class="edit-btn edit-dl" id="dl-btn" onclick="dlEdit()">&#8595; Download Edited</button></div>
 <div class="shell">
-<nav class="sidenav"><div class="sidenav-logo"><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div>
+<nav class="sidenav"><a href="#header" class="sidenav-logo-link" title="Back to top"><div class="sidenav-logo"><div class="badge-type" id="reportTypeBadge">RESTRICTED &middot; ${new Date().toISOString().slice(0, 10)}</div><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div></a>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a>
 <div class="nav-lbl">Press</div><a href="#sov" class="nav-a">Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social Media</div><a href="#social" class="nav-a">Social Media</a>
 <div class="nav-lbl">LLM</div><a href="#aeo" class="nav-a">LLM Visibility</a>
@@ -3714,7 +3719,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="mob-nav"><a href="#exec">Summary</a><a href="#sov">Press</a><a href="#tv">TV</a><a href="#momentum">Momentum</a><a href="#social">Social</a><a href="#aeo">LLM</a><a href="#score">Score</a><a href="#actions">Actions</a></div>
 <main class="main">
 <header class="rh" id="header"><div class="ey">Air Quality Media Intelligence &middot; India</div>
-<h1 class="rt">Air Quality<br><span class="rti">Triple Media Analytics</span></h1>
+<h1 class="rt">Air Quality<br><span class="rti">Triple Media Pulse</span></h1>
 <div class="rm">Period: ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)} &middot; ${now}</div>
 <div class="chips">${orgChips}</div>
 <div class="dn"><strong>Publicly available data</strong> Insight linked to evidence &middot; ${now}</div>

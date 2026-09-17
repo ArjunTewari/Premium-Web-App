@@ -782,6 +782,14 @@ export default function Home() {
       removeNavLink("#exec");
       removeNavLink("#actions");
 
+      // This copy is the client-facing version — flip the top-left badge from
+      // the default "RESTRICTED" (the full internal build) to say so.
+      const typeBadge = doc.getElementById("reportTypeBadge");
+      if (typeBadge) {
+        typeBadge.textContent = typeBadge.textContent!.replace(/^RESTRICTED/, "CLIENT VIEW");
+        typeBadge.classList.add("client");
+      }
+
       // Renumber remaining section eyebrows sequentially
       doc.querySelectorAll(".se").forEach((el, idx) => {
         const num = String(idx + 1).padStart(2, "0");
