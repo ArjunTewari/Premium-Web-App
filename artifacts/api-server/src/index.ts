@@ -4,6 +4,7 @@ import { ensureSchema } from "./lib/ensure-schema.js";
 import { seedAdminIfNeeded } from "./lib/seed.js";
 import { seedSampleReports } from "./lib/seed-sample-reports.js";
 import { migrateLocalReportsToGithub } from "./lib/migrate-reports-to-github.js";
+import { startReportScheduler } from "./lib/report-scheduler.js";
 
 const rawPort = process.env["PORT"];
 
@@ -38,6 +39,10 @@ seedSampleReports();
 // GitHub storage and free the space. No-op if GITHUB_REPORTS_TOKEN isn't
 // set. Runs in the background — doesn't delay accepting traffic.
 migrateLocalReportsToGithub().catch((err) => logger.warn({ err }, "Report migration failed"));
+
+// Weekly scheduled reports (Scheduler tab) — checks every few minutes and
+// fires any due schedule. No-op if none exist.
+startReportScheduler();
 
 app.listen(port, (err) => {
   if (err) {
