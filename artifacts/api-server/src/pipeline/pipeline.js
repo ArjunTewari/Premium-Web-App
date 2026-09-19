@@ -2899,6 +2899,20 @@ ${hmTable}
 // ══════════════════════════════════════════════════════════════════════════
 //  HTML BUILDER  (adds AEO + Social sections)
 // ══════════════════════════════════════════════════════════════════════════
+// Label for the report's span, shown in the sidebar badge. Inclusive day count
+// of DATE_FROM..DATE_TO — a full Monday–Sunday run is exactly 7 -> "Week".
+function reportDurationLabel(from, to) {
+  const a = Date.parse(`${String(from).slice(0, 10)}T00:00:00Z`);
+  const b = Date.parse(`${String(to).slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(a) || Number.isNaN(b) || b < a) return "Custom";
+  const days = Math.round((b - a) / 86400000) + 1;
+  if (days === 1) return "Day";
+  if (days === 7) return "Week";
+  if (days >= 28 && days <= 31) return "Month";
+  if (days >= 89 && days <= 92) return "Quarter";
+  return `${days} Days`;
+}
+
 function buildHTML(
   data,
   comps,
@@ -3535,6 +3549,8 @@ body{font-family:'Inter',sans-serif;background:var(--ink);color:var(--text);line
 .sidenav-logo-sub{font-size:15px;color:var(--muted);margin-top:2px;font-family:monospace}
 .badge-type{display:inline-block;font-family:monospace;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);background:var(--surface3);border:1px solid var(--border2);border-radius:3px;padding:2px 8px;margin-bottom:10px}
 .badge-type.client{color:#3d8ef0;background:rgba(61,142,240,.12);border-color:rgba(61,142,240,.3)}
+.badge-type .bt-type,.badge-type .bt-meta{display:block}
+.badge-type .bt-sep{display:none}
 .org-count-badge{font-family:monospace;font-size:14px;color:var(--muted2);background:var(--surface3);border:1px solid var(--border2);border-radius:5px;padding:6px 13px;line-height:1.4;white-space:nowrap}
 .nav-lbl{font-size:14px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:12px 20px 6px}
 .nav-a{display:block;padding:7px 20px;font-size:17px;color:var(--muted2);text-decoration:none;border-left:2px solid transparent}
@@ -3705,7 +3721,7 @@ body.edit-mode .sec-x{display:flex}
 </head><body>
 <div class="edit-bar" id="edit-bar"><span class="org-count-badge">${ORGS.length} org${ORGS.length !== 1 ? "s" : ""} analysed</span><button class="edit-btn" id="theme-btn" onclick="toggleTheme()">&#9728; Light Mode</button><button class="edit-btn" id="edit-btn" onclick="toggleEdit()">&#9998; Edit Mode</button><button class="edit-btn edit-dl" id="dl-btn" onclick="dlEdit()">&#8595; Download Edited</button></div>
 <div class="shell">
-<nav class="sidenav"><a href="#header" class="sidenav-logo-link" title="Back to top"><div class="sidenav-logo"><div class="badge-type" id="reportTypeBadge">RESTRICTED &middot; ${new Date().toISOString().slice(0, 10)}</div><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div></a>
+<nav class="sidenav"><a href="#header" class="sidenav-logo-link" title="Back to top"><div class="sidenav-logo"><div class="badge-type" id="reportTypeBadge"><span class="bt-type">RESTRICTED</span><span class="bt-sep"> &middot; </span><span class="bt-meta">${esc(reportDurationLabel(DATE_FROM, DATE_TO))} &middot; ${esc(String(DATE_FROM).slice(0, 10))}</span></div><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div></a>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a>
 <div class="nav-lbl">Press</div><a href="#sov" class="nav-a">Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social Media</div><a href="#social" class="nav-a">Social Media</a>
 <div class="nav-lbl">LLM</div><a href="#aeo" class="nav-a">LLM Visibility</a>
