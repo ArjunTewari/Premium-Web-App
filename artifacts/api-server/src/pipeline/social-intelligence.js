@@ -355,6 +355,10 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
         <th style="padding:10px 12px;text-align:left;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Question sent to LLMs</th>
         ${orgHeaderCells}
       </tr>
+      <tr style="background:var(--surface);border-top:1px solid var(--border)">
+        <td colspan="2" style="padding:6px 12px;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Cohort &middot; questions cited</td>
+        ${sortedOrgs.map(({ org }) => `<td style="padding:6px 12px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;color:var(--amber);border-left:1px solid var(--border)">${Object.values(aeoResults[org]?.questionResults || {}).filter((rs) => rs.some((r) => r.cited)).length}/${queriesUsed.length}</td>`).join('')}
+      </tr>
     </thead>
     <tbody>${qMatrixRows}</tbody>
   </table>
