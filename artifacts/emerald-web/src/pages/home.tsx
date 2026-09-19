@@ -916,9 +916,13 @@ export default function Home() {
 
       // This copy is the client-facing version — flip the top-left badge from
       // the default "RESTRICTED" (the full internal build) to say so.
+      // Newer reports split the badge into a type line + a duration/period
+      // line; older ones are one plain string, so fall back to a text replace.
       const typeBadge = doc.getElementById("reportTypeBadge");
       if (typeBadge) {
-        typeBadge.textContent = typeBadge.textContent!.replace(/^RESTRICTED/, "CLIENT VIEW");
+        const typeLine = typeBadge.querySelector(".bt-type");
+        if (typeLine) typeLine.textContent = "CLIENT VIEW";
+        else typeBadge.textContent = typeBadge.textContent!.replace(/^RESTRICTED/, "CLIENT VIEW");
         typeBadge.classList.add("client");
       }
 
