@@ -338,10 +338,10 @@ function buildYoutubeERHtml(results, hasApiKey) {
 
   const methodNote = !hasApiKey
     ? `<div style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:#d4a017;line-height:1.7">
-        <strong>&#9432; YOUTUBE_KEY not configured</strong> — YouTube Data API v3 is required for both video discovery and engagement stats; without it this section is skipped entirely. Add <code style="background:#1e2638;padding:1px 5px;border-radius:3px">YOUTUBE_KEY</code> (Google API key with YouTube Data API v3 enabled) to unlock this section.
+        <strong>&#9432; YOUTUBE_KEY not configured</strong> — YouTube Data API v3 is required for both video discovery and engagement stats; without it this section is skipped entirely. Add <code style="background:var(--surface3);padding:1px 5px;border-radius:3px">YOUTUBE_KEY</code> (Google API key with YouTube Data API v3 enabled) to unlock this section.
       </div>`
-    : `<div style="background:rgba(76,175,116,.06);border:1px solid rgba(76,175,116,.2);border-radius:8px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:#8fa3b8;line-height:1.7">
-        <strong style="color:#4caf74">Methodology:</strong> YouTube Data API v3 resolves the official channel (<code style="background:#1e2638;padding:1px 5px;border-radius:3px">channels.list?forHandle</code>), lists its videos already scoped to the report window (<code style="background:#1e2638;padding:1px 5px;border-radius:3px">search.list?channelId&order=date&publishedAfter/Before</code>), then fetches live likes/comments/view stats per video. <strong>Subscriber ER</strong> = (likes + comments) / subscribers × 100. <strong>View ER</strong> used as fallback when subscriber count is hidden.
+    : `<div style="background:rgba(76,175,116,.06);border:1px solid rgba(76,175,116,.2);border-radius:8px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:var(--muted2);line-height:1.7">
+        <strong style="color:#4caf74">Methodology:</strong> YouTube Data API v3 resolves the official channel (<code style="background:var(--surface3);padding:1px 5px;border-radius:3px">channels.list?forHandle</code>), lists its videos already scoped to the report window (<code style="background:var(--surface3);padding:1px 5px;border-radius:3px">search.list?channelId&order=date&publishedAfter/Before</code>), then fetches live likes/comments/view stats per video. <strong>Subscriber ER</strong> = (likes + comments) / subscribers × 100. <strong>View ER</strong> used as fallback when subscriber count is hidden.
       </div>`;
 
   const statCards = [
@@ -352,17 +352,17 @@ function buildYoutubeERHtml(results, hasApiKey) {
     { label: 'Best ER',             value: topOrg?.avgER || topOrg?.avgViewER || '—',
                                     unit: `${topOrg?.org || ''} (${topOrg?.erMethod || 'n/a'}-based)`, col: '#c9922a' },
   ].map(c => `
-    <div style="flex:1;min-width:150px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
-      <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:7px">${c.label}</div>
+    <div style="flex:1;min-width:150px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px">
+      <div style="font-family:monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:7px">${c.label}</div>
       <div style="font-family:monospace;font-size:22px;font-weight:700;color:${c.col};line-height:1">${c.value}</div>
-      <div style="font-size:11px;color:#5e7494;margin-top:4px">${c.unit}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">${c.unit}</div>
     </div>`).join('');
 
   const orgRows = results.map(r => {
     const er     = r.avgER || r.avgViewER;
     const erPct  = maxER > 0 ? Math.round((er / maxER) * 100) : 0;
     const hasER  = er > 0;
-    const col    = r.videoCount > 0 ? '#e53935' : '#252d40';
+    const col    = r.videoCount > 0 ? '#e53935' : 'var(--border)';
     const erLabel = r.avgER > 0 ? `${r.avgER}%` : r.avgViewER > 0 ? `${r.avgViewER}% (view)` : '—';
 
     const topVideos = [...r.videos]
@@ -375,17 +375,17 @@ function buildYoutubeERHtml(results, hasApiKey) {
             ? `<span style="color:#4caf74">${v.subscriberER}% ER</span>`
             : v.viewER !== null
               ? `<span style="color:#c9922a">${v.viewER}% view-ER</span>`
-              : '<span style="color:#3a4a5e">no ER</span>';
+              : '<span style="color:var(--muted)">no ER</span>';
           const statsRow = v.views !== null
-            ? `<span style="color:#5e7494">${(v.views||0).toLocaleString()} views · ${(v.likes||0).toLocaleString()} likes · ${(v.comments||0).toLocaleString()} comments</span>`
-            : '<span style="color:#3a4a5e">metrics not fetched</span>';
+            ? `<span style="color:var(--muted)">${(v.views||0).toLocaleString()} views · ${(v.likes||0).toLocaleString()} likes · ${(v.comments||0).toLocaleString()} comments</span>`
+            : '<span style="color:var(--muted)">metrics not fetched</span>';
           return `
-          <div style="margin-top:8px;padding:8px 10px;background:#0a0e17;border-left:2px solid #e53935;border-radius:0 4px 4px 0">
+          <div style="margin-top:8px;padding:8px 10px;background:var(--ink);border-left:2px solid #e53935;border-radius:0 4px 4px 0">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
               <div style="flex:1">
-                <div style="font-size:11px;color:#d8e4f0;line-height:1.4;margin-bottom:4px">${esc(v.title).slice(0, 80)}</div>
+                <div style="font-size:11px;color:var(--text);line-height:1.4;margin-bottom:4px">${esc(v.title).slice(0, 80)}</div>
                 <div style="font-family:monospace;font-size:10px;margin-bottom:2px">${statsRow}</div>
-                <div style="font-size:10px;color:#5e7494">${esc(v.channelName) || 'Channel unknown'}</div>
+                <div style="font-size:10px;color:var(--muted)">${esc(v.channelName) || 'Channel unknown'}</div>
               </div>
               <div style="flex-shrink:0;text-align:right">
                 <div style="font-family:monospace;font-size:12px;font-weight:700">${erDisplay}</div>
@@ -394,27 +394,27 @@ function buildYoutubeERHtml(results, hasApiKey) {
             </div>
           </div>`;
         }).join('')
-      : `<div style="margin-top:8px;font-size:11px;color:#3a4a5e">No YouTube videos indexed in this period</div>`;
+      : `<div style="margin-top:8px;font-size:11px;color:var(--muted)">No YouTube videos indexed in this period</div>`;
 
     return `
-    <div style="background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:16px 20px;border-left:3px solid ${col}">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px 20px;border-left:3px solid ${col}">
       <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
-        <div style="flex-shrink:0;width:28px;font-family:monospace;font-size:14px;font-weight:700;color:#5e7494;padding-top:2px">#${r.rank}</div>
+        <div style="flex-shrink:0;width:28px;font-family:monospace;font-size:14px;font-weight:700;color:var(--muted);padding-top:2px">#${r.rank}</div>
         <div style="flex:1;min-width:200px">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-            <div style="font-family:monospace;font-size:12px;font-weight:700;color:#d8e4f0">${esc(r.org)}</div>
-            <div style="font-size:11px;color:#5e7494">${r.videoCount} video${r.videoCount === 1 ? '' : 's'}</div>
+            <div style="font-family:monospace;font-size:12px;font-weight:700;color:var(--text)">${esc(r.org)}</div>
+            <div style="font-size:11px;color:var(--muted)">${r.videoCount} video${r.videoCount === 1 ? '' : 's'}</div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-            <div style="flex:1;height:6px;background:#1e2638;border-radius:3px;overflow:hidden">
-              <div style="height:100%;width:${erPct}%;background:${hasER ? '#e53935' : '#1e2638'};border-radius:3px"></div>
+            <div style="flex:1;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${erPct}%;background:${hasER ? '#e53935' : 'var(--surface3)'};border-radius:3px"></div>
             </div>
-            <span style="font-family:monospace;font-size:13px;font-weight:700;color:${hasER ? '#e53935' : '#3a4a5e'};width:80px;text-align:right">${erLabel}</span>
+            <span style="font-family:monospace;font-size:13px;font-weight:700;color:${hasER ? '#e53935' : 'var(--muted)'};width:80px;text-align:right">${erLabel}</span>
           </div>
-          <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:#5e7494;margin-bottom:4px">
-            <span><strong style="color:#d8e4f0">${r.totalViews.toLocaleString()}</strong> views</span>
-            <span><strong style="color:#d8e4f0">${r.totalLikes.toLocaleString()}</strong> likes</span>
-            <span><strong style="color:#d8e4f0">${r.totalComments.toLocaleString()}</strong> comments</span>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-bottom:4px">
+            <span><strong style="color:var(--text)">${r.totalViews.toLocaleString()}</strong> views</span>
+            <span><strong style="color:var(--text)">${r.totalLikes.toLocaleString()}</strong> likes</span>
+            <span><strong style="color:var(--text)">${r.totalComments.toLocaleString()}</strong> comments</span>
           </div>
           ${videoCards}
         </div>

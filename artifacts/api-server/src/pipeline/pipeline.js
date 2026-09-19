@@ -3013,9 +3013,9 @@ ${orgsByTotal((o) => outletTotal(o, activeOutlets)).map(({ org, i, total }) => `
       if (!orgCnts.length) {
         advantage = `<span style="color:var(--muted)">—</span>`;
       } else {
-        const rankColors = ['#4caf74', '#c9922a', '#5e7494'];
+        const rankColors = ['#4caf74', '#c9922a', 'var(--muted)'];
         const rankBadges = orgCnts.map((x, ri) => {
-          const rc = rankColors[ri] || '#5e7494';
+          const rc = rankColors[ri] || 'var(--muted)';
           return `<div style="display:flex;align-items:center;gap:4px"><span style="font-family:monospace;font-size:14px;font-weight:700;color:${rc};width:18px;flex-shrink:0">#${ri+1}</span><span style="font-size:15px;color:${orgHex(x.i)};font-weight:600">${esc(x.o)}</span><span style="font-family:monospace;font-size:14px;color:var(--muted)">(${x.n})</span></div>`;
         });
         advantage = `<div style="display:flex;flex-direction:column;gap:3px">${rankBadges.join('')}</div>`;

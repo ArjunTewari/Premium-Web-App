@@ -162,7 +162,7 @@ function fmtNum(n) {
 }
 
 function topPostsHtml(posts, color, fields) {
-  if (!posts?.length) return '<div style="font-size:15px;color:#7d90aa">No posts found</div>';
+  if (!posts?.length) return '<div style="font-size:15px;color:var(--muted2)">No posts found</div>';
   return posts.map((p, i) => {
     const metrics = fields.map(f => {
       const icons = { likes: '♥', comments: '💬', shares: '↗', retweets: '↻', replies: '↩', views: '👁' };
@@ -173,11 +173,11 @@ function topPostsHtml(posts, color, fields) {
           `<span style="display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.3);border-radius:3px;padding:0 5px;font-size:11px;font-family:monospace;margin:1px">${escHtml(kw)}</span>`
         ).join('')}</div>`
       : '';
-    return `<div style="padding:6px 10px;background:#0a0e17;border-left:2px solid ${i === 0 ? color : '#1e2638'};border-radius:0 4px 4px 0;margin-bottom:4px">
-      <div style="font-size:16px;color:#8fa3b8;line-height:1.4">
+    return `<div style="padding:6px 10px;background:var(--ink);border-left:2px solid ${i === 0 ? color : 'var(--border)'};border-radius:0 4px 4px 0;margin-bottom:4px">
+      <div style="font-size:16px;color:var(--muted2);line-height:1.4">
         ${p.url ? `<a href="${escHtml(p.url)}" target="_blank" rel="noopener" style="color:${color};text-decoration:none;font-weight:600;margin-right:6px">[link]</a>` : ''}${escHtml((p.snippet || '').slice(0, 200))}${(p.snippet||'').length > 200 ? '…' : ''}
       </div>
-      <div style="font-family:monospace;font-size:14px;color:#5e7494;margin-top:3px">${metrics}${p.date ? ' · ' + p.date.slice(0, 10) : ''}</div>
+      <div style="font-family:monospace;font-size:14px;color:var(--muted);margin-top:3px">${metrics}${p.date ? ' · ' + p.date.slice(0, 10) : ''}</div>
       ${kwPills}
     </div>`;
   }).join('');
@@ -207,7 +207,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     return `${n} organisation${n === 1 ? '' : 's'} ${n === 1 ? "doesn't" : "don't"} have ${article} ${p} channel`;
   });
   const healthBanner = fetchFailures.length
-    ? `<div class="sentinel-note" style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:16px;color:#8fa3b8;line-height:1.7">
+    ? `<div class="sentinel-note" style="background:rgba(201,146,42,.08);border:1px solid rgba(201,146,42,.3);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:16px;color:var(--muted2);line-height:1.7">
         <strong style="color:#c9922a">&#9432; NOTE</strong> — ${failClauses.join('; ')}, so those cells show <strong>✕</strong> (not a zero) and are left out of the totals.
       </div>`
     : `<div class="sentinel-note" style="background:rgba(74,175,116,.08);border:1px solid rgba(74,175,116,.3);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:16px;color:#4caf74;line-height:1.7">
@@ -218,7 +218,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   // and every genuine zero carries a tooltip vouching for why it's zero.
   const postCell = (count, pd, color, platformName) => {
     if (pd?.failed) return `<span style="color:#e05c5c;cursor:help" title="API request failed (${escHtml(pd.failReason || 'unknown')}) — data unavailable, not zero">✕</span>`;
-    if (pd?.noHandle) return `<span style="color:#3d4a63;cursor:help" title="No handle configured for this platform">–</span>`;
+    if (pd?.noHandle) return `<span style="color:var(--muted);cursor:help" title="No handle configured for this platform">–</span>`;
     if (!count) {
       const diag = pd ? Sentinel.diagnoseZero(pd, platformName) : 'no data collected for this platform';
       return `<span style="color:${color};cursor:help" title="SENTINEL verified: ${escHtml(diag)}">0</span>`;
@@ -242,8 +242,8 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
           : `${yt.discovered} video(s) found in the date window but none matched the AQ keywords — zero is genuine`;
 
   const ytCell = (yt) => {
-    if (!yt || yt.noHandle) return `<span style="color:#3d4a63;cursor:help" title="No handle configured for this platform">–</span>`;
-    if (yt.noKey) return `<span style="color:#3d4a63;cursor:help" title="YOUTUBE_KEY not configured — YouTube Data API v3 is required, section skipped entirely">–</span>`;
+    if (!yt || yt.noHandle) return `<span style="color:var(--muted);cursor:help" title="No handle configured for this platform">–</span>`;
+    if (yt.noKey) return `<span style="color:var(--muted);cursor:help" title="YOUTUBE_KEY not configured — YouTube Data API v3 is required, section skipped entirely">–</span>`;
     if (yt.failed) return `<span style="color:#e05c5c;cursor:help" title="YouTube Data API request failed (${escHtml(yt.failReason || 'unknown')}) — data unavailable, not zero">✕</span>`;
     if (!yt.videoCount) {
       return `<span style="color:#e53935;cursor:help" title="SENTINEL verified: ${escHtml(ytZeroDiagnosis(yt))}">0</span>`;
@@ -265,16 +265,16 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     { label: 'Instagram AQ posts',         value: totalIg,                            unit: 'Instagram Graph API',             col: '#e05c9c' },
     { label: 'YouTube videos',             value: totalYt,                            unit: 'YouTube Data API v3',             col: '#e53935' },
   ].map(c => `
-    <div style="flex:1;min-width:140px;background:#181e2e;border:1px solid #252d40;border-radius:8px;padding:14px 16px">
-      <div style="font-family:monospace;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#5e7494;margin-bottom:8px">${c.label}</div>
+    <div style="flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px">
+      <div style="font-family:monospace;font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">${c.label}</div>
       <div style="font-family:monospace;font-size:27px;font-weight:700;color:${c.col};line-height:1">${c.value}</div>
-      <div style="font-size:16px;color:#5e7494;margin-top:5px">${c.unit}</div>
+      <div style="font-size:16px;color:var(--muted);margin-top:5px">${c.unit}</div>
     </div>`).join('');
 
   // Source banner
   const sourceBanner = `
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
-    <span style="font-family:monospace;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#5e7494">Data sources:</span>
+    <span style="font-family:monospace;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Data sources:</span>
     <span style="font-family:monospace;font-size:15px;background:rgba(74,127,212,.14);border:1px solid rgba(74,127,212,.35);color:#4a7fd4;border-radius:4px;padding:2px 8px">LinkedIn · ✓ LinkedIn API</span>
     <span style="font-family:monospace;font-size:15px;background:rgba(74,159,212,.14);border:1px solid rgba(74,159,212,.35);color:#4a9fd4;border-radius:4px;padding:2px 8px">X/Twitter · ✓ X API v2</span>
     <span style="font-family:monospace;font-size:15px;background:rgba(224,92,156,.14);border:1px solid rgba(224,92,156,.35);color:#e05c9c;border-radius:4px;padding:2px 8px">Instagram · ✓ Graph API</span>
@@ -320,12 +320,12 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     erResults.map((r, i) => [r.org, '#' + ORG_COLORS_HEX[i % ORG_COLORS_HEX.length]])
   );
 
-  const summaryTable = `<div style="overflow:hidden;overflow-x:auto;border:1px solid #252d40;border-radius:8px;margin-bottom:16px">
+  const summaryTable = `<div style="overflow:hidden;overflow-x:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:16px">
   <table style="width:100%;border-collapse:collapse;font-size:17px">
     <thead>
-      <tr style="background:#181e2e">
-        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8;white-space:nowrap">#</th>
-        <th style="padding:8px 12px;text-align:left;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8fa3b8">Org</th>
+      <tr style="background:var(--surface2)">
+        <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);white-space:nowrap">#</th>
+        <th style="padding:8px 12px;text-align:left;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2)">Org</th>
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI posts</th>
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap;cursor:help" title="LinkedIn engagement rate = (likes+comments+shares) / (posts × followers) × 100, via the LinkedIn company API. Falls back to avg engagement/post when followers are unavailable (e.g. person profiles).">LI ER%</th>
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4a7fd4;white-space:nowrap">LI flw</th>
@@ -341,20 +341,20 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
         <th style="padding:8px 12px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4caf74;white-space:nowrap;cursor:help" title="Share of Voice — how much of the tracked group's total AQ social activity this org accounts for during the report period">SoV%</th>
       </tr>
-      <tr style="background:#0f1422;border-top:1px solid #252d40">
-        <td colspan="2" style="padding:5px 12px;font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7e9a">COHORT</td>
+      <tr style="background:var(--surface);border-top:1px solid var(--border)">
+        <td colspan="2" style="padding:5px 12px;font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">COHORT</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4a7fd4">${colTotals.li}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:var(--muted)">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:var(--muted)">—</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4a9fd4">${colTotals.x}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:var(--muted)">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:var(--muted)">—</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#e05c9c">${colTotals.ig}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:var(--muted)">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:var(--muted)">—</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#e53935">${colTotals.yt}</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
-        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:#6b7e9a">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:var(--muted)">—</td>
+        <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;color:var(--muted)">—</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#c9922a">${cohortTotal}</td>
         <td style="padding:5px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#4caf74">100%</td>
       </tr>
@@ -363,27 +363,27 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
       ${unifiedRows.map(({ r, yt, total, unifiedRank }) => {
         const sov  = cohortTotal > 0 ? ((total / cohortTotal) * 100).toFixed(1) : '0.0';
         const barW = Math.round((total / (unifiedRows[0].total || 1)) * 100);
-        const col  = total >= 10 ? '#4caf74' : total >= 5 ? '#c9922a' : total >= 1 ? '#4a9fd4' : '#5e7494';
+        const col  = total >= 10 ? '#4caf74' : total >= 5 ? '#c9922a' : total >= 1 ? '#4a9fd4' : 'var(--muted)';
         const liFollowers = r.liData?.followers || 0;
         const twFollowers = r.twData?.followers || 0;
         const igFollowers = r.igData?.followers || 0;
         const ytER   = yt.avgER || yt.avgViewER || 0;
         const ytSubs = yt.videos?.find(v => v.subscribers > 0)?.subscribers || 0;
-        const liER  = r.linkedinER > 0 ? `<span style="color:#4a7fd4">${r.linkedinER}%</span>` : '<span style="color:#6b7e9a">—</span>';
-        const twER  = r.twitterER  > 0 ? `<span style="color:#4a9fd4">${r.twitterER}%</span>` : '<span style="color:#6b7e9a">—</span>';
+        const liER  = r.linkedinER > 0 ? `<span style="color:#4a7fd4">${r.linkedinER}%</span>` : '<span style="color:var(--muted)">—</span>';
+        const twER  = r.twitterER  > 0 ? `<span style="color:#4a9fd4">${r.twitterER}%</span>` : '<span style="color:var(--muted)">—</span>';
         // IG ER: show ~ when followers < 500 (unreliable denominator)
         const igER  = r.instagramER > 0
           ? (igFollowers >= 500
               ? `<span style="color:#e05c9c">${r.instagramER}%</span>`
-              : `<span style="color:#6b7e9a" title="ER unreliable — follower count too low (${igFollowers}) for meaningful ER">~</span>`)
-          : '<span style="color:#6b7e9a">—</span>';
-        const ytERCell = ytER > 0 ? `<span style="color:#e53935">${ytER}%</span>` : '<span style="color:#6b7e9a">—</span>';
-        const liFlwCell = liFollowers > 0 ? `<span style="color:#4a7fd4;font-size:18px">${fmtNum(liFollowers)}</span>` : '<span style="color:#6b7e9a">—</span>';
-        const twFlwCell = twFollowers > 0 ? `<span style="color:#4a9fd4;font-size:18px">${fmtNum(twFollowers)}</span>` : '<span style="color:#6b7e9a">—</span>';
-        const igFlwCell = igFollowers > 0 ? `<span style="color:#e05c9c;font-size:18px">${fmtNum(igFollowers)}</span>` : '<span style="color:#6b7e9a">—</span>';
-        const ytSubsCell = ytSubs > 0 ? `<span style="color:#e53935;font-size:18px">${fmtNum(ytSubs)}</span>` : '<span style="color:#6b7e9a">—</span>';
-        return `<tr style="border-top:1px solid #252d40">
-          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:#8fa3b8">#${unifiedRank}</td>
+              : `<span style="color:var(--muted)" title="ER unreliable — follower count too low (${igFollowers}) for meaningful ER">~</span>`)
+          : '<span style="color:var(--muted)">—</span>';
+        const ytERCell = ytER > 0 ? `<span style="color:#e53935">${ytER}%</span>` : '<span style="color:var(--muted)">—</span>';
+        const liFlwCell = liFollowers > 0 ? `<span style="color:#4a7fd4;font-size:18px">${fmtNum(liFollowers)}</span>` : '<span style="color:var(--muted)">—</span>';
+        const twFlwCell = twFollowers > 0 ? `<span style="color:#4a9fd4;font-size:18px">${fmtNum(twFollowers)}</span>` : '<span style="color:var(--muted)">—</span>';
+        const igFlwCell = igFollowers > 0 ? `<span style="color:#e05c9c;font-size:18px">${fmtNum(igFollowers)}</span>` : '<span style="color:var(--muted)">—</span>';
+        const ytSubsCell = ytSubs > 0 ? `<span style="color:#e53935;font-size:18px">${fmtNum(ytSubs)}</span>` : '<span style="color:var(--muted)">—</span>';
+        return `<tr style="border-top:1px solid var(--border)">
+          <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:var(--muted2)">#${unifiedRank}</td>
           <td style="padding:8px 12px"><span style="font-family:monospace;font-size:18px;font-weight:700;color:${orgColorMap[r.org]}">${escHtml(r.org)}</span></td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px;font-weight:700">${postCell(r.linkedinPosts, r.liData, '#4a7fd4', 'LinkedIn')}</td>
           <td style="padding:8px 12px;text-align:center;font-family:monospace;font-size:18px">${liER}</td>
@@ -406,18 +406,18 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     </tbody>
   </table>
 </div>
-<div style="background:#0d1120;border:1px solid #1e2638;border-radius:6px;padding:10px 14px;font-family:monospace;font-size:14px;color:#7d90aa;line-height:1.9;margin-bottom:16px">
-  <strong style="color:#5e7494;letter-spacing:.06em">LEGEND</strong> &nbsp;·&nbsp;
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-family:monospace;font-size:14px;color:var(--muted2);line-height:1.9;margin-bottom:16px">
+  <strong style="color:var(--muted);letter-spacing:.06em">LEGEND</strong> &nbsp;·&nbsp;
   <strong style="color:#4a7fd4">LI</strong> = LinkedIn AQ posts &nbsp;·&nbsp;
   <strong style="color:#4a9fd4">X</strong> = X/Twitter AQ posts from official handle &nbsp;·&nbsp;
   <strong style="color:#e05c9c">IG</strong> = Instagram posts from official handle &nbsp;·&nbsp;
   <strong style="color:#e53935">YT</strong> = YouTube videos via Data API v3 &nbsp;·&nbsp;
-  <span style="color:#5e7494">flw = follower count &nbsp;·&nbsp; subs = subscriber count</span><br>
+  <span style="color:var(--muted)">flw = follower count &nbsp;·&nbsp; subs = subscriber count</span><br>
   ER% = Engagement Rate — LI: (likes+comments+shares)÷(posts×followers)×100 via LinkedIn company API, falls back to avg engagement/post when followers unavailable &nbsp;·&nbsp; X: (likes+replies+retweets)÷followers×100 &nbsp;·&nbsp; IG: (likes+comments)÷followers×100 (shown as <strong>~</strong> when followers &lt; 500, unreliable) &nbsp;·&nbsp; YT: (likes+comments)÷subscribers×100, falls back to ÷views &nbsp;·&nbsp;
   SoV% = org total ÷ cohort total &nbsp;·&nbsp; Data: LinkedIn API · X API v2 · Instagram Graph API · YouTube Data API v3<br>
-  <strong style="color:#5e7494;letter-spacing:.06em">CELL VALUES</strong> &nbsp;·&nbsp;
+  <strong style="color:var(--muted);letter-spacing:.06em">CELL VALUES</strong> &nbsp;·&nbsp;
   <strong style="color:#4caf74">0</strong> = fetch completed, verified no AQ posts in this window (hover any 0 for the specific reason) &nbsp;·&nbsp;
-  <strong style="color:#3d4a63">–</strong> = no handle configured for that platform &nbsp;·&nbsp;
+  <strong style="color:var(--muted)">–</strong> = no handle configured for that platform &nbsp;·&nbsp;
   <strong style="color:#e05c5c">✕</strong> = API request failed — data unavailable, NOT a zero (hover for the failure reason)
 </div>`;
 
@@ -428,7 +428,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
   const platformZeroNote = (pd, platformName, color) => {
     if (!pd) return '';
     if (pd.failed) return `<div style="margin-top:6px;font-size:14px;color:#e05c5c">${platformName}: API request failed (${escHtml(pd.failReason || 'unknown')}) — data unavailable, not zero</div>`;
-    if (pd.noHandle) return `<div style="margin-top:6px;font-size:14px;color:#3d4a63">${platformName}: no handle configured for this platform</div>`;
+    if (pd.noHandle) return `<div style="margin-top:6px;font-size:14px;color:var(--muted)">${platformName}: no handle configured for this platform</div>`;
     return `<div style="margin-top:6px;font-size:14px;color:${color}">${platformName}: 0 — SENTINEL verified: ${escHtml(Sentinel.diagnoseZero(pd, platformName))}</div>`;
   };
 
@@ -441,7 +441,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const li = r.liData || { postCount: 0, totalLikes: 0, totalComments: 0, totalShares: 0, followers: 0, er: 0, topPosts: [] };
     const liHtml = li.postCount > 0 ? `
       <div style="margin-top:8px">
-        <div style="font-size:14px;color:#7d90aa;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+        <div style="font-size:14px;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
           LinkedIn — <span style="color:#4a7fd4">${li.postCount} AQ post${li.postCount === 1 ? '' : 's'}</span>
           ${li.followers ? `&middot; ${fmtNum(li.followers)} followers` : ''}
           ${li.er > 0 ? `&middot; <span style="color:#4a7fd4;background:rgba(74,127,212,.1);border:1px solid rgba(74,127,212,.25);border-radius:3px;padding:1px 5px">ER ${li.er}${li.followers ? '%' : ''}</span>` : ''}
@@ -454,7 +454,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const tw = r.twData || { postCount: 0, totalLikes: 0, totalReplies: 0, totalRetweets: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
     const twHtml = tw.postCount > 0 ? `
       <div style="margin-top:8px">
-        <div style="font-size:14px;color:#7d90aa;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+        <div style="font-size:14px;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
           X/Twitter — <span style="color:#4a9fd4">${tw.postCount} tweet${tw.postCount === 1 ? '' : 's'}</span>
           ${tw.followers ? `&middot; ${fmtNum(tw.followers)} followers` : ''}
           ${tw.er > 0 ? `&middot; <span style="color:#4a9fd4;background:rgba(74,159,212,.1);border:1px solid rgba(74,159,212,.25);border-radius:3px;padding:1px 5px">ER ${tw.er}%</span>` : ''}
@@ -467,7 +467,7 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const ig = r.igData || { postCount: 0, totalLikes: 0, totalComments: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
     const igHtml = ig.postCount > 0 ? `
       <div style="margin-top:8px">
-        <div style="font-size:14px;color:#7d90aa;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
+        <div style="font-size:14px;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700;margin-bottom:4px">
           Instagram — <span style="color:#e05c9c">${ig.postCount} post${ig.postCount === 1 ? '' : 's'}</span>
           ${ig.followers ? `&middot; ${fmtNum(ig.followers)} followers` : ''}
           ${ig.er > 0 ? `&middot; <span style="color:#e05c9c;background:rgba(224,92,156,.1);border:1px solid rgba(224,92,156,.25);border-radius:3px;padding:1px 5px">ER ${ig.er}%</span>` : ''}
@@ -487,25 +487,25 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
     const ytHtml = yt.videoCount > 0 ? `
       <div style="margin-top:10px">
         <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:5px">
-          <span style="font-size:14px;color:#7d90aa;text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700">YouTube — <span style="color:#e53935">${yt.videoCount} video${yt.videoCount === 1 ? '' : 's'}</span>${yt.totalViews > 0 ? ` &middot; ${yt.totalViews.toLocaleString()} total views` : ''}</span>
+          <span style="font-size:14px;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;font-family:monospace;font-weight:700">YouTube — <span style="color:#e53935">${yt.videoCount} video${yt.videoCount === 1 ? '' : 's'}</span>${yt.totalViews > 0 ? ` &middot; ${yt.totalViews.toLocaleString()} total views` : ''}</span>
           ${avgER > 0 ? `<span style="font-family:monospace;font-size:15px;color:#e53935;background:rgba(229,57,53,.08);border:1px solid rgba(229,57,53,.2);border-radius:4px;padding:1px 7px">avg ER ${avgER}%</span>` : ''}
-          ${erMethodLabel ? `<span style="font-family:monospace;font-size:14px;color:#7d90aa">${erMethodLabel}</span>` : ''}
+          ${erMethodLabel ? `<span style="font-family:monospace;font-size:14px;color:var(--muted2)">${erMethodLabel}</span>` : ''}
         </div>
         ${sortedYtVideos.map((v, idx) => {
           const metricsStr = v.views !== null
             ? `${(v.views || 0).toLocaleString()} views &middot; ${(v.likes || 0).toLocaleString()} likes &middot; ${(v.comments || 0).toLocaleString()} comments`
-            : '<span style="color:#5e7494">metrics unavailable</span>';
+            : '<span style="color:var(--muted)">metrics unavailable</span>';
           const erStr = (v.subscriberER !== null)
             ? ` &middot; <span style="color:#e53935">ER ${v.subscriberER}% (sub)</span>`
             : (v.viewER !== null) ? ` &middot; <span style="color:#e05c5c">ER ${v.viewER}% (view)</span>` : '';
-          return `<div style="padding:6px 10px;background:#0a0e17;border-left:2px solid ${idx === 0 ? '#e53935' : '#1e2638'};border-radius:0 4px 4px 0;margin-bottom:4px">
+          return `<div style="padding:6px 10px;background:var(--ink);border-left:2px solid ${idx === 0 ? '#e53935' : 'var(--border)'};border-radius:0 4px 4px 0;margin-bottom:4px">
             <div style="display:flex;align-items:flex-start;gap:8px">
-              <span style="font-family:monospace;font-size:14px;color:#7d90aa;flex-shrink:0;margin-top:2px">#${idx + 1}</span>
+              <span style="font-family:monospace;font-size:14px;color:var(--muted2);flex-shrink:0;margin-top:2px">#${idx + 1}</span>
               <div style="flex:1;min-width:0">
                 ${v.url
                   ? `<a href="${escHtml(v.url)}" target="_blank" style="font-size:16px;color:#e53935;text-decoration:none;line-height:1.4;display:block;font-weight:600;margin-bottom:2px">${escHtml((v.title || v.url || '').slice(0, 150))}${(v.title || v.url || '').length > 150 ? '…' : ''}</a>`
-                  : `<div style="font-size:16px;color:#8fa3b8;line-height:1.4;margin-bottom:2px">${escHtml((v.title || '').slice(0, 150))}</div>`}
-                <div style="font-family:monospace;font-size:14px;color:#5e7494">${metricsStr}${erStr}</div>
+                  : `<div style="font-size:16px;color:var(--muted2);line-height:1.4;margin-bottom:2px">${escHtml((v.title || '').slice(0, 150))}</div>`}
+                <div style="font-family:monospace;font-size:14px;color:var(--muted)">${metricsStr}${erStr}</div>
               </div>
             </div>
           </div>`;
@@ -513,19 +513,19 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
       </div>` : (yt.failed
           ? `<div style="margin-top:6px;font-size:14px;color:#e05c5c">YouTube: API request failed (${escHtml(yt.failReason || 'unknown')}) — data unavailable, not zero</div>`
           : yt.noHandle
-            ? `<div style="margin-top:6px;font-size:14px;color:#3d4a63">YouTube: no handle configured for this platform</div>`
+            ? `<div style="margin-top:6px;font-size:14px;color:var(--muted)">YouTube: no handle configured for this platform</div>`
             : yt.noKey
-              ? `<div style="margin-top:6px;font-size:14px;color:#3d4a63">YouTube: YOUTUBE_KEY not configured — section skipped entirely</div>`
+              ? `<div style="margin-top:6px;font-size:14px;color:var(--muted)">YouTube: YOUTUBE_KEY not configured — section skipped entirely</div>`
               : `<div style="margin-top:6px;font-size:14px;color:#e53935">YouTube: 0 — SENTINEL verified: ${escHtml(ytZeroDiagnosis(yt))}</div>`);
 
     const hasAnyPost = r.totalPosts > 0 || yt.videoCount > 0;
 
-    return `<details style="border:1px solid #252d40;border-radius:6px;margin-bottom:6px">
-      <summary style="padding:10px 14px;cursor:pointer;background:#181e2e;border-radius:6px;list-style:none;display:flex;align-items:center;gap:12px;user-select:none">
-        <span style="font-family:monospace;font-size:15px;font-weight:700;color:#6b7e9a">#${r.rank}</span>
+    return `<details style="border:1px solid var(--border);border-radius:6px;margin-bottom:6px">
+      <summary style="padding:10px 14px;cursor:pointer;background:var(--surface2);border-radius:6px;list-style:none;display:flex;align-items:center;gap:12px;user-select:none">
+        <span style="font-family:monospace;font-size:15px;font-weight:700;color:var(--muted)">#${r.rank}</span>
         <span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgColorMap[r.org]}">${escHtml(r.org)}</span>
         <span style="font-family:monospace;font-size:17px;font-weight:700;color:${col}">${r.presenceScore}/10</span>
-        <span style="font-size:15px;color:#5e7494;margin-left:4px">
+        <span style="font-size:15px;color:var(--muted);margin-left:4px">
           <span style="color:#4a7fd4">${r.linkedinPosts || 0} LI</span> &middot;
           <span style="color:#4a9fd4">${r.twitterPosts || 0} X</span> &middot;
           <span style="color:#e05c9c">${r.instagramPosts || 0} IG</span> &middot;
@@ -533,8 +533,8 @@ function buildSocialERHtml(erResults, ytResults = [], hasYtKey = false) {
         </span>
         <span style="color:#c9922a;font-size:16px;margin-left:auto">▾</span>
       </summary>
-      <div style="padding:12px 14px;background:#0e1420">
-        ${!hasAnyPost ? '<div style="font-size:16px;color:#7d90aa">No AQ social posts found via APIdirect in this period</div>' : ''}
+      <div style="padding:12px 14px;background:var(--surface)">
+        ${!hasAnyPost ? '<div style="font-size:16px;color:var(--muted2)">No AQ social posts found via APIdirect in this period</div>' : ''}
         ${liHtml}
         ${twHtml}
         ${igHtml}
