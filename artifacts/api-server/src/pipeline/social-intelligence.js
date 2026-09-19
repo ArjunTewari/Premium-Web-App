@@ -317,7 +317,7 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
       </div>`;
     }).join('');
 
-    const orgCells = orgs.map(org => {
+    const orgCells = sortedOrgs.map(({ org }) => {
       const qResults = aeoResults[org]?.questionResults?.[qKey] || [];
       const cited = qResults.filter(r => r.cited).length;
       const total = qResults.length;
@@ -340,7 +340,7 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
     </tr>`;
   }).join('');
 
-  const orgHeaderCells = orgs.map((org, oi) => {
+  const orgHeaderCells = sortedOrgs.map(({ org, oi }) => {
     const col = orgColorList[oi % orgColorList.length];
     return `<th style="padding:10px 12px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${col};border-left:1px solid #252d40;white-space:nowrap">${escHtml(org)}</th>`;
   }).join('');
