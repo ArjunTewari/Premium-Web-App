@@ -254,6 +254,11 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
         <th style="padding:10px 14px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#c9922a;white-space:nowrap">Total</th>
         ${allLlms.map(llm => `<th style="padding:10px 14px;text-align:center;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);white-space:nowrap">${escHtml(llm)}</th>`).join('')}
       </tr>
+      <tr style="background:var(--surface);border-top:1px solid var(--border)">
+        <td colspan="2" style="padding:6px 14px;font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Cohort</td>
+        <td style="padding:6px 14px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:var(--amber)">${sortedOrgs.reduce((t, o) => t + o.m, 0)}</td>
+        ${allLlms.map(llm => `<td style="padding:6px 14px;text-align:center;font-family:monospace;font-size:18px;font-weight:700;color:var(--amber)">${sortedOrgs.reduce((t, o) => t + ((aeoResults[o.org]?.llmBreakdown || {})[llm]?.mentions || 0), 0)}</td>`).join('')}
+      </tr>
     </thead>
     <tbody>
       ${sortedOrgs.map(({ org, oi, m, rank }) => {
