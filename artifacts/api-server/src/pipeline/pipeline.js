@@ -2931,6 +2931,16 @@ function buildHTML(
 ) {
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
   const now = new Date().toUTCString();
+  // Every org table lists orgs highest-total-first (ties keep input order —
+  // Array#sort is stable), matching the LLM Visibility table's ranking.
+  const outletTotal = (org, outlets) =>
+    (arts[org] || []).filter((a) => outlets.includes(canonOutlet(a.source || ""))).length;
+  const orgsByTotal = (totalOf) =>
+    ORGS.map((org, i) => ({ org, i, total: totalOf(org) })).sort((a, b) => b.total - a.total);
+  const totalCell = (n) =>
+    `<td style="font-family:monospace;font-weight:700;color:var(--amber)">${n}</td>`;
+  const scoreOrder = [...ORGS].sort((a, b) => (data[b]?.score || 0) - (data[a]?.score || 0));
+  const actionRank = (org) => { const k = scoreOrder.indexOf(org); return k < 0 ? 999 : k; };
   // `tot` counts per-org mentions (a story naming N tracked orgs adds N).
   // `distinctTot` counts unique article URLs across all orgs.
   const tot = ORGS.reduce((s, o) => s + (data[o]?.total || 0), 0);
@@ -2959,8 +2969,8 @@ function buildHTML(
     const activeOutlets = PRINT_OUTLETS; // always show all 5 outlets
     if (!activeOutlets.length)
       return `<p style="color:var(--muted);font-size:17px">No newspaper site coverage indexed in this period.</p>`;
-    return `<table class="nt"><thead><tr><th>Org</th>${activeOutlets.map((o) => `<th>${esc(o)}</th>`).join("")}</tr></thead><tbody>
-${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${activeOutlets.map((outlet) => {
+    return `<table class="nt"><thead><tr><th>Org</th><th>Total</th>${activeOutlets.map((o) => `<th>${esc(o)}</th>`).join("")}</tr></thead><tbody>
+${orgsByTotal((o) => outletTotal(o, activeOutlets)).map(({ org, i, total }) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${totalCell(total)}${activeOutlets.map((outlet) => {
       const evArts = (arts[org] || []).filter((a) => canonOutlet(a.source || "") === outlet);
       const n = evArts.length;
       if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`;
@@ -3003,9 +3013,9 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
       if (!orgCnts.length) {
         advantage = `<span style="color:var(--muted)">—</span>`;
       } else {
-        const rankColors = ['#4caf74', '#c9922a', '#5e7494'];
+        const rankColors = ['#4caf74', '#c9922a', 'var(--muted)'];
         const rankBadges = orgCnts.map((x, ri) => {
-          const rc = rankColors[ri] || '#5e7494';
+          const rc = rankColors[ri] || 'var(--muted)';
           return `<div style="display:flex;align-items:center;gap:4px"><span style="font-family:monospace;font-size:14px;font-weight:700;color:${rc};width:18px;flex-shrink:0">#${ri+1}</span><span style="font-size:15px;color:${orgHex(x.i)};font-weight:600">${esc(x.o)}</span><span style="font-family:monospace;font-size:14px;color:var(--muted)">(${x.n})</span></div>`;
         });
         advantage = `<div style="display:flex;flex-direction:column;gap:3px">${rankBadges.join('')}</div>`;
@@ -3100,7 +3110,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
       return `<th style="padding:8px 12px;text-align:left;font-size:14px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)" title="${esc(sub)}">${esc(dn)}</th>`;
     }).join("");
 
-    const tbodyRows = ORGS.map((org, i) => {
+    const tbodyRows = orgsByTotal((o) => TOPICS.reduce((s, tk) => s + (topicArts[tk][o] || []).length, 0)).map(({ org, i, total }) => {
       const orgCells = TOPICS.map((tk) => {
         const artList = topicArts[tk][org] || [];
         const cv = artList.length;
@@ -3128,13 +3138,14 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
         <td style="padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1">
           <span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span>
         </td>
+        <td style="padding:10px 14px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:middle;font-family:monospace;font-size:17px;font-weight:700;color:var(--amber)">${total}</td>
         ${orgCells}
       </tr>`;
     }).join("");
 
     return `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:17px"><thead><tr style="background:var(--surface2)">
       <th style="padding:10px 14px;text-align:left;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Org</th>
-      ${theadTopics}
+      <th style="padding:10px 14px;text-align:left;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border);white-space:nowrap">Total</th>${theadTopics}
     </tr></thead><tbody>${tbodyRows}</tbody></table></div></div>`;
   }
 
@@ -3173,7 +3184,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
       `<th style="padding:8px 12px;text-align:left;font-size:14px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);min-width:120px;vertical-align:bottom;border-left:1px solid var(--border)">${esc(topic)}</th>`
     ).join("");
 
-    const tbodyDyn = ORGS.map((org, i) => {
+    const tbodyDyn = orgsByTotal((o) => dynTopics.reduce((s, d) => s + (d.orgData[o]?.length || 0), 0)).map(({ org, i, total }) => {
       const orgCells = dynTopics.map(({ topic, orgData }) => {
         const artList = orgData[org] || [];
         const cv = artList.length;
@@ -3201,6 +3212,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
         <td style="padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;position:sticky;left:0;background:var(--surface2);z-index:1">
           <span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span>
         </td>
+        <td style="padding:10px 14px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);vertical-align:middle;font-family:monospace;font-size:17px;font-weight:700;color:var(--amber)">${total}</td>
         ${orgCells}
       </tr>`;
     }).join("");
@@ -3212,7 +3224,7 @@ ${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16p
       </div>
       <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:17px"><thead><tr style="background:var(--surface2)">
         <th style="padding:10px 14px;text-align:left;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Org</th>
-        ${theadDyn}
+        <th style="padding:10px 14px;text-align:left;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--border);white-space:nowrap">Total</th>${theadDyn}
       </tr></thead><tbody>${tbodyDyn}</tbody></table></div></div>
     </div>`;
   }
@@ -3528,7 +3540,7 @@ ${articleLinks ? `<div style="margin-top:10px;border-top:1px solid var(--border)
   const actionRows =
     !actions || !actions.length
       ? `<tr><td colspan="5" style="color:var(--muted)">Action matrix generation failed</td></tr>`
-      : actions
+      : [...actions].sort((a, b) => actionRank(a.org) - actionRank(b.org))
           .map((a) => {
             const oi = ORGS.indexOf(a.org);
             const oc = oi >= 0 ? orgHex(oi) : "#c9922a";
@@ -3779,13 +3791,13 @@ ${(() => {
 <div class="sd">AQ article mentions specifically in English TV (NDTV, News18, India Today) and Hindi TV (India TV, ABP News) channels.</div><div class="sdiv"></div></div>
 <div style="margin-bottom:16px">
 <div style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">English TV</div>
-<table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_ENGLISH.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
-${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_ENGLISH.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const kwPills = (kws) => kws && kws.length ? `<div style="margin-top:3px;line-height:1.9">${kws.map(kw => `<span style="display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.3);border-radius:3px;padding:0 4px;font-size:11px;font-family:monospace;margin:1px">${esc(kw)}</span>`).join('')}</div>` : ''; const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>${kwPills(a.foundKeywords)}`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
+<table class="nt"><thead><tr><th>Org</th><th>Total</th>${TV_CHANNELS_ENGLISH.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
+${orgsByTotal((o) => outletTotal(o, TV_CHANNELS_ENGLISH)).map(({ org, i, total }) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${totalCell(total)}${TV_CHANNELS_ENGLISH.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const kwPills = (kws) => kws && kws.length ? `<div style="margin-top:3px;line-height:1.9">${kws.map(kw => `<span style="display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.3);border-radius:3px;padding:0 4px;font-size:11px;font-family:monospace;margin:1px">${esc(kw)}</span>`).join('')}</div>` : ''; const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="display:block;font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>${kwPills(a.foundKeywords)}`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
 </tbody></table></div>
 <div>
 <div style="font-size:17px;font-weight:600;color:var(--muted2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Hindi TV</div>
-<table class="nt"><thead><tr><th>Org</th>${TV_CHANNELS_HINDI.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
-${ORGS.map((org, i) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${TV_CHANNELS_HINDI.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const kwPills = (kws) => kws && kws.length ? `<div style="margin-top:3px;line-height:1.9">${kws.map(kw => `<span style="display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.3);border-radius:3px;padding:0 4px;font-size:11px;font-family:monospace;margin:1px">${esc(kw)}</span>`).join('')}</div>` : ''; const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px;display:block" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>${kwPills(a.foundKeywords)}`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
+<table class="nt"><thead><tr><th>Org</th><th>Total</th>${TV_CHANNELS_HINDI.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>
+${orgsByTotal((o) => outletTotal(o, TV_CHANNELS_HINDI)).map(({ org, i, total }) => `<tr><td><span style="font-family:monospace;font-size:16px;font-weight:700;color:${orgHex(i)}">${esc(org)}</span></td>${totalCell(total)}${TV_CHANNELS_HINDI.map((ch) => { const evArts = (arts[org] || []).filter(a => canonOutlet(a.source || '') === ch); const n = evArts.length; if (!n) return `<td style="font-family:monospace;color:var(--muted)">0</td>`; const uid = `tv_${org}_${ch}`.replace(/\W/g, '_'); const kwPills = (kws) => kws && kws.length ? `<div style="margin-top:3px;line-height:1.9">${kws.map(kw => `<span style="display:inline-block;background:rgba(61,142,240,.1);color:#3d8ef0;border:1px solid rgba(61,142,240,.3);border-radius:3px;padding:0 4px;font-size:11px;font-family:monospace;margin:1px">${esc(kw)}</span>`).join('')}</div>` : ''; const links = evArts.slice(0, 5).map(a => `<a href="${esc(a.url || '#')}" target="_blank" style="font-size:15px;color:var(--amber);text-decoration:none;margin-top:3px;line-height:1.4;white-space:normal;max-width:220px;display:block" title="${esc(a.title || '')}">${esc((a.title || '').length > 70 ? (a.title || '').slice(0, 70) + '…' : (a.title || ''))}</a>${kwPills(a.foundKeywords)}`).join(''); return `<td style="font-family:monospace"><strong>${n}</strong><br><span onclick="td('${uid}')" style="font-size:15px;color:var(--muted2);cursor:pointer;user-select:none">↗ sources</span><div id="${uid}" style="display:none">${links}</div></td>`; }).join("")}</tr>`).join("")}
 </tbody></table></div>
 </section>
 
