@@ -382,8 +382,13 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
         // "health impact" can be any of the org's posts — e.g. a dentistry
         // podcast. Only count it as an AQ post if its own text carries the
         // keyword searched for or one of the base AQ terms.
-        const postText = `${post.snippet || ''} ${post.text || ''} ${post.title || ''}`.toLowerCase();
-        if (!postText.includes(keyword) && !isAQ(postText, AQ_KW_BASE)) continue;
+        // NFKC folds the mathematical-bold letters LinkedIn posts often use
+        // (e.g. '𝗔𝗶𝗿 𝗤𝘂𝗮𝗹𝗶𝘁𝘆') back to plain text so they still match.
+        const postText = `${post.snippet || ''} ${post.text || ''} ${post.title || ''}`.normalize('NFKC').toLowerCase();
+        // Multi-word terms also match as hashtags (#AirPollution, #CleanAir).
+        const flatText = postText.replace(/[^a-z0-9.]+/g, '');
+        const hasTerm = (k) => postText.includes(k) || (/[\s-]/.test(k) && flatText.includes(k.replace(/[^a-z0-9.]+/g, '')));
+        if (!hasTerm(keyword) && !AQ_KW_BASE.some(hasTerm)) continue;
         const key = post.url || `${post.date}:${(post.snippet || '').slice(0, 80)}`;
         if (!seen.has(key)) seen.set(key, { post, keywords: new Set() });
         seen.get(key).keywords.add(keyword);
