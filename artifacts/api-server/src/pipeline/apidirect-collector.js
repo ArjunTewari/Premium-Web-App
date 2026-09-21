@@ -378,6 +378,12 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
 
       for (const post of batch) {
         if (!inDateRange(post.date, dateRange?.from, dateRange?.to)) continue;
+        // The search endpoint matches loosely (fuzzy/semantic), so a hit for
+        // "health impact" can be any of the org's posts — e.g. a dentistry
+        // podcast. Only count it as an AQ post if its own text carries the
+        // keyword searched for or one of the base AQ terms.
+        const postText = `${post.snippet || ''} ${post.text || ''} ${post.title || ''}`.toLowerCase();
+        if (!postText.includes(keyword) && !isAQ(postText, AQ_KW_BASE)) continue;
         const key = post.url || `${post.date}:${(post.snippet || '').slice(0, 80)}`;
         if (!seen.has(key)) seen.set(key, { post, keywords: new Set() });
         seen.get(key).keywords.add(keyword);
