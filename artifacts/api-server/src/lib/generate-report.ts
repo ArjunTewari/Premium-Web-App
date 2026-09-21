@@ -4,7 +4,8 @@ import { db, reportLogsTable } from "@workspace/db";
 import { calculateClientBilling } from "./auth.js";
 import { run, type RunConfig, type ReportTrendSummary } from "../pipeline/index.js";
 import { sendAdminReportEmail, sendClientReportEmail } from "./mailer.js";
-import { uploadReport, uploadReportData, isConfigured as isGithubStorageConfigured } from "./report-storage.js";
+import { uploadReport, uploadReportData, getReportContent, isConfigured as isGithubStorageConfigured } from "./report-storage.js";
+import { toClientView } from "./client-view.js";
 
 // Shared by both trigger paths: a manual POST /run (routes/pipeline.ts,
 // streams progress over SSE) and the weekly scheduler (report-scheduler.ts,
@@ -102,6 +103,14 @@ export interface GenerateReportParams {
   recipientEmail?: string | null;
 }
 
+// A report's HTML from local disk (samples / mid-upload) or GitHub storage.
+export async function loadReportHtml(htmlName: string): Promise<string | null> {
+  const name = path.basename(htmlName);
+  const fpath = path.join(OUT_DIR, name);
+  if (fs.existsSync(fpath)) return fs.readFileSync(fpath, "utf8");
+  return getReportContent(name);
+}
+
 export interface GenerateReportResult {
   htmlName: string;
   costInr: number;
@@ -124,6 +133,16 @@ export async function generateAndDeliverReport(params: GenerateReportParams): Pr
   // The admin always receives the real-API-cost + client-cost email; the
   // resolved recipient (if any) gets the client-facing cost email.
   (async () => {
+    // Admin gets the full report, the client gets the Client View. A failed
+    // fetch just means the emails go out without the attachment.
+    const fullHtml = result.htmlName ? await loadReportHtml(result.htmlName).catch(() => null) : null;
+    const attachmentFor = (view: "client" | "restricted") =>
+      fullHtml && result.htmlName
+        ? {
+            filename: view === "client" ? result.htmlName.replace(/\.html$/i, "-client.html") : result.htmlName,
+            content: view === "client" ? toClientView(fullHtml) : fullHtml,
+          }
+        : undefined;
     const emailCtx = {
       orgs: cfg.ORGS,
       dateFrom: cfg.DATE_FROM,
@@ -132,8 +151,8 @@ export async function generateAndDeliverReport(params: GenerateReportParams): Pr
       clientName: cfg.CLIENT_NAME,
       billing,
     };
-    await sendAdminReportEmail({ ...emailCtx, apiCost, generatedByEmail: recipientEmail });
-    if (recipientEmail) await sendClientReportEmail(recipientEmail, emailCtx);
+    await sendAdminReportEmail({ ...emailCtx, attachment: attachmentFor("restricted"), apiCost, generatedByEmail: recipientEmail });
+    if (recipientEmail) await sendClientReportEmail(recipientEmail, { ...emailCtx, attachment: attachmentFor("client") });
   })().catch((e: unknown) => console.error("Report email dispatch failed:", e));
 
   sendReportSms(billing.costInr, cfg.ORGS, result.htmlName ?? "").catch(() => {});

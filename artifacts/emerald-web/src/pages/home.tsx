@@ -947,6 +947,28 @@ export default function Home() {
     }
   }
 
+  // Emails a stored report to an address as an HTML attachment. Client View is
+  // the default; OK on the second prompt sends the full (restricted) report,
+  // which the server only allows for admin accounts.
+  async function emailReport(htmlName: string) {
+    const to = window.prompt(`Email ${htmlName} to which address?`);
+    if (!to || !to.trim()) return;
+    const full = window.confirm("Attach the FULL (restricted) report?\n\nOK = full report (admin only)\nCancel = Client View");
+    try {
+      const res = await fetch("/api/outputs/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ file: htmlName, to: to.trim(), view: full ? "restricted" : "client" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error || "Could not send the email."); return; }
+      alert(`Sent ${data.file} to ${data.to}.`);
+    } catch {
+      alert("Email failed.");
+    }
+  }
+
   async function startRun() {
     if (!selectedOrgs.length) { alert("Select at least one organisation."); return; }
     setRunning(true); setStopping(false); setLogs([]); setProgress(0); setResult(null); setTrendStatus(null);
@@ -1870,6 +1892,18 @@ export default function Home() {
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 16 }}>
+                        {f.name.endsWith(".html") && (
+                          <button
+                            onClick={() => emailReport(f.name)}
+                            style={{
+                              padding: "7px 14px", borderRadius: 8,
+                              background: "rgba(61,142,240,.12)", color: "#3d8ef0",
+                              border: "1px solid rgba(61,142,240,.25)",
+                              fontSize: 18, fontWeight: 600, cursor: "pointer",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >✉ Email</button>
+                        )}
                         {f.name.endsWith(".html") && (
                           <button
                             onClick={() => downloadClientReport(f.name)}
