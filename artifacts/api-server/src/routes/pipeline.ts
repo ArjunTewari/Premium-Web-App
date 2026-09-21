@@ -6,7 +6,9 @@ import { eq } from "drizzle-orm";
 import { db, usersTable, orgHandlesTable, reportLogsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/require-auth.js";
 import { type ReportTrendSummary } from "../pipeline/index.js";
-import { generateAndDeliverReport, OUT_DIR } from "../lib/generate-report.js";
+import { generateAndDeliverReport, loadReportHtml, OUT_DIR } from "../lib/generate-report.js";
+import { toClientView } from "../lib/client-view.js";
+import { sendReportFileEmail } from "../lib/mailer.js";
 import {
   listReports,
   listReportDataFiles,
@@ -276,6 +278,41 @@ router.get("/download/:file", requireAuth, async (req: Request, res: Response) =
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
   return res.send(content);
+});
+
+// ── POST /outputs/email — email an existing report as an attachment ─────────
+// Admins may send to any address; other accounts only to their own signup
+// email, so this can't be used to relay reports (or spam) to arbitrary people.
+router.post("/outputs/email", requireAuth, async (req: Request, res: Response) => {
+  const body = req.body || {};
+  const fname = path.basename(String(body.file || "").trim());
+  if (!/^[\w. \-]+\.html$/i.test(fname)) return res.status(400).json({ error: "Invalid report file" });
+  const view = body.view === "restricted" ? "restricted" : "client";
+  const to = String(body.to || "").trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: "Enter a valid email address" });
+
+  try {
+    const isAdmin = req.user?.role === "admin";
+    if (view === "restricted" && !isAdmin) return res.status(403).json({ error: "Only admins can email the full report" });
+    if (!isAdmin) {
+      const [me] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.username, req.user?.username ?? ""));
+      if (!me?.email || me.email.toLowerCase() !== to.toLowerCase())
+        return res.status(403).json({ error: "You can only email a report to your own account address" });
+    }
+
+    const html = await loadReportHtml(fname);
+    if (html == null) return res.status(404).json({ error: "Report not found" });
+    const attachment =
+      view === "client"
+        ? { filename: fname.replace(/\.html$/i, "-client.html"), content: toClientView(html) }
+        : { filename: fname, content: html };
+    const ok = await sendReportFileEmail(to, { htmlName: fname, view, attachment, sentBy: req.user?.username });
+    if (!ok) return res.status(502).json({ error: "Email could not be sent — check RESEND_API_KEY / EMAIL_FROM on the server" });
+    return res.json({ status: "ok", to, file: attachment.filename });
+  } catch (e) {
+    console.error("Email report failed:", e);
+    return res.status(500).json({ error: "Email failed" });
+  }
 });
 
 // ── GET /trends — per-org SoV history for the Trends tab ─────────────────────

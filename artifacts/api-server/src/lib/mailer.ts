@@ -15,10 +15,14 @@ const FROM_NAME = "Emerald AI";
 const fromAddress = () =>
   process.env.EMAIL_FROM || process.env.EMAIL_USER || "onboarding@resend.dev";
 
+// A file attached to an email. `content` is the raw file text (HTML reports).
+export interface EmailAttachment { filename: string; content: string }
+interface MailOpts { to: string; subject: string; text: string; html: string; attachments?: EmailAttachment[] }
+
 // ── Resend (HTTP API) ──────────────────────────────────────────────────────
 // Preferred on Railway: outbound SMTP (25/465/587) is blocked, so nodemailer
 // to smtp.gmail.com times out. Resend goes over HTTPS. Set RESEND_API_KEY.
-async function sendViaResend(opts: { to: string; subject: string; text: string; html: string }): Promise<boolean> {
+async function sendViaResend(opts: MailOpts): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   if (!key) return false;
   try {
@@ -31,8 +35,12 @@ async function sendViaResend(opts: { to: string; subject: string; text: string; 
         subject: opts.subject,
         text: opts.text,
         html: opts.html,
+        ...(opts.attachments?.length
+          ? { attachments: opts.attachments.map((a) => ({ filename: a.filename, content: Buffer.from(a.content, "utf8").toString("base64") })) }
+          : {}),
       }),
-      signal: AbortSignal.timeout(15000),
+      // Attachments are ~1 MB of base64, so allow more than a plain email.
+      signal: AbortSignal.timeout(opts.attachments?.length ? 45000 : 15000),
     });
     if (res.ok) {
       const body = (await res.json().catch(() => ({}))) as { id?: string };
@@ -69,8 +77,8 @@ function getTransport(): nodemailer.Transporter | null {
   return transport;
 }
 
-async function send(opts: { to: string; subject: string; text: string; html: string }) {
-  if (await sendViaResend(opts)) return;
+async function send(opts: MailOpts): Promise<boolean> {
+  if (await sendViaResend(opts)) return true;
 
   const t = getTransport();
   if (!t) {
@@ -78,16 +86,23 @@ async function send(opts: { to: string; subject: string; text: string; html: str
       { to: opts.to },
       "No email transport — set RESEND_API_KEY (recommended on Railway) or EMAIL_USER/EMAIL_PASS",
     );
-    return;
+    return false;
   }
   try {
-    const info = await t.sendMail({ from: `"${FROM_NAME}" <${process.env.EMAIL_USER}>`, ...opts });
+    const { attachments, ...rest } = opts;
+    const info = await t.sendMail({
+      from: `"${FROM_NAME}" <${process.env.EMAIL_USER}>`,
+      ...rest,
+      attachments: attachments?.map((a) => ({ filename: a.filename, content: a.content, contentType: "text/html" })),
+    });
     logger.info({ to: opts.to, messageId: info.messageId }, "Report email sent (SMTP)");
+    return true;
   } catch (err) {
     logger.warn(
       { err: (err as Error)?.message, to: opts.to },
       "SMTP send failed (host likely blocks outbound SMTP — use RESEND_API_KEY)",
     );
+    return false;
   }
 }
 
@@ -98,6 +113,8 @@ export interface ReportEmailContext {
   htmlName: string;
   clientName?: string;
   billing: ClientBilling;
+  /** Optional report file to attach (full report for admin, Client View for the client). */
+  attachment?: EmailAttachment;
 }
 
 // ── Client email — what the client is billed ────────────────────────────────
@@ -149,6 +166,7 @@ export async function sendClientReportEmail(to: string, ctx: ReportEmailContext)
     subject: `Emerald AI — report ready (${orgs.length} org${orgs.length !== 1 ? "s" : ""}, ${rupee(billing.costInr)})`,
     text,
     html,
+    attachments: ctx.attachment ? [ctx.attachment] : undefined,
   });
 }
 
@@ -254,6 +272,7 @@ export async function sendAdminReportEmail(
     subject: `Emerald AI — report generated · API ${rupee(apiTotalInr)} · client ${rupee(billing.costInr)}`,
     text,
     html,
+    attachments: ctx.attachment ? [ctx.attachment] : undefined,
   });
 }
 
@@ -294,5 +313,41 @@ export async function sendPasswordResetEmail(
     subject: "Emerald AI — your password was reset",
     text,
     html,
+  });
+}
+
+// ── Ad-hoc: email an existing report file (Reports tab "Email" button) ─────
+// Returns whether a transport actually accepted it, so the caller can tell the
+// user instead of reporting success on a silent failure.
+export async function sendReportFileEmail(
+  to: string,
+  opts: { htmlName: string; view: "client" | "restricted"; attachment: EmailAttachment; sentBy?: string },
+): Promise<boolean> {
+  const label = opts.view === "client" ? "Client View" : "full (restricted) report";
+  const text = [
+    "Emerald AI — report attached",
+    "",
+    `File : ${opts.attachment.filename}`,
+    `Type : ${label}`,
+    opts.sentBy ? `Sent by : ${opts.sentBy}` : "",
+    "",
+    "Open the attached HTML file in any browser.",
+  ].filter((l, i, arr) => l !== "" || arr[i - 1] !== "").join("\n");
+  const html = `
+<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#1a2232">
+  <div style="background:#0f1923;padding:18px 22px;border-radius:8px 8px 0 0">
+    <h2 style="margin:0;color:#c9922a;font-size:17px">Emerald AI — Report attached</h2>
+  </div>
+  <div style="border:1px solid #dde3ef;border-top:none;padding:22px;border-radius:0 0 8px 8px;font-size:14px">
+    <p style="margin:0 0 10px">The <strong>${esc(label)}</strong> is attached: <code>${esc(opts.attachment.filename)}</code></p>
+    <p style="margin:0;color:#5a6a80">Open the attached HTML file in any browser.</p>
+  </div>
+</div>`;
+  return send({
+    to,
+    subject: `Emerald AI — ${opts.htmlName.replace(/\.html$/i, "")} (${label})`,
+    text,
+    html,
+    attachments: [opts.attachment],
   });
 }
