@@ -685,7 +685,7 @@ async function run(cfg, cb) {
     }
     for (const org of ORGS)
       cb(`  ${org}: ${arts[org].length} article(s)`, arts[org].length ? "ok" : "warn");
-    cb(`  white-space (name no tracked org): ${exaWhiteSpace.length} → Emerging Narratives`, "ok");
+    cb(`  ${exaWhiteSpace.length} corpus article(s) name no tracked org (unused — emerging-narratives analysis was removed)`, "ok");
   }
 
   // ── STEP 1d: Require org name in scraped body text ───────────
@@ -1086,20 +1086,15 @@ ${batchText}`;
     );
   }
 
-  // ── STEP 5a: General AQ landscape (white-space gap analysis) ──────────────
-  cb(`\nSTEP 5a/6 — General AQ landscape (white-space gaps)...`, "head");
-  checkAbort();
-  // Exa discovery already produced this: corpus articles that name no tracked
-  // org. No extra queries needed — and it's guaranteed consistent with the
-  // press section (same corpus, same window).
-  const whiteSpaceArticles = exaWhiteSpace.filter((a) => !dateOutsideRange(a.date));
-  cb(`  ${whiteSpaceArticles.length} in-window AQ articles with no tracked org (from the Exa corpus)`, whiteSpaceArticles.length ? "ok" : "warn");
-
-  // ── STEP 5b: AI analysis ───────────────────────────────────
-  cb(
-    `\nSTEP 5b/6 — AI analysis (executive summary, gap narratives, actions)...`,
-    "head",
-  );
+  // ── STEP 5: AI analysis ───────────────────────────────────
+  // Emerging-narratives / white-space gap analysis (an extra Claude call
+  // clustering the Exa corpus's no-tracked-org articles) was removed —
+  // no analysis step in this pipeline should add cost beyond what a report
+  // already spends. `emerging` stays permanently empty; ActionMatrixGraph
+  // and the HTML/PPTX builders already treat an empty list as "no gaps
+  // found" — the same path they took whenever the old step came up short
+  // on articles, so nothing downstream needed to change.
+  cb(`\nSTEP 5/6 — AI analysis (executive summary, actions)...`, "head");
   checkAbort();
   const orgSummary = ORGS.map((o) => {
     const er = socialERResults.find((r) => r.org === o);
@@ -1127,35 +1122,6 @@ ${batchText}`;
     execAudit = result.execAudit;
   } catch (e) {
     cb(`  exec summary graph error: ${e.message}`, "err");
-  }
-  await sleep(300);
-
-  try {
-    cb("  White-space gap analysis...");
-    if (whiteSpaceArticles.length < 3) {
-      cb("  Not enough general AQ articles for gap analysis", "warn");
-      emerging = [];
-    } else {
-      const wsCombined = whiteSpaceArticles
-        .slice(0, 50)
-        .map(
-          (a) =>
-            `${a.date || "unknown"}|${a.title || ""}|${a.link || a.url || ""}|${(a.snippet || "").slice(0, 120)}`,
-        )
-        .join("\n");
-      const r = await callClaude(
-        `You are analysing the broader Indian air quality media landscape from ${DATE_FROM} to ${DATE_TO}.\n\nThe tracked organisations are: ${ORGS.join(", ")}.\n\nThe articles below are from GENERAL Indian AQ news coverage — these articles do NOT mention any of the tracked organisations. They represent the AQ media landscape where the tracked orgs are ABSENT.\n\nIdentify 2–3 distinct topic clusters from these articles that the tracked organisations are NOT participating in. These are white-space opportunities — genuine gaps where the AQ media conversation is active but the tracked orgs have no presence.\n\nFor each gap topic:\n- "topic": short name (3–5 words)\n- "description": 1 sentence on what this topic covers and why it matters\n- "gap_signal": specific evidence citing article count and themes (e.g. "5 articles on X between March–May 2026, none mentioning ${ORGS.join("/")}")\n- "opportunity": 1 actionable sentence — what a tracked org could publish or say to enter this conversation\n- "supporting_articles": include AT LEAST 3 articles from the list below that belong to this cluster. Only include articles that actually appear in the list.\n\nReturn ONLY JSON array: [{"topic":"...","description":"...","gap_signal":"...","opportunity":"...","supporting_articles":[{"title":"...","url":"...","date":"YYYY-MM-DD"}]}]\n\nARTICLES (date|title|url|snippet):\n${wsCombined}`,
-        cfg.CLAUDE_KEY,
-        2400,
-      );
-      emerging = parseJ(r) || [];
-      cb(
-        `  ${emerging.length} white-space gaps identified`,
-        emerging.length > 0 ? "ok" : "warn",
-      );
-    }
-  } catch (e) {
-    cb(`  gap analysis err: ${e.message}`, "warn");
   }
   await sleep(300);
 
@@ -2407,91 +2373,9 @@ async function buildPPTX(
     footer(sl);
   }
 
-  // Slide 9: White-Space Gaps
-  {
-    const sl = pres.addSlide();
-    darkBg(sl);
-    eyebrow(sl, "Section 07");
-    stitle(sl, "AQ Media White-Space Gaps");
-    sl.addText(
-      "Topics the broader AQ media is covering that tracked orgs are absent from — narrative opportunities.",
-      {
-        x: 0.5,
-        y: 1.12,
-        w: 12.3,
-        h: 0.32,
-        fontSize: 11,
-        color: MUTED,
-        fontFace: "Calibri",
-        italic: true,
-      },
-    );
-    const narrs =
-      emerging.length > 0
-        ? emerging.slice(0, 2)
-        : [
-            {
-              topic: "Insufficient data",
-              description:
-                "Not enough general AQ articles fetched to identify gaps.",
-              gap_signal: "",
-              opportunity: "",
-            },
-          ];
-    narrs.forEach((n, i) => {
-      const y = 1.55 + i * 2.5;
-      card(sl, 0.5, y, 12.3, 2.32);
-      sl.addShape(pres.shapes.ROUNDED_RECTANGLE, {
-        x: 0.5,
-        y,
-        w: 0.55,
-        h: 2.32,
-        fill: { color: AMBER, transparency: 78 },
-        line: { color: AMBER, width: 0.5 },
-        rectRadius: 0.04,
-      });
-      sl.addText(n.topic || "", {
-        x: 1.18,
-        y: y + 0.1,
-        w: 11.1,
-        h: 0.38,
-        fontSize: 14,
-        bold: true,
-        color: TXT,
-        fontFace: "Calibri",
-      });
-      sl.addText(n.description || "", {
-        x: 1.18,
-        y: y + 0.52,
-        w: 11.1,
-        h: 0.34,
-        fontSize: 11,
-        color: MUTED,
-        fontFace: "Calibri",
-      });
-      if (n.gap_signal)
-        sl.addText(`Gap: ${n.gap_signal}`, {
-          x: 1.18,
-          y: y + 0.9,
-          w: 11.1,
-          h: 0.34,
-          fontSize: 10,
-          color: WARN,
-          fontFace: "Calibri",
-        });
-      if (n.opportunity)
-        sl.addText(`Opportunity: ${n.opportunity}`, {
-          x: 1.18,
-          y: y + 1.3,
-          w: 11.1,
-          h: 0.7,
-          fontSize: 10,
-          color: GOOD,
-          fontFace: "Calibri",
-        });
-    });
-    footer(sl);
-  }
+  // Slide 9 (White-Space Gaps) removed along with the emerging-narratives
+  // feature — it was the one step in this pipeline that needed an extra,
+  // separate Claude call beyond what a report already pays for.
 
   // Slide 10: Scorecard — orgs ranked by score, paginate into groups of 5
   {
@@ -3223,7 +3107,7 @@ ${orgsByTotal((o) => outletTotal(o, activeOutlets)).map(({ org, i, total }) => `
     return `<div style="margin-top:28px">
       <div style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted2);margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span>Dynamic Coverage — ${dynTopics.length} additional topic${dynTopics.length === 1 ? "" : "s"} detected this period</span>
-        <span style="font-size:14px;color:var(--muted);font-weight:400">Topics Claude identified outside the fixed taxonomy above &middot; topics with zero mentions across all orgs are excluded (see Emerging Narratives)</span>
+        <span style="font-size:14px;color:var(--muted);font-weight:400">Topics Claude identified outside the fixed taxonomy above &middot; topics with zero mentions across all orgs are excluded</span>
       </div>
       <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:17px"><thead><tr style="background:var(--surface2)">
         <th style="padding:10px 14px;text-align:left;font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);position:sticky;left:0;background:var(--surface2);z-index:2;white-space:nowrap">Org</th>
@@ -3504,37 +3388,6 @@ ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border
     )
     .join("");
 
-  const emergingCards =
-    !emerging || !emerging.length
-      ? `<div class="em-card"><div class="em-topic">Insufficient data</div><div class="em-body">Not enough general AQ articles were fetched to identify white-space gaps. Check the Serper key or broaden the date range.</div></div>`
-      : emerging
-          .map((n) => {
-            const articleLinks = (n.supporting_articles || [])
-              .map((a) =>
-                a.url
-                  ? `<div class="em-src"><a href="${esc(a.url)}" target="_blank" style="color:var(--amber);text-decoration:none">${esc(a.title)}</a></div>`
-                  : `<div class="em-src">${esc(a.title || a)}</div>`,
-              )
-              .join("");
-            const artCount = (n.supporting_articles || []).length;
-            const absentBadges = ORGS.map((o, i) =>
-              `<span style="font-family:monospace;font-size:15px;font-weight:700;padding:1px 7px;border-radius:3px;background:${orgHex(i)}1a;color:${orgHex(i)};border:1px solid ${orgHex(i)}4d">${esc(o)}</span>`
-            ).join(" ");
-            return `<div class="em-card">
-<div class="em-hdr"><div class="em-topic">${esc(n.topic)}</div></div>
-<div class="em-body">${esc(n.description || "")}</div>
-<div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-  <span style="font-size:15px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Absent:</span>
-  ${absentBadges}
-</div>
-${articleLinks ? `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-  ${artCount > 0 ? `<div style="font-family:monospace;font-size:15px;color:var(--muted2);margin-bottom:7px;letter-spacing:.04em">${artCount} article${artCount !== 1 ? "s" : ""} in this narrative</div>` : ""}
-  ${articleLinks}
-</div>` : ""}
-</div>`;
-          })
-          .join("");
-
   const pmap = {
     "Fix Now": "pri-fix",
     Leverage: "pri-lev",
@@ -3739,7 +3592,7 @@ body.edit-mode .sec-x{display:flex}
 <div class="shell">
 <nav class="sidenav"><a href="#header" class="sidenav-logo-link" title="Back to top"><div class="sidenav-logo"><div class="badge-type" id="reportTypeBadge"><span class="bt-type">RESTRICTED</span><span class="bt-sep"> &middot; </span><span class="bt-meta">${esc(reportDurationLabel(DATE_FROM, DATE_TO))} &middot; ${esc(String(DATE_FROM).slice(0, 10))}</span></div><div class="sidenav-logo-name">Emerald AI</div><div class="sidenav-logo-sub">AQ Intelligence</div></div></a>
 <div class="nav-lbl">Report</div><a href="#exec" class="nav-a active">Executive Summary</a>
-<div class="nav-lbl">Press</div><a href="#sov" class="nav-a">Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><a href="#em" class="nav-a">White-Space Gaps</a><div class="nav-lbl">Social Media</div><a href="#social" class="nav-a">Social Media</a>
+<div class="nav-lbl">Press</div><a href="#sov" class="nav-a">Press Analytics</a><a href="#tv" class="nav-a">TV Coverage</a><a href="#momentum" class="nav-a">Momentum</a><a href="#topics" class="nav-a">Topic Ownership</a><a href="#appendix" class="nav-a">Citations</a><div class="nav-lbl">Social Media</div><a href="#social" class="nav-a">Social Media</a>
 <div class="nav-lbl">LLM</div><a href="#aeo" class="nav-a">LLM Visibility</a>
 <div class="nav-lbl">Conclusions</div><a href="#score" class="nav-a">Scorecard</a><a href="#actions" class="nav-a">Action Matrix</a>
 <div class="sidenav-footer">Generated: ${new Date().toISOString().slice(0, 10)}<br>CONFIDENTIAL</div></nav>
@@ -3816,13 +3669,6 @@ ${dynamicTopicTable()}</section>
 <section class="sec" id="appendix"><div class="sh"><div class="se">Section 03</div><h2 class="st">Citations</h2><div class="sd">All indexed articles from tracked outlets. Verify any claim by following the URL.</div><div class="sdiv"></div></div>
 ${appendixSections}</section>
 
-<section class="sec" id="em"><div class="sh"><div class="se">Section 04</div><h2 class="st">Emerging Narratives</h2><div class="sd">Topics gaining traction in the <strong style="color:var(--text)">broader Indian AQ media landscape</strong> that the tracked organisations had <strong style="color:var(--warn)">no coverage in during this report period</strong> &mdash; identified by fetching general AQ news without org filters, removing articles that mention a tracked org, then clustering the remainder. <strong>Gap signal</strong> = evidence of the absence.</div><div class="sdiv"></div></div>
-<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 14px;cursor:pointer;user-select:none" onclick="toggleEm()">
-<span style="font-family:monospace;font-size:16px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber)">${emerging.length} narrative gap${emerging.length !== 1 ? "s" : ""} identified</span>
-<span id="em-icon" style="font-family:monospace;font-size:17px;color:var(--amber)">&#9650; Collapse</span>
-</div>
-<div id="em-body">${emergingCards}</div></section>
-
 ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
 <section class="sec" id="social"><div class="sh"><div class="se">Section 05 &middot; ${esc(DATE_FROM)} &rarr; ${esc(DATE_TO)}</div><h2 class="st">Social Media Presence</h2><div class="sd">Shows how active each organisation is on social media during the report period — how many followers they have, how often they post about air quality, and how much engagement that content receives across LinkedIn, X/Twitter, Instagram, and YouTube.</div><div class="sdiv"></div></div>
 ${socialERHtml}</section>
@@ -3846,7 +3692,6 @@ var secs=document.querySelectorAll('.sec[id],header[id]');
 var nis=document.querySelectorAll('.nav-a');
 secs.forEach(function(s){new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){nis.forEach(function(n){n.classList.remove('active');});var a=document.querySelector('.nav-a[href="#'+e.target.id+'"]');if(a)a.classList.add('active');}});},{threshold:0.25,rootMargin:'-10% 0px -60% 0px'}).observe(s);});
 function toggleExecDraft(){var d=document.getElementById('exec-draft');var ic=document.getElementById('exec-draft-icon');if(!d)return;var open=d.style.display!=='none';d.style.display=open?'none':'block';if(ic)ic.textContent=open?'\\u25bc Show draft':'\\u25b2 Hide draft';}
-function toggleEm(){var b=document.getElementById('em-body');var ic=document.getElementById('em-icon');if(!b)return;var open=b.style.display!=='none';b.style.display=open?'none':'';if(ic)ic.innerHTML=open?'&#9660; Expand':'&#9650; Collapse';}
 function toggleEdit(){
   var on=!document.body.classList.contains('edit-mode');
   document.body.classList.toggle('edit-mode',on);
