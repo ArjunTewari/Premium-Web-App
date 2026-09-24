@@ -6,7 +6,8 @@ import { eq } from "drizzle-orm";
 import { db, usersTable, orgHandlesTable, reportLogsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/require-auth.js";
 import { type ReportTrendSummary } from "../pipeline/index.js";
-import { generateAndDeliverReport, loadReportHtml, OUT_DIR } from "../lib/generate-report.js";
+import { generateAndDeliverReport, loadReportHtml, persistReportToGithub, OUT_DIR } from "../lib/generate-report.js";
+import { deriveReport, listReportOrgs, parseReportType, reportTypeOfName, reportTypeOfHtml } from "../lib/report-types.js";
 import { toClientView } from "../lib/client-view.js";
 import { sendReportFileEmail } from "../lib/mailer.js";
 import {
@@ -111,6 +112,19 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   if (!cfg.ORGS.length) cfg.ORGS = ["Council on Energy, Environment and Water", "CSTEP"];
   if (cfg.ORGS.length > 20) cfg.ORGS = cfg.ORGS.slice(0, 20);
 
+  // Report type: "full" (default) or a one-org "benchmark" / "snapshot" view of
+  // `subjectOrg`, which must be one of the orgs in this run. Checked before any
+  // paid work starts.
+  const reportType = parseReportType(body.reportType);
+  if (!reportType) return res.status(400).json({ error: "reportType must be full, benchmark or snapshot." });
+  let subjectOrg: string | null = null;
+  if (reportType !== "full") {
+    const want = String(body.subjectOrg || "").trim().toLowerCase();
+    subjectOrg = cfg.ORGS.find((o: string) => o.toLowerCase() === want) ?? null;
+    if (!subjectOrg) return res.status(400).json({ error: "Choose a subject organisation from the organisations in this run." });
+    if (cfg.ORGS.length < 2) return res.status(400).json({ error: "A benchmark needs at least one other organisation to compare against." });
+  }
+
   // Load the shared handle list (latest for every account), then layer any
   // per-run overrides from the request body on top.
   try {
@@ -210,6 +224,8 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
       cb,
       generatedByUsername: (req.user as { username?: string } | undefined)?.username ?? null,
       recipientEmail: clientEmail,
+      reportType,
+      subjectOrg,
     });
 
     // Always persist result — the client may already be disconnected.
@@ -302,8 +318,9 @@ router.post("/outputs/email", requireAuth, async (req: Request, res: Response) =
 
     const html = await loadReportHtml(fname);
     if (html == null) return res.status(404).json({ error: "Report not found" });
+    // Benchmark / snapshot dashboards are already client-facing: one file for both views.
     const attachment =
-      view === "client"
+      view === "client" && reportTypeOfHtml(html) === "full"
         ? { filename: fname.replace(/\.html$/i, "-client.html"), content: toClientView(html) }
         : { filename: fname, content: html };
     const ok = await sendReportFileEmail(to, { htmlName: fname, view, attachment, sentBy: req.user?.username });
@@ -312,6 +329,46 @@ router.post("/outputs/email", requireAuth, async (req: Request, res: Response) =
   } catch (e) {
     console.error("Email report failed:", e);
     return res.status(500).json({ error: "Email failed" });
+  }
+});
+
+// ── GET /outputs/orgs?file= — organisations in a stored full report ────────
+router.get("/outputs/orgs", requireAuth, async (req: Request, res: Response) => {
+  const fname = path.basename(String(req.query.file || "").trim());
+  if (!/^[\w. \-]+\.html$/i.test(fname)) return res.status(400).json({ error: "Invalid report file" });
+  try {
+    if (reportTypeOfName(fname) !== "full") return res.status(400).json({ error: "Only a full report has a cohort to choose from." });
+    const html = await loadReportHtml(fname);
+    if (html == null) return res.status(404).json({ error: "Report not found" });
+    if (reportTypeOfHtml(html) !== "full") return res.status(400).json({ error: "Only a full report has a cohort to choose from." });
+    return res.json({ orgs: listReportOrgs(html) });
+  } catch (e) {
+    console.error("List report orgs failed:", e);
+    return res.status(422).json({ error: "This report's format could not be read." });
+  }
+});
+
+// ── POST /outputs/derive — benchmark / snapshot from a stored full report ───
+// Free: reads the report already on file, makes no API calls. The new file is
+// stored next to the full report and appears in the list like any other.
+router.post("/outputs/derive", requireAuth, async (req: Request, res: Response) => {
+  const body = req.body || {};
+  const fname = path.basename(String(body.file || "").trim());
+  if (!/^[\w. \-]+\.html$/i.test(fname)) return res.status(400).json({ error: "Invalid report file" });
+  const type = parseReportType(body.type);
+  if (!type || type === "full") return res.status(400).json({ error: "type must be benchmark or snapshot." });
+  const org = String(body.org || "").trim();
+  if (!org) return res.status(400).json({ error: "Choose an organisation." });
+
+  try {
+    const html = await loadReportHtml(fname);
+    if (html == null) return res.status(404).json({ error: "Report not found" });
+    const derived = deriveReport(html, type, org);
+    fs.writeFileSync(path.join(OUT_DIR, derived.htmlName), derived.html);
+    await persistReportToGithub(derived.htmlName, undefined, () => {});
+    return res.json({ status: "ok", htmlName: derived.htmlName, type, org: derived.org });
+  } catch (e) {
+    return res.status(422).json({ error: (e as Error).message || "Could not build the report" });
   }
 });
 

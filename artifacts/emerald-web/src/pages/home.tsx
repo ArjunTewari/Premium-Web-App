@@ -177,6 +177,27 @@ interface ReportFile {
   costInr: string | null;
 }
 
+type ReportType = "full" | "benchmark" | "snapshot";
+
+const REPORT_TYPE_LABELS: Record<ReportType, string> = {
+  full: "Full report",
+  benchmark: "Benchmark report",
+  snapshot: "Snapshot",
+};
+
+const REPORT_TYPE_HINTS: Record<ReportType, string> = {
+  full: "Every organisation, all sections.",
+  benchmark: "One organisation measured against the field — all sections.",
+  snapshot: "One organisation's scorecard only (the benchmark's first section).",
+};
+
+// Benchmark / snapshot files are stored as aq-benchmark-… / aq-snapshot-…;
+// full reports keep the pipeline's aq-report-… name.
+function reportTypeOfName(name: string): ReportType {
+  const m = /^aq-(benchmark|snapshot)-/i.exec(name);
+  return m ? (m[1].toLowerCase() as ReportType) : "full";
+}
+
 interface TrendScores {
   sovScore: number;
   pressShare: number;
@@ -396,6 +417,10 @@ export default function Home() {
   const [dateFrom, setDateFrom] = useState(() => defaultDateRange().from);
   const [dateTo, setDateTo] = useState(() => defaultDateRange().to);
   const [clientName, setClientName] = useState("Chetan Bhattacharji");
+  const [reportType, setReportType] = useState<ReportType>("full");
+  const [subjectOrg, setSubjectOrg] = useState("");
+  // Benchmark / snapshot made from a report already in the list (free — no re-run).
+  const [deriveState, setDeriveState] = useState<{ file: string; orgs: string[]; type: "benchmark" | "snapshot"; org: string; busy: boolean; error: string } | null>(null);
 
   const [scopeOpen, setScopeOpen] = useState(false);
   const [scopeKeywords, setScopeKeywords] = useState<string[]>([...DEFAULT_SCOPE]);
@@ -881,7 +906,49 @@ export default function Home() {
     });
   }
 
+  async function openDerive(file: string) {
+    try {
+      const res = await fetch(`/api/outputs/orgs?file=${encodeURIComponent(file)}`, { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error || "Could not read this report."); return; }
+      const orgs: string[] = data.orgs || [];
+      setDeriveState({ file, orgs, type: "benchmark", org: orgs[0] ?? "", busy: false, error: "" });
+    } catch {
+      alert("Could not read this report.");
+    }
+  }
+
+  async function submitDerive() {
+    if (!deriveState || !deriveState.org) return;
+    setDeriveState({ ...deriveState, busy: true, error: "" });
+    try {
+      const res = await fetch("/api/outputs/derive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ file: deriveState.file, type: deriveState.type, org: deriveState.org }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setDeriveState({ ...deriveState, busy: false, error: data.error || "Could not build the report." }); return; }
+      setDeriveState(null);
+      await loadPrev();
+    } catch {
+      setDeriveState({ ...deriveState, busy: false, error: "Could not build the report." });
+    }
+  }
+
   async function downloadClientReport(htmlName: string) {
+    // Benchmark / snapshot files are already client-facing one-org dashboards;
+    // the Client View stripping below is for the full report only.
+    if (reportTypeOfName(htmlName) !== "full") {
+      const a = document.createElement("a");
+      a.href = `/api/download/${encodeURIComponent(htmlName)}`;
+      a.download = htmlName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
     try {
       const res = await fetch(`/api/download/${encodeURIComponent(htmlName)}`, { credentials: "include" });
       if (!res.ok) { alert("Could not fetch report."); return; }
@@ -971,10 +1038,14 @@ export default function Home() {
 
   async function startRun() {
     if (!selectedOrgs.length) { alert("Select at least one organisation."); return; }
+    if (reportType !== "full") {
+      if (selectedOrgs.length < 2) { alert("A benchmark or snapshot needs at least two organisations — the subject and the field."); return; }
+      if (!selectedOrgs.includes(subjectOrg)) { alert("Choose the subject organisation for the " + REPORT_TYPE_LABELS[reportType].toLowerCase() + "."); return; }
+    }
     setRunning(true); setStopping(false); setLogs([]); setProgress(0); setResult(null); setTrendStatus(null);
     runIdRef.current = null;
 
-    const payload = { orgs: selectedOrgs, orgYtHandles: allOrgHandles, orgTwHandles: allTwHandles, orgIgHandles: allIgHandles, orgLiHandles: allLiHandles, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries };
+    const payload = { orgs: selectedOrgs, orgYtHandles: allOrgHandles, orgTwHandles: allTwHandles, orgIgHandles: allIgHandles, orgLiHandles: allLiHandles, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries, reportType, subjectOrg: reportType === "full" ? undefined : subjectOrg };
     const TOTAL_STEPS = 60;
     let stepCount = 0;
 
@@ -1112,6 +1183,56 @@ export default function Home() {
 
   return (
     <div style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif", background: C.bg, minHeight: "100vh", color: C.text, position: "relative", overflowX: "hidden" }}>
+
+      {/* ── Benchmark / Snapshot from an existing report ────────────────── */}
+      {deriveState && (
+        <div
+          onClick={() => !deriveState.busy && setDeriveState(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "var(--elevate-2)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "28px 28px 22px", maxWidth: 480, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column", gap: 16 }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: C.gold }}>Benchmark / Snapshot</div>
+            <div style={{ fontSize: 12, color: C.muted, fontFamily: "'DM Mono', monospace", wordBreak: "break-all" }}>{deriveState.file}</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {(["benchmark", "snapshot"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setDeriveState({ ...deriveState, type: t })}
+                  style={{
+                    padding: "7px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    background: deriveState.type === t ? C.gold : "transparent",
+                    color: deriveState.type === t ? "var(--bg-app)" : C.muted,
+                    border: `1px solid ${deriveState.type === t ? C.gold : C.border}`,
+                  }}
+                >{REPORT_TYPE_LABELS[t]}</button>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: C.muted, fontFamily: "'DM Mono', monospace" }}>{REPORT_TYPE_HINTS[deriveState.type]}</div>
+            <select value={deriveState.org} onChange={(e) => setDeriveState({ ...deriveState, org: e.target.value })} style={inputStyle}>
+              {deriveState.orgs.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+            <div style={{ fontSize: 10, color: C.muted, fontFamily: "'DM Mono', monospace" }}>Built from this report's data — no new analysis, no cost.</div>
+            {deriveState.error && <div style={{ fontSize: 13, color: "#e05a5a" }}>{deriveState.error}</div>}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setDeriveState(null)}
+                disabled={deriveState.busy}
+                style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+              >Cancel</button>
+              <button
+                onClick={submitDerive}
+                disabled={deriveState.busy || !deriveState.org}
+                style={{ background: C.gold, color: "var(--bg-app)", border: "none", borderRadius: 8, padding: "8px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: deriveState.busy ? 0.6 : 1, fontFamily: "'Space Grotesk', sans-serif" }}
+              >{deriveState.busy ? "Building…" : "Create"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Confirmation dialog ─────────────────────────────────────────── */}
       {confirmState && (
@@ -1480,6 +1601,42 @@ export default function Home() {
                   <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>CLIENT NAME</div>
                   <input value={clientName} onChange={(e) => setClientName(e.target.value)} style={inputStyle} placeholder="Client name (appears in footer)" />
                 </div>
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>REPORT TYPE</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {(["full", "benchmark", "snapshot"] as ReportType[]).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => { setReportType(t); if (t !== "full" && !selectedOrgs.includes(subjectOrg)) setSubjectOrg(selectedOrgs[0] ?? ""); }}
+                        style={{
+                          padding: "7px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          background: reportType === t ? C.gold : "transparent",
+                          color: reportType === t ? "var(--bg-app)" : C.muted,
+                          border: `1px solid ${reportType === t ? C.gold : C.border}`,
+                        }}
+                      >{REPORT_TYPE_LABELS[t]}</button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.muted, marginTop: 6, fontFamily: "'DM Mono', monospace" }}>{REPORT_TYPE_HINTS[reportType]}</div>
+                  {reportType !== "full" && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>SUBJECT ORGANISATION</div>
+                      <select
+                        value={selectedOrgs.includes(subjectOrg) ? subjectOrg : ""}
+                        onChange={(e) => setSubjectOrg(e.target.value)}
+                        style={inputStyle}
+                      >
+                        <option value="" disabled>Select from the organisations in this run</option>
+                        {selectedOrgs.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                      <div style={{ fontSize: 10, color: C.muted, marginTop: 6, fontFamily: "'DM Mono', monospace" }}>
+                        The whole run is still analysed (the field averages need it); only this {REPORT_TYPE_LABELS[reportType].toLowerCase()} is kept. To keep the full report, choose Full report — a benchmark or snapshot can then be made from it in the Reports tab at no cost.
+                      </div>
+                    </div>
+                  )}
+                </div>
               </Card>
             </SlideUp>
 
@@ -1819,6 +1976,15 @@ export default function Home() {
                 <span style={{ fontSize: 18, fontWeight: 500, fontFamily: "'DM Mono', monospace", color: C.gold }}>₹{result.costInr.toFixed(2)}</span>
               )}
             </div>
+            {reportTypeOfName(result.htmlName) !== "full" ? (
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <a
+                  href={`/api/download/${encodeURIComponent(result.htmlName)}`}
+                  download={result.htmlName}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.green, color: C.bg, fontFamily: "'Space Grotesk', sans-serif", border: "none" }}
+                >⬇ {REPORT_TYPE_LABELS[reportTypeOfName(result.htmlName)]}</a>
+              </div>
+            ) : (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
               {/* Client View report (strips Action Matrix) */}
               <button
@@ -1832,9 +1998,12 @@ export default function Home() {
                 style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: "rgba(76,175,116,.15)", color: C.green, border: `1px solid rgba(76,175,116,.35)`, fontFamily: "'Space Grotesk', sans-serif" }}
               >⬇ Restricted</a>
             </div>
+            )}
+            {reportTypeOfName(result.htmlName) === "full" && (
             <div style={{ fontSize: 10, color: C.muted, marginTop: 8, fontFamily: "'DM Mono', monospace" }}>
               Client View excludes AI Executive Summary &amp; Action Matrix · Restricted includes everything
             </div>
+            )}
           </div>
         )}
 
@@ -1885,6 +2054,11 @@ export default function Home() {
                         <div style={{ minWidth: 0 }}>
                           <div style={{ color: C.text, fontFamily: "'DM Mono', monospace", fontSize: 18, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {f.name}
+                            {reportTypeOfName(f.name) !== "full" && (
+                              <span style={{ marginLeft: 10, background: "var(--elevate-2)", color: C.gold, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 7px", fontSize: 10, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", verticalAlign: "middle" }}>
+                                {REPORT_TYPE_LABELS[reportTypeOfName(f.name)]}
+                              </span>
+                            )}
                           </div>
                           <div style={{ color: C.muted, fontFamily: "'DM Mono', monospace", fontSize: 10, marginTop: 3 }}>
                             {f.size} KB · {f.mtime}
@@ -1904,7 +2078,19 @@ export default function Home() {
                             }}
                           >✉ Email</button>
                         )}
-                        {f.name.endsWith(".html") && (
+                        {f.name.endsWith(".html") && reportTypeOfName(f.name) === "full" && (
+                          <button
+                            onClick={() => openDerive(f.name)}
+                            style={{
+                              padding: "7px 14px", borderRadius: 8,
+                              background: "rgba(201,146,42,.12)", color: C.gold,
+                              border: `1px solid rgba(201,146,42,.25)`,
+                              fontSize: 18, fontWeight: 600, cursor: "pointer",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >◧ Benchmark / Snapshot</button>
+                        )}
+                        {f.name.endsWith(".html") && reportTypeOfName(f.name) === "full" && (
                           <button
                             onClick={() => downloadClientReport(f.name)}
                             style={{
@@ -1918,7 +2104,7 @@ export default function Home() {
                         )}
                         <a
                           href={`/api/download/${encodeURIComponent(f.name)}`}
-                          download={f.name.replace(/\.html$/i, "-restricted.html")}
+                          download={reportTypeOfName(f.name) === "full" ? f.name.replace(/\.html$/i, "-restricted.html") : f.name}
                           style={{
                             padding: "7px 14px", borderRadius: 8,
                             background: "rgba(201,146,42,.12)", color: C.gold,
@@ -1926,7 +2112,7 @@ export default function Home() {
                             fontSize: 18, fontWeight: 600, textDecoration: "none",
                             fontFamily: "'Space Grotesk', sans-serif",
                           }}
-                        >⬇ Restricted</a>
+                        >{reportTypeOfName(f.name) === "full" ? "⬇ Restricted" : "⬇ Download"}</a>
                       </div>
                     </div>
                   ))}

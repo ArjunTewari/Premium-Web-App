@@ -6,6 +6,7 @@ import { run, type RunConfig, type ReportTrendSummary } from "../pipeline/index.
 import { sendAdminReportEmail, sendClientReportEmail } from "./mailer.js";
 import { uploadReport, uploadReportData, getReportContent, isConfigured as isGithubStorageConfigured } from "./report-storage.js";
 import { toClientView } from "./client-view.js";
+import { deriveReport, reportTypeOfName, type ReportType } from "./report-types.js";
 
 // Shared by both trigger paths: a manual POST /run (routes/pipeline.ts,
 // streams progress over SSE) and the weekly scheduler (report-scheduler.ts,
@@ -101,6 +102,9 @@ export interface GenerateReportParams {
   generatedByUsername?: string | null;
   /** Client-facing recipient for sendClientReportEmail — resolved by the caller. */
   recipientEmail?: string | null;
+  /** "full" (default) keeps the pipeline's multi-org report; "benchmark" / "snapshot" replace it with that view for `subjectOrg`. */
+  reportType?: ReportType;
+  subjectOrg?: string | null;
 }
 
 // A report's HTML from local disk (samples / mid-upload) or GitHub storage.
@@ -117,9 +121,26 @@ export interface GenerateReportResult {
 }
 
 export async function generateAndDeliverReport(params: GenerateReportParams): Promise<GenerateReportResult> {
-  const { cfg, cb, generatedByUsername = null, recipientEmail = null } = params;
+  const { cfg, cb, generatedByUsername = null, recipientEmail = null, reportType = "full", subjectOrg = null } = params;
 
   const result = await run(cfg, cb);
+
+  // Benchmark / snapshot: the pipeline always analyses the whole cohort (the
+  // field averages need it), then only the chosen view is kept. Derivation is
+  // free. If it fails after the paid run, keep the full report rather than
+  // lose it.
+  if (reportType !== "full" && subjectOrg && result.htmlName) {
+    const fullPath = path.join(OUT_DIR, result.htmlName);
+    try {
+      const derived = deriveReport(fs.readFileSync(fullPath, "utf8"), reportType, subjectOrg);
+      fs.writeFileSync(path.join(OUT_DIR, derived.htmlName), derived.html);
+      fs.rmSync(fullPath, { force: true });
+      cb(`  ${reportType === "snapshot" ? "Snapshot" : "Benchmark report"} for ${derived.org} → ${derived.htmlName}`, "ok");
+      result.htmlName = derived.htmlName;
+    } catch (e) {
+      cb(`  Could not build the ${reportType} for ${subjectOrg} (${(e as Error).message}) — keeping the full report`, "warn");
+    }
+  }
 
   // Client billing: random ₹52–53 per org per month, this report.
   const billing = calculateClientBilling(cfg.ORGS, cfg.DATE_FROM, cfg.DATE_TO);
@@ -136,10 +157,12 @@ export async function generateAndDeliverReport(params: GenerateReportParams): Pr
     // Admin gets the full report, the client gets the Client View. A failed
     // fetch just means the emails go out without the attachment.
     const fullHtml = result.htmlName ? await loadReportHtml(result.htmlName).catch(() => null) : null;
+    const derivedType = reportTypeOfName(result.htmlName ?? "");
     const attachmentFor = (view: "client" | "restricted") =>
       fullHtml && result.htmlName
         ? {
-            filename: view === "client" ? result.htmlName.replace(/\.html$/i, "-client.html") : result.htmlName,
+            // A benchmark / snapshot is the same file for both audiences.
+            filename: view === "client" && derivedType === "full" ? result.htmlName.replace(/\.html$/i, "-client.html") : result.htmlName,
             content: view === "client" ? toClientView(fullHtml) : fullHtml,
           }
         : undefined;
