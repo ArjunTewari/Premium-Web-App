@@ -418,6 +418,7 @@ export default function Home() {
   const [dateTo, setDateTo] = useState(() => defaultDateRange().to);
   const [clientName, setClientName] = useState("Chetan Bhattacharji");
   const [reportType, setReportType] = useState<ReportType>("full");
+  const [reportsFilter, setReportsFilter] = useState<"all" | ReportType>("all");
   const [subjectOrg, setSubjectOrg] = useState("");
   // Benchmark / snapshot made from a report already in the list (free — no re-run).
   const [deriveState, setDeriveState] = useState<{ file: string; orgs: string[]; type: "benchmark" | "snapshot"; org: string; busy: boolean; error: string } | null>(null);
@@ -584,7 +585,7 @@ export default function Home() {
     try {
       const res = await fetch("/api/outputs", { credentials: "include" });
       const files: ReportFile[] = await res.json();
-      setPrevReports(files.slice(0, 10));
+      setPrevReports(files);
     } catch {}
   }, []);
 
@@ -2039,8 +2040,27 @@ export default function Home() {
               </SlideUp>
             ) : (
               <SlideUp delay={80}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+                  {(["all", "full", "benchmark", "snapshot"] as const).map((t) => {
+                    const n = t === "all" ? prevReports.length : prevReports.filter((f) => reportTypeOfName(f.name) === t).length;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setReportsFilter(t)}
+                        style={{
+                          padding: "6px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          background: reportsFilter === t ? C.gold : "transparent",
+                          color: reportsFilter === t ? "var(--bg-app)" : C.muted,
+                          border: `1px solid ${reportsFilter === t ? C.gold : C.border}`,
+                        }}
+                      >{t === "all" ? "All" : REPORT_TYPE_LABELS[t]} · {n}</button>
+                    );
+                  })}
+                </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {prevReports.map((f, i) => (
+                  {prevReports.filter((f) => reportsFilter === "all" || reportTypeOfName(f.name) === reportsFilter).map((f, i) => (
                     <div key={f.name} style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       padding: "14px 18px",
