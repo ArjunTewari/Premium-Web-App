@@ -623,6 +623,33 @@ var secs=links.map(function(a){return document.querySelector(a.getAttribute('hre
 function onScroll(){var y=window.scrollY+120,i=secs.length;while(--i>=0){if(secs[i]&&secs[i].offsetTop<=y){links.forEach(function(l){l.classList.remove('active')});links[i].classList.add('active');break}}}
 window.addEventListener('scroll',onScroll);onScroll();`;
 
+// ── Light / dark theme ─────────────────────────────────────────────────────
+// Dark is the default. The choice is saved under the same key the full report
+// uses ("emerald-theme"), so a reader's preference carries across reports.
+// Light values are the full report's own light palette. This block also holds
+// the styling for INFERENCE notes (needed in both themes).
+const THEME_CSS = String.raw`
+.callout-inf{margin:14px 0 0;background:rgba(212,160,23,.08);border:1px dashed rgba(212,160,23,.5);border-left:3px solid var(--warn);border-radius:6px;padding:12px 16px;font-size:15px;color:var(--muted2);line-height:1.7}
+.callout-inf::before{content:"⚠ INFERENCE — not in the source data";display:block;font-family:monospace;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--warn);margin-bottom:6px}
+.inf-lbl{display:block;font-family:monospace;font-size:13px;font-style:italic;color:var(--warn);margin-bottom:6px}
+.inf-badge{display:inline-block;font-family:monospace;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--warn);background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.35);border-radius:3px;padding:0 6px}
+:root{color-scheme:dark}
+:root[data-theme="light"]{color-scheme:light;--ink:#f1f5f9;--surface:#ffffff;--surface2:#ffffff;--surface3:#f8fafc;--border:#e2e8f0;--border2:#cbd5e1;--text:#0f172a;--muted:#64748b;--muted2:#475569;--amber:#b07020;--amber-dim:rgba(176,112,32,.12);--amber-glow:rgba(176,112,32,.06);--good:#2d8a52;--warn:#a8710b;--bad:#dc2626}
+:root[data-theme="light"] .badge-client,:root[data-theme="light"] .pri-opt,:root[data-theme="light"] .kw{color:#1d5fc4}
+:root[data-theme="light"] .pdot{box-shadow:0 0 0 1px rgba(15,23,42,.18)}
+:root[data-theme="light"] .scalebar{opacity:.85}
+.theme-btn{position:fixed;right:16px;bottom:16px;z-index:60;font-family:monospace;font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--text);background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:8px 14px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.theme-btn:hover{border-color:var(--amber);color:var(--amber)}
+@media print{.theme-btn{display:none}}
+`;
+const THEME_BUTTON = '<button type="button" class="theme-btn" id="theme-btn" onclick="toggleTheme()" aria-label="Switch between light and dark mode">&#9728; Light mode</button>';
+const THEME_HEAD_JS = String.raw`try{if(localStorage.getItem('emerald-theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}`;
+const THEME_JS = String.raw`
+function applyThemeBtn(){var b=document.getElementById('theme-btn');if(!b)return;var l=document.documentElement.getAttribute('data-theme')==='light';b.innerHTML=l?'&#9789; Dark mode':'&#9728; Light mode';}
+function toggleTheme(){var l=document.documentElement.getAttribute('data-theme')==='light';if(l){document.documentElement.removeAttribute('data-theme');}else{document.documentElement.setAttribute('data-theme','light');}try{localStorage.setItem('emerald-theme',l?'dark':'light');}catch(e){}applyThemeBtn();}
+applyThemeBtn();
+`;
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many || one + "s"}`;
 const commas = (n) => Math.round(n).toLocaleString("en-US");
@@ -934,8 +961,11 @@ ${artRows(list)}
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 ${CSS}
-</style></head>
+${THEME_CSS}
+</style>
+<script>${THEME_HEAD_JS}</script></head>
 <body>
+${THEME_BUTTON}
 <div class="shell">
 <nav class="sidenav">
   <div class="sidenav-logo">
@@ -1212,6 +1242,7 @@ ${actionHtml}
 </div>
 <script>
 ${PAGE_JS}
+${THEME_JS}
 </script>
 </body></html>
 `;
@@ -1226,6 +1257,24 @@ function toSnapshot(html) {
   return (html.slice(0, from) + html.slice(to))
     .replace(/<div class="nav-lbl">(?!Overview)[^<]*<\/div>\s*/g, "")
     .replace(/<a class="nav-a" href="#(?!scorecard")[^"]*">[^<]*<\/a>\s*/g, "");
+}
+
+// Give an already-generated one-org dashboard (benchmark / snapshot) the light/dark
+// toggle and the INFERENCE-note styling. Purely additive and idempotent: figures
+// and wording are untouched, so it works on files whose source report is gone.
+function addTheme(html) {
+  if (/id="theme-btn"/.test(html)) return html;
+  if (!/name="emerald-report-type"/.test(html)) throw new Error("addTheme: not a one-organisation dashboard");
+  const styleEnd = html.indexOf("</style>");
+  const bodyOpen = html.search(/<body[^>]*>/);
+  const scriptEnd = html.lastIndexOf("</script>");
+  if (styleEnd < 0 || bodyOpen < 0 || scriptEnd < 0) throw new Error("addTheme: unexpected page structure");
+  const bodyTagEnd = html.indexOf(">", bodyOpen) + 1;
+  return (
+    html.slice(0, styleEnd) + THEME_CSS + "\n</style>\n<script>" + THEME_HEAD_JS + "</script>" +
+    html.slice(styleEnd + "</style>".length, bodyTagEnd) + "\n" + THEME_BUTTON +
+    html.slice(bodyTagEnd, scriptEnd) + THEME_JS + html.slice(scriptEnd)
+  );
 }
 
 function buildSingleOrgDashboard(baseHtml, opts = {}) {
@@ -1254,8 +1303,15 @@ function main(argv) {
       else { a[key] = nxt; i++; }
     }
   }
+  if (a["add-theme"]) {
+    const src = a["add-theme"];
+    const out = a.out || src;
+    fs.writeFileSync(out, addTheme(fs.readFileSync(src, "utf8")));
+    console.log("wrote", out);
+    return;
+  }
   if (!a.base) {
-    console.error("Usage: node single-org-dashboard.js --base report.html (--org \"Name\" [--name \"Display\"] [--profile p.json] [--out f.html] [--view benchmark|snapshot] [--sample] | --all --out-dir dir | --list)");
+    console.error("Usage: node single-org-dashboard.js --base report.html (--org \"Name\" [--name \"Display\"] [--profile p.json] [--out f.html] [--view benchmark|snapshot] [--sample] | --all --out-dir dir | --list | --add-theme dashboard.html [--out f.html])");
     process.exit(2);
   }
   const html = fs.readFileSync(a.base, "utf8");
@@ -1281,5 +1337,6 @@ function main(argv) {
 
 module.exports.buildSingleOrgDashboard = buildSingleOrgDashboard;
 module.exports.listOrgs = (html) => parseBaseReport(html).orgs;
+module.exports.addTheme = addTheme;
 if (require.main === module) main(process.argv.slice(2));
 
