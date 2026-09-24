@@ -900,8 +900,10 @@ ${artRows(list)}
     : `<li><b>Evidence:</b> every figure and rank in this dashboard is drawn from the source run.</li>`;
 
   const sample = M.sample;
+  const view = M.view === "snapshot" ? "snapshot" : "benchmark";
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${D} — Benchmark Dashboard</title>
+<title>${D} — ${view === "snapshot" ? "Snapshot" : "Benchmark Dashboard"}</title>
+<meta name="emerald-report-type" content="${view}">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 ${CSS}
@@ -938,7 +940,7 @@ ${CSS}
 <div class="banner">${sample ? "SAMPLE &mdash; f" : "F"}igures are from the source run dated ${esc(m.generated || "")} (${N}-organisation ${platformShort} run, period ${m.from} to ${m.to}).${sample ? " Layout and wording are draft." : ""}</div>
 <header class="rh">
   <div class="ey">Triple Media Pulse</div>
-  <h1 class="rt">${D} <span class="rti">benchmark dashboard</span></h1>
+  <h1 class="rt">${D} <span class="rti">${view === "snapshot" ? "snapshot" : "benchmark dashboard"}</span></h1>
   <div class="rm">Period ${m.from} to ${m.to} &middot; one organisation measured against a ${P}-organisation field</div>
   <div class="chips">
     <span class="chip chip-me">&#9679; ${D} &mdash; measured</span>
@@ -1184,13 +1186,27 @@ ${PAGE_JS}
 `;
 }
 
+// Snapshot = the benchmark dashboard cut down to its first scorecard section
+// (Section 00): same header, same bars and table, nothing after it.
+function toSnapshot(html) {
+  const from = html.indexOf("<!-- ================= 01 =");
+  const to = html.indexOf('<footer class="rf">');
+  if (from < 0 || to < 0) throw new Error("toSnapshot: dashboard markers not found");
+  return (html.slice(0, from) + html.slice(to))
+    .replace(/<div class="nav-lbl">(?!Overview)[^<]*<\/div>\s*/g, "")
+    .replace(/<a class="nav-a" href="#(?!scorecard")[^"]*">[^<]*<\/a>\s*/g, "");
+}
+
 function buildSingleOrgDashboard(baseHtml, opts = {}) {
+  const view = opts.view === "snapshot" ? "snapshot" : "benchmark";
   const base = opts.base || parseBaseReport(baseHtml);
   const M = buildModel(base, opts.org, opts);
   M.tvChannels = base.tvChannels;
   M.tvChannelsN = base.tvChannels.length;
   M.assistants = base.assistants;
-  return renderDashboard(M);
+  M.view = view;
+  const html = renderDashboard(M);
+  return view === "snapshot" ? toSnapshot(html) : html;
 }
 
 function slug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
@@ -1208,7 +1224,7 @@ function main(argv) {
     }
   }
   if (!a.base) {
-    console.error("Usage: node single-org-dashboard.js --base report.html (--org \"Name\" [--name \"Display\"] [--profile p.json] [--out f.html] [--sample] | --all --out-dir dir | --list)");
+    console.error("Usage: node single-org-dashboard.js --base report.html (--org \"Name\" [--name \"Display\"] [--profile p.json] [--out f.html] [--view benchmark|snapshot] [--sample] | --all --out-dir dir | --list)");
     process.exit(2);
   }
   const html = fs.readFileSync(a.base, "utf8");
@@ -1220,14 +1236,14 @@ function main(argv) {
     fs.mkdirSync(dir, { recursive: true });
     for (const org of base.orgs) {
       const out = path.join(dir, `${slug(org)}-dashboard.html`);
-      fs.writeFileSync(out, buildSingleOrgDashboard(html, { base, org, sample: !!a.sample }));
+      fs.writeFileSync(out, buildSingleOrgDashboard(html, { base, org, sample: !!a.sample, view: a.view }));
       console.log("wrote", out);
     }
     return;
   }
   if (!a.org) { console.error("--org is required (use --list to see names)"); process.exit(2); }
   const out = a.out || `${slug(a.org)}-dashboard.html`;
-  fs.writeFileSync(out, buildSingleOrgDashboard(html, { base, org: a.org, displayName: a.name, profile, sample: !!a.sample }));
+  fs.writeFileSync(out, buildSingleOrgDashboard(html, { base, org: a.org, displayName: a.name, profile, sample: !!a.sample, view: a.view }));
   if (a["dump-data"]) fs.writeFileSync(a["dump-data"], JSON.stringify(base, null, 2));
   console.log("wrote", out);
 }
