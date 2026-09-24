@@ -1,5 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
+import {
+  type ReportType, type ReportFilters,
+  REPORT_TYPE_LABELS, REPORT_TYPE_HINTS, DEFAULT_REPORT_FILTERS,
+  reportTypeOfName, applyReportFilters, typeCounts, monthOptions, isDefaultFilters,
+} from "@/lib/report-filters";
 import { useLocation } from "wouter";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -175,27 +180,6 @@ interface ReportFile {
   size: number;
   mtime: string;
   costInr: string | null;
-}
-
-type ReportType = "full" | "benchmark" | "snapshot";
-
-const REPORT_TYPE_LABELS: Record<ReportType, string> = {
-  full: "Full report",
-  benchmark: "Benchmark report",
-  snapshot: "Snapshot",
-};
-
-const REPORT_TYPE_HINTS: Record<ReportType, string> = {
-  full: "Every organisation, all sections.",
-  benchmark: "One organisation measured against the field — all sections.",
-  snapshot: "One organisation's scorecard only (the benchmark's first section).",
-};
-
-// Benchmark / snapshot files are stored as aq-benchmark-… / aq-snapshot-…;
-// full reports keep the pipeline's aq-report-… name.
-function reportTypeOfName(name: string): ReportType {
-  const m = /^aq-(benchmark|snapshot)-/i.exec(name);
-  return m ? (m[1].toLowerCase() as ReportType) : "full";
 }
 
 interface TrendScores {
@@ -418,7 +402,7 @@ export default function Home() {
   const [dateTo, setDateTo] = useState(() => defaultDateRange().to);
   const [clientName, setClientName] = useState("Chetan Bhattacharji");
   const [reportType, setReportType] = useState<ReportType>("full");
-  const [reportsFilter, setReportsFilter] = useState<"all" | ReportType>("all");
+  const [reportFilters, setReportFilters] = useState<ReportFilters>(DEFAULT_REPORT_FILTERS);
   const [subjectOrg, setSubjectOrg] = useState("");
   // Benchmark / snapshot made from a report already in the list (free — no re-run).
   const [deriveState, setDeriveState] = useState<{ file: string; orgs: string[]; type: "benchmark" | "snapshot"; org: string; busy: boolean; error: string } | null>(null);
@@ -2040,27 +2024,74 @@ export default function Home() {
               </SlideUp>
             ) : (
               <SlideUp delay={80}>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-                  {(["all", "full", "benchmark", "snapshot"] as const).map((t) => {
-                    const n = t === "all" ? prevReports.length : prevReports.filter((f) => reportTypeOfName(f.name) === t).length;
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setReportsFilter(t)}
-                        style={{
-                          padding: "6px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer",
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          background: reportsFilter === t ? C.gold : "transparent",
-                          color: reportsFilter === t ? "var(--bg-app)" : C.muted,
-                          border: `1px solid ${reportsFilter === t ? C.gold : C.border}`,
-                        }}
-                      >{t === "all" ? "All" : REPORT_TYPE_LABELS[t]} · {n}</button>
-                    );
-                  })}
-                </div>
+                {(() => {
+                  const counts = typeCounts(prevReports, reportFilters.month);
+                  const months = monthOptions(prevReports, reportFilters.type);
+                  const shown = applyReportFilters(prevReports, reportFilters);
+                  const selectStyle: React.CSSProperties = { ...inputStyle, fontSize: 14, padding: "6px 10px", width: "auto", cursor: "pointer" };
+                  const labelStyle: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-muted)", fontFamily: "'DM Mono', monospace", marginBottom: 4 };
+                  return (
+                    <>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                        {(["all", "full", "benchmark", "snapshot"] as const).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setReportFilters({ ...reportFilters, type: t })}
+                            style={{
+                              padding: "6px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                              background: reportFilters.type === t ? C.gold : "transparent",
+                              color: reportFilters.type === t ? "var(--bg-app)" : C.muted,
+                              border: `1px solid ${reportFilters.type === t ? C.gold : C.border}`,
+                            }}
+                          >{t === "all" ? "All" : REPORT_TYPE_LABELS[t]} · {counts[t]}</button>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 14 }}>
+                        <div>
+                          <div style={labelStyle}>Month generated</div>
+                          <select
+                            value={reportFilters.month}
+                            onChange={(e) => setReportFilters({ ...reportFilters, month: e.target.value })}
+                            style={selectStyle}
+                          >
+                            <option value="all">All months</option>
+                            {months.map((m) => <option key={m.key} value={m.key}>{m.label} · {m.count}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={labelStyle}>Sort</div>
+                          <select
+                            value={reportFilters.sort}
+                            onChange={(e) => setReportFilters({ ...reportFilters, sort: e.target.value as ReportFilters["sort"] })}
+                            style={selectStyle}
+                          >
+                            <option value="newest">Latest first</option>
+                            <option value="oldest">Oldest first</option>
+                          </select>
+                        </div>
+                        <div style={{ fontSize: 12, color: C.muted, fontFamily: "'DM Mono', monospace", paddingBottom: 8 }}>
+                          Showing {shown.length} of {prevReports.length}
+                        </div>
+                        {!isDefaultFilters(reportFilters) && (
+                          <button
+                            type="button"
+                            onClick={() => setReportFilters(DEFAULT_REPORT_FILTERS)}
+                            style={{ background: "transparent", color: C.gold, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif", paddingBottom: 6, textDecoration: "underline" }}
+                          >Clear filters</button>
+                        )}
+                      </div>
+                      {shown.length === 0 && (
+                        <div style={{ textAlign: "center", padding: "36px 0", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, color: C.muted, fontSize: 16 }}>
+                          No reports match these filters.
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {prevReports.filter((f) => reportsFilter === "all" || reportTypeOfName(f.name) === reportsFilter).map((f, i) => (
+                  {applyReportFilters(prevReports, reportFilters).map((f, i) => (
                     <div key={f.name} style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       padding: "14px 18px",
