@@ -303,16 +303,43 @@ function parseBaseReport(html) {
     const m = cell.html.match(/<span[^>]*>\s*([\d.]+)%\s*<\/span>/);
     return m ? parseFloat(m[1]) : null;
   };
-  for (const r of scT.rows) {
-    if (r.length < 6 || !r[so].text) continue;
-    const presence = r[hIdx(scT.headers, /social sov/i)].text.match(/(\d+)\/10/);
-    sc[r[so].text] = {
-      press: spct(r[hIdx(scT.headers, /press sov/i)]) || 0,
-      llm: spct(r[hIdx(scT.headers, /llm sov/i)]) || 0,
-      social: spct(r[hIdx(scT.headers, /social sov/i)]) || 0,
-      overall: spct(r[hIdx(scT.headers, /overall/i)]) || 0,
-      presence: presence ? parseInt(presence[1], 10) : null,
-    };
+  const scRows = scT.rows.filter((r) => r.length >= 6 && r[so].text);
+  const iPress = hIdx(scT.headers, /press sov/i);
+  const iLlm = hIdx(scT.headers, /llm sov/i);
+  const iSoc = hIdx(scT.headers, /social sov/i);
+  const iOv = hIdx(scT.headers, /overall/i);
+  // Older reports (before share-of-voice scoring) print the same three inputs as
+  // plain numbers — press score, AI score, presence /10 — and an overall in
+  // points, with no % anywhere in the table.
+  const legacyScores = scRows.length > 0 && scRows.every((r) => spct(r[iPress]) === null && spct(r[iOv]) === null);
+  if (legacyScores) {
+    const num = (cell) => parseFloat(cell.text.replace(/[^\d.]/g, "")) || 0;
+    const raw = scRows.map((r) => {
+      const pm = r[iSoc].text.match(/(\d+)\s*\/\s*10/);
+      return { org: r[so].text, press: num(r[iPress]), llm: num(r[iLlm]), presence: pm ? parseInt(pm[1], 10) : 0 };
+    });
+    const tot = (k) => raw.reduce((s, x) => s + x[k], 0) || 1;
+    const [tp, tl, ts] = [tot("press"), tot("llm"), tot("presence")];
+    const r1 = (v) => Math.round(v * 10) / 10;
+    for (const x of raw) {
+      // The current method: each score as a share of all organisations' scores,
+      // overall = mean of the three shares (reproduces the printed figures of
+      // current-format reports to the decimal).
+      const p = (x.press / tp) * 100, l = (x.llm / tl) * 100, s = (x.presence / ts) * 100;
+      sc[x.org] = { press: r1(p), llm: r1(l), social: r1(s), overall: r1((p + l + s) / 3), presence: x.presence };
+    }
+    meta.legacyScores = true;
+  } else {
+    for (const r of scRows) {
+      const presence = r[iSoc].text.match(/(\d+)\/10/);
+      sc[r[so].text] = {
+        press: spct(r[iPress]) || 0,
+        llm: spct(r[iLlm]) || 0,
+        social: spct(r[iSoc]) || 0,
+        overall: spct(r[iOv]) || 0,
+        presence: presence ? parseInt(presence[1], 10) : null,
+      };
+    }
   }
 
   return { meta, orgs, printOutlets, tvChannels, press, tv, weeks: weeks.map((w) => w.label), momentum, fieldWeekly, topics: topics.map((t) => t.name), topicCounts, citations, llm, assistants, questions, questionCells, nAns, social, posts, sc };
@@ -971,7 +998,11 @@ ${bars}
 ${trows}
     </tbody>
   </table>
-  <div class="foot-note">&mdash; in the rank column: the value is shared by several organisations, so a single rank is not shown.</div>
+  <div class="foot-note">&mdash; in the rank column: the value is shared by several organisations, so a single rank is not shown.</div>${m.legacyScores ? `
+  <div class="callout-inf">
+    <span class="inf-lbl">computed from the source report's Press, AI and Social scores, which it states as points rather than shares</span>
+    The Overall visibility figures here are share-of-voice percentages recomputed for this period: each organisation's Press, AI and Social score as a share of all ${N} organisations' scores, averaged. The source report itself does not print these percentages.
+  </div>` : ""}
 </section>
 
 <!-- ================= 01 ================= -->
