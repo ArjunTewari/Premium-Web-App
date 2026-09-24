@@ -1,0 +1,34 @@
+{
+  "displayName": "Raahgiri Foundation",
+  "shortName": "Raahgiri",
+  "basis": "general knowledge of the Raahgiri Day movement — car-free streets, walkability, cycling, road safety, public space — not from the source dataset",
+  "programmeAreas": "car-free streets, walkability, cycling, road safety, public space",
+  "topicSet": [
+    "Active mobility & NMT",
+    "Pedestrian infrastructure & walkability",
+    "Cycling infrastructure",
+    "Street reclamation / car-free streets",
+    "Road safety / Vision Zero",
+    "Public space & placemaking",
+    "Low-emission & parking policy",
+    "Mobility–air-quality link"
+  ],
+  "venuesBasis": "general knowledge of urban-mobility policy documents, not from the source dataset",
+  "citationVenues": [
+    "city Comprehensive Mobility Plans",
+    "street-design and non-motorised-transport guidelines",
+    "NCAP city action-plan annexes",
+    "partner-organisation reports"
+  ],
+  "aiBasis": "general knowledge that Raahgiri Foundation originated the \"Raahgiri Day\" name, not from the source dataset — worth confirming with Raahgiri Foundation directly",
+  "aiQuestions": [
+    { "q": "Who started Raahgiri Day, and who runs it?", "why": "to check whether the assistant names the Foundation or a municipality" },
+    { "q": "Which organisations work on car-free streets or walkability in India?", "why": "to check whether Raahgiri is named" }
+  ],
+  "mediaPitch": "the urban-mobility and street-reclamation work",
+  "topicPillars": ["active mobility", "urban air quality", "pedestrian infrastructure"],
+  "aeoTopics": "Raahgiri Day, car-free streets and active mobility",
+  "notes": [
+    "\"Raahgiri\" is used by several municipalities for their own car-free-day events, so media and AI matching needs manual review."
+  ]
+}
