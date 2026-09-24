@@ -85,6 +85,8 @@ export interface StoredReportMeta {
   name: string;
   size: number; // KB, matching the local-disk listing's units
   mtime: string; // ISO, sliced to 16 chars — matches the local-disk listing's format
+  /** Client-facing price in rupees — set for benchmark / snapshot reports. */
+  priceInr?: number;
 }
 
 interface Manifest {
@@ -107,7 +109,7 @@ async function getManifest(): Promise<{ manifest: Manifest; sha?: string }> {
 
 // Upload one report's content and record it in the manifest. Returns true
 // only once both the file and the manifest update succeeded.
-export async function uploadReport(name: string, content: string): Promise<boolean> {
+export async function uploadReport(name: string, content: string, priceInr?: number): Promise<boolean> {
   if (!isConfigured()) return false;
 
   const wrote = await putFile(`reports/${name}`, content, `Add report: ${name}`);
@@ -119,7 +121,7 @@ export async function uploadReport(name: string, content: string): Promise<boole
   for (let attempt = 0; attempt < 3; attempt++) {
     const { manifest, sha } = await getManifest();
     const next: Manifest = {
-      reports: [...manifest.reports.filter((r) => r.name !== name), { name, size, mtime }],
+      reports: [...manifest.reports.filter((r) => r.name !== name), { name, size, mtime, ...(priceInr !== undefined ? { priceInr } : {}) }],
     };
     const res = await githubRequest(`/contents/manifest.json`, {
       method: "PUT",

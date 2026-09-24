@@ -1216,7 +1216,7 @@ export default function Home() {
             <select value={deriveState.org} onChange={(e) => setDeriveState({ ...deriveState, org: e.target.value })} style={inputStyle}>
               {deriveState.orgs.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
-            <div style={{ fontSize: 10, color: C.muted, fontFamily: "'DM Mono', monospace" }}>Built from this report's data — no new analysis, no cost.</div>
+            <div style={{ fontSize: 10, color: C.muted, fontFamily: "'DM Mono', monospace" }}>Built from this report's data — no new analysis. Priced ₹{deriveState.type === "snapshot" ? "40–45" : "90–100"}.</div>
             {deriveState.error && <div style={{ fontSize: 13, color: "#e05a5a" }}>{deriveState.error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button
@@ -2061,7 +2061,7 @@ export default function Home() {
                             )}
                           </div>
                           <div style={{ color: C.muted, fontFamily: "'DM Mono', monospace", fontSize: 10, marginTop: 3 }}>
-                            {f.size} KB · {f.mtime}
+                            {f.size} KB · {f.mtime}{reportTypeOfName(f.name) !== "full" && f.costInr ? ` · ₹${Number(f.costInr).toFixed(2)}` : ""}
                           </div>
                         </div>
                       </div>

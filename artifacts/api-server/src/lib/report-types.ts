@@ -17,6 +17,19 @@ export type DerivedReportType = Exclude<ReportType, "full">;
 
 export const REPORT_TYPES: readonly ReportType[] = ["full", "benchmark", "snapshot"];
 
+// What the client is shown for a derived report: a value drawn from these
+// ranges (rupees) when the report is created, in the same spirit as the
+// per-org monthly rate in auth.ts. Full reports keep the existing billing.
+export const DERIVED_PRICE_RANGE_INR: Record<DerivedReportType, [number, number]> = {
+  snapshot: [40, 45],
+  benchmark: [90, 100],
+};
+
+export function priceForType(type: DerivedReportType): number {
+  const [lo, hi] = DERIVED_PRICE_RANGE_INR[type];
+  return Math.round((lo + Math.random() * (hi - lo)) * 100) / 100;
+}
+
 export function parseReportType(v: unknown): ReportType | null {
   if (v == null || v === "") return "full";
   const s = String(v).toLowerCase();

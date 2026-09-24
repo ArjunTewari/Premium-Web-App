@@ -7,7 +7,7 @@ import { db, usersTable, orgHandlesTable, reportLogsTable } from "@workspace/db"
 import { requireAuth } from "../middleware/require-auth.js";
 import { type ReportTrendSummary } from "../pipeline/index.js";
 import { generateAndDeliverReport, loadReportHtml, persistReportToGithub, OUT_DIR } from "../lib/generate-report.js";
-import { deriveReport, listReportOrgs, parseReportType, reportTypeOfName, reportTypeOfHtml } from "../lib/report-types.js";
+import { deriveReport, listReportOrgs, parseReportType, priceForType, reportTypeOfName, reportTypeOfHtml } from "../lib/report-types.js";
 import { toClientView } from "../lib/client-view.js";
 import { sendReportFileEmail } from "../lib/mailer.js";
 import {
@@ -277,7 +277,13 @@ router.get("/outputs", requireAuth, async (_req: Request, res: Response) => {
       if (log.htmlName && log.costInr) costMap[log.htmlName] = log.costInr;
     }
 
-    res.json(files.map((f) => ({ ...f, costInr: costMap[f.name] ?? null })));
+    // Run-log cost first; benchmark / snapshot reports fall back to the price stored in the manifest.
+    res.json(
+      files.map((f) => {
+        const price = (f as { priceInr?: number }).priceInr;
+        return { ...f, costInr: costMap[f.name] ?? (price != null ? price.toFixed(2) : null) };
+      }),
+    );
   } catch {
     res.json([]);
   }
@@ -365,8 +371,9 @@ router.post("/outputs/derive", requireAuth, async (req: Request, res: Response) 
     if (html == null) return res.status(404).json({ error: "Report not found" });
     const derived = deriveReport(html, type, org);
     fs.writeFileSync(path.join(OUT_DIR, derived.htmlName), derived.html);
-    await persistReportToGithub(derived.htmlName, undefined, () => {});
-    return res.json({ status: "ok", htmlName: derived.htmlName, type, org: derived.org });
+    const priceInr = priceForType(type);
+    await persistReportToGithub(derived.htmlName, undefined, () => {}, priceInr);
+    return res.json({ status: "ok", htmlName: derived.htmlName, type, org: derived.org, priceInr });
   } catch (e) {
     return res.status(422).json({ error: (e as Error).message || "Could not build the report" });
   }
