@@ -6,7 +6,7 @@ import { run, type RunConfig, type ReportTrendSummary } from "../pipeline/index.
 import { sendAdminReportEmail, sendClientReportEmail } from "./mailer.js";
 import { uploadReport, uploadReportData, getReportContent, isConfigured as isGithubStorageConfigured } from "./report-storage.js";
 import { toClientView } from "./client-view.js";
-import { deriveReport, reportTypeOfName, type ReportType } from "./report-types.js";
+import { deriveReport, priceForType, reportTypeOfName, type ReportType } from "./report-types.js";
 
 // Shared by both trigger paths: a manual POST /run (routes/pipeline.ts,
 // streams progress over SSE) and the weekly scheduler (report-scheduler.ts,
@@ -68,6 +68,7 @@ export async function persistReportToGithub(
   htmlName: string,
   trendSummary: ReportTrendSummary | undefined,
   cb: (msg: string, level?: string) => void,
+  priceInr?: number,
 ): Promise<void> {
   if (!isGithubStorageConfigured()) return;
   const fpath = path.join(OUT_DIR, htmlName);
@@ -77,7 +78,7 @@ export async function persistReportToGithub(
   } catch {
     return;
   }
-  const ok = await uploadReport(htmlName, content);
+  const ok = await uploadReport(htmlName, content, priceInr);
   if (!ok) {
     cb(`  GitHub upload failed — report stays on local disk for now`, "warn");
     return;
@@ -143,12 +144,18 @@ export async function generateAndDeliverReport(params: GenerateReportParams): Pr
   }
 
   // Client billing: random ₹52–53 per org per month, this report.
-  const billing = calculateClientBilling(cfg.ORGS, cfg.DATE_FROM, cfg.DATE_TO);
+  // A benchmark / snapshot is priced per report; a full report per org-month.
+  const producedType = reportTypeOfName(result.htmlName ?? "");
+  const priceInr = producedType === "full" ? undefined : priceForType(producedType);
+  const billing =
+    priceInr !== undefined
+      ? { costInr: priceInr, perOrgMonthInr: priceInr, numOrgs: 1, months: 1 }
+      : calculateClientBilling(cfg.ORGS, cfg.DATE_FROM, cfg.DATE_TO);
   // Real API cost of producing the report (from the pipeline's usage counters).
   const apiCost = result.cost;
   const apiCostInr = apiCost?.totalINR ?? 0;
 
-  await persistReportToGithub(result.htmlName, result.trendSummary, cb);
+  await persistReportToGithub(result.htmlName, result.trendSummary, cb, priceInr);
 
   // ── Cost emails ────────────────────────────────────────────────────────
   // The admin always receives the real-API-cost + client-cost email; the
