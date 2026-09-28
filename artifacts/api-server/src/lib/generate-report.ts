@@ -205,7 +205,11 @@ export async function generateAndDeliverReport(params: GenerateReportParams): Pr
     costLlmAeoInr: (((apiCost?.linesUSD.perplexity ?? 0) + (apiCost?.linesUSD.openai ?? 0) + (apiCost?.linesUSD.gemini ?? 0)) * (apiCost?.usdToInr ?? 84)).toFixed(2),
     costYoutubeInr: ((apiCost?.linesUSD.youtube ?? 0) * (apiCost?.usdToInr ?? 84)).toFixed(2),
     costStorageInr: ((apiCost?.linesUSD.firecrawl ?? 0) * (apiCost?.usdToInr ?? 84)).toFixed(2),
+    // Column name is legacy ("Deployment") but this is APIdirect.io social-data
+    // spend, not hosting cost — the admin dashboard now labels it "Social Data
+    // (APIdirect)". Left as costDeploymentInr to avoid a DB migration.
     costDeploymentInr: ((apiCost?.linesUSD.apidirect ?? 0) * (apiCost?.usdToInr ?? 84)).toFixed(2),
+    costExaInr: ((apiCost?.linesUSD.exa ?? 0) * (apiCost?.usdToInr ?? 84)).toFixed(2),
   }).catch((e: unknown) => console.error("Failed to log report:", e));
 
   return { htmlName: result.htmlName, costInr: billing.costInr };

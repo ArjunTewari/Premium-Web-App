@@ -47,8 +47,11 @@ export const reportLogsTable = pgTable("report_logs", {
   costYoutubeInr: numeric("cost_youtube_inr", { precision: 10, scale: 2 }).notNull().default("0"),
   costStorageInr: numeric("cost_storage_inr", { precision: 10, scale: 2 }).notNull(),
   costDeploymentInr: numeric("cost_deployment_inr", { precision: 10, scale: 2 }).notNull(),
+  // Exa /search corpus-fetch spend (STEP 1/6, runs on every report). Split out
+  // from apiCostInr so the per-service breakdown actually sums to the total.
+  costExaInr: numeric("cost_exa_inr", { precision: 10, scale: 2 }).notNull().default("0"),
   // Real total API cost to produce this report (INR) — sum of the metered
-  // Claude/Serper spend plus per-call Firecrawl/APIdirect/YouTube/AEO costs.
+  // Claude/Serper spend plus per-call Firecrawl/APIdirect/YouTube/AEO/Exa costs.
   apiCostInr: numeric("api_cost_inr", { precision: 10, scale: 2 }).notNull().default("0"),
   // The per-org-per-month rate this report was billed to the client at (INR).
   perOrgMonthInr: numeric("per_org_month_inr", { precision: 10, scale: 2 }).notNull().default("0"),

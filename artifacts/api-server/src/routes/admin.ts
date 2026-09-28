@@ -55,6 +55,7 @@ router.get("/admin/costs", requireAdmin, async (_req: Request, res: Response) =>
       totalYoutube: sql<number>`sum(cost_youtube_inr::numeric)::float`,
       totalStorage: sql<number>`sum(cost_storage_inr::numeric)::float`,
       totalDeployment: sql<number>`sum(cost_deployment_inr::numeric)::float`,
+      totalExa: sql<number>`sum(cost_exa_inr::numeric)::float`,
     })
     .from(reportLogsTable)
     .groupBy(sql`to_char(created_at, 'YYYY-MM')`)
