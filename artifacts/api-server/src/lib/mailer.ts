@@ -183,6 +183,7 @@ export async function sendAdminReportEmail(
         ["Claude (classify/summary)", apiCost.counts.claudeInputTokens + apiCost.counts.claudeOutputTokens, apiCost.linesUSD.claude],
         ["Claude (AEO probes)", apiCost.counts.claudeAeoCalls, apiCost.linesUSD.claudeAeo],
         ["Firecrawl searches", apiCost.counts.firecrawlSearches, apiCost.linesUSD.firecrawl],
+        ["Exa corpus searches", apiCost.counts.exaSearches, apiCost.linesUSD.exa],
         ["Serper queries", apiCost.counts.serperQueries, apiCost.linesUSD.serper],
         ["APIdirect calls", apiCost.counts.apidirectCalls, apiCost.linesUSD.apidirect],
         ["Perplexity queries", apiCost.counts.perplexityCalls, apiCost.linesUSD.perplexity],

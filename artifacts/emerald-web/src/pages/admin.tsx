@@ -17,6 +17,7 @@ interface ReportLog {
   costYoutubeInr: string;
   costStorageInr: string;
   costDeploymentInr: string;
+  costExaInr: string;
   createdAt: string;
 }
 
@@ -38,6 +39,7 @@ interface MonthlyCost {
   totalYoutube: number;
   totalStorage: number;
   totalDeployment: number;
+  totalExa: number;
 }
 
 function fmt(n: string | number) {
@@ -51,7 +53,8 @@ function infraTotal(r: ReportLog) {
     Number(r.costClaudeInr) +
     Number(r.costYoutubeInr || 0) +
     Number(r.costStorageInr) +
-    Number(r.costDeploymentInr)
+    Number(r.costDeploymentInr) +
+    Number(r.costExaInr || 0)
   );
 }
 
@@ -202,7 +205,7 @@ export default function Admin() {
                   <table style={tableStyle}>
                     <thead>
                       <tr>
-                        {["Month", "Reports", "Serper", "LLM (AEO)", "Claude", "YouTube", "Storage", "Deployment", "Total Infra", "Customer Rev"].map((h) => (
+                        {["Month", "Reports", "Serper", "LLM (AEO)", "Claude", "YouTube", "Storage", "Social Data (APIdirect)", "Exa Corpus", "Total Infra", "Customer Rev"].map((h) => (
                           <th key={h} style={thStyle}>{h}</th>
                         ))}
                       </tr>
@@ -210,7 +213,7 @@ export default function Admin() {
                     <tbody>
                       {months.map((m) => {
                         const totalInfra =
-                          m.totalSerper + m.totalLlmAeo + m.totalClaude + (m.totalYoutube || 0) + m.totalStorage + m.totalDeployment;
+                          m.totalSerper + m.totalLlmAeo + m.totalClaude + (m.totalYoutube || 0) + m.totalStorage + m.totalDeployment + (m.totalExa || 0);
                         return (
                           <tr key={m.month} style={{ borderBottom: "1px solid var(--border-col)" }}>
                             <td style={tdStyle}>{monthLabel(m.month)}</td>
@@ -221,6 +224,7 @@ export default function Admin() {
                             <td style={{ ...tdStyle, color: "#ff6b6b" }}>{fmt(m.totalYoutube || 0)}</td>
                             <td style={tdStyle}>{fmt(m.totalStorage)}</td>
                             <td style={tdStyle}>{fmt(m.totalDeployment)}</td>
+                            <td style={tdStyle}>{fmt(m.totalExa || 0)}</td>
                             <td style={{ ...tdStyle, color: "#818cf8", fontWeight: 600 }}>{fmt(totalInfra)}</td>
                             <td style={{ ...tdStyle, color: "var(--accent-amber)", fontWeight: 600 }}>{fmt(m.totalCostInr)}</td>
                           </tr>
@@ -321,7 +325,8 @@ export default function Admin() {
                                     <CostBadge label="Claude API" value={r.costClaudeInr} color="#f472b6" />
                                     <CostBadge label="YouTube API" value={r.costYoutubeInr || "0"} color="#ff6b6b" />
                                     <CostBadge label="Storage" value={r.costStorageInr} color="#34d399" />
-                                    <CostBadge label="Deployment" value={r.costDeploymentInr} color="#38bdf8" />
+                                    <CostBadge label="Social Data (APIdirect)" value={r.costDeploymentInr} color="#38bdf8" />
+                                    <CostBadge label="Exa Corpus" value={r.costExaInr || "0"} color="#a78bfa" />
                                     <CostBadge label="Total Infra" value={infraTotal(r).toFixed(2)} color="#818cf8" bold />
                                     <CostBadge label="Customer Cost" value={r.costInr} color="var(--accent-amber)" bold />
                                   </div>
