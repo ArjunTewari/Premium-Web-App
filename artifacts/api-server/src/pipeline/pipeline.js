@@ -3674,6 +3674,16 @@ ${SI.buildAEOHtml(aeoResults, ORGS, aeoQueriesUsed)}
 ${socialERHtml}</section>
 
 <section class="sec" id="score"><div class="sh"><div class="se">Section 06</div><h2 class="st">Scorecard</h2><div class="sd">Share of voice across Press, LLM, and Social. Each channel is normalised to its own cohort share so all three carry equal weight; the Overall SoV is their average, and orgs are ranked by it. Click any row to see the breakdown.</div><div class="sdiv"></div></div>
+<div class="sc-key" style="background:var(--amber-glow);border:1px solid var(--border);border-radius:6px;padding:14px 18px;margin-bottom:18px;font-size:16px;line-height:1.7;color:var(--muted2)">
+<div style="font-family:monospace;font-size:14px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin-bottom:8px">How to read the numbers</div>
+In each Press, LLM and Social cell, the <b>percentage on top</b> is the organisation's share of voice on that channel. The <b>smaller number beneath</b> is the raw figure that share is worked out from:
+<ul style="margin:8px 0 8px 20px">
+<li><b>Press</b> &mdash; press score: articles found &times; 2.5, capped at 100. Example: 4 articles = 10.</li>
+<li><b>LLM</b> &mdash; AI mentions: the number of the 45 AI answers (15 questions &times; 3 assistants) that named the organisation.</li>
+<li><b>Social</b> &mdash; social presence score, out of 10.</li>
+</ul>
+Share = the organisation's raw figure &divide; the total of that figure across all tracked organisations. Overall SoV is the average of the three shares. A raw figure of 0 gives a share of 0%. The Cohort row shows each column adds up to 100%.
+</div>
 ${scorecards}</section>
 
 <section class="sec" id="actions"><div class="sh"><h2 class="st">Action Matrix</h2><div class="sd">Data-anchored recommendations per org, including LLM and Social Media actions.</div><div class="sdiv"></div></div>
