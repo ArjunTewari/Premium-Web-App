@@ -1463,7 +1463,7 @@ export default function Home() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16, padding: "9px 16px", background: "rgba(76,175,116,.07)", border: "1px solid rgba(76,175,116,.2)", borderRadius: 100, width: "fit-content" }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.green, animation: "pulse-dot 1.8s ease-in-out infinite", flexShrink: 0, display: "inline-block" }} />
             <span style={{ fontSize: 18, color: C.green }}>
-              <strong>API keys pre-loaded</strong> — Serper, Claude, OpenAI, Perplexity, Gemini &amp; social keys are active
+              <strong>API keys pre-loaded</strong> — Serper, Claude, OpenAI, Perplexity &amp; social keys are active
             </span>
           </div>
         </SlideUp>
@@ -1683,7 +1683,7 @@ export default function Home() {
                 {aeoOpen && (
                   <div style={{ marginTop: 14 }}>
                     <p style={{ fontSize: 15, color: C.muted, marginBottom: 12, lineHeight: 1.7, fontFamily: "'DM Mono', monospace" }}>
-                      Sent to GPT-4o mini, Perplexity Sonar &amp; Gemini 1.5 Flash. Each response naming a tracked org = <strong style={{ color: C.gold }}>10 pts</strong> (max 100). Click to edit inline.
+                      Sent to GPT-4o mini, Claude &amp; Perplexity Sonar. Each response naming a tracked org = <strong style={{ color: C.gold }}>10 pts</strong> (max 100). Click to edit inline.
                     </p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 10, maxHeight: 300, overflowY: "auto" }}>
                       {aeoQueries.map((q, i) => (
