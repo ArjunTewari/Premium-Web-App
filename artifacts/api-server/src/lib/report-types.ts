@@ -62,13 +62,19 @@ const PROFILES: Record<string, Record<string, unknown>> = {
 interface Dashboard {
   buildSingleOrgDashboard(
     baseHtml: string,
-    opts: { org: string; view?: DerivedReportType; profile?: Record<string, unknown> },
+    opts: { org: string; view?: DerivedReportType; profile?: Record<string, unknown>; range?: { from: string; to: string } },
   ): string;
   listOrgs(baseHtml: string): string[];
   parseBaseReport(baseHtml: string): { meta: { from: string; to: string }; orgs: string[] };
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const dash = ((_dashboard as any).buildSingleOrgDashboard ? _dashboard : (_dashboard as any).default) as Dashboard;
+
+/** The period a full report covers (ISO dates, inclusive). */
+export function reportPeriod(fullHtml: string): { from: string; to: string } {
+  const { from, to } = dash.parseBaseReport(fullHtml).meta;
+  return { from, to };
+}
 
 /** Organisations in a full report, in the report's own order. */
 export function listReportOrgs(fullHtml: string): string[] {
@@ -90,7 +96,13 @@ export interface DerivedReport {
  * Throws (with a message safe to show the user) when the org isn't in the
  * report or the input isn't a full multi-org report.
  */
-export function deriveReport(fullHtml: string, type: DerivedReportType, org: string): DerivedReport {
+export function deriveReport(
+  fullHtml: string,
+  type: DerivedReportType,
+  org: string,
+  /** A snapshot may cover a shorter window inside the report's period. */
+  range?: { from: string; to: string },
+): DerivedReport {
   if (reportTypeOfHtml(fullHtml) !== "full") {
     throw new Error("A benchmark or snapshot can only be made from a full report.");
   }
@@ -99,11 +111,15 @@ export function deriveReport(fullHtml: string, type: DerivedReportType, org: str
   const subject = base.orgs.find((o) => o.toLowerCase() === want);
   if (!subject) throw new Error(`"${org}" is not one of the organisations in this report.`);
 
+  if (range && type !== "snapshot") throw new Error("A shorter period is available for snapshots only.");
   const html = dash.buildSingleOrgDashboard(fullHtml, {
     org: subject,
     view: type,
     profile: PROFILES[subject.toLowerCase()],
+    ...(range ? { range } : {}),
   });
-  const htmlName = `aq-${type}-${slug(subject)}-${base.meta.from}-to-${base.meta.to}.html`;
+  const from = range ? range.from : base.meta.from;
+  const to = range ? range.to : base.meta.to;
+  const htmlName = `aq-${type}-${slug(subject)}-${from}-to-${to}.html`;
   return { html, htmlName, org: subject };
 }

@@ -405,7 +405,7 @@ export default function Home() {
   const [reportFilters, setReportFilters] = useState<ReportFilters>(DEFAULT_REPORT_FILTERS);
   const [subjectOrg, setSubjectOrg] = useState("");
   // Benchmark / snapshot made from a report already in the list (free — no re-run).
-  const [deriveState, setDeriveState] = useState<{ file: string; orgs: string[]; type: "benchmark" | "snapshot"; org: string; busy: boolean; error: string } | null>(null);
+  const [deriveState, setDeriveState] = useState<{ file: string; orgs: string[]; type: "benchmark" | "snapshot"; org: string; busy: boolean; error: string; period: { from: string; to: string } | null; from: string; to: string } | null>(null);
 
   const [scopeOpen, setScopeOpen] = useState(false);
   const [scopeKeywords, setScopeKeywords] = useState<string[]>([...DEFAULT_SCOPE]);
@@ -897,7 +897,8 @@ export default function Home() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { alert(data.error || "Could not read this report."); return; }
       const orgs: string[] = data.orgs || [];
-      setDeriveState({ file, orgs, type: "benchmark", org: orgs[0] ?? "", busy: false, error: "" });
+      const period: { from: string; to: string } | null = data.period || null;
+      setDeriveState({ file, orgs, type: "benchmark", org: orgs[0] ?? "", busy: false, error: "", period, from: period?.from ?? "", to: period?.to ?? "" });
     } catch {
       alert("Could not read this report.");
     }
@@ -905,13 +906,20 @@ export default function Home() {
 
   async function submitDerive() {
     if (!deriveState || !deriveState.org) return;
+    // A shorter window only counts when it differs from the whole report period.
+    const p = deriveState.period;
+    const custom = deriveState.type === "snapshot" && !!p && (deriveState.from !== p.from || deriveState.to !== p.to);
+    if (custom && (!deriveState.from || !deriveState.to || deriveState.from > deriveState.to)) {
+      setDeriveState({ ...deriveState, error: "Choose a start date that is on or before the end date." });
+      return;
+    }
     setDeriveState({ ...deriveState, busy: true, error: "" });
     try {
       const res = await fetch("/api/outputs/derive", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ file: deriveState.file, type: deriveState.type, org: deriveState.org }),
+        body: JSON.stringify({ file: deriveState.file, type: deriveState.type, org: deriveState.org, ...(custom ? { from: deriveState.from, to: deriveState.to } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setDeriveState({ ...deriveState, busy: false, error: data.error || "Could not build the report." }); return; }
@@ -1222,6 +1230,26 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
             <select value={deriveState.org} onChange={(e) => setDeriveState({ ...deriveState, org: e.target.value })} style={inputStyle}>
               {deriveState.orgs.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
+            {deriveState.type === "snapshot" && deriveState.period && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>
+                  PERIOD — WITHIN THE REPORT'S {deriveState.period.from} → {deriveState.period.to}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input type="date" value={deriveState.from} min={deriveState.period.from} max={deriveState.period.to} onChange={(e) => setDeriveState({ ...deriveState, from: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
+                  <span style={{ color: C.muted }}>→</span>
+                  <input type="date" value={deriveState.to} min={deriveState.period.from} max={deriveState.period.to} onChange={(e) => setDeriveState({ ...deriveState, to: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
+                </div>
+                {(deriveState.from !== deriveState.period.from || deriveState.to !== deriveState.period.to) ? (
+                  <div style={{ fontSize: 10, color: C.muted, marginTop: 6, fontFamily: "'DM Mono', monospace", lineHeight: 1.6 }}>
+                    Counted from the dated items in this report. AI visibility and YouTube are not dated, so they stay at the whole-report values; the snapshot says so.{" "}
+                    <button type="button" onClick={() => setDeriveState({ ...deriveState, from: deriveState.period!.from, to: deriveState.period!.to })} style={{ background: "none", border: "none", color: C.gold, cursor: "pointer", textDecoration: "underline", padding: 0, fontSize: 10, fontFamily: "'DM Mono', monospace" }}>Use the whole period</button>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 10, color: C.muted, marginTop: 6, fontFamily: "'DM Mono', monospace" }}>Whole report period. Pick a shorter window to cut the snapshot to part of it.</div>
+                )}
+              </div>
+            )}
             <div style={{ fontSize: 10, color: C.muted, fontFamily: "'DM Mono', monospace" }}>Built from this report's data — no new analysis. Priced ₹{deriveState.type === "snapshot" ? "40–45" : "90–100"}.</div>
             {deriveState.error && <div style={{ fontSize: 13, color: "#e05a5a" }}>{deriveState.error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
