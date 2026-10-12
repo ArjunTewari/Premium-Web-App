@@ -53,7 +53,8 @@ function buildYtAqTerms(scopeKeywords) {
 const YT_VIDEOS_URL   = 'https://www.googleapis.com/youtube/v3/videos';
 const YT_CHANNELS_URL = 'https://www.googleapis.com/youtube/v3/channels';
 const YT_SEARCH_URL   = 'https://www.googleapis.com/youtube/v3/search';
-const MAX_SEARCH_PAGES = 3; // 150 videos — see quota-cost note above
+const YT_PLAYLIST_ITEMS_URL = 'https://www.googleapis.com/youtube/v3/playlistItems';
+const MAX_PLAYLIST_PAGES = 6; // 300 newest uploads, 1 quota unit per page
 
 function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -101,40 +102,56 @@ async function resolveChannel(ytHandle, apiKey) {
 }
 
 // ─── List a channel's videos already scoped to the date window ─────────────
+// A channel's uploads sit in the playlist whose id is the channel id with the
+// leading "UC" swapped for "UU", newest first. playlistItems.list costs 1 quota
+// unit per page of 50; the search.list call this replaced cost 100 units per
+// page, so 21 orgs used ~2,100 of Google's 10,000 daily units per run and the
+// fifth run of a day was refused (HTTP 429 "Search Queries per day").
 async function discoverChannelVideos(channelId, dateRange, apiKey) {
-  let videos = [];
+  if (!/^UC[A-Za-z0-9_-]{22}$/.test(channelId || '')) return { videos: [], truncated: false };
+  const playlistId = 'UU' + channelId.slice(2);
+  const fromMs = dateRange.from ? dateRange.from.getTime() : -Infinity;
+  const toMs = dateRange.to ? dateRange.to.getTime() : Infinity;
+  const videos = [];
   let pageToken;
   let pages = 0;
+  let reachedOlder = false;
   let truncated = false;
   do {
-    const { data } = await axios.get(YT_SEARCH_URL, {
-      params: {
-        part: 'snippet',
-        channelId,
-        type: 'video',
-        order: 'date',
-        publishedAfter: dateRange.from ? dateRange.from.toISOString() : undefined,
-        publishedBefore: dateRange.to ? dateRange.to.toISOString() : undefined,
-        maxResults: 50,
-        pageToken,
-        key: apiKey,
-      },
-      timeout: 20000,
-    });
+    let data;
+    try {
+      ({ data } = await axios.get(YT_PLAYLIST_ITEMS_URL, {
+        params: { part: 'snippet,contentDetails', playlistId, maxResults: 50, pageToken, key: apiKey },
+        timeout: 20000,
+      }));
+    } catch (e) {
+      // a channel with no uploads has no uploads playlist
+      if (e.response && e.response.status === 404) return { videos, truncated: false };
+      throw e;
+    }
     costTracker.youtubeApiCalls++;
-    const items = data.items || [];
-    videos = videos.concat(items.map((it) => ({
-      video_id: it.id?.videoId || '',
-      title: it.snippet?.title || '',
-      description: it.snippet?.description || '',
-      date: it.snippet?.publishedAt || '',
-      channel_id: it.snippet?.channelId || channelId,
-      url: it.id?.videoId ? `https://www.youtube.com/watch?v=${it.id.videoId}` : '',
-    })));
+    for (const it of data.items || []) {
+      const id = it.contentDetails?.videoId || it.snippet?.resourceId?.videoId || '';
+      const title = it.snippet?.title || '';
+      if (!id || title === 'Private video' || title === 'Deleted video') continue;
+      const published = it.contentDetails?.videoPublishedAt || it.snippet?.publishedAt || '';
+      const t = Date.parse(published);
+      if (Number.isNaN(t)) continue;
+      if (t < fromMs) { reachedOlder = true; continue; }
+      if (t > toMs) continue; // newer than the window — keep paging back
+      videos.push({
+        video_id: id,
+        title,
+        description: it.snippet?.description || '',
+        date: published,
+        channel_id: it.snippet?.channelId || channelId,
+        url: `https://www.youtube.com/watch?v=${id}`,
+      });
+    }
     pageToken = data.nextPageToken;
     pages++;
-    if (pageToken && pages >= MAX_SEARCH_PAGES) { truncated = true; break; }
-  } while (pageToken);
+    if (pageToken && !reachedOlder && pages >= MAX_PLAYLIST_PAGES) { truncated = true; break; }
+  } while (pageToken && !reachedOlder);
   return { videos, truncated };
 }
 
@@ -439,4 +456,4 @@ function buildYoutubeERHtml(results, hasApiKey) {
 </section>`;
 }
 
-module.exports = { run, buildYoutubeERHtml, extractVideoId };
+module.exports = { run, buildYoutubeERHtml, extractVideoId, discoverChannelVideos };
