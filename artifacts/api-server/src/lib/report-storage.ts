@@ -142,6 +142,59 @@ export async function uploadReport(name: string, content: string, priceInr?: num
   return false;
 }
 
+async function deleteFile(filePath: string, message: string): Promise<"deleted" | "missing" | "failed"> {
+  const sha = await getFileSha(filePath);
+  if (!sha) return "missing";
+  const res = await githubRequest(`/contents/${filePath}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, sha, branch: branch() }),
+  });
+  if (res?.ok) return "deleted";
+  logger.warn({ filePath, status: res?.status }, "GitHub report-storage delete failed");
+  return "failed";
+}
+
+export interface DeleteReportResult {
+  html: "deleted" | "missing" | "failed";
+  data: "deleted" | "missing" | "failed";
+  manifest: boolean;
+}
+
+// Remove a report from storage: its HTML, its trend-data JSON (what the Trends
+// tab reads) and its manifest entry. The repo's git history still holds the old
+// content, so a deletion can be recovered by hand if it was a mistake.
+export async function deleteReport(name: string): Promise<DeleteReportResult> {
+  const result: DeleteReportResult = { html: "missing", data: "missing", manifest: false };
+  if (!isConfigured()) return result;
+
+  result.html = await deleteFile(`reports/${name}`, `Delete report: ${name}`);
+  if (result.html === "failed") return result;
+
+  // Trend data first: it is what makes a deleted report keep showing up in Trends.
+  result.data = await deleteFile(`reports/${name.replace(/\.html$/i, ".json")}`, `Delete report data: ${name}`);
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { manifest, sha } = await getManifest();
+    if (!manifest.reports.some((r) => r.name === name)) { result.manifest = true; break; }
+    const next: Manifest = { reports: manifest.reports.filter((r) => r.name !== name) };
+    const res = await githubRequest(`/contents/manifest.json`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `Update manifest: remove ${name}`,
+        content: Buffer.from(JSON.stringify(next, null, 2), "utf8").toString("base64"),
+        branch: branch(),
+        ...(sha ? { sha } : {}),
+      }),
+    });
+    if (res?.ok) { result.manifest = true; break; }
+    if (res?.status === 409 || res?.status === 422) continue;
+    break;
+  }
+  return result;
+}
+
 export async function listReports(): Promise<StoredReportMeta[]> {
   if (!isConfigured()) return [];
   const { manifest } = await getManifest();

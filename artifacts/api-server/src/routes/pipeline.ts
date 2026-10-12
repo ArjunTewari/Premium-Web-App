@@ -14,7 +14,10 @@ import {
   listReports,
   listReportDataFiles,
   getReportContent,
+  deleteReport,
 } from "../lib/report-storage.js";
+import { isSampleReport } from "../lib/seed-sample-reports.js";
+import { logger } from "../lib/logger.js";
 
 // Fallback report period when the client doesn't send one — a rolling month
 // ending today, computed fresh on every request instead of a fixed date. The
@@ -383,6 +386,38 @@ router.post("/outputs/derive", requireAuth, async (req: Request, res: Response) 
     return res.json({ status: "ok", htmlName: derived.htmlName, type, org: derived.org, priceInr });
   } catch (e) {
     return res.status(422).json({ error: (e as Error).message || "Could not build the report" });
+  }
+});
+
+// ── DELETE /outputs/:file — remove a report (admin only) ─────────────────────
+// Removes the HTML, the trend-data JSON the Trends tab reads, and the manifest
+// entry, then drops the trends cache so charts update at once. Cost history in
+// report_logs is deliberately kept. Built-in samples are re-seeded on boot, so
+// they are refused rather than appearing to delete.
+router.delete("/outputs/:file", requireAuth, async (req: Request, res: Response) => {
+  if (req.user?.role !== "admin") return res.status(403).json({ error: "Only admins can delete reports" });
+  const fname = path.basename(String(req.params.file || "").trim());
+  if (!/^[\w. \-]+\.html$/i.test(fname)) return res.status(400).json({ error: "Invalid report file" });
+  if (isSampleReport(fname))
+    return res.status(409).json({ error: "This is a built-in sample report. It is restored on every restart, so it cannot be deleted." });
+
+  try {
+    const local = path.join(OUT_DIR, fname);
+    const hadLocal = fs.existsSync(local);
+    if (hadLocal) fs.rmSync(local, { force: true });
+
+    const stored = await deleteReport(fname);
+    if (stored.html === "failed") {
+      return res.status(502).json({ error: "Could not delete the report from storage — nothing else was removed. Try again." });
+    }
+    if (stored.html === "missing" && !hadLocal) return res.status(404).json({ error: "Report not found" });
+
+    trendsCache = null;
+    logger.info({ file: fname, by: req.user?.username, stored }, "Report deleted");
+    return res.json({ status: "ok", file: fname, trendData: stored.data, manifest: stored.manifest });
+  } catch (e) {
+    logger.error({ err: e, file: fname }, "Delete report failed");
+    return res.status(500).json({ error: "Delete failed" });
   }
 });
 
