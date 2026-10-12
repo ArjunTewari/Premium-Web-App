@@ -169,6 +169,7 @@ function parseBaseReport(html) {
   const tt0 = tablesOf(sectionOf(html, "topics"))[0];
   const topics = [];
   const topicCounts = {};
+  const topicUrls = {};
   if (tt0) {
     const o = hIdx(tt0.headers, /^org/i);
     const tot = hIdx(tt0.headers, /^total$/i);
@@ -177,9 +178,11 @@ function parseBaseReport(html) {
       if (r.length < 3) continue;
       const org = r[o].text;
       topicCounts[org] = {};
+      topicUrls[org] = {};
       for (const tp of topics) {
         const m = r[tp.idx].text.match(/(?:Active|Leader|Not Present)\s*·\s*(\d+)/i);
         topicCounts[org][tp.name] = m ? parseInt(m[1], 10) : 0;
+        topicUrls[org][tp.name] = [...r[tp.idx].html.matchAll(/href="(https?:[^"]+)"/g)].map((x) => decode(x[1]));
       }
     }
   }
@@ -326,13 +329,17 @@ function parseBaseReport(html) {
       // overall = mean of the three shares (reproduces the printed figures of
       // current-format reports to the decimal).
       const p = (x.press / tp) * 100, l = (x.llm / tl) * 100, s = (x.presence / ts) * 100;
-      sc[x.org] = { press: r1(p), llm: r1(l), social: r1(s), overall: r1((p + l + s) / 3), presence: x.presence };
+      sc[x.org] = { press: r1(p), llm: r1(l), social: r1(s), overall: r1((p + l + s) / 3), presence: x.presence, pressRaw: x.press, llmRaw: x.llm };
     }
     meta.legacyScores = true;
   } else {
+    // The small number under each share: press score, LLM mentions, presence /10.
+    const rawOf = (cell) => parseFloat(cell.text.replace(/^[\d.]+%/, "").replace(/[^\d.]/g, "")) || 0;
     for (const r of scRows) {
       const presence = r[iSoc].text.match(/(\d+)\/10/);
       sc[r[so].text] = {
+        pressRaw: rawOf(r[iPress]),
+        llmRaw: rawOf(r[iLlm]),
         press: spct(r[iPress]) || 0,
         llm: spct(r[iLlm]) || 0,
         social: spct(r[iSoc]) || 0,
@@ -342,7 +349,7 @@ function parseBaseReport(html) {
     }
   }
 
-  return { meta, orgs, printOutlets, tvChannels, press, tv, weeks: weeks.map((w) => w.label), momentum, fieldWeekly, topics: topics.map((t) => t.name), topicCounts, citations, llm, assistants, questions, questionCells, nAns, social, posts, sc };
+  return { meta, orgs, printOutlets, tvChannels, press, tv, weeks: weeks.map((w) => w.label), momentum, fieldWeekly, topics: topics.map((t) => t.name), topicCounts, topicUrls, citations, llm, assistants, questions, questionCells, nAns, social, posts, sc };
 }
 
 // ─────────────────────────────── statistics ─────────────────────────────────
@@ -371,6 +378,102 @@ function kfmt(x) {
   if (x >= 1e6) return `${Number((x / 1e6).toFixed(1))}M`;
   if (x >= 1000) return `${Number((x / 1000).toFixed(1))}K`;
   return String(Math.round(x));
+}
+
+// ─────────────────────── part of the report's period ───────────────────────
+// Re-count a stored full report for a shorter window inside its period, from the
+// dated items it already lists: citations (articles, with date and URL), the
+// article links behind each topic cell, and each org's listed LinkedIn / X /
+// Instagram posts (with date). Social and overall SoV are then recomputed the way
+// the pipeline computes them (press score = articles x 2.5 capped at 100, presence
+// 0-10 from post counts, each as a share of all orgs' scores, overall = mean).
+// AI visibility is measured once per run, so it is carried over unchanged, and
+// YouTube videos carry no publish date, so YouTube counts are carried over too.
+const dayOf = (d) => { const m = /(\d{4}-\d{2}-\d{2})/.exec(String(d || "")); return m ? m[1] : null; };
+const inWindow = (d, from, to) => { const x = dayOf(d); return !!x && x >= from && x <= to; };
+
+function presenceScore(li, x, ig) {
+  const total = li + x + ig;
+  const volume = total === 0 ? 0 : total === 1 ? 1 : total <= 3 ? 2 : total <= 6 ? 3 : 4;
+  const platforms = [li > 0, x > 0, ig > 0].filter(Boolean).length;
+  return volume + platforms + (total > 0 ? 3 : 0);
+}
+
+function restrictToPeriod(base, from, to) {
+  const rf = base.meta.from, rt = base.meta.to;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new Error("Choose a start and end date.");
+  if (from > to) throw new Error("The start date is after the end date.");
+  if (from < rf || to > rt) throw new Error(`The period must lie within the report's period (${rf} to ${rt}).`);
+
+  const A = base.orgs;
+  const printSet = new Set(base.printOutlets), tvSet = new Set(base.tvChannels);
+  const citations = {}, press = {}, tv = {}, topicCounts = {}, social = {}, sc = {};
+  const incomplete = [];
+  const undatedByOrg = {};
+
+  for (const o of A) {
+    undatedByOrg[o] = (base.citations[o] || []).filter((a) => !dayOf(a.date)).length;
+    const cit = (base.citations[o] || []).filter((a) => inWindow(a.date, from, to));
+    citations[o] = cit;
+    const byOutlet = {}, byChannel = {};
+    for (const n of base.printOutlets) byOutlet[n] = 0;
+    for (const n of base.tvChannels) byChannel[n] = 0;
+    for (const a of cit) {
+      if (tvSet.has(a.outlet)) byChannel[a.outlet] += 1;
+      else if (printSet.has(a.outlet)) byOutlet[a.outlet] += 1;
+    }
+    press[o] = { total: Object.values(byOutlet).reduce((x, y) => x + y, 0), byOutlet };
+    tv[o] = { total: Object.values(byChannel).reduce((x, y) => x + y, 0), byChannel };
+
+    // topics: count each topic's article links that fall in the window
+    const dateByUrl = new Map((base.citations[o] || []).map((a) => [a.url, a.date]));
+    topicCounts[o] = {};
+    for (const t of Object.keys(base.topicCounts[o] || {})) {
+      const urls = (base.topicUrls && base.topicUrls[o] && base.topicUrls[o][t]) || [];
+      const full = base.topicCounts[o][t];
+      if (urls.length !== full) { topicCounts[o][t] = full; if (full > 0) incomplete.push({ org: o, platform: `topic ${t}`, listed: urls.length, counted: full }); continue; }
+      topicCounts[o][t] = urls.filter((u) => inWindow(dateByUrl.get(u), from, to)).length;
+    }
+
+    // social: dated posts per platform
+    const s0 = base.social[o] || {};
+    const groups = ((base.posts[o] || {}).groups) || [];
+    const cnt = (prefix, key) => {
+      const cell = s0[key];
+      if (!cell || cell.marker === "failed" || cell.marker === "nohandle") return cell;
+      const g = groups.find((x) => x.header.startsWith(prefix));
+      const posts = g ? g.posts : [];
+      if (posts.length < (cell.v || 0)) incomplete.push({ org: o, platform: prefix, listed: posts.length, counted: cell.v });
+      const v = posts.filter((p) => inWindow(p.metrics, from, to)).length;
+      return { ...cell, v, raw: String(v) };
+    };
+    const li = cnt("LinkedIn", "li"), x = cnt("X", "x"), ig = cnt("Instagram", "ig");
+    const n = (c) => (c && typeof c.v === "number" ? c.v : 0);
+    const yt = s0.yt;
+    social[o] = { ...s0, li, x, ig, total: n(li) + n(x) + n(ig) + n(yt) };
+  }
+
+  // scores
+  const raw = {};
+  for (const o of A) {
+    const arts = press[o].total + tv[o].total;
+    raw[o] = {
+      press: Math.min(100, Math.round(arts * 2.5)),
+      llm: (base.sc[o] && base.sc[o].llmRaw) || 0,
+      pres: presenceScore(social[o].li && social[o].li.v || 0, social[o].x && social[o].x.v || 0, social[o].ig && social[o].ig.v || 0),
+    };
+  }
+  const tot = (k) => A.reduce((a, o) => a + raw[o][k], 0) || 1;
+  const [tp, tl, ts] = [tot("press"), tot("llm"), tot("pres")];
+  const r1 = (v) => Math.round(v * 10) / 10;
+  for (const o of A) {
+    const p = (raw[o].press / tp) * 100, l = (raw[o].llm / tl) * 100, so = (raw[o].pres / ts) * 100;
+    sc[o] = { press: r1(p), llm: r1(l), social: r1(so), overall: r1((p + l + so) / 3), presence: raw[o].pres, pressRaw: raw[o].press, llmRaw: raw[o].llm };
+  }
+
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
+  const out = { ...base, meta: { ...base.meta, from, to, days }, citations, press, tv, topicCounts, social, sc };
+  return { base: out, sub: { from, to, reportFrom: rf, reportTo: rt, incomplete, undatedByOrg } };
 }
 
 // ─────────────────────────────── dashboard model ────────────────────────────
@@ -954,6 +1057,23 @@ ${artRows(list)}
     : `<li><b>Evidence:</b> every figure and rank in this dashboard is drawn from the source run.</li>`;
 
   const sample = M.sample;
+  const subNote = M.sub ? (() => {
+    const own = M.sub.incomplete.filter((i) => i.org === M.org).map((i) => i.platform);
+    const others = M.sub.incomplete.filter((i) => i.org !== M.org).length;
+    const gaps = own.length || others
+      ? ` The source lists fewer items than it counts for ${own.length ? `${D}'s ${andList([...new Set(own)])}${others ? " and " : ""}` : ""}${others ? `${others} other organisation-measure${others === 1 ? "" : "s"}` : ""}, so ${own.length && !others ? "that count" : "those counts"} may be low, and the Social and Overall SoV figures can shift slightly with them.`
+      : "";
+    const ownUndated = M.sub.undatedByOrg[M.org] || 0;
+    const otherUndated = Object.entries(M.sub.undatedByOrg).filter(([k]) => k !== M.org).reduce((a, [, v]) => a + v, 0);
+    const undated = ownUndated || otherUndated
+      ? ` Articles with no publish date cannot be placed in the window and are not counted (${ownUndated ? `${ownUndated} for ${D}` : ""}${ownUndated && otherUndated ? "; " : ""}${otherUndated ? `${otherUndated} for other organisations` : ""}).`
+      : "";
+    return `
+  <div class="callout-inf">
+    <span class="inf-lbl">recomputed for part of the report's period from dated items in the source report</span>
+    This snapshot covers ${m.from} to ${m.to}, part of the ${M.sub.reportFrom} to ${M.sub.reportTo} report. Press and broadcast articles, topics held and LinkedIn, X and Instagram posts are counted from the dated items in the source report, and Social and Overall SoV are recomputed from those counts the way the report computes them; the source report does not print figures for this window. AI visibility is measured once when the report runs, so it is the result for the whole ${M.sub.reportFrom} to ${M.sub.reportTo} run, and YouTube videos carry no publish date, so YouTube counts are for the whole period.${undated}${gaps}
+  </div>`;
+  })() : "";
   const view = M.view === "snapshot" ? "snapshot" : "benchmark";
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${D} — ${view === "snapshot" ? "Snapshot" : "Benchmark Dashboard"}</title>
@@ -994,11 +1114,11 @@ ${THEME_BUTTON}
   </div>
 </nav>
 <main class="main">
-<div class="banner">${sample ? "SAMPLE &mdash; f" : "F"}igures are from the source run dated ${esc(m.generated || "")} (${N}-organisation ${platformShort} run, period ${m.from} to ${m.to}).${sample ? " Layout and wording are draft." : ""}</div>
+<div class="banner">${sample ? "SAMPLE &mdash; f" : "F"}igures are from the source run dated ${esc(m.generated || "")} (${N}-organisation ${platformShort} run, period ${M.sub ? `${M.sub.reportFrom} to ${M.sub.reportTo}` : `${m.from} to ${m.to}`}).${M.sub ? ` This snapshot covers ${m.from} to ${m.to}.` : ""}${sample ? " Layout and wording are draft." : ""}</div>
 <header class="rh">
   <div class="ey">Triple Media Pulse</div>
   <h1 class="rt">${D} <span class="rti">${view === "snapshot" ? "snapshot" : "benchmark dashboard"}</span></h1>
-  <div class="rm">Period ${m.from} to ${m.to} &middot; one organisation measured against a ${P}-organisation field</div>
+  <div class="rm">Period ${m.from} to ${m.to}${M.sub ? ` (part of the ${M.sub.reportFrom} to ${M.sub.reportTo} report)` : ""} &middot; one organisation measured against a ${P}-organisation field</div>
   <div class="chips">
     <span class="chip chip-me">&#9679; ${D} &mdash; measured</span>
     <span class="chip chip-field">&#9679; ${P}-organisation field &mdash; average and range</span>
@@ -1028,7 +1148,7 @@ ${bars}
 ${trows}
     </tbody>
   </table>
-  <div class="foot-note">&mdash; in the rank column: the value is shared by several organisations, so a single rank is not shown.</div>${m.legacyScores ? `
+  <div class="foot-note">&mdash; in the rank column: the value is shared by several organisations, so a single rank is not shown.</div>${subNote}${m.legacyScores ? `
   <div class="callout-inf">
     <span class="inf-lbl">computed from the source report's Press, AI and Social scores, which it states as points rather than shares</span>
     The Overall visibility figures here are share-of-voice percentages recomputed for this period: each organisation's Press, AI and Social score as a share of all ${N} organisations' scores, averaged. The source report itself does not print these percentages.
@@ -1279,12 +1399,21 @@ function addTheme(html) {
 
 function buildSingleOrgDashboard(baseHtml, opts = {}) {
   const view = opts.view === "snapshot" ? "snapshot" : "benchmark";
-  const base = opts.base || parseBaseReport(baseHtml);
+  let base = opts.base || parseBaseReport(baseHtml);
+  let sub = null;
+  // A window equal to the report's own period is the ordinary snapshot, unchanged.
+  if (opts.range && view === "snapshot" && !(opts.range.from === base.meta.from && opts.range.to === base.meta.to)) {
+    const r = restrictToPeriod(base, opts.range.from, opts.range.to);
+    base = r.base; sub = r.sub;
+  } else if (opts.range && view !== "snapshot") {
+    throw new Error("A shorter period is available for snapshots only.");
+  }
   const M = buildModel(base, opts.org, opts);
   M.tvChannels = base.tvChannels;
   M.tvChannelsN = base.tvChannels.length;
   M.assistants = base.assistants;
   M.view = view;
+  M.sub = sub;
   const html = renderDashboard(M);
   return view === "snapshot" ? toSnapshot(html) : html;
 }
@@ -1337,6 +1466,7 @@ function main(argv) {
 
 module.exports.buildSingleOrgDashboard = buildSingleOrgDashboard;
 module.exports.listOrgs = (html) => parseBaseReport(html).orgs;
+module.exports.restrictToPeriod = restrictToPeriod;
 module.exports.addTheme = addTheme;
 if (require.main === module) main(process.argv.slice(2));
 

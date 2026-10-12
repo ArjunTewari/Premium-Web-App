@@ -7,7 +7,7 @@ import { db, usersTable, orgHandlesTable, reportLogsTable } from "@workspace/db"
 import { requireAuth } from "../middleware/require-auth.js";
 import { type ReportTrendSummary } from "../pipeline/index.js";
 import { generateAndDeliverReport, loadReportHtml, persistReportToGithub, OUT_DIR } from "../lib/generate-report.js";
-import { deriveReport, listReportOrgs, parseReportType, priceForType, reportTypeOfName, reportTypeOfHtml } from "../lib/report-types.js";
+import { deriveReport, listReportOrgs, parseReportType, priceForType, reportPeriod, reportTypeOfName, reportTypeOfHtml } from "../lib/report-types.js";
 import { toClientView } from "../lib/client-view.js";
 import { sendReportFileEmail } from "../lib/mailer.js";
 import {
@@ -357,7 +357,7 @@ router.get("/outputs/orgs", requireAuth, async (req: Request, res: Response) => 
     const html = await loadReportHtml(fname);
     if (html == null) return res.status(404).json({ error: "Report not found" });
     if (reportTypeOfHtml(html) !== "full") return res.status(400).json({ error: "Only a full report has a cohort to choose from." });
-    return res.json({ orgs: listReportOrgs(html) });
+    return res.json({ orgs: listReportOrgs(html), period: reportPeriod(html) });
   } catch (e) {
     console.error("List report orgs failed:", e);
     return res.status(422).json({ error: "This report's format could not be read." });
@@ -375,11 +375,15 @@ router.post("/outputs/derive", requireAuth, async (req: Request, res: Response) 
   if (!type || type === "full") return res.status(400).json({ error: "type must be benchmark or snapshot." });
   const org = String(body.org || "").trim();
   if (!org) return res.status(400).json({ error: "Choose an organisation." });
+  // Optional shorter window (snapshots): both dates or neither.
+  const from = String(body.from || "").trim(), to = String(body.to || "").trim();
+  if (!!from !== !!to) return res.status(400).json({ error: "Give both a start date and an end date." });
+  const range = from && to ? { from, to } : undefined;
 
   try {
     const html = await loadReportHtml(fname);
     if (html == null) return res.status(404).json({ error: "Report not found" });
-    const derived = deriveReport(html, type, org);
+    const derived = deriveReport(html, type, org, range);
     fs.writeFileSync(path.join(OUT_DIR, derived.htmlName), derived.html);
     const priceInr = priceForType(type);
     await persistReportToGithub(derived.htmlName, undefined, () => {}, priceInr);
