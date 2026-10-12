@@ -29,6 +29,9 @@ function defaultDateRange(): { from: string; to: string } {
 
 const router: IRouter = Router();
 
+// Organisations allowed in one manual run (the weekly scheduler has no limit).
+const MAX_ORGS_PER_RUN = 25;
+
 if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
 
 // ── In-memory run result store ────────────────────────────────────────────────
@@ -110,7 +113,11 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   };
 
   if (!cfg.ORGS.length) cfg.ORGS = ["Council on Energy, Environment and Water", "CSTEP"];
-  if (cfg.ORGS.length > 20) cfg.ORGS = cfg.ORGS.slice(0, 20);
+  // The old behaviour silently kept the first 20 orgs and dropped the rest (the
+  // app lists orgs alphabetically, so the last one vanished from the report with
+  // no message). Refuse instead of truncating, so the user can see and decide.
+  if (cfg.ORGS.length > MAX_ORGS_PER_RUN)
+    return res.status(400).json({ error: `A run can include at most ${MAX_ORGS_PER_RUN} organisations; ${cfg.ORGS.length} were selected.` });
 
   // Report type: "full" (default) or a one-org "benchmark" / "snapshot" view of
   // `subjectOrg`, which must be one of the orgs in this run. Checked before any
