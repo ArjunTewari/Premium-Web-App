@@ -829,13 +829,20 @@ function renderDashboard(M) {
     { k: "social", label: "Social media", tlabel: "Social media activity (AQ posts)", dec: 1, pval: (s) => String(s.v) },
     { k: "overall", label: "Overall visibility", tlabel: "Overall visibility (share of voice)", dec: 1, pct: true, pval: (s) => pct(s.v) },
   ];
+  const noSoc = M.socialUnavailable || null;
   const bars = rowSpec.map((r) => {
+    if (noSoc && (r.k === "social" || r.k === "overall")) {
+      return `    <div class="prow"><div class="plabel">${r.label}</div><div class="pend">&mdash;</div><div class="ptrack"><div class="pmid"></div></div><div class="pend">&mdash;</div><div class="pval">${r.k === "social" ? "&#10005; not collected" : "not comparable"}</div></div>`;
+    }
     const s = st[r.k];
     const pos = dotPos(s);
     const f = fmtStat(s, r.dec, r.pct);
     return `    <div class="prow"><div class="plabel">${r.label}</div><div class="pend">${f.min}</div><div class="ptrack"><div class="pmid"></div><div class="pdot ${dotClass(pos)}" style="left:${Math.round(pos)}%"></div></div><div class="pend">${f.max}</div><div class="pval">${r.pval(s)}</div></div>`;
   }).join("\n");
   const trows = rowSpec.map((r) => {
+    if (noSoc && (r.k === "social" || r.k === "overall")) {
+      return `      <tr><td>${r.tlabel}</td><td class="num">${r.k === "social" ? "&#10005; not collected" : "not comparable"}</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num">&mdash;</td></tr>`;
+    }
     const s = st[r.k];
     const pos = dotPos(s);
     const f = fmtStat(s, r.dec, r.pct);
@@ -1057,6 +1064,10 @@ ${artRows(list)}
     : `<li><b>Evidence:</b> every figure and rank in this dashboard is drawn from the source run.</li>`;
 
   const sample = M.sample;
+  const socNote = M.socialUnavailable ? `
+  <div class="callout">
+    <b>Data collection:</b> the social media data for this report's run could not be collected &mdash; LinkedIn failed for ${M.socialUnavailable.li} of ${M.socialUnavailable.n} organisations, X for ${M.socialUnavailable.x} and Instagram for ${M.socialUnavailable.ig}. Social media is therefore shown as &#10005; (not collected), not as 0. Overall visibility includes the Social media share, so it is shown as not comparable. Press, broadcast, topic and AI figures were collected normally.
+  </div>` : "";
   const subNote = M.sub ? (() => {
     const own = M.sub.incomplete.filter((i) => i.org === M.org).map((i) => i.platform);
     const others = M.sub.incomplete.filter((i) => i.org !== M.org).length;
@@ -1071,7 +1082,7 @@ ${artRows(list)}
     return `
   <div class="callout-inf">
     <span class="inf-lbl">recomputed for part of the report's period from dated items in the source report</span>
-    This snapshot covers ${m.from} to ${m.to}, part of the ${M.sub.reportFrom} to ${M.sub.reportTo} report. Press and broadcast articles, topics held and LinkedIn, X and Instagram posts are counted from the dated items in the source report, and Social and Overall SoV are recomputed from those counts the way the report computes them; the source report does not print figures for this window. AI visibility is measured once when the report runs, so it is the result for the whole ${M.sub.reportFrom} to ${M.sub.reportTo} run, and YouTube videos carry no publish date, so YouTube counts are for the whole period.${undated}${gaps}
+    This snapshot covers ${m.from} to ${m.to}, part of the ${M.sub.reportFrom} to ${M.sub.reportTo} report. ${M.socialUnavailable ? "Press and broadcast articles and topics held are counted from the dated items in the source report; the source report does not print figures for this window." : "Press and broadcast articles, topics held and LinkedIn, X and Instagram posts are counted from the dated items in the source report, and Social and Overall SoV are recomputed from those counts the way the report computes them; the source report does not print figures for this window."} AI visibility is measured once when the report runs, so it is the result for the whole ${M.sub.reportFrom} to ${M.sub.reportTo} run, and YouTube videos carry no publish date, so YouTube counts are for the whole period.${undated}${M.socialUnavailable ? "" : gaps}
   </div>`;
   })() : "";
   const view = M.view === "snapshot" ? "snapshot" : "benchmark";
@@ -1148,7 +1159,7 @@ ${bars}
 ${trows}
     </tbody>
   </table>
-  <div class="foot-note">&mdash; in the rank column: the value is shared by several organisations, so a single rank is not shown.</div>${subNote}${m.legacyScores ? `
+  <div class="foot-note">&mdash; in the rank column: the value is shared by several organisations, so a single rank is not shown.</div>${socNote}${subNote}${m.legacyScores ? `
   <div class="callout-inf">
     <span class="inf-lbl">computed from the source report's Press, AI and Social scores, which it states as points rather than shares</span>
     The Overall visibility figures here are share-of-voice percentages recomputed for this period: each organisation's Press, AI and Social score as a share of all ${N} organisations' scores, averaged. The source report itself does not print these percentages.
@@ -1413,6 +1424,15 @@ function buildSingleOrgDashboard(baseHtml, opts = {}) {
   M.tvChannelsN = base.tvChannels.length;
   M.assistants = base.assistants;
   M.view = view;
+  // A run whose social collection failed (APIdirect refused every call) holds failed
+  // markers, not zeros. Show Social and Overall as not collected instead of 0.
+  {
+    const O = base.orgs;
+    const failedOf = (k) => O.filter((o) => base.social[o] && base.social[o][k] && base.social[o][k].marker === "failed").length;
+    const liTotal = O.reduce((a, o) => a + ((base.social[o] && base.social[o].li && base.social[o].li.v) || 0), 0);
+    const xF = failedOf("x");
+    if (liTotal === 0 && xF >= O.length / 2) M.socialUnavailable = { li: failedOf("li"), x: xF, ig: failedOf("ig"), n: O.length };
+  }
   M.sub = sub;
   const html = renderDashboard(M);
   return view === "snapshot" ? toSnapshot(html) : html;
