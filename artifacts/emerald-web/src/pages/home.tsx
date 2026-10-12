@@ -1002,6 +1002,27 @@ export default function Home() {
   // Emails a stored report to an address as an HTML attachment. Client View is
   // the default; OK on the second prompt sends the full (restricted) report,
   // which the server only allows for admin accounts.
+  // Admin only. Removes the report page, its trend data (so the Trends charts
+  // drop it too) and its list entry; the server refuses built-in samples.
+  function confirmDeleteReport(htmlName: string) {
+    withConfirm(
+      `Permanently delete "${htmlName}"?
+
+It is removed from the Reports list and from the Trends charts. This cannot be undone from the app.`,
+      async () => {
+        try {
+          const res = await fetch(`/api/outputs/${encodeURIComponent(htmlName)}`, { method: "DELETE", credentials: "include" });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) { alert(data.error || "Could not delete the report."); return; }
+          await loadPrev();
+          await loadTrends();
+        } catch {
+          alert("Could not delete the report.");
+        }
+      },
+    );
+  }
+
   async function emailReport(htmlName: string) {
     const to = window.prompt(`Email ${htmlName} to which address?`);
     if (!to || !to.trim()) return;
@@ -2164,6 +2185,19 @@ export default function Home() {
                             fontFamily: "'Space Grotesk', sans-serif",
                           }}
                         >{reportTypeOfName(f.name) === "full" ? "⬇ Restricted" : "⬇ Download"}</a>
+                        {user?.role === "admin" && f.name.endsWith(".html") && (
+                          <button
+                            onClick={() => confirmDeleteReport(f.name)}
+                            title="Delete this report"
+                            style={{
+                              padding: "7px 14px", borderRadius: 8,
+                              background: "rgba(224,92,92,.10)", color: "#e05c5c",
+                              border: "1px solid rgba(224,92,92,.35)",
+                              fontSize: 18, fontWeight: 600, cursor: "pointer",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >🗑 Delete</button>
+                        )}
                       </div>
                     </div>
                   ))}

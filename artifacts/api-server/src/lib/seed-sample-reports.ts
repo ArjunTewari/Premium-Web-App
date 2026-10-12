@@ -25,6 +25,16 @@ const LEGACY_SAMPLE_NAMES = [
   "emerald-sample-report-feb-may-2026.html",
 ];
 
+// Built-in samples are re-copied from the repo on every boot, so deleting one
+// from the app cannot stick.
+export function isSampleReport(name: string): boolean {
+  try {
+    return fs.readdirSync(SRC_DIR).some((f) => f.toLowerCase() === name.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 export function seedSampleReports(): void {
   try {
     if (!fs.existsSync(SRC_DIR)) return;
