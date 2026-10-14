@@ -21,9 +21,37 @@
  */
 
 const axios = require('axios');
+const { askClaude } = require('./claude-cli'); // Claude runs through the CLI, never the API
 const { costTracker } = require('./claude-client'); // shared per-run usage counters
 
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
+
+// Run fn over items with at most `limit` in flight; same shape as Promise.allSettled.
+async function settledLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      try { out[i] = { status: 'fulfilled', value: await fn(items[i], i) }; }
+      catch (e) { out[i] = { status: 'rejected', reason: e }; }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+// Retry a request that was refused for rate limiting (HTTP 429), honouring Retry-After.
+async function retry429(fn, delaysMs = [2000, 5000, 12000]) {
+  for (let attempt = 0; ; attempt++) {
+    try { return await fn(); }
+    catch (e) {
+      if (e.response?.status !== 429 || attempt >= delaysMs.length) throw e;
+      const ra = parseFloat(e.response?.headers?.['retry-after']);
+      await new Promise((r) => setTimeout(r, Number.isFinite(ra) && ra > 0 ? Math.min(ra * 1000, 20000) : delaysMs[attempt]));
+    }
+  }
+}
 
 // Word-boundary org mention check — prevents "IIT" matching inside "IITM" etc.
 function orgMentioned(text, org) {
@@ -113,13 +141,14 @@ async function runAEO(cfg, orgs, cb) {
     // Perplexity Sonar (all questions)
     cfg.PERPLEXITY_KEY && (async () => {
       cb(`  Probing Perplexity Sonar — ${queriesUsed.length} questions...`);
-      const responses = await Promise.allSettled(
-        queriesUsed.map(q =>
-          axios.post('https://api.perplexity.ai/chat/completions',
+      // 15 questions fired at once tripped Perplexity's rate limit (14 of 15 refused);
+      // run 3 at a time and retry refusals.
+      const responses = await settledLimit(
+        queriesUsed, 3, q =>
+          retry429(() => axios.post('https://api.perplexity.ai/chat/completions',
             { model: 'sonar', max_tokens: 300, messages: [{ role: 'system', content: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }, { role: 'user', content: q }] },
             { headers: { 'Authorization': `Bearer ${cfg.PERPLEXITY_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000 }
-          )
-        )
+          ))
       );
       costTracker.perplexityCalls += responses.filter(r => r.status === 'fulfilled').length;
       let pplxErrors = 0;
@@ -152,23 +181,19 @@ async function runAEO(cfg, orgs, cb) {
     // Claude Haiku
     cfg.CLAUDE_KEY && (async () => {
       cb(`  Probing Claude Haiku — ${queriesUsed.length} questions...`);
-      const responses = await Promise.allSettled(
-        queriesUsed.map(q =>
-          axios.post('https://api.anthropic.com/v1/messages',
-            { model: 'claude-haiku-4-5-20251001', max_tokens: 300, system: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.', messages: [{ role: 'user', content: q }] },
-            { headers: { 'x-api-key': cfg.CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, timeout: 30000 }
-          )
-        )
+      const responses = await settledLimit(
+        queriesUsed, 3, q =>
+          askClaude(q, { model: CLAUDE_MODEL, system: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' })
       );
       costTracker.claudeAeoCalls += responses.filter(r => r.status === 'fulfilled').length;
       let claudeErrors = 0;
       const texts = responses.map((r, i) => {
         if (r.status === 'rejected') {
           claudeErrors++;
-          if (i === 0) cb(`  Claude error: ${r.reason?.response?.data?.error?.message || r.reason?.message || 'unknown'}`, 'warn');
+          if (i === 0) cb(`  Claude error: ${r.reason?.message || 'unknown'}`, 'warn');
           return '';
         }
-        return r.value.data.content?.[0]?.text || '';
+        return r.value || '';
       });
       if (claudeErrors > 0) cb(`  Claude Haiku: ${claudeErrors}/${queriesUsed.length} calls failed`, 'warn');
       for (const org of orgs) {
@@ -403,4 +428,4 @@ async function run(cfg, cb) {
   return { aeo, htmlBlocks: { aeoHtml } };
 }
 
-module.exports = { run, runAEO, buildAEOHtml };
+module.exports = { run, runAEO, buildAEOHtml, settledLimit, retry429 };

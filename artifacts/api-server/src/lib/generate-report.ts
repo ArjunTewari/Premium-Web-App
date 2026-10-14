@@ -6,6 +6,7 @@ import { run, type RunConfig, type ReportTrendSummary } from "../pipeline/index.
 import { sendAdminReportEmail, sendClientReportEmail } from "./mailer.js";
 import { uploadReport, uploadReportData, getReportContent, isConfigured as isGithubStorageConfigured } from "./report-storage.js";
 import { toClientView } from "./client-view.js";
+import { preflight } from "./preflight.js";
 import { deriveReport, priceForType, reportTypeOfName, type ReportType } from "./report-types.js";
 
 // Shared by both trigger paths: a manual POST /run (routes/pipeline.ts,
@@ -123,6 +124,18 @@ export interface GenerateReportResult {
 
 export async function generateAndDeliverReport(params: GenerateReportParams): Promise<GenerateReportResult> {
   const { cfg, cb, generatedByUsername = null, recipientEmail = null, reportType = "full", subjectOrg = null } = params;
+
+  // Stop before spending anything if a service the report depends on is unusable
+  // (dead key, no credit, blocked account). Set SKIP_PREFLIGHT=1 to bypass.
+  if (process.env.SKIP_PREFLIGHT !== "1") {
+    const pre = await preflight(cfg);
+    for (const w of pre.warnings) cb(`  PRE-RUN CHECK · warning: ${w}`, "warn");
+    if (pre.fatal.length) {
+      for (const f of pre.fatal) cb(`  PRE-RUN CHECK · ${f}`, "err");
+      throw new Error(`Run not started — fix before running: ${pre.fatal.join(" | ")}`);
+    }
+    if (pre.checked.length) cb(`  PRE-RUN CHECK · ${pre.checked.join(", ")} reachable`, "ok");
+  }
 
   const result = await run(cfg, cb);
 

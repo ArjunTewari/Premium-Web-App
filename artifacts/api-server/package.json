@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.220",
     "@langchain/core": "^1.2.3",
     "@langchain/langgraph": "^1.4.8",
     "@types/bcryptjs": "^3.0.0",
