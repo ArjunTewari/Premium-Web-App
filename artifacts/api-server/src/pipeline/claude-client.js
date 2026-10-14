@@ -10,7 +10,7 @@
  * by reference to keep incrementing it from serperSearch/serperScrape.
  */
 
-const axios = require("axios");
+const { askClaude } = require("./claude-cli");
 
 // Shared usage counters for one pipeline run. pipeline.js resets these at the
 // top of run() and reads them back at the end to compute the real API cost of
@@ -70,29 +70,11 @@ function parseJ(raw) {
 const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 const CLAUDE_CLASSIFY_MODEL = "claude-sonnet-4-6";
 
+// All Claude use goes through the Claude CLI (claude-cli.js), never the Anthropic
+// API. `key` and `maxTokens` are accepted only so existing call sites keep working:
+// the CLI authenticates with the account's login, and there are no tokens to bill.
 async function callClaude(prompt, key, maxTokens = 2500, model = CLAUDE_MODEL) {
-  const res = await axios.post(
-    "https://api.anthropic.com/v1/messages",
-    {
-      model,
-      max_tokens: maxTokens,
-      messages: [{ role: "user", content: prompt }],
-    },
-    {
-      headers: {
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      timeout: 600000,
-    },
-  );
-  const usage = res.data.usage;
-  if (usage) {
-    costTracker.claudeInputTokens += usage.input_tokens || 0;
-    costTracker.claudeOutputTokens += usage.output_tokens || 0;
-  }
-  return res.data.content[0].text;
+  return askClaude(prompt, { model });
 }
 
 module.exports = {

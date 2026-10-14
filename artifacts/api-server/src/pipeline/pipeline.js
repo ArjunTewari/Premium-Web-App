@@ -1238,7 +1238,7 @@ ${batchText}`;
     perplexityCall:   0.001,   // sonar per query
     openaiCall:       0.0003,  // gpt-4o-mini per short query
     geminiCall:       0.0,     // free tier
-    claudeAeoCall:    0.0006,  // Haiku ~300-token probe
+    claudeAeoCall:    0,       // Claude now runs through the CLI (account plan) — no per-call API charge
   };
   const c = costTracker;
   const lines = {

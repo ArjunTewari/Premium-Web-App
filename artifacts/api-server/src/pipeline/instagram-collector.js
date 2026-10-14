@@ -18,7 +18,7 @@
 const axios = require('axios');
 
 const GRAPH_BASE = 'https://graph.facebook.com/v21.0';
-const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
+const { askClaude } = require('./claude-cli'); // Claude runs through the CLI, never the API
 
 // Default IG handles for tracked AQ orgs
 const ORG_IG_HANDLES = {
@@ -44,23 +44,15 @@ async function sleep(ms) {
 async function classifyPost(caption, claudeKey) {
   if (!caption || !claudeKey) return false;
   try {
-    const res = await axios.post(CLAUDE_API, {
-      model:      'claude-haiku-4-5-20251001',
-      max_tokens: 10,
-      system:     'You classify social media posts. Reply with only YES or NO.',
-      messages: [{
-        role:    'user',
-        content: `Is this post about air quality, air pollution, AQI, PM2.5, smog, clean air, emissions, or environmental air health?\n\nPost: "${caption.slice(0, 500)}"\n\nAnswer YES or NO only.`,
-      }],
-    }, {
-      headers: {
-        'x-api-key':          claudeKey,
-        'anthropic-version':  '2023-06-01',
-        'Content-Type':       'application/json',
-      },
-      timeout: 15000,
-    });
-    return res.data.content?.[0]?.text?.trim().toUpperCase() === 'YES';
+    const text = await askClaude(
+      `Is this post about air quality, air pollution, AQI, PM2.5, smog, clean air, emissions, or environmental air health?
+
+Post: "${caption.slice(0, 500)}"
+
+Answer YES or NO only.`,
+      { model: 'claude-haiku-4-5-20251001', system: 'You classify social media posts. Reply with only YES or NO.' },
+    );
+    return String(text).trim().toUpperCase().startsWith('YES');
   } catch {
     return false;
   }

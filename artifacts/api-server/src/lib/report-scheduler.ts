@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, reportSchedulesTable, orgHandlesTable, type ReportSchedule } from "@workspace/db";
 import { logger } from "./logger.js";
 import { generateAndDeliverReport } from "./generate-report.js";
+import { CLAUDE_VIA_CLI } from "./preflight.js";
 import type { RunConfig } from "../pipeline/index.js";
 
 // Fires each active schedule at most once per (IST) Monday, generating the
@@ -77,7 +78,7 @@ async function fireSchedule(schedule: ReportSchedule, mondayDateKey: string): Pr
     CLIENT_NAME: schedule.clientName,
     SCOPE_KEYWORDS: schedule.scopeKeywords ?? [],
     SERPER_KEY: process.env.SERPER_KEY || "",
-    CLAUDE_KEY: process.env.CLAUDE_KEY || "",
+    CLAUDE_KEY: CLAUDE_VIA_CLI, // Claude runs through the Claude CLI; no API key is used
     OPENAI_KEY: process.env.OPENAI_KEY || "",
     PERPLEXITY_KEY: process.env.PERPLEXITY_KEY || "",
     GEMINI_KEY: process.env.GEMINI_KEY || "",

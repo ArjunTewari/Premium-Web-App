@@ -7,6 +7,7 @@ import { db, usersTable, orgHandlesTable, reportLogsTable } from "@workspace/db"
 import { requireAuth } from "../middleware/require-auth.js";
 import { type ReportTrendSummary } from "../pipeline/index.js";
 import { generateAndDeliverReport, loadReportHtml, persistReportToGithub, OUT_DIR } from "../lib/generate-report.js";
+import { CLAUDE_VIA_CLI } from "../lib/preflight.js";
 import { deriveReport, listReportOrgs, parseReportType, priceForType, reportPeriod, reportTypeOfName, reportTypeOfHtml } from "../lib/report-types.js";
 import { toClientView } from "../lib/client-view.js";
 import { sendReportFileEmail } from "../lib/mailer.js";
@@ -94,7 +95,7 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     SCOPE_KEYWORDS: Array.isArray(body.scopeKeywords) ? body.scopeKeywords : [],
     AEO_QUERIES: Array.isArray(body.aeoQueries) && body.aeoQueries.length > 0 ? body.aeoQueries.filter(Boolean) : [],
     SERPER_KEY: body.serperKey || process.env.SERPER_KEY || "",
-    CLAUDE_KEY: body.claudeKey || process.env.CLAUDE_KEY || "",
+    CLAUDE_KEY: CLAUDE_VIA_CLI, // Claude runs through the Claude CLI; no API key is used
     OPENAI_KEY: body.openaiKey || process.env.OPENAI_KEY || "",
     PERPLEXITY_KEY: body.perplexityKey || process.env.PERPLEXITY_KEY || "",
     GEMINI_KEY: body.geminiKey || process.env.GEMINI_KEY || "",
@@ -164,8 +165,6 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   // Firecrawl/Serper search path has been removed.
   if (!cfg.EXA_API_KEY)
     return res.status(400).json({ error: "EXA_API_KEY is required for article discovery." });
-  if (!cfg.CLAUDE_KEY)
-    return res.status(400).json({ error: "Claude API key is required." });
 
   // Generate a stable run ID: hex-encoded seconds + random suffix.
   const runId = Math.floor(Date.now() / 1000).toString(16) + "-" + crypto.randomBytes(8).toString("hex");

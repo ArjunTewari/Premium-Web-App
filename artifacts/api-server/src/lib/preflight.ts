@@ -14,6 +14,11 @@
 // Warning — the report is still useful and the gap is visible in it:
 //          YouTube (cells show ✕), Perplexity (not checked: no free endpoint).
 
+// Claude is used only through the Claude CLI. The pipeline still gates features on
+// cfg.CLAUDE_KEY being truthy, so this marker stands in for a key: no Anthropic API
+// key is read, sent or needed anywhere.
+export const CLAUDE_VIA_CLI = "claude-cli";
+
 export interface PreflightResult {
   fatal: string[];
   warnings: string[];
@@ -21,6 +26,7 @@ export interface PreflightResult {
 }
 
 type FetchFn = typeof fetch;
+type AskFn = (prompt: string, opts?: { model?: string; timeoutMs?: number }) => Promise<string>;
 
 interface PreflightConfig {
   CLAUDE_KEY?: string;
@@ -44,7 +50,13 @@ async function body(res: Response): Promise<string> {
   }
 }
 
-export async function preflight(cfg: PreflightConfig, fetchImpl: FetchFn = fetch): Promise<PreflightResult> {
+async function defaultAsk(): Promise<AskFn> {
+  // @ts-ignore — CommonJS module, same interop as ../pipeline/index.ts
+  const mod = (await import("../pipeline/claude-cli.js")) as { askClaude?: AskFn; default?: { askClaude: AskFn } };
+  return (mod.askClaude ?? mod.default!.askClaude) as AskFn;
+}
+
+export async function preflight(cfg: PreflightConfig, fetchImpl: FetchFn = fetch, askImpl?: AskFn): Promise<PreflightResult> {
   const out: PreflightResult = { fatal: [], warnings: [], checked: [] };
   const signal = () => AbortSignal.timeout(15000);
 
@@ -52,18 +64,17 @@ export async function preflight(cfg: PreflightConfig, fetchImpl: FetchFn = fetch
 
   if (cfg.CLAUDE_KEY) {
     tasks.push((async () => {
-      out.checked.push("Claude");
+      out.checked.push("Claude CLI");
       try {
-        const res = await fetchImpl("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "x-api-key": cfg.CLAUDE_KEY!, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-          body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 1, messages: [{ role: "user", content: "hi" }] }),
-          signal: signal(),
-        });
-        if (res.ok || res.status === 429 || res.status === 529) return; // reachable; rate limits are transient
-        out.fatal.push(`Claude (Anthropic) refused the request: ${await body(res) || `HTTP ${res.status}`}`);
+        const ask = askImpl ?? (await defaultAsk());
+        await ask("Reply with the single word OK.", { model: "claude-haiku-4-5-20251001", timeoutMs: 90000 });
       } catch (e) {
-        out.warnings.push(`Claude could not be reached to check it (${(e as Error).message}); continuing.`);
+        const err = e as Error & { auth?: boolean; retryable?: boolean };
+        if (err.retryable && !err.auth && /rate limit|limit/i.test(err.message)) {
+          out.warnings.push(`Claude CLI is rate limited right now; continuing (${err.message}).`);
+        } else {
+          out.fatal.push(`Claude CLI is not usable — nothing that needs Claude can run: ${err.message}`);
+        }
       }
     })());
   }

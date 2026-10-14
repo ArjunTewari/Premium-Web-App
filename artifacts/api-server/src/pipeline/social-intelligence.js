@@ -21,6 +21,7 @@
  */
 
 const axios = require('axios');
+const { askClaude } = require('./claude-cli'); // Claude runs through the CLI, never the API
 const { costTracker } = require('./claude-client'); // shared per-run usage counters
 
 const CLAUDE_MODEL = 'claude-haiku-4-5-20251001';
@@ -180,23 +181,19 @@ async function runAEO(cfg, orgs, cb) {
     // Claude Haiku
     cfg.CLAUDE_KEY && (async () => {
       cb(`  Probing Claude Haiku — ${queriesUsed.length} questions...`);
-      const responses = await Promise.allSettled(
-        queriesUsed.map(q =>
-          axios.post('https://api.anthropic.com/v1/messages',
-            { model: 'claude-haiku-4-5-20251001', max_tokens: 300, system: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.', messages: [{ role: 'user', content: q }] },
-            { headers: { 'x-api-key': cfg.CLAUDE_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' }, timeout: 30000 }
-          )
-        )
+      const responses = await settledLimit(
+        queriesUsed, 3, q =>
+          askClaude(q, { model: CLAUDE_MODEL, system: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' })
       );
       costTracker.claudeAeoCalls += responses.filter(r => r.status === 'fulfilled').length;
       let claudeErrors = 0;
       const texts = responses.map((r, i) => {
         if (r.status === 'rejected') {
           claudeErrors++;
-          if (i === 0) cb(`  Claude error: ${r.reason?.response?.data?.error?.message || r.reason?.message || 'unknown'}`, 'warn');
+          if (i === 0) cb(`  Claude error: ${r.reason?.message || 'unknown'}`, 'warn');
           return '';
         }
-        return r.value.data.content?.[0]?.text || '';
+        return r.value || '';
       });
       if (claudeErrors > 0) cb(`  Claude Haiku: ${claudeErrors}/${queriesUsed.length} calls failed`, 'warn');
       for (const org of orgs) {
