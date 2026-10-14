@@ -41,7 +41,9 @@ const { costTracker } = require('./claude-client'); // shared per-run usage coun
 // round-trips) into ~4 waves. Quota is unchanged (same total calls).
 const YT_CONCURRENCY = Math.max(1, parseInt(process.env.YT_CONCURRENCY || '4', 10) || 4);
 
-const YT_AQ_BASE = ['air quality', 'air pollution', 'aqi', 'pm2.5', 'ncap', 'smog', 'clean air', 'particulate', 'emission', 'pollution'];
+const FW = require('./frameworks');
+const YT_AQ_BASE = [];
+FW.onFrameworkChange((fw) => FW.replaceInPlace(YT_AQ_BASE, fw.youtubeTerms));;
 
 // Base AQ terms + user SCOPE_KEYWORDS, capped at 15 (matches apidirect-collector.js's
 // convention of slicing keyword lists before building a query clause).

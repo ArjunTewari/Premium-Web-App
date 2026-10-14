@@ -32,23 +32,9 @@ function orgMentioned(text, org) {
 }
 
 // The 5 AEO discovery questions asked to each LLM
-const AEO_QUESTIONS = [
-  'Which Indian research organisations are the most authoritative sources on air quality data and policy in India?',
-  'What organisations publish the most reliable air quality index and PM2.5 data for Indian cities?',
-  'Who are the leading think tanks and research bodies working on clean air policy in India?',
-  'Which organisations should journalists cite when writing about India\'s National Clean Air Programme?',
-  'What Indian NGOs or research institutes are most influential on air pollution solutions and technology?',
-  'What research organisations in India are doing the most credible work on reducing vehicular air pollution?',
-  'Which Indian institutes publish peer-reviewed studies on indoor air quality and household pollution?',
-  'Who are the most cited Indian organisations in international climate and air quality policy discussions?',
-  'What organisations should I follow for the latest data on India\'s air quality improvement progress?',
-  'Which bodies produce the most reliable assessments of India\'s National Clean Air Programme targets?',
-  'What Indian think tanks and research centres are leading the conversation on clean air finance and investment?',
-  'Which organisations have the most credible data on PM2.5 health impacts in major Indian cities?',
-  'Who are the key institutional voices on stubble burning and crop residue burning policy in India?',
-  'What research organisations in India are tracking the health burden of air pollution most rigorously?',
-  'Which Indian organisations are most frequently cited in government air quality policy consultations?'
-];
+const FW = require('./frameworks');
+const AEO_QUESTIONS = [];
+FW.onFrameworkChange((fw) => FW.replaceInPlace(AEO_QUESTIONS, fw.aeoQuestionsDiscovery));;
 
 // ══════════════════════════════════════════════════════════════════════════
 //  STEP 1: AEO PROBING

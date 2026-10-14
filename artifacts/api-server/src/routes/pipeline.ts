@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, usersTable, orgHandlesTable, reportLogsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/require-auth.js";
-import { type ReportTrendSummary } from "../pipeline/index.js";
+import { type ReportTrendSummary, frameworkIds, listFrameworks } from "../pipeline/index.js";
 import { generateAndDeliverReport, loadReportHtml, persistReportToGithub, OUT_DIR } from "../lib/generate-report.js";
 import { deriveReport, listReportOrgs, parseReportType, priceForType, reportPeriod, reportTypeOfName, reportTypeOfHtml } from "../lib/report-types.js";
 import { toClientView } from "../lib/client-view.js";
@@ -112,6 +112,7 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     X_BEARER_TOKEN: process.env.X_BEARER_TOKEN || "",
     META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN || "",
     IG_BUSINESS_ACCOUNT_ID: process.env.IG_BUSINESS_ACCOUNT_ID || "",
+    FRAMEWORK: typeof body.framework === "string" && body.framework ? body.framework : "air-quality",
     outDir: OUT_DIR,
   };
 
@@ -121,6 +122,9 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   // no message). Refuse instead of truncating, so the user can see and decide.
   if (cfg.ORGS.length > MAX_ORGS_PER_RUN)
     return res.status(400).json({ error: `A run can include at most ${MAX_ORGS_PER_RUN} organisations; ${cfg.ORGS.length} were selected.` });
+
+  if (!frameworkIds().includes(cfg.FRAMEWORK))
+    return res.status(400).json({ error: `Unknown framework "${cfg.FRAMEWORK}". Available: ${frameworkIds().join(", ")}.` });
 
   // Report type: "full" (default) or a one-org "benchmark" / "snapshot" view of
   // `subjectOrg`, which must be one of the orgs in this run. Checked before any
@@ -257,6 +261,10 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
   }
 
   if (!clientDisconnected && !res.writableEnded) res.end();
+});
+
+router.get("/frameworks", requireAuth, (_req: Request, res: Response) => {
+  res.json({ frameworks: listFrameworks() });
 });
 
 router.get("/outputs", requireAuth, async (_req: Request, res: Response) => {

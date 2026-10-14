@@ -57,7 +57,7 @@ async function generateSummary(state, config) {
   cb?.(isCorrective ? `  Executive summary (corrective retry ${retryCount}/${MAX_RETRIES})...` : '  Executive summary...');
   try {
     const prompt = buildPrompt({ ORGS, DATE_FROM, DATE_TO, orgSummary }, state.execAudit);
-    const r = await ClaudeClient.callClaude(prompt, cfg.CLAUDE_KEY, 1200);
+    const r = await ClaudeClient.callClaude(require("../frameworks").fwText(prompt), cfg.CLAUDE_KEY, 1200);
     const execF = ClaudeClient.parseJ(r) || [];
     cb?.(`  ${execF.length} findings`, execF.length > 0 ? 'ok' : 'err');
     return { execF, retryCount };

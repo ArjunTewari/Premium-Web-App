@@ -78,7 +78,7 @@ async function generateActionsForOrg(state, config) {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       const r = await Promise.race([
-        ClaudeClient.callClaude(prompt, cfg.CLAUDE_KEY, 600, ClaudeClient.CLAUDE_CLASSIFY_MODEL),
+        ClaudeClient.callClaude(require("../frameworks").fwText(prompt), cfg.CLAUDE_KEY, 600, ClaudeClient.CLAUDE_CLASSIFY_MODEL),
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), PER_ORG_TIMEOUT)),
       ]);
       const parsed = ClaudeClient.parseJ(r) || [];
