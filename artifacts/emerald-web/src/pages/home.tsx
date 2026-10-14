@@ -151,6 +151,8 @@ function defaultDateRange(): { from: string; to: string } {
   return { from: iso(from), to: iso(to) };
 }
 
+interface FrameworkInfo { id: string; name: string; short: string; defaultScope: string[]; aeoQuestions: string[]; }
+
 const DEFAULT_SCOPE = [
   "AQI", "PM2.5", "PM10", "air pollution", "air quality", "smog",
   "clean air", "NCAP", "GRAP", "Black Carbon", "Ozone", "Ammonia",
@@ -413,12 +415,35 @@ export default function Home() {
 
   const [aeoOpen, setAeoOpen] = useState(false);
   const [aeoQueries, setAeoQueries] = useState<string[]>([...DEFAULT_AEO_QUERIES]);
+  // Subject-matter framework (air quality / climate / sustainability). The server
+  // owns the definitions; the scope keywords and AI-search questions below start
+  // from the chosen framework's defaults and stay editable.
+  const [frameworks, setFrameworks] = useState<FrameworkInfo[]>([]);
+  const [framework, setFramework] = useState("air-quality");
   const [aeoInput, setAeoInput] = useState("");
   const [aeoEditIdx, setAeoEditIdx] = useState<number | null>(null);
   const [aeoEditVal, setAeoEditVal] = useState("");
 
   const [confirmState, setConfirmState] = useState<{ message: string; onConfirm: () => void } | null>(null);
   function withConfirm(message: string, action: () => void) { setConfirmState({ message, onConfirm: action }); }
+
+  const activeFramework = frameworks.find((f) => f.id === framework);
+  const defaultScopeFor = (id: string) => frameworks.find((f) => f.id === id)?.defaultScope ?? DEFAULT_SCOPE;
+  const defaultAeoFor = (id: string) => frameworks.find((f) => f.id === id)?.aeoQuestions ?? DEFAULT_AEO_QUERIES;
+  const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+  function chooseFramework(id: string) {
+    if (id === framework) return;
+    const apply = () => {
+      setFramework(id);
+      setScopeKeywords([...defaultScopeFor(id)]);
+      setAeoQueries([...defaultAeoFor(id)]);
+    };
+    const edited = !sameList(scopeKeywords, defaultScopeFor(framework)) || !sameList(aeoQueries, defaultAeoFor(framework));
+    const name = frameworks.find((f) => f.id === id)?.name ?? id;
+    if (edited) withConfirm(`Switch to ${name}? Your edited scope keywords and AI-search questions will be replaced with the ${name} defaults.`, apply);
+    else apply();
+  }
 
   // Change-password modal — self-service, for moving off a temp password an
   // admin reset (there's no other way to change a password once logged in).
@@ -574,6 +599,16 @@ export default function Home() {
   }, []);
 
   useEffect(() => { loadPrev(); }, [loadPrev]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/frameworks", { credentials: "include" });
+        const body = (await res.json()) as { frameworks?: FrameworkInfo[] };
+        if (Array.isArray(body.frameworks)) setFrameworks(body.frameworks);
+      } catch {}
+    })();
+  }, []);
 
   const loadTrends = useCallback(async () => {
     setTrendsLoading(true);
@@ -858,7 +893,7 @@ export default function Home() {
   }
 
   function resetScope() {
-    withConfirm("Reset scope keywords to defaults? All custom keywords will be removed.", () => setScopeKeywords([...DEFAULT_SCOPE]));
+    withConfirm("Reset scope keywords to defaults? All custom keywords will be removed.", () => setScopeKeywords([...defaultScopeFor(framework)]));
   }
 
   function addAeoQuery() {
@@ -875,7 +910,7 @@ export default function Home() {
   }
 
   function resetAeoQueries() {
-    withConfirm("Reset AEO queries to defaults? All custom queries will be removed.", () => setAeoQueries([...DEFAULT_AEO_QUERIES]));
+    withConfirm("Reset AEO queries to defaults? All custom queries will be removed.", () => setAeoQueries([...defaultAeoFor(framework)]));
   }
 
   function startEditAeo(idx: number) { setAeoEditIdx(idx); setAeoEditVal(aeoQueries[idx]); }
@@ -1059,7 +1094,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
     setRunning(true); setStopping(false); setLogs([]); setProgress(0); setResult(null); setTrendStatus(null);
     runIdRef.current = null;
 
-    const payload = { orgs: selectedOrgs, orgYtHandles: allOrgHandles, orgTwHandles: allTwHandles, orgIgHandles: allIgHandles, orgLiHandles: allLiHandles, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries, reportType, subjectOrg: reportType === "full" ? undefined : subjectOrg };
+    const payload = { orgs: selectedOrgs, orgYtHandles: allOrgHandles, orgTwHandles: allTwHandles, orgIgHandles: allIgHandles, orgLiHandles: allLiHandles, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries, framework, reportType, subjectOrg: reportType === "full" ? undefined : subjectOrg };
     const TOTAL_STEPS = 60;
     let stepCount = 0;
 
@@ -1469,10 +1504,10 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
         {/* Hero */}
         <SlideUp delay={60} style={{ padding: "48px 0 8px" }}>
           <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: C.gold, marginBottom: 14 }}>
-            AQ Intelligence Platform
+            {activeFramework?.short ?? "AQ"} Intelligence Platform
           </div>
           <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 46, fontWeight: 700, lineHeight: 1.1, letterSpacing: "-.02em", margin: "0 0 8px", color: C.textHi }}>
-            Air Quality<br />
+            {activeFramework?.name ?? "Air Quality"}<br />
             <span style={{
               background: "linear-gradient(90deg, var(--accent-amber) 0%, var(--accent-green) 100%)",
               WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
@@ -1480,7 +1515,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
             }}>Intelligence Report</span>
           </h1>
           <p style={{ fontSize: 18, color: C.muted, marginTop: 8 }}>
-            Generate comparative air quality media intelligence reports with LLM visibility and social media analysis.
+            Generate comparative {(activeFramework?.name ?? "Air Quality").toLowerCase()} media intelligence reports with LLM visibility and social media analysis.
           </p>
         </SlideUp>
 
@@ -1635,6 +1670,28 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                   <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>CLIENT NAME</div>
                   <input value={clientName} onChange={(e) => setClientName(e.target.value)} style={inputStyle} placeholder="Client name (appears in footer)" />
                 </div>
+                {frameworks.length > 1 && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>SUBJECT AREA</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {frameworks.map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => chooseFramework(f.id)}
+                          style={{
+                            padding: "7px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                            background: framework === f.id ? C.gold : "transparent",
+                            color: framework === f.id ? "var(--bg-app)" : C.muted,
+                            border: `1px solid ${framework === f.id ? C.gold : C.border}`,
+                          }}
+                        >{f.name}</button>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 10, color: C.muted, marginTop: 6, fontFamily: "'DM Mono', monospace" }}>Sets the topics, filter words and AI-search questions used for this run.</div>
+                  </div>
+                )}
                 <div style={{ marginTop: 14 }}>
                   <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>REPORT TYPE</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

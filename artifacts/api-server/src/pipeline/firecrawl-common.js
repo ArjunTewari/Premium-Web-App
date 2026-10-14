@@ -23,13 +23,9 @@
 // which let in loosely-related environment stories and inflated the counts.
 // Back to the 21 specific AQ concepts — an article must be about one of these
 // to count as coverage.
-const AQ_KEYWORDS = [
-  "ncap", "pm2.5", "exposure mapping", "stubble burn", "clean air finance",
-  "vehicular pollution", "health impact", "industrial pollution", "heat-aqi",
-  "brick kiln", "petrol emission", "diesel emission", "super emitter",
-  "thermal power", "household pollution", "indoor pollution", "biomass",
-  "rice residue", "wheat residue", "road dust", "air quality",
-];
+const FW = require("./frameworks");
+const AQ_KEYWORDS = [];
+FW.onFrameworkChange((fw) => FW.replaceInPlace(AQ_KEYWORDS, fw.gateKeywords));;
 
 // ── Org aliases ──────────────────────────────────────────────────────────────
 // Outlets rarely use an org's full configured display name. Each entry lists
@@ -135,7 +131,7 @@ function articleDate(item) {
 /** Which AQ keywords appear in the article. */
 function matchedKeywords(item) {
   const text = articleText(item).toLowerCase();
-  return AQ_KEYWORDS.filter((kw) => text.includes(kw));
+  return FW.matchedTerms(text, AQ_KEYWORDS);
 }
 
 /**

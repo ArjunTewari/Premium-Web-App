@@ -1414,7 +1414,17 @@ function buildSingleOrgDashboard(baseHtml, opts = {}) {
   M.assistants = base.assistants;
   M.view = view;
   M.sub = sub;
-  const html = renderDashboard(M);
+  let html = renderDashboard(M);
+  // The base report records its subject framework (pipeline writes the meta tag).
+  // Re-word the dashboard's fixed "AQ" labels to match; air quality is unchanged.
+  const fwId = (/<meta name="emerald-framework" content="([a-z-]+)"/.exec(baseHtml || "") || [])[1];
+  if (fwId && fwId !== "air-quality") {
+    const FW = require("./frameworks");
+    if (FW.frameworkIds().includes(fwId)) {
+      html = FW.fwText(html, FW.getFramework(fwId));
+      html = html.replace("<title>", '<meta name="emerald-framework" content="' + fwId + '">\n<title>');
+    }
+  }
   return view === "snapshot" ? toSnapshot(html) : html;
 }
 

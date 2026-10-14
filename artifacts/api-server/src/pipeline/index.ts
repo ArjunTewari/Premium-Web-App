@@ -5,6 +5,8 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 // @ts-ignore
 import _pipeline from "./pipeline.js";
+// @ts-ignore
+import _frameworks from "./frameworks/index.js";
 
 export type RunCallback = (msg: string, level?: string) => void;
 export interface RunConfig {
@@ -29,6 +31,8 @@ export interface RunConfig {
   X_BEARER_TOKEN?: string;
   META_ACCESS_TOKEN?: string;
   IG_BUSINESS_ACCOUNT_ID?: string;
+  /** Subject-matter framework id (air-quality, climate, sustainability). Defaults to air-quality. */
+  FRAMEWORK?: string;
   outDir: string;
   /** Cooperative-cancellation signal — checked between pipeline stages. */
   signal?: AbortSignal;
@@ -70,3 +74,16 @@ export interface RunResult {
 const mod = _pipeline as any;
 export const run: (cfg: RunConfig, cb: RunCallback) => Promise<RunResult> =
   mod.run ?? mod.default?.run;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const fwMod = _frameworks as any;
+export interface FrameworkSummary {
+  id: string;
+  name: string;
+  short: string;
+  topics: { key: string; label: string }[];
+  defaultScope: string[];
+  aeoQuestions: string[];
+}
+export const listFrameworks: () => FrameworkSummary[] = fwMod.listFrameworks ?? fwMod.default?.listFrameworks;
+export const frameworkIds: () => string[] = fwMod.frameworkIds ?? fwMod.default?.frameworkIds;

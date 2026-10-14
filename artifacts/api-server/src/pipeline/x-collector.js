@@ -11,29 +11,9 @@
  */
 
 // 21 hardcoded AQ topic columns — one per report column
-const AQ_KEYWORDS = [
-  'ncap',
-  'policy regulations',
-  'pm2.5',
-  'stubble burning',
-  'clean air finance',
-  'vehicular pollution',
-  'health impact',
-  'industrial pollution',
-  'heat-aqi',
-  'brick kiln',
-  'petrol emission',
-  'diesel emission',
-  'super emitter',
-  'thermal power',
-  'household pollution',
-  'indoor pollution',
-  'biomass',
-  'rice residue',
-  'wheat residue',
-  'road dust',
-  'air quality',
-];
+const FW = require('./frameworks');
+const AQ_KEYWORDS = [];
+FW.onFrameworkChange((fw) => FW.replaceInPlace(AQ_KEYWORDS, fw.xKeywords));;
 
 // Default X handles for tracked AQ orgs
 const ORG_X_HANDLES = {

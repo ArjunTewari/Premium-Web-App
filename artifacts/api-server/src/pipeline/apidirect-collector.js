@@ -94,34 +94,16 @@ async function resolveCompanyId(companyUrl, apiKey, cb) {
 }
 // Base AQ keywords. 'pollution' removed — bare substring matches water/noise/soil/light
 // pollution and produces false positives; 'air pollution' in the list already covers the AQ case.
-const AQ_KW_BASE = ['air quality', 'air pollution', 'aqi', 'pm2.5', 'pm10', 'ncap', 'grap',
-                    'smog', 'clean air', 'particulate', 'emission'];
+const FW = require('./frameworks');
+const AQ_KW_BASE = [];;
 
 // Hardcoded topic columns used as LinkedIn search queries and Instagram local filter.
 // Each entry maps to exactly one column in the Social AQ report table.
-const AQ_KEYWORDS_SEARCH = [
-  'ncap',
-  'policy regulations',
-  'pm2.5',
-  'stubble burning',
-  'clean air finance',
-  'vehicular pollution',
-  'health impact',
-  'industrial pollution',
-  'heat-aqi',
-  'brick kiln',
-  'petrol emission',
-  'diesel emission',
-  'super emitter',
-  'thermal power',
-  'household pollution',
-  'indoor pollution',
-  'biomass',
-  'rice residue',
-  'wheat residue',
-  'road dust',
-  'air quality',
-];
+const AQ_KEYWORDS_SEARCH = [];
+FW.onFrameworkChange((fw) => {
+  FW.replaceInPlace(AQ_KW_BASE, fw.postFilterTerms);
+  FW.replaceInPlace(AQ_KEYWORDS_SEARCH, fw.socialSearchKeywords);
+});;
 
 // Merge base keywords with user-supplied SCOPE_KEYWORDS (lowercased, deduplicated).
 function buildAqKeywords(scopeKeywords) {
@@ -133,7 +115,7 @@ function buildAqKeywords(scopeKeywords) {
 
 function isAQ(text, aqKw) {
   const t = (text || '').toLowerCase();
-  return (aqKw || AQ_KW_BASE).some(k => t.includes(k));
+  return FW.matchedTerms(t, aqKw || AQ_KW_BASE).length > 0;
 }
 
 // ── Adaptive per-endpoint concurrency gate ──────────────────────────────────
@@ -387,7 +369,7 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
         const postText = `${post.snippet || ''} ${post.text || ''} ${post.title || ''}`.normalize('NFKC').toLowerCase();
         // Multi-word terms also match as hashtags (#AirPollution, #CleanAir).
         const flatText = postText.replace(/[^a-z0-9.]+/g, '');
-        const hasTerm = (k) => postText.includes(k) || (/[\s-]/.test(k) && flatText.includes(k.replace(/[^a-z0-9.]+/g, '')));
+        const hasTerm = (k) => FW.termMatches(postText, k) || (/[\s-]/.test(k) && flatText.includes(k.replace(/[^a-z0-9.]+/g, '')));
         if (!hasTerm(keyword) && !AQ_KW_BASE.some(hasTerm)) continue;
         const key = post.url || `${post.date}:${(post.snippet || '').slice(0, 80)}`;
         if (!seen.has(key)) seen.set(key, { post, keywords: new Set() });

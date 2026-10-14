@@ -14,6 +14,8 @@ const Sentinel = require("./sentinel");
 // search path was removed — AQ_KEYWORDS (the 21-term Topic-Ownership-Map
 // taxonomy) now lives in firecrawl-common.js alongside the org-matching helpers.
 const { AQ_KEYWORDS } = require("./firecrawl-common");
+const FW = require("./frameworks");
+const fwNow = () => FW.getActiveFramework();
 const {
   callClaude,
   parseJ,
@@ -64,29 +66,19 @@ const TV_CHANNEL_DOMAINS = {
 // Adding a topic means Claude must find it in scraped article text.
 // Removing one silently drops that coverage dimension from every report.
 // Renaming breaks backward consistency across report runs.
-const TOPICS = [
-  "NCAP",
-  "Policy",
-  "PM2.5 Exposure",
-  "Stubble Burning",
-  "Clean Air Finance",
-  "Vehicular Pollution",
-  "Health Impact",
-  "Industrial Pollution",
-  "Heat-AQI",
-  "Brick Kilns",
-  "Petrol Emissions",
-  "Diesel Emissions",
-  "Super Emitters",
-  "Thermal Power Plants",
-  "Household Pollution",
-  "Indoor Pollution",
-  "Biomass Air Pollution",
-  "Rice Residue Burning",
-  "Wheat Residue Burning",
-  "Road Dust",
-  "General AQ",
-];
+const TOPICS = [];
+// Exact (case-insensitive) match first; then a topic whose full name appears in the answer; only
+// then the looser "first word appears in the answer" fallback. So topics that share a first word
+// (Sustainable Finance / Sustainable Mobility) are not mis-assigned. For air quality, whose first
+// words are all distinct, results are unchanged.
+function matchTopic(t) {
+  const s = String(t || "").trim().toLowerCase();
+  return (
+    TOPICS.find((tp) => tp.toLowerCase() === s) ||
+    TOPICS.find((tp) => s.includes(tp.toLowerCase())) ||
+    TOPICS.find((tp) => s.includes(tp.toLowerCase().split(" ")[0]))
+  );
+};
 // 13 visually distinct colours — one per org slot
 const ORG_COLORS_HEX = [
   "3d8ef0",
@@ -108,23 +100,11 @@ const orgPptx = (i) => ORG_COLORS_HEX[i % ORG_COLORS_HEX.length];
 
 // AQ questions asked to each LLM for AEO scoring
 // Intentionally generic — no org names — so mentions in responses are fully organic
-const AEO_QUESTIONS = [
-  "What does the latest research say about PM2.5 health impacts in Indian cities?",
-  "How effective has India's National Clean Air Programme been so far, and what does the evidence show?",
-  "What are the main sources of air pollution in Indian cities and what data exists on their relative contribution?",
-  "What are the most trusted data sources for monitoring air quality across Indian cities?",
-  "What scientific evidence exists on the health burden of air pollution in India?",
-  "What policy interventions have been most effective at reducing air pollution in Indian cities?",
-  "How is coal-based power generation contributing to air quality problems in India?",
-  "What is known about seasonal air quality patterns in North India — what drives the winter smog?",
-  "How do Indian cities compare on air quality improvement, and which approaches are working best?",
-  "What are the key gaps in India's air quality monitoring and reporting infrastructure?",
-  "What role do Indian think tanks and research organisations play in shaping clean air policy?",
-  "Which organisations are most active in advocating for stricter air quality standards in India?",
-  "What is the current scientific consensus on crop residue burning and its contribution to North India AQ?",
-  "How is India's electric vehicle transition contributing to improvements in urban air quality?",
-  "What are the most significant emerging air pollution sources in Indian cities that need attention?",
-];
+const AEO_QUESTIONS = [];
+FW.onFrameworkChange((fw) => {
+  FW.replaceInPlace(TOPICS, fw.topics.map((t) => t.key));
+  FW.replaceInPlace(AEO_QUESTIONS, fw.aeoQuestionsReport);
+});;
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -389,11 +369,7 @@ function aggregateOrg(artList, clsList, dateFrom) {
   TOPICS.forEach((t) => (tc[t] = 0));
   clsList.forEach((c) => {
     const t = (c.aq_subtopic || "").trim();
-    const match = TOPICS.find(
-      (tp) =>
-        tp.toLowerCase() === t.toLowerCase() ||
-        t.toLowerCase().includes(tp.toLowerCase().split(" ")[0].toLowerCase()),
-    );
+    const match = matchTopic(t);
     if (match) tc[match]++;
   });
   const sov = Math.min(100, Math.round(artList.length * 2.5));
@@ -550,7 +526,7 @@ async function computeSpikeAnnotations(arts, ORGS, DATE_FROM, DATE_TO, claudeKey
 
   try {
     const raw = await callClaude(
-      `Analyse these AQ media coverage spikes. For each, write ONE punchy sentence identifying the likely trigger (report release, government event, announcement) and top outlets involved. Be factual.
+      `Analyse these ${fwNow().short} media coverage spikes. For each, write ONE punchy sentence identifying the likely trigger (report release, government event, announcement) and top outlets involved. Be factual.
 
 ${spikeDescs}
 
@@ -572,6 +548,7 @@ Return ONLY a JSON array: [{"idx":0,"annotation":"..."},...]`,
 //  MAIN PIPELINE EXPORT
 // ══════════════════════════════════════════════════════════════════════════
 async function run(cfg, cb) {
+  FW.setActiveFramework(cfg.FRAMEWORK);
   // cfg: { ORGS[], DATE_FROM, DATE_TO, CLIENT_NAME, SERPER_KEY, CLAUDE_KEY, CLAUDE_MODEL,
   //         OPENAI_KEY?, PERPLEXITY_KEY?, GEMINI_KEY?, TWITTER_KEY?, YOUTUBE_KEY?, outDir }
   // cb(message, level) — streams log lines
@@ -746,7 +723,7 @@ async function run(cfg, cb) {
           return `[${j}] TITLE: ${a.title}\nSOURCE: ${a.source}${note}\nCONTENT: ${textWindow}`;
         }).join("\n===\n");
 
-        const prompt = `You are filtering news articles for the organisation "${org}" (air quality / environment sector).
+        const prompt = `You are filtering news articles for the organisation "${org}" (${fwNow().sector}).
 
 DEFAULT: keep=true. Only set keep=false when you are CERTAIN the mention is trivial. When in doubt, return keep=true.
 IMPORTANT: If "${org}" does not appear anywhere in the CONTENT text, set keep=false — the article was fetched by mistake. The organisation may appear under an abbreviation or a Hindi (Devanagari) rendering of its name — treat those as valid mentions of "${org}".
@@ -761,7 +738,7 @@ Set keep=false ONLY if you are certain that:
 - "${org}" appears solely in a list (e.g. monitoring stations, award recipients, rankings) with no contribution described
 - "${org}" is mentioned only as a venue, event host, or location
 - "${org}" appears only in a footer, disclaimer, or boilerplate credit line
-- The article is exclusively about the org's internal affairs (admissions, sports, HR) with zero AQ relevance
+- The article is exclusively about the org's internal affairs (admissions, sports, HR) with zero ${fwNow().short} relevance
 
 Return ONLY a JSON array with one entry per article:
 [{"index":0,"keep":true},{"index":1,"keep":false},...]
@@ -859,14 +836,14 @@ ${batchText}`;
         })
         .join("\n===\n");
 
-      const prompt = `You are a media intelligence analyst classifying Indian news articles about air quality for the organisation "${org}".
+      const prompt = `You are a media intelligence analyst classifying Indian news articles about ${fwNow().subject} for the organisation "${org}".
 
 For EACH numbered article, return one JSON object with:
 - index: the article number shown in [brackets]
 - citation_quality: "Data Cited" if a specific number, %, statistic, or named report FROM "${org}" appears in the CONTENT excerpt. "Named Mention" if org is named but no specific data cited. "Not Mentioned" if org does not appear in the excerpt.
-- aq_relevant: true ONLY if the article's PRIMARY subject is air quality, pollution, emissions, AQ policy, or environmental health in India. false for everything else — including articles where air quality is a minor mention, and articles about rankings, awards, PhD programs, sports, finance, or general institutional news even if they mention "${org}".
+- aq_relevant: true ONLY if the article's PRIMARY subject is ${fwNow().relevanceRule}. false for everything else — including articles where ${fwNow().subject} is a minor mention, and articles about rankings, awards, PhD programs, sports, finance, or general institutional news even if they mention "${org}".
 - mention_count: copy the ORG MENTIONS IN FULL SCRAPED TEXT number exactly as given — do not recount from the excerpt
-- aq_subtopic: EXACTLY one of: NCAP, Policy, PM2.5 Exposure, Stubble Burning, Clean Air Finance, Vehicular Pollution, Health Impact, Industrial Pollution, Heat-AQI, Brick Kilns, Petrol Emissions, Diesel Emissions, Super Emitters, Thermal Power Plants, Household Pollution, Indoor Pollution, Biomass Air Pollution, Rice Residue Burning, Wheat Residue Burning, Road Dust, General AQ. Prefer the most specific topic; use General AQ only when the article covers overall air quality without focusing on any particular source, pollutant type, or policy.
+- aq_subtopic: EXACTLY one of: ${TOPICS.join(", ")}. Prefer the most specific topic; use ${fwNow().catchAll} only when the article covers overall ${fwNow().subject} without focusing on any particular ${fwNow().specificity}.
 - evidence_quote: exact phrase ≤12 words from content. "not mentioned" if absent.
 - outlet: publication from SOURCE field
 - date: date from DATE field
@@ -941,14 +918,14 @@ ${txt}`;
           const ctx = extractCitationContext(a.fullText || '', term, 2);
           return `[${j}] TITLE: ${a.title}\nCONTEXT (±2 lines around each "${term}" mention):\n${ctx}`;
         }).join('\n===\n');
-        const prompt = `You are verifying whether news articles genuinely cite the organisation "${org}" as a source of research or data on air quality in India.
+        const prompt = `You are verifying whether news articles genuinely cite the organisation "${org}" as a source of research or data on ${fwNow().subject} in India.
 
 For EACH article below, respond citationVerified=true ONLY if the article:
 - Cites a named report, study, or publication by "${org}"
 - Attributes a specific statistic, number, or finding to "${org}"
-- Quotes a researcher from "${org}" on an air quality topic
+- Quotes a researcher from "${org}" on ${fwNow().evidencePhrase}
 
-Respond citationVerified=false if "${org}" is only mentioned in passing, as an event participant, or without specific attribution of AQ evidence.
+Respond citationVerified=false if "${org}" is only mentioned in passing, as an event participant, or without specific attribution of ${fwNow().short} evidence.
 
 Return ONLY a JSON array with no preamble: [{"index":0,"citationVerified":true}, ...]
 
@@ -1164,7 +1141,7 @@ ${batchText}`;
     if (fy === ty) return `${fm}-${tm}${ty}`;
     return `${fm}${fy}-${tm}${ty}`;
   };
-  const base = `TMP-${monthLabel(DATE_FROM, DATE_TO)}-${ORGS.length}orgs`;
+  const base = `TMP-${fwNow().id === "air-quality" ? "" : fwNow().short + "-"}${monthLabel(DATE_FROM, DATE_TO)}-${ORGS.length}orgs`;
   const htmlFile = path.join(cfg.outDir, `${base}.html`);
   let html;
   try {
@@ -1201,6 +1178,8 @@ ${batchText}`;
     cb(`  SENTINEL · report audit skipped: ${e.message}`, "warn");
   }
 
+  html = FW.fwText(html);
+  html = html.replace("<title>", `<meta name="emerald-framework" content="${fwNow().id}">\n<title>`);
   fs.writeFileSync(htmlFile, html, "utf8");
   cb(`  HTML: ${base}.html (${Math.round(html.length / 1024)}KB)`, "ok");
 
@@ -1324,9 +1303,20 @@ async function buildPPTX(
 ) {
   const { ORGS, DATE_FROM, DATE_TO, CLIENT_NAME } = cfg;
   const pres = new PptxGen();
+  // Re-word slide text for the framework (air quality: unchanged).
+  {
+    const deep = (v) => (typeof v === "string" ? FW.fwText(v) : Array.isArray(v) ? v.map(deep) : v && typeof v === "object" && typeof v.text !== "undefined" ? { ...v, text: deep(v.text) } : v);
+    const addSlide = pres.addSlide.bind(pres);
+    pres.addSlide = (...a) => {
+      const s = addSlide(...a);
+      const addText = s.addText.bind(s);
+      s.addText = (t, o) => addText(deep(t), o);
+      return s;
+    };
+  }
   pres.layout = "LAYOUT_WIDE";
   pres.author = "Emerald AI";
-  pres.title = `AQ Media Intelligence — ${ORGS.join(" vs ")}`;
+  pres.title = FW.fwText(`AQ Media Intelligence — ${ORGS.join(" vs ")}`);
 
   const BG = "0a0e17",
     CARD = "111520",
@@ -2922,52 +2912,8 @@ ${orgsByTotal((o) => outletTotal(o, activeOutlets)).map(({ org, i, total }) => `
   }
 
   function topicCards() {
-    const topicDisplayNames = {
-      NCAP: "NCAP / Policy Targets",
-      Policy: "Policy & Regulations",
-      "PM2.5 Exposure": "PM2.5 Exposure Mapping",
-      "Stubble Burning": "Stubble Burning",
-      "Clean Air Finance": "Clean Air Finance",
-      "Vehicular Pollution": "Vehicular Pollution",
-      "Health Impact": "Health Impact",
-      "Industrial Pollution": "Industrial Pollution",
-      "Heat-AQI": "Heat-AQI Interaction",
-      "Brick Kilns": "Brick Kilns",
-      "Petrol Emissions": "Petrol Emissions",
-      "Diesel Emissions": "Diesel Emissions",
-      "Super Emitters": "Super Emitters",
-      "Thermal Power Plants": "Thermal Power Plants",
-      "Household Pollution": "Household Pollution",
-      "Indoor Pollution": "Indoor Pollution",
-      "Biomass Air Pollution": "Biomass Air Pollution",
-      "Rice Residue Burning": "Rice Residue Burning",
-      "Wheat Residue Burning": "Wheat Residue Burning",
-      "Road Dust": "Road Dust",
-      "General AQ": "General Air Quality",
-    };
-    const topicSubtitles = {
-      NCAP: "National Clean Air Programme progress & compliance",
-      Policy: "Air quality regulations, standards, government actions",
-      "PM2.5 Exposure": "City & ward-level exposure data, health burden",
-      "Stubble Burning": "Parali, enforcement, seasonal contribution",
-      "Clean Air Finance": "Funding flows, investment gaps, municipal budgets",
-      "Vehicular Pollution": "EV targets, transport emissions, FAME",
-      "Health Impact": "Mortality, hospital admissions, DALY data",
-      "Industrial Pollution": "Factory emissions, cement, steel plants",
-      "Heat-AQI": "Summer heat compounding PM2.5 impacts",
-      "Brick Kilns": "Brick kiln emissions, FCBTK, zig-zag technology",
-      "Petrol Emissions": "Petrol vehicle tailpipe pollution",
-      "Diesel Emissions": "Diesel generators, trucks, buses",
-      "Super Emitters": "High-emission point sources, hotspots",
-      "Thermal Power Plants": "Coal power plant emissions, FGD",
-      "Household Pollution": "Cooking fuel, biomass, LPG substitution",
-      "Indoor Pollution": "Indoor air quality, IAQ monitoring",
-      "Biomass Air Pollution": "Wood, crop residue, biomass burning",
-      "Rice Residue Burning": "Paddy straw burning, Punjab, Haryana",
-      "Wheat Residue Burning": "Wheat stubble burning, post-harvest",
-      "Road Dust": "Resuspended road dust, unpaved roads",
-      "General AQ": "Broad air quality coverage not specific to one source or policy",
-    };
+    const topicDisplayNames = Object.fromEntries(fwNow().topics.map((t) => [t.key, t.label]));
+    const topicSubtitles = Object.fromEntries(fwNow().topics.map((t) => [t.key, t.subtitle]));
 
     // Build topic→org→articles index (join classification with original article for title/url)
     const topicArts = {};
@@ -2978,11 +2924,7 @@ ${orgsByTotal((o) => outletTotal(o, activeOutlets)).map(({ org, i, total }) => `
     ORGS.forEach((org) => {
       (data[org]?.classifications || []).forEach((c) => {
         const t = (c.aq_subtopic || "").trim();
-        const match = TOPICS.find(
-          (tp) =>
-            tp.toLowerCase() === t.toLowerCase() ||
-            t.toLowerCase().includes(tp.toLowerCase().split(" ")[0].toLowerCase()),
-        );
+        const match = matchTopic(t);
         if (match) {
           const art = arts[org]?.[c.index] || {};
           topicArts[match][org].push({ ...c, title: art.title || "", url: art.url || "" });
@@ -3043,11 +2985,7 @@ ${orgsByTotal((o) => outletTotal(o, activeOutlets)).map(({ org, i, total }) => `
       (data[org]?.classifications || []).forEach((c) => {
         const t = (c.aq_subtopic || "").trim();
         if (!t) return;
-        const matchesFixed = TOPICS.some(
-          (tp) =>
-            tp.toLowerCase() === t.toLowerCase() ||
-            t.toLowerCase().includes(tp.toLowerCase().split(" ")[0].toLowerCase()),
-        );
+        const matchesFixed = !!matchTopic(t);
         if (matchesFixed) return;
         if (!dynArts[t]) dynArts[t] = {};
         if (!dynArts[t][org]) dynArts[t][org] = [];
@@ -3726,4 +3664,4 @@ function dlEdit(){
 <\/script></body></html>`;
 }
 
-module.exports = { run };
+module.exports = { run, _test: { matchTopic, TOPICS, AEO_QUESTIONS } };

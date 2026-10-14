@@ -42,12 +42,9 @@ const outletForUrl = buildOutletMatcher(OUTLET_DOMAINS);
 // Group the 21 AQ keywords into a handful of semantically coherent queries.
 // Each query is a natural-language description (Exa's neural search wants a
 // described page, not a keyword bag) that still names the concrete terms.
-const KEYWORD_CLUSTERS = [
-  "India air quality, AQI, PM2.5 and PM10 pollution levels, NCAP national clean air programme and clean-air policy in Delhi and other cities",
-  "stubble burning, paddy and wheat crop residue, farm fires in Punjab and Haryana, and winter smog over Delhi-NCR",
-  "thermal power plant and coal SO2 emissions, industrial pollution, brick kilns, vehicular and diesel/petrol exhaust emissions in India",
-  "air pollution health impact, household and indoor air pollution, biomass burning, road dust and clean air finance in India",
-];
+const FW = require("./frameworks");
+const KEYWORD_CLUSTERS = [];
+FW.onFrameworkChange((fw) => FW.replaceInPlace(KEYWORD_CLUSTERS, fw.exaClusters));;
 
 async function exaSearch(query, params) {
   const body = {
@@ -98,7 +95,6 @@ async function fetchCorpus(cfg, cb = () => {}) {
   const end = isoDate(DATE_TO);
   cb(`  [exa] corpus fetch: ${KEYWORD_CLUSTERS.length} queries · ${start} → ${end} · ${INCLUDE_DOMAINS.length} outlets`);
 
-  const kwLower = AQ_KEYWORDS.map((k) => k.toLowerCase());
   const seen = new Set();
   const out = [];
 
@@ -121,7 +117,7 @@ async function fetchCorpus(cfg, cb = () => {}) {
       if (!outlet) continue; // off the fixed outlet list
       const text = it.text || "";
       const hay = `${it.title || ""}\n${text}`.toLowerCase();
-      const found = kwLower.filter((k) => hay.includes(k));
+      const found = FW.matchedTerms(hay, AQ_KEYWORDS);
       if (!found.length) continue; // no AQ keyword anywhere — skip
       out.push({
         title: it.title || "",
