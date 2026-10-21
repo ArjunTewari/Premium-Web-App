@@ -413,6 +413,24 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
   return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers, er: erVal, topPosts, fetched: posts.length, inRangeCount: posts.length };
 }
 
+// Identity of a tweet, so the same tweet returned twice is counted once.
+function tweetKey(t) {
+  const id = t.id_str || t.id || t.tweet_id || t.rest_id;
+  if (id) return String(id);
+  const m = /status\/(\d+)/.exec(t.url || t.link || '');
+  if (m) return m[1];
+  return `${t.date || t.created_at || ''}|${(t.text || t.snippet || t.title || '').slice(0, 120)}`;
+}
+
+// Same test the LinkedIn collector applies: the post's own text must carry a
+// keyword. NFKC folds mathematical-bold letters; multi-word terms also match as
+// hashtags (#AirPollution, #CleanAir).
+function keywordsInText(raw, terms) {
+  const text = String(raw || '').normalize('NFKC').toLowerCase();
+  const flat = text.replace(/[^a-z0-9.]+/g, '');
+  return terms.filter(k => FW.termMatches(text, k) || (/[\s-]/.test(k) && flat.includes(k.replace(/[^a-z0-9.]+/g, ''))));
+}
+
 // ── Twitter / X ───────────────────────────────────────────────────────────────
 // Smart pagination: fetch pages sequentially, stop as soon as the oldest tweet
 // on a page predates dateFrom. Max 5 pages (~100 tweets).
@@ -443,31 +461,63 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
 
     if (firstPageRes.status === 'rejected') throw firstPageRes.reason;
 
-    let allTweets = firstPageRes.value?.tweets || firstPageRes.value?.posts || [];
+    // De-duplicate as pages arrive. The search has been seen to return the same
+    // page again for a later page number (one account's 20 tweets came back five
+    // times and were reported as 100), so a page that adds nothing new ends the
+    // paging, and no tweet is ever counted twice.
+    const seenIds = new Set();
+    const unique = [];
+    let duplicatesRemoved = 0;
+    const addBatch = (batch) => {
+      let fresh = 0;
+      for (const t of batch) {
+        const k = tweetKey(t);
+        if (seenIds.has(k)) { duplicatesRemoved++; continue; }
+        seenIds.add(k); unique.push(t); fresh++;
+      }
+      return fresh;
+    };
+    let pagesFetched = 1;
+    let exhausted = false; // true when paging ended because there was nothing more in the window
+    const firstBatch = firstPageRes.value?.tweets || firstPageRes.value?.posts || [];
+    addBatch(firstBatch);
+    if (!firstBatch.length) exhausted = true;
 
     // Paginate until we run out of results or cross dateFrom
-    if (allTweets.length > 0) {
-      const oldest = oldestInBatch(allTweets, 'date', 'created_at');
-      if (!dateRange?.from || !oldest || oldest >= dateRange.from) {
+    if (unique.length > 0) {
+      const oldest = oldestInBatch(unique, 'date', 'created_at');
+      if (dateRange?.from && oldest && oldest < dateRange.from) {
+        exhausted = true;
+      } else {
         for (let page = 2; page <= MAX_PAGES; page++) {
           const r = await apiFetch('twitter/posts', { query, page }, apiKey);
           const batch = r.tweets || r.posts || [];
-          if (!batch.length) break;
-          allTweets = allTweets.concat(batch);
+          if (!batch.length) { exhausted = true; break; }
+          pagesFetched++;
+          const fresh = addBatch(batch);
+          if (fresh === 0) { exhausted = true; break; }
           const batchOldest = oldestInBatch(batch, 'date', 'created_at');
-          if (dateRange?.from && batchOldest && batchOldest < dateRange.from) break;
+          if (dateRange?.from && batchOldest && batchOldest < dateRange.from) { exhausted = true; break; }
         }
       }
     }
+    // Stopped by the page limit while still inside the window: more may exist.
+    const capHit = !exhausted && pagesFetched >= MAX_PAGES;
+    if (duplicatesRemoved > 0) cb?.(`  [APIdirect/X] ${org}: ${duplicatesRemoved} repeated tweet(s) from the API removed`, 'warn');
+    if (capHit) cb?.(`  [APIdirect/X] ${org}: stopped at the ${MAX_PAGES}-page limit — the count may be lower than the true number`, 'warn');
 
-    // Date-range filter (search already AQ-filtered by query, so no keyword gate needed)
-    const tweets = allTweets.filter(t => inDateRange(t.date || t.created_at, dateRange?.from, dateRange?.to));
-
-    // Tag each tweet with which of the 21 keywords actually matched
-    const tagged = tweets.map(t => {
-      const text = `${t.text || t.snippet || t.title || ''}`.toLowerCase();
-      return { ...t, keywords_found: aqKw.filter(kw => text.includes(kw)) };
-    });
+    // Date-range filter, then keep only tweets whose own text carries a keyword.
+    // The search matches loosely (it also matches the account's display name, so an
+    // account called "... Clean Air" returns every tweet for "clean air").
+    const tweets = unique.filter(t => inDateRange(t.date || t.created_at, dateRange?.from, dateRange?.to));
+    const tagged = [];
+    let droppedNoKeyword = 0;
+    for (const t of tweets) {
+      const kws = keywordsInText(`${t.text || ''} ${t.snippet || ''} ${t.title || ''}`, aqKw);
+      if (!kws.length) { droppedNoKeyword++; continue; }
+      tagged.push({ ...t, keywords_found: kws });
+    }
+    if (droppedNoKeyword > 0) cb?.(`  [APIdirect/X] ${org}: ${droppedNoKeyword} tweet(s) dropped — their text has none of the keywords`, 'warn');
 
     const totalLikes    = tagged.reduce((s, t) => s + (t.likes    || 0), 0);
     const totalReplies  = tagged.reduce((s, t) => s + (t.replies  || 0), 0);
@@ -492,7 +542,7 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
 
     const erVal = er(totalEngage, followers, tagged.length);
     cb?.(`  [APIdirect/X] ${org}: ${tagged.length} AQ tweets (search), ${followers.toLocaleString()} followers, ER=${erVal}%`, tagged.length > 0 ? 'ok' : 'warn');
-    return { postCount: tagged.length, totalLikes, totalReplies, totalRetweets, totalViews, followers, er: erVal, topPosts, fetched: allTweets.length, inRangeCount: tagged.length };
+    return { postCount: tagged.length, totalLikes, totalReplies, totalRetweets, totalViews, followers, er: erVal, topPosts, fetched: unique.length, inRangeCount: tagged.length, duplicatesRemoved, droppedNoKeyword, pagesFetched, capHit };
   } catch (e) {
     cb?.(`  [APIdirect/X] ${org}: ${e.message}`, 'warn');
     return failResult(EMPTY, e);

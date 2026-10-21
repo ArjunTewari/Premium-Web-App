@@ -15,6 +15,7 @@ const Sentinel = require("./sentinel");
 // taxonomy) now lives in firecrawl-common.js alongside the org-matching helpers.
 const { AQ_KEYWORDS } = require("./firecrawl-common");
 const FW = require("./frameworks");
+const Audit = require("./audit");
 const fwNow = () => FW.getActiveFramework();
 const {
   callClaude,
@@ -1180,6 +1181,15 @@ ${batchText}`;
 
   html = FW.fwText(html);
   html = html.replace("<title>", `<meta name="emerald-framework" content="${fwNow().id}">\n<title>`);
+
+  // ── AUDIT: last gate. Rule checks + independent Codex CLI review. A failed or
+  // incomplete audit stops the run here — nothing is written, stored or sent.
+  const auditResult = await Audit.runAudit(
+    { ORGS, data, socialERResults, youtubeERResults, execF, actions, html, dateFrom: DATE_FROM, dateTo: DATE_TO, subject: fwNow().subject },
+    cb,
+  );
+  if (!auditResult.passed) throw new Error(Audit.failureMessage(auditResult));
+  html = html.replace("<title>", `<meta name="emerald-audit" content="${Audit.stamp(auditResult)}">\n<title>`);
   fs.writeFileSync(htmlFile, html, "utf8");
   cb(`  HTML: ${base}.html (${Math.round(html.length / 1024)}KB)`, "ok");
 
