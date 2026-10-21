@@ -101,7 +101,7 @@ class ClaudeCliError extends Error {
 
 function classify(text, code) {
   const t = String(text || "");
-  if (/not logged in|please run \/login|invalid api key|oauth token|authentication|unauthor|setup-token|credit balance/i.test(t)) {
+  if (/not logged in|please run \/login|invalid api key|oauth token|oauth session|authenticat|unauthor|setup-token|credit balance/i.test(t)) {
     return new ClaudeCliError(`Claude CLI is not authenticated: ${t.trim().slice(0, 300) || `exit ${code}`}`, { auth: true });
   }
   if (/rate limit|usage limit|limit reached|too many|overloaded|529|429|try again/i.test(t)) {

@@ -1,8 +1,8 @@
-// Run: node tests/audit.test.cjs  (needs the app's node_modules). No network, no Codex.
+// Run: node tests/audit.test.cjs  (needs the app's node_modules). No network, no Claude.
 // The rule layer of the audit must stop the 18 Oct 2026 fault and pass a consistent report.
 const path = require("path");
 const A = require(path.join(__dirname, "..", "src", "pipeline", "audit.js"));
-const Codex = require(path.join(__dirname, "..", "src", "pipeline", "codex-review.js"));
+const Reviewer = require(path.join(__dirname, "..", "src", "pipeline", "claude-review.js"));
 let fail = 0;
 const eq = (n, g, w) => { const ok = JSON.stringify(g) === JSON.stringify(w); if (!ok) fail++; console.log(ok ? "PASS" : "FAIL", n, ok ? "" : `\n  got  ${JSON.stringify(g)}\n  want ${JSON.stringify(w)}`); };
 
@@ -38,7 +38,40 @@ const trunc = social(false); trunc[0].twData.capHit = true; trunc[0].twData.dupl
 const w = A.checkDeterministic({ ORGS, data: data(false), socialERResults: trunc, execF: [], html: "" });
 eq("page-limit hit and removed repeats are warnings, not errors", [w.errors.length, w.warnings.length], [0, 2]);
 
-eq("codex reply is parsed", Codex.parseReview('{"verdict":"fail","findings":[{"severity":"error","org":"CREA","where":"X posts","issue":"repeat","evidence":"same id"}]}').findings[0].org, "CREA");
-let threw = false; try { Codex.parseReview("not json"); } catch { threw = true; }
-eq("an unreadable Codex reply is rejected, never treated as a pass", threw, true);
-console.log(fail ? `${fail} FAILED` : "all passed"); process.exit(fail ? 1 : 0);
+eq("reviewer reply is parsed", Reviewer.parseReview('{"verdict":"fail","findings":[{"severity":"error","org":"CREA","where":"X posts","issue":"repeat","evidence":"same id"}]}').findings[0].org, "CREA");
+let threw = false; try { Reviewer.parseReview("not json"); } catch { threw = true; }
+eq("an unreadable reviewer reply is rejected, never treated as a pass", threw, true);
+eq("a reply wrapped in a sentence and a code fence is still read", Reviewer.parseReview('Here you go:\n```json\n{"verdict":"pass","findings":[]}\n```').verdict, "pass");
+let bad2 = false; try { Reviewer.parseReview('{"verdict":"maybe","findings":[]}'); } catch { bad2 = true; }
+eq("an unknown verdict is rejected", bad2, true);
+
+// ── runAudit end to end with the Claude CLI stubbed ──
+const Module = require("module"); const origLoad = Module._load;
+let reply; const claudeStub = { askClaude: async () => { const r = reply(); if (r instanceof Error) throw r; return r; }, usage: {}, ClaudeCliError: Error };
+Module._load = function (req, ...a) { return /claude-cli(\.js)?$/.test(req) ? claudeStub : origLoad.call(this, req, ...a); };
+delete require.cache[require.resolve(path.join(__dirname, "..", "src", "pipeline", "claude-review.js"))];
+delete require.cache[require.resolve(path.join(__dirname, "..", "src", "pipeline", "audit.js"))];
+const A2 = require(path.join(__dirname, "..", "src", "pipeline", "audit.js"));
+const ctxOk = { ORGS, data: data(false), socialERResults: social(false), execF: [], actions: [], html: page(2), dateFrom: "2026-10-12", dateTo: "2026-10-18", subject: "air quality" };
+(async () => {
+  reply = () => '{"verdict":"pass","findings":[]}';
+  let r = await A2.runAudit(ctxOk);
+  eq("consistent report + reviewer pass -> passed", [r.passed, r.review.ran], [true, true]);
+  reply = () => '{"verdict":"fail","findings":[{"severity":"error","org":"CREA","where":"X posts","issue":"repeat","evidence":"same id"}]}';
+  r = await A2.runAudit(ctxOk);
+  eq("reviewer error finding -> blocked", [r.passed, r.errors.some((e) => e.source === "review")], [false, true]);
+  reply = () => '{"verdict":"fail","findings":[]}';
+  eq("fail verdict without a finding -> still blocked", (await A2.runAudit(ctxOk)).passed, false);
+  reply = () => '{"verdict":"pass","findings":[{"severity":"warning","org":"TERI","where":"X","issue":"odd","evidence":"x"}]}';
+  r = await A2.runAudit(ctxOk);
+  eq("reviewer warning -> passes, recorded", [r.passed, r.warnings.some((w) => w.source === "review")], [true, true]);
+  reply = () => new Error("Claude CLI is not authenticated");
+  r = await A2.runAudit(ctxOk);
+  eq("reviewer unavailable -> blocked, never a silent pass", [r.passed, r.errors[0].where], [false, "Claude CLI review"]);
+  reply = () => "I could not parse this";
+  eq("garbage reply -> blocked", (await A2.runAudit(ctxOk)).passed, false);
+  reply = () => { throw new Error("must not be called"); };
+  r = await A2.runAudit({ ...ctxOk, data: data(true), socialERResults: social(true), html: page(100) });
+  eq("rule errors block before the reviewer is even asked", [r.passed, r.review.ran], [false, false]);
+  console.log(fail ? `${fail} FAILED` : "all passed"); process.exit(fail ? 1 : 0);
+})();
