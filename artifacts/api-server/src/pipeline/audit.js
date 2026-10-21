@@ -6,7 +6,7 @@
  *   1. checkDeterministic() — plain code. Cross-checks the report's numbers
  *      against each other and against what the report page will show. Cannot be
  *      talked out of a finding.
- *   2. Codex CLI (codex-review.js) — an independent model reads an evidence pack
+ *   2. Claude Code CLI (claude-review.js) — a separate model call reads an evidence pack
  *      built from the same data and looks for what the fixed rules do not cover.
  *
  * Any error finding, or an audit that could not be completed, stops the run: no
@@ -19,7 +19,7 @@
  */
 
 const Sentinel = require("./sentinel");
-const Codex = require("./codex-review");
+const Reviewer = require("./claude-review");
 
 const PLATFORMS = [
   { key: "liData", name: "LinkedIn", fields: ["totalLikes", "totalComments", "totalShares"], htmlRe: /LinkedIn\s*—\s*<span[^>]*>(\d+)\s*(?:AQ\s*|[A-Za-z]+\s*)?posts?/gi },
@@ -144,7 +144,7 @@ function buildEvidencePack({ ORGS, data, socialERResults = [], youtubeERResults 
 }
 
 /**
- * Run both layers. Resolves to { passed, errors, warnings, checks, codex, summary }.
+ * Run both layers. Resolves to { passed, errors, warnings, checks, review, summary }.
  * Never throws for a failed audit — the caller decides; it throws only for programming errors.
  */
 async function runAudit(ctx, cb = () => {}) {
@@ -153,25 +153,25 @@ async function runAudit(ctx, cb = () => {}) {
   for (const e of det.errors) cb(`    ✗ ${e.org} · ${e.where}: ${e.issue}`, "err");
   for (const w of det.warnings) cb(`    ! ${w.org} · ${w.where}: ${w.issue}`, "warn");
 
-  const out = { passed: false, errors: [...det.errors], warnings: [...det.warnings], checks: det.checks, codex: { ran: false } };
+  const out = { passed: false, errors: [...det.errors], warnings: [...det.warnings], checks: det.checks, review: { ran: false } };
   if (det.errors.length) { out.summary = summarise(out); return out; }
 
-  cb(`  AUDIT · Codex CLI independent review...`);
+  cb(`  AUDIT · Claude CLI independent review...`);
   try {
     const pack = buildEvidencePack(ctx);
-    const review = await Codex.review(pack, { cb });
-    out.codex = { ran: true, verdict: review.verdict, model: review.model, findings: review.findings };
+    const review = await Reviewer.review(pack, { cb });
+    out.review = { ran: true, verdict: review.verdict, model: review.model, findings: review.findings };
     for (const f of review.findings) {
-      const item = { source: "codex", severity: f.severity === "error" ? "error" : "warning", org: f.org || "(report)", where: f.where || "", issue: `${f.issue}${f.evidence ? ` — ${f.evidence}` : ""}` };
+      const item = { source: "review", severity: f.severity === "error" ? "error" : "warning", org: f.org || "(report)", where: f.where || "", issue: `${f.issue}${f.evidence ? ` — ${f.evidence}` : ""}` };
       (item.severity === "error" ? out.errors : out.warnings).push(item);
-      cb(`    ${item.severity === "error" ? "✗" : "!"} Codex · ${item.org} · ${item.where}: ${item.issue}`, item.severity === "error" ? "err" : "warn");
+      cb(`    ${item.severity === "error" ? "✗" : "!"} Review · ${item.org} · ${item.where}: ${item.issue}`, item.severity === "error" ? "err" : "warn");
     }
-    if (review.verdict === "fail" && !out.errors.some((e) => e.source === "codex")) {
-      out.errors.push({ source: "codex", severity: "error", org: "(report)", where: "verdict", issue: "Codex returned a fail verdict without listing a finding" });
+    if (review.verdict === "fail" && !out.errors.some((e) => e.source === "review")) {
+      out.errors.push({ source: "review", severity: "error", org: "(report)", where: "verdict", issue: "the reviewer returned a fail verdict without listing a finding" });
     }
   } catch (e) {
-    out.errors.push({ source: "codex", severity: "error", org: "(audit)", where: "Codex CLI", issue: `the independent review could not be completed: ${e.message}` });
-    cb(`    ✗ Codex review could not be completed: ${e.message}`, "err");
+    out.errors.push({ source: "review", severity: "error", org: "(audit)", where: "Claude CLI review", issue: `the independent review could not be completed: ${e.message}` });
+    cb(`    ✗ review could not be completed: ${e.message}`, "err");
   }
   out.passed = out.errors.length === 0;
   out.summary = summarise(out);
@@ -180,8 +180,8 @@ async function runAudit(ctx, cb = () => {}) {
 }
 
 function summarise(a) {
-  const codex = a.codex?.ran ? `Codex reviewed (${a.codex.model || "model n/a"}, verdict ${a.codex.verdict})` : "Codex review not run";
-  return `${a.checks} rule checks, ${a.errors.length} error(s), ${a.warnings.length} warning(s); ${codex}`;
+  const rv = a.review?.ran ? `independent review ${a.review.model || ""} verdict ${a.review.verdict}` : "independent review not run";
+  return `${a.checks} rule checks, ${a.errors.length} error(s), ${a.warnings.length} warning(s); ${rv}`;
 }
 
 function failureMessage(a) {

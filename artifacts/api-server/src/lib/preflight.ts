@@ -56,35 +56,11 @@ async function defaultAsk(): Promise<AskFn> {
   return (mod.askClaude ?? mod.default!.askClaude) as AskFn;
 }
 
-async function defaultCodexPing(): Promise<() => Promise<unknown>> {
-  // @ts-ignore — CommonJS module, same interop as ../pipeline/index.ts
-  const mod = (await import("../pipeline/codex-review.js")) as { ping?: () => Promise<unknown>; default?: { ping: () => Promise<unknown> } };
-  return (mod.ping ?? mod.default!.ping) as () => Promise<unknown>;
-}
-
-export async function preflight(
-  cfg: PreflightConfig,
-  fetchImpl: FetchFn = fetch,
-  askImpl?: AskFn,
-  codexPingImpl?: () => Promise<unknown>,
-): Promise<PreflightResult> {
+export async function preflight(cfg: PreflightConfig, fetchImpl: FetchFn = fetch, askImpl?: AskFn): Promise<PreflightResult> {
   const out: PreflightResult = { fatal: [], warnings: [], checked: [] };
   const signal = () => AbortSignal.timeout(15000);
 
   const tasks: Promise<void>[] = [];
-
-  // Every report is independently reviewed by the Codex CLI before it is stored
-  // or sent (pipeline/audit.js). Without it no report can be released, so it is
-  // checked up front — before any paid fetching — and is always fatal.
-  tasks.push((async () => {
-    out.checked.push("Codex CLI");
-    try {
-      const ping = codexPingImpl ?? (await defaultCodexPing());
-      await ping();
-    } catch (e) {
-      out.fatal.push(`Codex CLI is not usable — every report is reviewed by it before release, so none can be produced: ${(e as Error).message}`);
-    }
-  })());
 
   if (cfg.CLAUDE_KEY) {
     tasks.push((async () => {

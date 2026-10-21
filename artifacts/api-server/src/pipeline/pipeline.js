@@ -1182,7 +1182,7 @@ ${batchText}`;
   html = FW.fwText(html);
   html = html.replace("<title>", `<meta name="emerald-framework" content="${fwNow().id}">\n<title>`);
 
-  // ── AUDIT: last gate. Rule checks + independent Codex CLI review. A failed or
+  // ── AUDIT: last gate. Rule checks + independent Claude CLI review. A failed or
   // incomplete audit stops the run here — nothing is written, stored or sent.
   const auditResult = await Audit.runAudit(
     { ORGS, data, socialERResults, youtubeERResults, execF, actions, html, dateFrom: DATE_FROM, dateTo: DATE_TO, subject: fwNow().subject },
