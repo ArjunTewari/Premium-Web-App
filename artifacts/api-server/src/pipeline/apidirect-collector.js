@@ -136,6 +136,8 @@ const RATE_RETRY_DELAYS = [1500, 4000, 8000]; // backoff on 429 before giving up
 // path above (retrying those without backing off just burns quota).
 const TRANSIENT_RETRY_DELAYS = [2000, 5000];
 const endpointGates = new Map(); // endpoint -> { active, limit, queue }
+// Calls made this run, per endpoint, so the run log shows where the money went.
+const usageByEndpoint = new Map();
 
 let _log = null;
 function setLogger(cb) { _log = cb; }
@@ -188,6 +190,7 @@ async function apiFetch(endpoint, params, apiKey, opts = {}) {
           timeout,
         });
         costTracker.apidirectCalls++;
+        usageByEndpoint.set(endpoint, (usageByEndpoint.get(endpoint) || 0) + 1);
         return data;
       } catch (e) {
         const status = e.response?.status;
@@ -316,15 +319,11 @@ function linkedinMode() {
 }
 const LI_TIMELINE_MAX_PAGES = Math.max(1, parseInt(process.env.LI_TIMELINE_PAGES || '10', 10) || 10);
 
-// A post carries a term in its own text, or as a hashtag for multi-word terms
-// (#AirPollution, #CleanAir). NFKC folds the bold letters LinkedIn posts often use.
+// The post's own text only (see keywordsInText): a title can carry the company's name.
 function liPostText(post) {
-  return `${post.snippet || ''} ${post.text || ''} ${post.title || ''}`.normalize('NFKC').toLowerCase();
+  return String(post.text || post.snippet || post.title || '').normalize('NFKC').toLowerCase();
 }
-function liHasTerm(postText, k) {
-  const flatText = postText.replace(/[^a-z0-9.]+/g, '');
-  return FW.termMatches(postText, k) || (/[\s-]/.test(k) && flatText.includes(k.replace(/[^a-z0-9.]+/g, '')));
-}
+function liHasTerm(postText, k) { return termInText(postText, k); }
 
 async function fetchLinkedInTimeline(companyUrl, dateRange, apiKey) {
   const out = [];
@@ -396,28 +395,26 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
   // ── Step 2: search per keyword, deduplicate ──
   // seen: url → { post, keywords: Set<string> }
 
-  const seen = new Map();
   const MAX_PAGES_PER_KW = 5;
   let source = 'search', timelinePages = 0, capHit = false, searchFallback = false;
+
+  // Raw = every post of the window, before the keyword rule (so the rule can be applied again later).
+  const raw = new Map();
+  const addRaw = (post) => { const key = post.url || `${post.date}:${(post.snippet || '').slice(0, 80)}`; if (!raw.has(key)) raw.set(key, post); };
 
   if (companyUrl && linkedinMode() === 'timeline') {
     try {
       const tl = await fetchLinkedInTimeline(companyUrl, dateRange, apiKey);
       timelinePages = tl.pages; capHit = tl.capHit;
-      const terms = [...new Set([...AQ_KEYWORDS_SEARCH, ...(aqKw || AQ_KW_BASE)])];
       for (const post of tl.posts) {
         if (!parseDate(post.date) || !inDateRange(post.date, dateRange?.from, dateRange?.to)) continue;
-        const postText = liPostText(post);
-        const kws = terms.filter(k => liHasTerm(postText, k));
-        if (!kws.length) continue;
-        const key = post.url || `${post.date}:${(post.snippet || '').slice(0, 80)}`;
-        if (!seen.has(key)) seen.set(key, { post, keywords: new Set(kws) });
+        addRaw(post);
       }
       source = 'timeline';
       if (capHit) cb?.(`  [APIdirect/LI] ${org}: stopped at the page limit — the count may be lower than the true number`, 'warn');
     } catch (e) {
       searchFallback = true;
-      seen.clear();
+      raw.clear();
       cb?.(`  [APIdirect/LI] ${org}: reading the company's posts failed (${e.message}) — using the keyword search instead`, 'warn');
     }
   }
@@ -434,25 +431,9 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
         }
         const batch = data.posts || [];
         if (!batch.length) break;
-
         for (const post of batch) {
-          if (!inDateRange(post.date, dateRange?.from, dateRange?.to)) continue;
-          // The search endpoint matches loosely (fuzzy/semantic), so a hit for
-          // "health impact" can be any of the org's posts — e.g. a dentistry
-          // podcast. Only count it as an AQ post if its own text carries the
-          // keyword searched for or one of the base AQ terms.
-          // NFKC folds the mathematical-bold letters LinkedIn posts often use
-          // (e.g. '𝗔𝗶𝗿 𝗤𝘂𝗮𝗹𝗶𝘁𝘆') back to plain text so they still match.
-          const postText = `${post.snippet || ''} ${post.text || ''} ${post.title || ''}`.normalize('NFKC').toLowerCase();
-          // Multi-word terms also match as hashtags (#AirPollution, #CleanAir).
-          const flatText = postText.replace(/[^a-z0-9.]+/g, '');
-          const hasTerm = (k) => FW.termMatches(postText, k) || (/[\s-]/.test(k) && flatText.includes(k.replace(/[^a-z0-9.]+/g, '')));
-          if (!hasTerm(keyword) && !AQ_KW_BASE.some(hasTerm)) continue;
-          const key = post.url || `${post.date}:${(post.snippet || '').slice(0, 80)}`;
-          if (!seen.has(key)) seen.set(key, { post, keywords: new Set() });
-          seen.get(key).keywords.add(keyword);
+          if (inDateRange(post.date, dateRange?.from, dateRange?.to)) addRaw(post);
         }
-
         // Stop paginating this keyword once we've passed the date window start
         const oldest = oldestInBatch(batch, 'date');
         if (dateRange?.from && oldest && oldest < dateRange.from) break;
@@ -460,8 +441,19 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
     }
   }
 
-  // ── Step 3: aggregate ──
-  const entries = [...seen.values()];
+  return buildLinkedInResult({ org, followers, raw: [...raw.values()], source, timelinePages, capHit, searchFallback, aqKw, cb });
+}
+
+// The counting rule, engagement and top posts. Pure given its inputs: the same function
+// re-counts saved posts (reprocessLinkedIn) without any API call.
+function buildLinkedInResult({ org, followers, raw, source, timelinePages, capHit, searchFallback, aqKw, cb }) {
+  const terms = [...new Set([...AQ_KEYWORDS_SEARCH, ...(aqKw || AQ_KW_BASE)])];
+  const entries = [];
+  for (const post of raw) {
+    const kws = terms.filter(k => liHasTerm(liPostText(post), k));
+    if (kws.length) entries.push({ post, keywords: new Set(kws) });
+  }
+  const droppedNoKeyword = raw.length - entries.length;
   const posts   = entries.map(e => e.post);
 
   const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
@@ -477,7 +469,7 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
     })
     .map(({ post, keywords }) => ({
       url:            post.url || '',
-      snippet:        (post.snippet || post.text || '').slice(0, 250),
+      snippet:        String(post.text || post.snippet || post.title || '').slice(0, 250),
       author:         post.author || '',
       likes:          post.likes    || 0,
       comments:       post.comments || 0,
@@ -488,7 +480,27 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
 
   const erVal = er(totalEngage, followers, posts.length);
   cb?.(`  [APIdirect/LI] ${org}: ${posts.length} AQ posts (${source === 'timeline' ? `company posts, ${timelinePages} page${timelinePages === 1 ? '' : 's'}` : `${AQ_KEYWORDS_SEARCH.length} keyword searches`}), ${totalEngage} engagements${followers > 0 ? `, ${followers.toLocaleString()} followers` : ''}, ER=${erVal}${followers > 0 ? '%' : ''}`, posts.length > 0 ? 'ok' : 'warn');
-  return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers, er: erVal, topPosts, fetched: posts.length, inRangeCount: posts.length, source, timelinePages, capHit, searchFallback };
+  if (droppedNoKeyword > 0) cb?.(`  [APIdirect/LI] ${org}: ${droppedNoKeyword} post(s) of the window left out — their text has none of the keywords`);
+  return {
+    postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers, er: erVal, topPosts,
+    fetched: raw.length, inRangeCount: posts.length, droppedNoKeyword, source, timelinePages, capHit, searchFallback,
+    rawPosts: raw.map(slimLinkedInPost),
+    rawMeta: { followers, source, timelinePages, capHit, searchFallback },
+  };
+}
+
+function slimLinkedInPost(p) {
+  return {
+    url: p.url || '', text: String(p.text || p.snippet || p.title || '').slice(0, 1500), date: p.date || '',
+    likes: p.likes || 0, comments: p.comments || 0, shares: p.shares || 0, author: p.author || '',
+  };
+}
+
+/** Count a saved LinkedIn result again under the current rules, from its saved posts. No API call. */
+function reprocessLinkedIn(org, d, aqKw, cb) {
+  if (!d || !Array.isArray(d.rawPosts) || !d.rawMeta) return d;
+  const m = d.rawMeta;
+  return buildLinkedInResult({ org, followers: m.followers ?? d.followers ?? 0, raw: d.rawPosts, source: m.source, timelinePages: m.timelinePages, capHit: m.capHit, searchFallback: m.searchFallback, aqKw, cb });
 }
 
 // Identity of a tweet, so the same tweet returned twice is counted once.
@@ -500,13 +512,50 @@ function tweetKey(t) {
   return `${t.date || t.created_at || ''}|${(t.text || t.snippet || t.title || '').slice(0, 120)}`;
 }
 
-// Same test the LinkedIn collector applies: the post's own text must carry a
-// keyword. NFKC folds mathematical-bold letters; multi-word terms also match as
-// hashtags (#AirPollution, #CleanAir).
+// A term is in a post's text if it matches there, or — for a multi-word term — as an actual
+// hashtag (#AirPollution, #CleanAir). A hashtag is NOT "the letters appear somewhere once the
+// spaces are removed": that matched "cleanair" inside a link (energyandcleanair.org).
+function termInText(text, k) {
+  if (FW.termMatches(text, k)) return true;
+  if (/[\s-]/.test(k)) {
+    const tag = '#' + k.replace(/[^a-z0-9]+/g, '');
+    const i = text.indexOf(tag);
+    if (i !== -1 && !/[a-z0-9]/.test(text.charAt(i + tag.length) || '')) return true;
+  }
+  return false;
+}
+
+// The post's own text (NFKC folds the bold letters LinkedIn posts often use). Only that text:
+// a result's title or snippet can carry the author's name ("Centre for Research on Energy and
+// Clean Air on X: ..."), which would make every post of that account match "clean air".
 function keywordsInText(raw, terms) {
   const text = String(raw || '').normalize('NFKC').toLowerCase();
-  const flat = text.replace(/[^a-z0-9.]+/g, '');
-  return terms.filter(k => FW.termMatches(text, k) || (/[\s-]/.test(k) && flat.includes(k.replace(/[^a-z0-9.]+/g, ''))));
+  return terms.filter(k => termInText(text, k));
+}
+
+function tweetText(t) { return String(t.text || t.snippet || t.title || ''); }
+function isRetweet(t) { return /^RT @/.test(tweetText(t).trim()) || !!t.retweeted_status || !!t.is_retweet; }
+
+// In the report window, not a retweet, and the tweet's own text carries a keyword.
+function gateTweets(list, aqKw, dateRange) {
+  const kept = [];
+  let dropped = 0, retweets = 0;
+  for (const t of list.filter(x => inDateRange(x.date || x.created_at, dateRange?.from, dateRange?.to))) {
+    if (isRetweet(t)) { retweets++; continue; }
+    const kws = keywordsInText(tweetText(t), aqKw);
+    if (!kws.length) { dropped++; continue; }
+    kept.push({ ...t, keywords_found: kws });
+  }
+  return { kept, dropped, retweets };
+}
+
+// What is saved so the counting rules can be applied again later without fetching.
+function slimTweet(t) {
+  return {
+    id: String(t.id_str || t.id || t.tweet_id || t.rest_id || ''), url: t.url || '', text: tweetText(t).slice(0, 1500),
+    date: t.date || t.created_at || '', likes: t.likes || 0, replies: t.replies || 0, retweets: t.retweets || 0, views: t.views || 0,
+    author: t.author || '', is_retweet: isRetweet(t),
+  };
 }
 
 // ── X timeline cross-check ────────────────────────────────────────────────
@@ -515,13 +564,15 @@ function keywordsInText(raw, terms) {
 // (CSTEP showed 0 in every report although it had tweeted about air quality).
 // The account's own timeline does not depend on that index, so it is fetched too,
 // filtered locally with the same keyword rule, and merged with the search results.
-//   X_TIMELINE_MODE = always (default) | zero (only when the search found nothing) | off
-//   X_TIMELINE_PAGES = page limit per account (default 8, ~20 tweets a page)
+//   X_TIMELINE_MODE = zero (default: only when the search found nothing) | always | off
+//   X_TIMELINE_PAGES = page limit per account (default 4, ~20 tweets a page)
+// 'always' reads every account's timeline (up to X_TIMELINE_PAGES calls each) and
+// roughly doubles the X cost of a run; use it for an audit run, not every run.
 function timelineMode() {
-  const m = String(process.env.X_TIMELINE_MODE || 'always').toLowerCase();
-  return m === 'off' || m === 'zero' ? m : 'always';
+  const m = String(process.env.X_TIMELINE_MODE || 'zero').toLowerCase();
+  return m === 'off' || m === 'always' ? m : 'zero';
 }
-const TIMELINE_MAX_PAGES = Math.max(1, parseInt(process.env.X_TIMELINE_PAGES || '8', 10) || 8);
+const TIMELINE_MAX_PAGES = Math.max(1, parseInt(process.env.X_TIMELINE_PAGES || '4', 10) || 4);
 
 function newestInBatch(batch, ...fields) {
   let newest = null;
@@ -637,30 +688,16 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
     const searchCapHit = !exhausted && pagesFetched >= MAX_PAGES;
     if (duplicatesRemoved > 0) cb?.(`  [APIdirect/X] ${org}: ${duplicatesRemoved} repeated tweet(s) from the API removed`, 'warn');
 
-    // Date-range filter, then keep only tweets whose own text carries a keyword.
-    // The search matches loosely (it also matches the account's display name, so an
-    // account called "... Clean Air" returns every tweet for "clean air").
-    const gate = (list) => {
-      const kept = [];
-      let dropped = 0;
-      for (const t of list.filter(x => inDateRange(x.date || x.created_at, dateRange?.from, dateRange?.to))) {
-        const kws = keywordsInText(`${t.text || ''} ${t.snippet || ''} ${t.title || ''}`, aqKw);
-        if (!kws.length) { dropped++; continue; }
-        kept.push({ ...t, keywords_found: kws });
-      }
-      return { kept, dropped };
-    };
-
     // Cross-check with the account's own timeline (see fetchTimelineTweets).
     let timelineRan = false, timelineFailed = false, timelinePages = 0, timelineCapHit = false;
     const fromTimeline = new Set();
-    const runTimeline = tlMode === 'always' || (tlMode === 'zero' && gate(unique).kept.length === 0);
+    const runTimeline = tlMode === 'always' || (tlMode === 'zero' && gateTweets(unique, aqKw, dateRange).kept.length === 0);
     if (runTimeline) {
       try {
         const tl = await fetchTimelineTweets(handle, dateRange, apiKey);
         timelineRan = true; timelinePages = tl.pages; timelineCapHit = tl.capHit;
         for (const t of tl.tweets) {
-          if (/^RT @/.test(String(t.text || '').trim()) || t.retweeted_status || t.is_retweet) continue;
+          if (isRetweet(t)) continue;
           const k = tweetKey(t);
           if (seenIds.has(k)) continue;
           seenIds.add(k); unique.push(t); fromTimeline.add(k);
@@ -673,43 +710,70 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
     if (searchFailed && !timelineRan) throw firstPageRes.reason;
     if (searchFailed) cb?.(`  [APIdirect/X] ${org}: the search failed; counted from the account's timeline only`, 'warn');
 
-    // The count is complete only if whichever source covered the window was not cut short.
-    const capHit = (timelineRan && timelinePages > 0) ? timelineCapHit : searchCapHit;
-    if (capHit) cb?.(`  [APIdirect/X] ${org}: stopped at the page limit — the count may be lower than the true number`, 'warn');
-
-    const { kept: tagged, dropped: droppedNoKeyword } = gate(unique);
-    const timelineAdded = tagged.filter(t => fromTimeline.has(tweetKey(t))).length;
-    if (timelineAdded > 0) cb?.(`  [APIdirect/X] ${org}: the timeline found ${timelineAdded} tweet(s) the search had missed`, 'warn');
-    if (droppedNoKeyword > 0) cb?.(`  [APIdirect/X] ${org}: ${droppedNoKeyword} tweet(s) dropped — their text has none of the keywords`, 'warn');
-
-    const totalLikes    = tagged.reduce((s, t) => s + (t.likes    || 0), 0);
-    const totalReplies  = tagged.reduce((s, t) => s + (t.replies  || 0), 0);
-    const totalRetweets = tagged.reduce((s, t) => s + (t.retweets || 0), 0);
-    const totalViews    = tagged.reduce((s, t) => s + (t.views    || 0), 0);
-    const totalEngage   = totalLikes + totalReplies + totalRetweets;
-
-    const topPosts = [...tagged]
-      .sort((a, b) => ((b.likes || 0) + (b.replies || 0) + (b.retweets || 0)) - ((a.likes || 0) + (a.replies || 0) + (a.retweets || 0)))
-      .slice(0, 5)
-      .map(t => ({
-        url:            t.url || '',
-        snippet:        (t.text || t.snippet || t.title || '').slice(0, 250),
-        author:         t.author || handle,
-        likes:          t.likes    || 0,
-        replies:        t.replies  || 0,
-        retweets:       t.retweets || 0,
-        views:          t.views    || 0,
-        date:           t.date || t.created_at || '',
-        keywords_found: t.keywords_found,
-      }));
-
-    const erVal = er(totalEngage, followers, tagged.length);
-    cb?.(`  [APIdirect/X] ${org}: ${tagged.length} AQ tweets (${timelineRan ? 'search + timeline' : 'search'}), ${followers.toLocaleString()} followers, ER=${erVal}%`, tagged.length > 0 ? 'ok' : 'warn');
-    return { postCount: tagged.length, totalLikes, totalReplies, totalRetweets, totalViews, followers, er: erVal, topPosts, fetched: unique.length, inRangeCount: tagged.length, duplicatesRemoved, droppedNoKeyword, pagesFetched, capHit, searchFailed, timelineRan, timelineFailed, timelinePages, timelineAdded };
+    return buildTwitterResult({
+      org, handle, followers, unique, fromTimeline, aqKw, dateRange, cb,
+      meta: { duplicatesRemoved, pagesFetched, searchFailed, searchCapHit, timelineRan, timelineFailed, timelinePages, timelineCapHit },
+    });
   } catch (e) {
     cb?.(`  [APIdirect/X] ${org}: ${e.message}`, 'warn');
     return failResult(EMPTY, e);
   }
+}
+
+// Everything after the fetching: count rules, engagement, top posts. Pure given its inputs,
+// so the same function re-counts saved posts (reprocessTwitter) without any API call.
+function buildTwitterResult({ org, handle, followers, unique, fromTimeline, meta, aqKw, dateRange, cb }) {
+  const { kept: tagged, dropped: droppedNoKeyword, retweets: droppedRetweets } = gateTweets(unique, aqKw, dateRange);
+  const timelineAdded = tagged.filter(t => fromTimeline.has(tweetKey(t))).length;
+  // The count is complete only if whichever source covered the window was not cut short.
+  const capHit = (meta.timelineRan && meta.timelinePages > 0) ? meta.timelineCapHit : meta.searchCapHit;
+  if (capHit) cb?.(`  [APIdirect/X] ${org}: stopped at the page limit — the count may be lower than the true number`, 'warn');
+  if (timelineAdded > 0) cb?.(`  [APIdirect/X] ${org}: the timeline found ${timelineAdded} tweet(s) the search had missed`, 'warn');
+  if (droppedNoKeyword > 0) cb?.(`  [APIdirect/X] ${org}: ${droppedNoKeyword} tweet(s) dropped — their text has none of the keywords`, 'warn');
+  if (droppedRetweets > 0) cb?.(`  [APIdirect/X] ${org}: ${droppedRetweets} retweet(s) of other accounts left out`, 'warn');
+
+  const totalLikes    = tagged.reduce((s, t) => s + (t.likes    || 0), 0);
+  const totalReplies  = tagged.reduce((s, t) => s + (t.replies  || 0), 0);
+  const totalRetweets = tagged.reduce((s, t) => s + (t.retweets || 0), 0);
+  const totalViews    = tagged.reduce((s, t) => s + (t.views    || 0), 0);
+  const totalEngage   = totalLikes + totalReplies + totalRetweets;
+
+  const topPosts = [...tagged]
+    .sort((a, b) => ((b.likes || 0) + (b.replies || 0) + (b.retweets || 0)) - ((a.likes || 0) + (a.replies || 0) + (a.retweets || 0)))
+    .slice(0, 5)
+    .map(t => ({
+      url:            t.url || '',
+      snippet:        tweetText(t).slice(0, 250),
+      author:         t.author || handle,
+      likes:          t.likes    || 0,
+      replies:        t.replies  || 0,
+      retweets:       t.retweets || 0,
+      views:          t.views    || 0,
+      date:           t.date || t.created_at || '',
+      keywords_found: t.keywords_found,
+    }));
+
+  const erVal = er(totalEngage, followers, tagged.length);
+  cb?.(`  [APIdirect/X] ${org}: ${tagged.length} AQ tweets (${meta.timelineRan ? 'search + timeline' : 'search'}), ${followers.toLocaleString()} followers, ER=${erVal}%`, tagged.length > 0 ? 'ok' : 'warn');
+  const rawTweets = unique.filter(t => inDateRange(t.date || t.created_at, dateRange?.from, dateRange?.to)).map(slimTweet);
+  const rawIds = new Set(rawTweets.map(t => t.id).filter(Boolean));
+  return {
+    postCount: tagged.length, totalLikes, totalReplies, totalRetweets, totalViews, followers, er: erVal, topPosts,
+    fetched: unique.length, inRangeCount: tagged.length,
+    duplicatesRemoved: meta.duplicatesRemoved, droppedNoKeyword, droppedRetweets, pagesFetched: meta.pagesFetched, capHit,
+    searchFailed: meta.searchFailed, timelineRan: meta.timelineRan, timelineFailed: meta.timelineFailed, timelinePages: meta.timelinePages, timelineAdded,
+    rawTweets,
+    rawMeta: { ...meta, handle, followers, fetched: unique.length, timelineIds: [...fromTimeline].filter(k => rawIds.has(k)) },
+  };
+}
+
+/** Count a saved X result again under the current rules, from its saved tweets. No API call. */
+function reprocessTwitter(org, d, aqKw, dateRange, cb) {
+  if (!d || !Array.isArray(d.rawTweets) || !d.rawMeta) return d;
+  return buildTwitterResult({
+    org, handle: d.rawMeta.handle || '', followers: d.rawMeta.followers ?? d.followers ?? 0,
+    unique: d.rawTweets, fromTimeline: new Set(d.rawMeta.timelineIds || []), meta: d.rawMeta, aqKw, dateRange, cb,
+  });
 }
 
 // ── Instagram ─────────────────────────────────────────────────────────────────
@@ -867,6 +931,7 @@ async function run(cfg, selectedOrgs, orgHandles = {}, cb) {
   const apiKey = cfg.APIDIRECT_KEY;
   setLogger(cb);   // route adaptive-throttle notices into the run transcript
   resetGates();    // fresh concurrency headroom for this run
+  usageByEndpoint.clear();
   if (!apiKey) {
     cb?.('  [APIdirect] No APIDIRECT_KEY — social collection skipped', 'warn');
     return selectedOrgs.map(org => ({
@@ -916,6 +981,10 @@ async function run(cfg, selectedOrgs, orgHandles = {}, cb) {
     }
   }
 
+  const total = [...usageByEndpoint.values()].reduce((a, b) => a + b, 0);
+  const detail = [...usageByEndpoint.entries()].sort((a, b) => b[1] - a[1]).map(([e, n]) => `${e} ${n}`).join(' · ');
+  cb?.(`  [APIdirect] usage this run: ${total} calls (~$${(total * 0.006).toFixed(2)} at $0.006/call, $${(total * 0.01).toFixed(2)} at the $0.01 the report cost uses) — ${detail}`, 'ok');
+
   return results;
 }
 
@@ -923,6 +992,7 @@ module.exports = {
   run,
   // Individual fetchers + helpers exported for the sentinel's targeted retries
   fetchLinkedIn, fetchTwitter, fetchInstagram, fetchYouTubeChannel,
+  reprocessTwitter, reprocessLinkedIn,
   buildAqKeywords, parseDate, inDateRange, isAQ,
   AQ_KEYWORDS_SEARCH,
 };

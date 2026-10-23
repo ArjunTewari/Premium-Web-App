@@ -80,10 +80,15 @@ function termRegex(term) {
   }
   return r;
 }
+// Letters-only terms of 3-4 characters (ncap, grap, aqi, smog) are acronyms or short words that
+// occur inside many longer ones ("grap" in photography, graphite, biography), so in substring
+// mode they must also stand alone. Everything else keeps matching anywhere in the text.
+const SHORT_ALPHA = /^[a-z]{3,4}$/;
 function termMatches(text, term, fw = active) {
   const t = String(text || "").toLowerCase();
-  if (fw.matchMode === "word") return termRegex(term.toLowerCase()).test(t);
-  return t.includes(term.toLowerCase());
+  const k = term.toLowerCase();
+  if (fw.matchMode === "word" || SHORT_ALPHA.test(k)) return termRegex(k).test(t);
+  return t.includes(k);
 }
 function matchedTerms(text, terms, fw = active) {
   return terms.filter((k) => termMatches(text, k, fw));
