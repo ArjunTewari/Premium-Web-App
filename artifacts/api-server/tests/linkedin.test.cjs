@@ -53,7 +53,7 @@ const run = async (s, handle = "org-x") => { script = s; calls.length = 0; const
   // page limit
   let id = 100;
   o = await run(route({ posts: () => ({ posts: [post(id++, "air quality", 14), post(id++, "air quality", 15)] }) }));
-  eq("page limit (6) reached inside the window -> flagged", [n("linkedin/company/posts"), o.r.capHit, o.r.postCount], [6, true, 12]);
+  eq("page limit (10) reached inside the window -> flagged", [n("linkedin/company/posts"), o.r.capHit, o.r.postCount], [10, true, 20]);
 
   // LI_MODE=search keeps the old behaviour
   process.env.LI_MODE = "search";
