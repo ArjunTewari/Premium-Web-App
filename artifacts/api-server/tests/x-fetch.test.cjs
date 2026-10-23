@@ -33,7 +33,8 @@ const run = async (s) => { script = s; calls.length = 0; const msgs = []; const 
   o = await run((u) => u.includes("twitter/posts") ? { tweets: [] } : { user: { followers_count: 1 } });
   eq("empty search -> 0, no cap flag", [o.r.postCount, o.r.capHit], [0, false]);
 
-  // ── timeline cross-check ──
+  // ── timeline cross-check (the cases below exercise the full cross-check, so mode "always") ──
+  const defaultMode = process.env.X_TIMELINE_MODE; process.env.X_TIMELINE_MODE = "always";
   const TL = "twitter/user/tweets", SEARCH = "twitter/posts";
   const route = ({ search, timeline }) => (u, p) => u.includes(TL) ? timeline(p.page) : u.includes(SEARCH) ? search(p.page) : { user: { followers_count: 4500 } };
   const old = (id) => ({ ...tw(id, "Pinned: our annual report", 14), date: "2026-06-01T10:00:00Z" });
@@ -84,5 +85,13 @@ const run = async (s) => { script = s; calls.length = 0; const msgs = []; const 
   o = await run(route({ search: () => ({ tweets: [] }), timeline: (pg) => pg === 1 ? { tweets: [tw(96, "smog", 14)] } : { tweets: [] } }));
   eq("mode zero: timeline used when the search found nothing", [o.r.timelineRan, o.r.postCount], [true, 1]);
   delete process.env.X_TIMELINE_MODE;
+  // default is "zero": no timeline calls when the search found tweets (keeps the cost of a run down)
+  o = await run(route({ search: (pg) => pg === 1 ? { tweets: [tw(97, "air quality", 14)] } : { tweets: [] }, timeline: () => { throw new Error("must not be called"); } }));
+  eq("default mode: timeline not called when the search found tweets", [o.r.timelineRan, o.r.postCount], [false, 1]);
+  o = await run(route({ search: () => ({ tweets: [] }), timeline: (pg) => pg === 1 ? { tweets: [tw(98, "air quality", 14)] } : { tweets: [] } }));
+  eq("default mode: timeline used when the search found nothing (the CSTEP case)", [o.r.timelineRan, o.r.postCount], [true, 1]);
+  let pagesAsked = 0;
+  o = await run(route({ search: () => ({ tweets: [] }), timeline: (pg) => { pagesAsked++; return { tweets: [tw(200 + pg, "air quality", 14)] }; } }));
+  eq("default page limit is 4", [pagesAsked, o.r.capHit], [4, true]);
   console.log(fail ? `${fail} FAILED` : "all passed"); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(2); });
