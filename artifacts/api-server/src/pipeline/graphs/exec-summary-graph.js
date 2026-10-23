@@ -140,6 +140,19 @@ async function run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb }) {
     execAudit = reAudit;
   }
 
+  // Whatever still disagrees with the computed data after regeneration and correction
+  // cannot be verified (an ambiguous "%", or a claim the model keeps getting wrong).
+  // A report must not carry a number it cannot stand behind, so those findings are
+  // taken out, logged, and recorded in execAudit.dropped (the audit shows it).
+  if (execAudit.issues.length) {
+    const bad = new Set(execAudit.issues.map((iss) => iss.findingIdx));
+    const dropped = [...bad].sort((a, b) => a - b).map((i) => ({ headline: execF[i]?.headline || '', claims: execAudit.issues.filter((iss) => iss.findingIdx === i).map((iss) => `${iss.org}: ${iss.claimed} ${iss.metric}, data ${iss.actual}`) }));
+    execF = execF.filter((_, i) => !bad.has(i));
+    for (const d of dropped) cb?.(`  SENTINEL · exec summary: finding removed because a number in it could not be verified — "${d.headline}" (${d.claims.join('; ')})`, 'warn');
+    const finalAudit = Sentinel.validateExecSummary(execF, data, ORGS);
+    execAudit = { ...finalAudit, dropped };
+  }
+
   return { execF, execAudit };
 }
 

@@ -362,12 +362,20 @@ function validateExecSummary(execF, data, ORGS) {
         checked++;
         const truth = data[nearestOrg];
         if (!truth) continue;
-        const matches = fields.some((f) => truth[f] != null && Math.abs(truth[f] - val) < 0.6);
+        // "%" can mean the data-specific share or the authoritative share. The words
+        // right around the number usually say which ("50% data-specific"); only when
+        // they name exactly one is it treated as that field. Otherwise it stays
+        // ambiguous: checked against both, and never auto-corrected on a guess.
+        let useFields = fields;
+        if (fields.length > 1) {
+          const ctx = text.slice(Math.max(0, m.index - 70), m.index + m[0].length + 70).toLowerCase();
+          const sayData = /data[- ](specific|driven|backed|cited|content)|\bdatasets?\b/.test(ctx);
+          const sayAuth = /authorit/.test(ctx);
+          if (sayData !== sayAuth) useFields = [sayData ? 'dataPct' : 'authPct'];
+        }
+        const matches = useFields.some((f) => truth[f] != null && Math.abs(truth[f] - val) < 0.6);
         if (!matches) {
-          // Only auto-correctable when the unit maps to exactly one field —
-          // "%" maps to either dataPct or authPct, so which one the finding
-          // meant is ambiguous and must stay a flagged issue, not a guess.
-          const singleField = fields.length === 1 ? fields[0] : null;
+          const singleField = useFields.length === 1 ? useFields[0] : null;
           const correctedValue = singleField != null && truth[singleField] != null
             ? String(truth[singleField]) : null;
           issues.push({
@@ -376,7 +384,7 @@ function validateExecSummary(execF, data, ORGS) {
             org: nearestOrg,
             claimed: val,
             metric: label,
-            actual: fields.map((f) => `${f}=${truth[f] ?? 'n/a'}`).join(', '),
+            actual: useFields.map((f) => `${f}=${truth[f] ?? 'n/a'}`).join(', '),
             matchStart: gStart,
             matchEnd: gEnd,
             correctedValue,

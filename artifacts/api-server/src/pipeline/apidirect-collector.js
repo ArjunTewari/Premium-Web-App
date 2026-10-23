@@ -310,11 +310,11 @@ function oldestInBatch(batch, ...fields) {
 // (10 a page), so the report window is read in a few pages and filtered locally
 // with the same keyword rule.
 //   LI_MODE = timeline (default; falls back to the keyword search if the read fails) | search
-//   LI_TIMELINE_PAGES = page limit per company (default 6, 10 posts a page)
+//   LI_TIMELINE_PAGES = page limit per company (default 10, 10 posts a page)
 function linkedinMode() {
   return String(process.env.LI_MODE || 'timeline').toLowerCase() === 'search' ? 'search' : 'timeline';
 }
-const LI_TIMELINE_MAX_PAGES = Math.max(1, parseInt(process.env.LI_TIMELINE_PAGES || '6', 10) || 6);
+const LI_TIMELINE_MAX_PAGES = Math.max(1, parseInt(process.env.LI_TIMELINE_PAGES || '10', 10) || 10);
 
 // A post carries a term in its own text, or as a hashtag for multi-word terms
 // (#AirPollution, #CleanAir). NFKC folds the bold letters LinkedIn posts often use.
