@@ -431,6 +431,56 @@ function keywordsInText(raw, terms) {
   return terms.filter(k => FW.termMatches(text, k) || (/[\s-]/.test(k) && flat.includes(k.replace(/[^a-z0-9.]+/g, ''))));
 }
 
+// ── X timeline cross-check ────────────────────────────────────────────────
+// The keyword search is not exhaustive: an account's tweets can be missing from the
+// provider's search index, and an empty search was being reported as "0 posts"
+// (CSTEP showed 0 in every report although it had tweeted about air quality).
+// The account's own timeline does not depend on that index, so it is fetched too,
+// filtered locally with the same keyword rule, and merged with the search results.
+//   X_TIMELINE_MODE = always (default) | zero (only when the search found nothing) | off
+//   X_TIMELINE_PAGES = page limit per account (default 8, ~20 tweets a page)
+function timelineMode() {
+  const m = String(process.env.X_TIMELINE_MODE || 'always').toLowerCase();
+  return m === 'off' || m === 'zero' ? m : 'always';
+}
+const TIMELINE_MAX_PAGES = Math.max(1, parseInt(process.env.X_TIMELINE_PAGES || '8', 10) || 8);
+
+function newestInBatch(batch, ...fields) {
+  let newest = null;
+  for (const p of batch) {
+    for (const f of fields) {
+      const d = parseDate(p[f]);
+      if (d && (!newest || d > newest)) newest = d;
+    }
+  }
+  return newest;
+}
+
+// Newest first. A pinned tweet can sit at the top of page 1 with an old date, so
+// paging stops only on a page whose NEWEST tweet is already before the window.
+async function fetchTimelineTweets(handle, dateRange, apiKey) {
+  const out = [];
+  const seen = new Set();
+  let pages = 0;
+  let exhausted = false;
+  for (let page = 1; page <= TIMELINE_MAX_PAGES; page++) {
+    const r = await apiFetch('twitter/user/tweets', { username: handle, page }, apiKey);
+    const batch = r.tweets || r.posts || [];
+    if (!batch.length) { exhausted = true; break; }
+    pages++;
+    let fresh = 0;
+    for (const t of batch) {
+      const k = tweetKey(t);
+      if (seen.has(k)) continue;
+      seen.add(k); out.push(t); fresh++;
+    }
+    if (fresh === 0) { exhausted = true; break; } // a repeated page
+    const newest = newestInBatch(batch, 'date', 'created_at');
+    if (dateRange?.from && newest && newest < dateRange.from) { exhausted = true; break; }
+  }
+  return { tweets: out, pages, capHit: !exhausted };
+}
+
 // ── Twitter / X ───────────────────────────────────────────────────────────────
 // Smart pagination: fetch pages sequentially, stop as soon as the oldest tweet
 // on a page predates dateFrom. Max 5 pages (~100 tweets).
@@ -459,7 +509,11 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
     ]);
     const followers = userRes.status === 'fulfilled' ? (userRes.value?.user?.followers_count || 0) : 0;
 
-    if (firstPageRes.status === 'rejected') throw firstPageRes.reason;
+    // A failed search is not "0 tweets". With the timeline cross-check the report can
+    // still be built from the timeline; with neither it is a failed fetch.
+    const searchFailed = firstPageRes.status === 'rejected';
+    const tlMode = timelineMode();
+    if (searchFailed && tlMode === 'off') throw firstPageRes.reason;
 
     // De-duplicate as pages arrive. The search has been seen to return the same
     // page again for a later page number (one account's 20 tweets came back five
@@ -479,7 +533,7 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
     };
     let pagesFetched = 1;
     let exhausted = false; // true when paging ended because there was nothing more in the window
-    const firstBatch = firstPageRes.value?.tweets || firstPageRes.value?.posts || [];
+    const firstBatch = searchFailed ? [] : (firstPageRes.value?.tweets || firstPageRes.value?.posts || []);
     addBatch(firstBatch);
     if (!firstBatch.length) exhausted = true;
 
@@ -502,21 +556,52 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
       }
     }
     // Stopped by the page limit while still inside the window: more may exist.
-    const capHit = !exhausted && pagesFetched >= MAX_PAGES;
+    const searchCapHit = !exhausted && pagesFetched >= MAX_PAGES;
     if (duplicatesRemoved > 0) cb?.(`  [APIdirect/X] ${org}: ${duplicatesRemoved} repeated tweet(s) from the API removed`, 'warn');
-    if (capHit) cb?.(`  [APIdirect/X] ${org}: stopped at the ${MAX_PAGES}-page limit — the count may be lower than the true number`, 'warn');
 
     // Date-range filter, then keep only tweets whose own text carries a keyword.
     // The search matches loosely (it also matches the account's display name, so an
     // account called "... Clean Air" returns every tweet for "clean air").
-    const tweets = unique.filter(t => inDateRange(t.date || t.created_at, dateRange?.from, dateRange?.to));
-    const tagged = [];
-    let droppedNoKeyword = 0;
-    for (const t of tweets) {
-      const kws = keywordsInText(`${t.text || ''} ${t.snippet || ''} ${t.title || ''}`, aqKw);
-      if (!kws.length) { droppedNoKeyword++; continue; }
-      tagged.push({ ...t, keywords_found: kws });
+    const gate = (list) => {
+      const kept = [];
+      let dropped = 0;
+      for (const t of list.filter(x => inDateRange(x.date || x.created_at, dateRange?.from, dateRange?.to))) {
+        const kws = keywordsInText(`${t.text || ''} ${t.snippet || ''} ${t.title || ''}`, aqKw);
+        if (!kws.length) { dropped++; continue; }
+        kept.push({ ...t, keywords_found: kws });
+      }
+      return { kept, dropped };
+    };
+
+    // Cross-check with the account's own timeline (see fetchTimelineTweets).
+    let timelineRan = false, timelineFailed = false, timelinePages = 0, timelineCapHit = false;
+    const fromTimeline = new Set();
+    const runTimeline = tlMode === 'always' || (tlMode === 'zero' && gate(unique).kept.length === 0);
+    if (runTimeline) {
+      try {
+        const tl = await fetchTimelineTweets(handle, dateRange, apiKey);
+        timelineRan = true; timelinePages = tl.pages; timelineCapHit = tl.capHit;
+        for (const t of tl.tweets) {
+          if (/^RT @/.test(String(t.text || '').trim()) || t.retweeted_status || t.is_retweet) continue;
+          const k = tweetKey(t);
+          if (seenIds.has(k)) continue;
+          seenIds.add(k); unique.push(t); fromTimeline.add(k);
+        }
+      } catch (e) {
+        timelineFailed = true;
+        cb?.(`  [APIdirect/X] ${org}: timeline cross-check failed — ${e.message}`, 'warn');
+      }
     }
+    if (searchFailed && !timelineRan) throw firstPageRes.reason;
+    if (searchFailed) cb?.(`  [APIdirect/X] ${org}: the search failed; counted from the account's timeline only`, 'warn');
+
+    // The count is complete only if whichever source covered the window was not cut short.
+    const capHit = (timelineRan && timelinePages > 0) ? timelineCapHit : searchCapHit;
+    if (capHit) cb?.(`  [APIdirect/X] ${org}: stopped at the page limit — the count may be lower than the true number`, 'warn');
+
+    const { kept: tagged, dropped: droppedNoKeyword } = gate(unique);
+    const timelineAdded = tagged.filter(t => fromTimeline.has(tweetKey(t))).length;
+    if (timelineAdded > 0) cb?.(`  [APIdirect/X] ${org}: the timeline found ${timelineAdded} tweet(s) the search had missed`, 'warn');
     if (droppedNoKeyword > 0) cb?.(`  [APIdirect/X] ${org}: ${droppedNoKeyword} tweet(s) dropped — their text has none of the keywords`, 'warn');
 
     const totalLikes    = tagged.reduce((s, t) => s + (t.likes    || 0), 0);
@@ -541,8 +626,8 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
       }));
 
     const erVal = er(totalEngage, followers, tagged.length);
-    cb?.(`  [APIdirect/X] ${org}: ${tagged.length} AQ tweets (search), ${followers.toLocaleString()} followers, ER=${erVal}%`, tagged.length > 0 ? 'ok' : 'warn');
-    return { postCount: tagged.length, totalLikes, totalReplies, totalRetweets, totalViews, followers, er: erVal, topPosts, fetched: unique.length, inRangeCount: tagged.length, duplicatesRemoved, droppedNoKeyword, pagesFetched, capHit };
+    cb?.(`  [APIdirect/X] ${org}: ${tagged.length} AQ tweets (${timelineRan ? 'search + timeline' : 'search'}), ${followers.toLocaleString()} followers, ER=${erVal}%`, tagged.length > 0 ? 'ok' : 'warn');
+    return { postCount: tagged.length, totalLikes, totalReplies, totalRetweets, totalViews, followers, er: erVal, topPosts, fetched: unique.length, inRangeCount: tagged.length, duplicatesRemoved, droppedNoKeyword, pagesFetched, capHit, searchFailed, timelineRan, timelineFailed, timelinePages, timelineAdded };
   } catch (e) {
     cb?.(`  [APIdirect/X] ${org}: ${e.message}`, 'warn');
     return failResult(EMPTY, e);
