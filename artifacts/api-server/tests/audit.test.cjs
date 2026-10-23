@@ -38,6 +38,13 @@ const trunc = social(false); trunc[0].twData.capHit = true; trunc[0].twData.dupl
 const w = A.checkDeterministic({ ORGS, data: data(false), socialERResults: trunc, execF: [], html: "" });
 eq("page-limit hit and removed repeats are warnings, not errors", [w.errors.length, w.warnings.length], [0, 2]);
 
+const tl = social(false); tl[0].twData.timelineAdded = 2; tl[0].twData.timelineRan = true; tl[1].twData.timelineFailed = true;
+const wt = A.checkDeterministic({ ORGS, data: data(false), socialERResults: tl, execF: [], html: "" });
+eq("posts found only by the timeline, and a failed cross-check, are warnings", [wt.errors.length, wt.warnings.filter((x) => /timeline/.test(x.issue)).length], [0, 2]);
+const z = social(false); z[1].twData = { postCount: 0, followers: 4500, topPosts: [] };
+eq("a zero that was not cross-checked is flagged", A.checkDeterministic({ ORGS, data: data(false), socialERResults: z, execF: [], html: "" }).warnings.some((x) => /not cross-checked/.test(x.issue)), true);
+z[1].twData.timelineRan = true;
+eq("a zero that was cross-checked is not flagged", A.checkDeterministic({ ORGS, data: data(false), socialERResults: z, execF: [], html: "" }).warnings.some((x) => /not cross-checked/.test(x.issue)), false);
 eq("reviewer reply is parsed", Reviewer.parseReview('{"verdict":"fail","findings":[{"severity":"error","org":"CREA","where":"X posts","issue":"repeat","evidence":"same id"}]}').findings[0].org, "CREA");
 let threw = false; try { Reviewer.parseReview("not json"); } catch { threw = true; }
 eq("an unreadable reviewer reply is rejected, never treated as a pass", threw, true);

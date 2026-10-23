@@ -75,6 +75,12 @@ function checkDeterministic({ ORGS, data, socialERResults = [], execF, html = ""
       if (d.duplicatesRemoved > 0) warn(r.org, where, `${d.duplicatesRemoved} repeated post(s) returned by the data source were removed before counting`);
       if (d.droppedNoKeyword > 0) warn(r.org, where, `${d.droppedNoKeyword} post(s) returned by the search were left out because their text has none of the keywords`);
       if (d.capHit) warn(r.org, where, `fetching stopped at its page limit inside the report period — the true count may be higher`);
+      if (p.key === "twData") {
+        if (d.timelineAdded > 0) warn(r.org, where, `the keyword search missed ${d.timelineAdded} post(s) that the account's own timeline contained; they are counted`);
+        if (d.searchFailed) warn(r.org, where, `the keyword search failed; the count comes from the account's timeline only`);
+        if (d.timelineFailed) warn(r.org, where, `the cross-check against the account's own timeline failed; the count rests on the keyword search alone`);
+        if (d.postCount === 0 && d.timelineRan !== true) warn(r.org, where, `0 posts is not cross-checked against the account's timeline`);
+      }
     }
   }
 
@@ -121,7 +127,7 @@ function buildEvidencePack({ ORGS, data, socialERResults = [], youtubeERResults 
   const platform = (d) => d && {
     posts: d.postCount, followers: d.followers, engagementRatePct: d.er,
     likes: d.totalLikes, comments: d.totalComments ?? d.totalReplies, shares: d.totalShares ?? d.totalRetweets, views: d.totalViews,
-    removedRepeats: d.duplicatesRemoved || 0, leftOutNoKeyword: d.droppedNoKeyword || 0, stoppedAtPageLimit: !!d.capHit, failed: !!d.failed, noHandle: !!d.noHandle,
+    removedRepeats: d.duplicatesRemoved || 0, leftOutNoKeyword: d.droppedNoKeyword || 0, stoppedAtPageLimit: !!d.capHit, foundOnlyByTimeline: d.timelineAdded || 0, timelineCrossChecked: d.timelineRan === true, failed: !!d.failed, noHandle: !!d.noHandle,
     topPosts: (d.topPosts || []).map((t) => ({ url: t.url, date: t.date, text: clip(t.snippet, 220), keywordsMatched: t.keywords_found, likes: t.likes, comments: t.comments ?? t.replies, shares: t.shares ?? t.retweets })),
   };
   return {
