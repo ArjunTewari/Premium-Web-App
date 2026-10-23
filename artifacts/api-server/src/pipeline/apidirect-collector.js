@@ -136,6 +136,8 @@ const RATE_RETRY_DELAYS = [1500, 4000, 8000]; // backoff on 429 before giving up
 // path above (retrying those without backing off just burns quota).
 const TRANSIENT_RETRY_DELAYS = [2000, 5000];
 const endpointGates = new Map(); // endpoint -> { active, limit, queue }
+// Calls made this run, per endpoint, so the run log shows where the money went.
+const usageByEndpoint = new Map();
 
 let _log = null;
 function setLogger(cb) { _log = cb; }
@@ -188,6 +190,7 @@ async function apiFetch(endpoint, params, apiKey, opts = {}) {
           timeout,
         });
         costTracker.apidirectCalls++;
+        usageByEndpoint.set(endpoint, (usageByEndpoint.get(endpoint) || 0) + 1);
         return data;
       } catch (e) {
         const status = e.response?.status;
@@ -515,13 +518,15 @@ function keywordsInText(raw, terms) {
 // (CSTEP showed 0 in every report although it had tweeted about air quality).
 // The account's own timeline does not depend on that index, so it is fetched too,
 // filtered locally with the same keyword rule, and merged with the search results.
-//   X_TIMELINE_MODE = always (default) | zero (only when the search found nothing) | off
-//   X_TIMELINE_PAGES = page limit per account (default 8, ~20 tweets a page)
+//   X_TIMELINE_MODE = zero (default: only when the search found nothing) | always | off
+//   X_TIMELINE_PAGES = page limit per account (default 4, ~20 tweets a page)
+// 'always' reads every account's timeline (up to X_TIMELINE_PAGES calls each) and
+// roughly doubles the X cost of a run; use it for an audit run, not every run.
 function timelineMode() {
-  const m = String(process.env.X_TIMELINE_MODE || 'always').toLowerCase();
-  return m === 'off' || m === 'zero' ? m : 'always';
+  const m = String(process.env.X_TIMELINE_MODE || 'zero').toLowerCase();
+  return m === 'off' || m === 'always' ? m : 'zero';
 }
-const TIMELINE_MAX_PAGES = Math.max(1, parseInt(process.env.X_TIMELINE_PAGES || '8', 10) || 8);
+const TIMELINE_MAX_PAGES = Math.max(1, parseInt(process.env.X_TIMELINE_PAGES || '4', 10) || 4);
 
 function newestInBatch(batch, ...fields) {
   let newest = null;
@@ -867,6 +872,7 @@ async function run(cfg, selectedOrgs, orgHandles = {}, cb) {
   const apiKey = cfg.APIDIRECT_KEY;
   setLogger(cb);   // route adaptive-throttle notices into the run transcript
   resetGates();    // fresh concurrency headroom for this run
+  usageByEndpoint.clear();
   if (!apiKey) {
     cb?.('  [APIdirect] No APIDIRECT_KEY — social collection skipped', 'warn');
     return selectedOrgs.map(org => ({
@@ -915,6 +921,10 @@ async function run(cfg, selectedOrgs, orgHandles = {}, cb) {
       if (r.status === 'fulfilled') results.push(r.value);
     }
   }
+
+  const total = [...usageByEndpoint.values()].reduce((a, b) => a + b, 0);
+  const detail = [...usageByEndpoint.entries()].sort((a, b) => b[1] - a[1]).map(([e, n]) => `${e} ${n}`).join(' · ');
+  cb?.(`  [APIdirect] usage this run: ${total} calls (~$${(total * 0.006).toFixed(2)} at $0.006/call, $${(total * 0.01).toFixed(2)} at the $0.01 the report cost uses) — ${detail}`, 'ok');
 
   return results;
 }
