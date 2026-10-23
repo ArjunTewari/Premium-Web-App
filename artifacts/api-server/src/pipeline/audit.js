@@ -49,6 +49,7 @@ function checkDeterministic({ ORGS, data, socialERResults = [], execF, html = ""
   for (const r of socialERResults) {
     for (const p of PLATFORMS) {
       const d = r[p.key];
+      if (d && d.failed && !d.noHandle) warn(r.org, `${p.name} (social)`, `collection failed; the report shows this cell as unavailable (not as a zero), but the organisation's social score counts it as 0 — a lower bound`);
       if (!d || d.noHandle || d.failed) continue;
       const where = `${p.name} (social)`;
       check(isCount(d.postCount), r.org, where, `post count ${d.postCount} is not a whole number >= 0`);
@@ -125,7 +126,13 @@ function checkDeterministic({ ORGS, data, socialERResults = [], execF, html = ""
 // The evidence pack the independent reviewer sees: figures and post excerpts, nothing else.
 function buildEvidencePack({ ORGS, data, socialERResults = [], youtubeERResults = [], execF = [], actions = [], dateFrom, dateTo, subject }) {
   const clip = (s, n) => String(s || "").replace(/\s+/g, " ").slice(0, n);
-  const platform = (d) => d && {
+  const platform = (d) => d && (d.failed || d.noHandle) ? {
+    collected: false,
+    note: d.noHandle
+      ? "no handle for this platform; the report shows the cell as not applicable, not as a zero"
+      : "collection FAILED; the report shows the cell as unavailable (a cross), not as a measured zero. The organisation's presence points count it as 0, so its score is a lower bound",
+  } : d && {
+    collected: true,
     posts: d.postCount, followers: d.followers, engagementRatePct: d.er,
     likes: d.totalLikes, comments: d.totalComments ?? d.totalReplies, shares: d.totalShares ?? d.totalRetweets, views: d.totalViews,
     removedRepeats: d.duplicatesRemoved || 0, leftOutNoKeyword: d.droppedNoKeyword || 0, stoppedAtPageLimit: !!d.capHit, foundOnlyByTimeline: d.timelineAdded || 0, timelineCrossChecked: d.timelineRan === true, failed: !!d.failed, noHandle: !!d.noHandle,

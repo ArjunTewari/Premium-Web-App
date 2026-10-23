@@ -85,7 +85,12 @@ async function run(cfg, selectedOrgs, cb) {
     cb?.(`  Sentinel error (non-fatal): ${e.message}`, 'warn');
   }
 
-  // Map APIdirect results → pipeline.js-compatible format
+  return finalize(rawResults, cb);
+}
+
+// Map APIdirect results → pipeline.js-compatible format, score and rank them.
+// Shared by run() and regate() so a re-count produces exactly what a fresh run would.
+function finalize(rawResults, cb) {
   const orgResults = rawResults.map((d, idx) => {
     const liCount = d.li.postCount;
     const xCount  = d.tw.postCount;
@@ -144,6 +149,36 @@ async function run(cfg, selectedOrgs, cb) {
 
   cb?.('  Social Presence (APIdirect) complete', 'ok');
   return orgResults;
+}
+
+/**
+ * Count saved social results again under the CURRENT counting rules, from the posts that were
+ * saved with them (twData.rawTweets, liData.rawPosts). No API call. Results saved without raw
+ * posts (platforms that failed, Instagram, older saved data) are kept exactly as saved.
+ * Returns { results, recounted, asSaved }.
+ */
+function regate(saved, cfg, cb) {
+  const APIdirect = require('./apidirect-collector');
+  const aqKw = APIdirect.buildAqKeywords(cfg.SCOPE_KEYWORDS);
+  const dateRange = { from: APIdirect.parseDate(cfg.DATE_FROM), to: APIdirect.parseDate(cfg.DATE_TO) };
+  let recounted = 0, asSaved = 0;
+  const quiet = () => {};
+  const raw = saved.map((r) => {
+    const hasX = r.twData && Array.isArray(r.twData.rawTweets);
+    const hasLi = r.liData && Array.isArray(r.liData.rawPosts);
+    hasX ? recounted++ : asSaved++;
+    hasLi ? recounted++ : asSaved++;
+    return {
+      org: r.org,
+      li: hasLi ? APIdirect.reprocessLinkedIn(r.org, r.liData, aqKw, quiet) : r.liData,
+      tw: hasX ? APIdirect.reprocessTwitter(r.org, r.twData, aqKw, dateRange, quiet) : r.twData,
+      ig: r.igData,
+      yt: r.ytChData,
+    };
+  });
+  const results = finalize(raw, quiet);
+  cb?.(`  Social figures re-counted under the current rules from the saved posts: ${recounted} organisation-platform result(s) re-counted, ${asSaved} kept as saved (no saved posts)`, 'ok');
+  return { results, recounted, asSaved };
 }
 
 // ── HTML helpers ────────────────────────────────────────────────────────────
@@ -553,4 +588,5 @@ ${summaryTable}
 ${orgDetails.join('')}`;
 }
 
-module.exports = { run, buildSocialERHtml };
+module.exports = {
+  regate, finalize, run, buildSocialERHtml };

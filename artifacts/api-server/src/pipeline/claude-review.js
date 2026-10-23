@@ -31,7 +31,7 @@ Look for, and report only what you can point to in the pack:
 3. Figures that contradict each other: counts versus listed posts, totals smaller than their parts, shares that do not follow from the figures, an organisation ranked or described in a way its figures do not support.
 4. Implausible values for the period or the audience (for example a very high post count against a small account, engagement that does not match followers).
 5. Any statement in the executive summary that the figures do not support, or that names the wrong organisation for a figure.
-6. Data that is missing or marked failed but is presented as a real zero.
+6. Data presented as a real zero although it was not collected. A platform marked collected:false is shown in the report as unavailable (a cross), never as a measured zero — do NOT report that as an error. Report it (as a warning) only if you see it described or scored as a measured absence of activity in the summary.
 
 Rules:
 - severity "error" = a figure or statement is wrong or unsupported, and you can show it from the pack. severity "warning" = suspicious but not provable from the pack.

@@ -1035,6 +1035,13 @@ ${batchText}`;
     aeoQueriesUsed = st.aeoQueriesUsed;
     socialERResults = st.socialERResults;
     youtubeERResults = st.youtubeERResults;
+    // The counting rules may have changed since the data was saved: count the saved posts again.
+    try {
+      socialERResults = SocialER.regate(st.socialERResults, cfg, cb).results;
+    } catch (e) {
+      cb(`  Re-counting the saved social posts failed (${e.message}) — using the figures as saved`, "warn");
+      socialERResults = st.socialERResults;
+    }
     // the saved data's own fetching cost belongs to this report too
     for (const [k, v] of Object.entries(cfg.resumeCheckpoint.cost || {})) {
       if (typeof v === "number" && typeof costTracker[k] === "number") costTracker[k] += v;
