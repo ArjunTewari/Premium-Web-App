@@ -5,8 +5,9 @@ import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, usersTable, orgHandlesTable, reportLogsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/require-auth.js";
-import { type ReportTrendSummary, frameworkIds, listFrameworks } from "../pipeline/index.js";
+import { type ReportTrendSummary, frameworkIds, listFrameworks, parseCheckpointName, unpackCheckpoint, checkpointMismatch, checkpointFingerprint } from "../pipeline/index.js";
 import { generateAndDeliverReport, loadReportHtml, persistReportToGithub, OUT_DIR } from "../lib/generate-report.js";
+import { getCheckpoint, listCheckpoints, isConfigured as isGithubConfigured } from "../lib/report-storage.js";
 import { CLAUDE_VIA_CLI } from "../lib/preflight.js";
 import { deriveReport, listReportOrgs, parseReportType, priceForType, reportPeriod, reportTypeOfName, reportTypeOfHtml } from "../lib/report-types.js";
 import { toClientView } from "../lib/client-view.js";
@@ -126,6 +127,21 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
 
   if (!frameworkIds().includes(cfg.FRAMEWORK))
     return res.status(400).json({ error: `Unknown framework "${cfg.FRAMEWORK}". Available: ${frameworkIds().join(", ")}.` });
+
+  // Resume from saved data (see pipeline/checkpoint.js): nothing is fetched again.
+  // The file must exist and must have been saved for exactly this run.
+  if (body.resumeFrom !== undefined && body.resumeFrom !== null && body.resumeFrom !== "") {
+    const wanted = String(body.resumeFrom);
+    if (!parseCheckpointName(wanted)) return res.status(400).json({ error: "resumeFrom is not a saved-data file name." });
+    let buf: Buffer | null = null;
+    try { buf = fs.readFileSync(path.join(OUT_DIR, wanted)); } catch { buf = await getCheckpoint(wanted); }
+    if (!buf) return res.status(404).json({ error: "The saved data was not found." });
+    let chk;
+    try { chk = unpackCheckpoint(buf); } catch (e) { return res.status(400).json({ error: (e as Error).message }); }
+    const why = checkpointMismatch(chk, checkpointFingerprint(cfg, cfg.FRAMEWORK));
+    if (why.length) return res.status(400).json({ error: `The saved data was collected for a different run (${why.join("; ")}).` });
+    (cfg as { resumeCheckpoint?: unknown }).resumeCheckpoint = chk;
+  }
 
   // Report type: "full" (default) or a one-org "benchmark" / "snapshot" view of
   // `subjectOrg`, which must be one of the orgs in this run. Checked before any
@@ -264,6 +280,19 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
 
 router.get("/frameworks", requireAuth, (_req: Request, res: Response) => {
   res.json({ frameworks: listFrameworks() });
+});
+
+// Saved collected data (checkpoints) that a run can resume from, newest window first.
+router.get("/checkpoints", requireAuth, async (_req: Request, res: Response) => {
+  const names = new Set<string>();
+  try { for (const f of fs.readdirSync(OUT_DIR)) names.add(f); } catch { /* no local files */ }
+  if (isGithubConfigured()) for (const n of await listCheckpoints()) names.add(n);
+  const out = [...names]
+    .map((name) => ({ name, info: parseCheckpointName(name) }))
+    .filter((x): x is { name: string; info: NonNullable<typeof x.info> } => !!x.info)
+    .map((x) => ({ name: x.name, framework: x.info.framework, dateFrom: x.info.dateFrom, dateTo: x.info.dateTo, orgCount: x.info.orgCount }))
+    .sort((a, b) => (a.dateFrom < b.dateFrom ? 1 : a.dateFrom > b.dateFrom ? -1 : 0));
+  res.json({ checkpoints: out });
 });
 
 router.get("/outputs", requireAuth, async (_req: Request, res: Response) => {

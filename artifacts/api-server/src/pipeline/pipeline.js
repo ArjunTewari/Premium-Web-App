@@ -645,6 +645,26 @@ async function run(cfg, cb) {
   // reused directly as the white-space set in STEP 5a.
   let exaWhiteSpace = null;
 
+  // Everything collected from the outside world (steps 1–4b) is saved right after
+  // step 4b (see checkpoint.js). A run given cfg.resumeCheckpoint skips those steps and
+  // carries on from the saved data: an aborted or failed run, or a corrected rule,
+  // then costs no fetching.
+  const Checkpoint = require("./checkpoint");
+  const RESUMED = !!cfg.resumeCheckpoint;
+  const cpFingerprint = Checkpoint.fingerprint(cfg, fwNow().id);
+  const cls = {};
+  let aeoResults = {};
+  let aeoQueriesUsed;
+  const SocialER = require("./social-er");
+  let socialERResults = [];
+  let socialERHtml = "";
+  let youtubeERResults = [];
+  if (RESUMED) {
+    const bad = Checkpoint.mismatch(cfg.resumeCheckpoint, cpFingerprint);
+    if (bad.length) throw new Error(`The saved data does not match this run (${bad.join("; ")}) — nothing was started.`);
+  }
+
+  if (!RESUMED) {
   {
     // ── STEP 1 (Exa): fetch the whole AQ corpus for the window, then assign
     //    each article to the tracked orgs it names. Naming none → white-space.
@@ -804,7 +824,6 @@ ${batchText}`;
   // ── STEP 2: Classify with Claude ──────────────────────────
   cb(`\nSTEP 2/6 — Classifying with Claude (batches of 8)...`, "head");
   checkAbort();
-  const cls = {};
   for (const o of ORGS) cls[o] = [];
 
   {
@@ -958,8 +977,6 @@ ${batchText}`;
   // ── STEP 3: AEO Visibility (via Social Intelligence module) ──
   cb(`\nSTEP 3/6 — AEO / LLM Visibility...`, "head");
   checkAbort();
-  let aeoResults = {};
-  let aeoQueriesUsed;
   for (const org of ORGS)
     aeoResults[org] = {
       mentions: 0,
@@ -983,9 +1000,6 @@ ${batchText}`;
   // ── STEP 4: Social Presence (APIdirect.io) ─────────────────────────────
   cb(`\nSTEP 4/6 — Social Presence (APIdirect.io: LI + X + IG)...`, "head");
   checkAbort();
-  const SocialER = require("./social-er");
-  let socialERResults = [];
-  let socialERHtml = "";
   try {
     socialERResults = await SocialER.run(cfg, ORGS, cb);
     cb(
@@ -1000,7 +1014,6 @@ ${batchText}`;
   cb(`\nSTEP 4b/6 — YouTube ER (YouTube Data API v3)...`, "head");
   checkAbort();
   const YoutubeER = require("./youtube-er");
-  let youtubeERResults = [];
   try {
     youtubeERResults = await YoutubeER.run(cfg, ORGS, cb);
     cb(
@@ -1011,11 +1024,46 @@ ${batchText}`;
     cb(`  YouTube ER error: ${e.message}`, "err");
   }
 
+  } // end of: if (!RESUMED) — steps 1 to 4b
+
+  if (RESUMED) {
+    const st = cfg.resumeCheckpoint.state;
+    for (const o of ORGS) arts[o] = st.arts[o] || [];
+    Object.assign(cls, st.cls);
+    exaWhiteSpace = st.exaWhiteSpace;
+    aeoResults = st.aeoResults;
+    aeoQueriesUsed = st.aeoQueriesUsed;
+    socialERResults = st.socialERResults;
+    youtubeERResults = st.youtubeERResults;
+    // the saved data's own fetching cost belongs to this report too
+    for (const [k, v] of Object.entries(cfg.resumeCheckpoint.cost || {})) {
+      if (typeof v === "number" && typeof costTracker[k] === "number") costTracker[k] += v;
+    }
+    cb(`\nRESUMED from saved data (${cfg.resumeCheckpoint.savedAt}) — steps 1 to 4b skipped, nothing fetched again`, "head");
+  }
+
   // Build combined social HTML after both runs complete
   try {
     socialERHtml = SocialER.buildSocialERHtml(socialERResults, youtubeERResults, !!cfg.YOUTUBE_KEY);
   } catch (e) {
     cb(`  Social HTML build error: ${e.message}`, "err");
+  }
+
+  // ── CHECKPOINT: the collected data, saved before anything else can go wrong ──
+  if (!RESUMED) {
+    try {
+      const buf = Checkpoint.pack(
+        cpFingerprint,
+        { arts, cls, exaWhiteSpace, aeoResults, aeoQueriesUsed, socialERResults, youtubeERResults },
+        { ...costTracker },
+      );
+      const cpName = Checkpoint.name(cpFingerprint);
+      fs.writeFileSync(path.join(cfg.outDir, cpName), buf);
+      cb(`  CHECKPOINT · collected data saved (${cpName}, ${Math.round(buf.length / 1024)}KB) — a failed or aborted run can resume from here without fetching again`, "ok");
+      if (cfg.onCheckpoint) await cfg.onCheckpoint(cpName, buf);
+    } catch (e) {
+      cb(`  CHECKPOINT · could not save the collected data: ${e.message}`, "warn");
+    }
   }
 
   // ── Social presence score (0–10) from transparent formula in social-er.js ──

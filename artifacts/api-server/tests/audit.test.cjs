@@ -42,6 +42,8 @@ const tl = social(false); tl[0].twData.timelineAdded = 2; tl[0].twData.timelineR
 const wt = A.checkDeterministic({ ORGS, data: data(false), socialERResults: tl, execF: [], html: "" });
 eq("posts found only by the timeline, and a failed cross-check, are warnings", [wt.errors.length, wt.warnings.filter((x) => /timeline/.test(x.issue)).length], [0, 2]);
 const z = social(false); z[1].twData = { postCount: 0, followers: 4500, topPosts: [] };
+const lf = social(false); lf[1].liData = { postCount: 0, searchFallback: true, topPosts: [] };
+eq("a LinkedIn count that fell back to the keyword search is a warning", A.checkDeterministic({ ORGS, data: data(false), socialERResults: lf, execF: [], html: "" }).warnings.some((x) => /company's posts failed/.test(x.issue)), true);
 eq("a zero that was not cross-checked is flagged", A.checkDeterministic({ ORGS, data: data(false), socialERResults: z, execF: [], html: "" }).warnings.some((x) => /not cross-checked/.test(x.issue)), true);
 z[1].twData.timelineRan = true;
 eq("a zero that was cross-checked is not flagged", A.checkDeterministic({ ORGS, data: data(false), socialERResults: z, execF: [], html: "" }).warnings.some((x) => /not cross-checked/.test(x.issue)), false);

@@ -59,7 +59,7 @@ async function getFileSha(path: string): Promise<string | undefined> {
 // write landed between our GET and PUT) by re-fetching the latest sha —
 // uploads are rare/slow relative to this window, so this is a safety net
 // for concurrent runs, not the common case.
-async function putFile(path: string, content: string, message: string): Promise<boolean> {
+async function putFile(path: string, content: string | Buffer, message: string): Promise<boolean> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const sha = await getFileSha(path);
     const res = await githubRequest(`/contents/${path}`, {
@@ -67,7 +67,7 @@ async function putFile(path: string, content: string, message: string): Promise<
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message,
-        content: Buffer.from(content, "utf8").toString("base64"),
+        content: (Buffer.isBuffer(content) ? content : Buffer.from(content, "utf8")).toString("base64"),
         branch: branch(),
         ...(sha ? { sha } : {}),
       }),
@@ -229,4 +229,30 @@ export async function listReportDataFiles(): Promise<string[]> {
   return body
     .filter((f) => f.type === "file" && typeof f.name === "string" && f.name.endsWith(".json"))
     .map((f) => f.name as string);
+}
+
+// ── Checkpoints: the data a run collected (gzipped JSON), kept under raw/ ──
+// Separate from reports/ so the Reports and Trends tabs never list them. See
+// pipeline/checkpoint.js: a later run can resume from one without fetching again.
+export async function uploadCheckpoint(name: string, data: Buffer): Promise<boolean> {
+  if (!isConfigured()) return false;
+  return putFile(`raw/${name}`, data, `Add collected data: ${name}`);
+}
+
+export async function getCheckpoint(name: string): Promise<Buffer | null> {
+  if (!isConfigured()) return null;
+  const res = await githubRequest(`/contents/raw/${encodeURIComponent(name)}?ref=${branch()}`, {
+    headers: { Accept: "application/vnd.github.raw+json" },
+  });
+  if (!res || !res.ok) return null;
+  return Buffer.from(await res.arrayBuffer());
+}
+
+export async function listCheckpoints(): Promise<string[]> {
+  if (!isConfigured()) return [];
+  const res = await githubRequest(`/contents/raw?ref=${branch()}`);
+  if (!res || !res.ok) return [];
+  const body = (await res.json().catch(() => null)) as { name?: string; type?: string }[] | null;
+  if (!Array.isArray(body)) return [];
+  return body.filter((f) => f.type === "file" && typeof f.name === "string").map((f) => f.name as string);
 }

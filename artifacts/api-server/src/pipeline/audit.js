@@ -75,6 +75,7 @@ function checkDeterministic({ ORGS, data, socialERResults = [], execF, html = ""
       if (d.duplicatesRemoved > 0) warn(r.org, where, `${d.duplicatesRemoved} repeated post(s) returned by the data source were removed before counting`);
       if (d.droppedNoKeyword > 0) warn(r.org, where, `${d.droppedNoKeyword} post(s) returned by the search were left out because their text has none of the keywords`);
       if (d.capHit) warn(r.org, where, `fetching stopped at its page limit inside the report period — the true count may be higher`);
+      if (p.key === "liData" && d.searchFallback) warn(r.org, where, `reading the company's posts failed; the count comes from the keyword search, which can miss posts`);
       if (p.key === "twData") {
         if (d.timelineAdded > 0) warn(r.org, where, `the keyword search missed ${d.timelineAdded} post(s) that the account's own timeline contained; they are counted`);
         if (d.searchFailed) warn(r.org, where, `the keyword search failed; the count comes from the account's timeline only`);
