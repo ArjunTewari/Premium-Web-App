@@ -4,7 +4,7 @@ import { db, reportLogsTable } from "@workspace/db";
 import { calculateClientBilling } from "./auth.js";
 import { run, type RunConfig, type ReportTrendSummary } from "../pipeline/index.js";
 import { sendAdminReportEmail, sendClientReportEmail } from "./mailer.js";
-import { uploadReport, uploadReportData, getReportContent, isConfigured as isGithubStorageConfigured } from "./report-storage.js";
+import { uploadReport, uploadReportData, uploadCheckpoint, getReportContent, isConfigured as isGithubStorageConfigured } from "./report-storage.js";
 import { toClientView } from "./client-view.js";
 import { preflight } from "./preflight.js";
 import { deriveReport, priceForType, reportTypeOfName, type ReportType } from "./report-types.js";
@@ -128,7 +128,8 @@ export async function generateAndDeliverReport(params: GenerateReportParams): Pr
   // Stop before spending anything if a service the report depends on is unusable
   // (dead key, no credit, blocked account). Set SKIP_PREFLIGHT=1 to bypass.
   if (process.env.SKIP_PREFLIGHT !== "1") {
-    const pre = await preflight(cfg);
+    // A resumed run fetches nothing from APIdirect / YouTube / OpenAI, so only Claude is checked.
+    const pre = await preflight(cfg.resumeCheckpoint ? { CLAUDE_KEY: cfg.CLAUDE_KEY } : cfg);
     for (const w of pre.warnings) cb(`  PRE-RUN CHECK · warning: ${w}`, "warn");
     if (pre.fatal.length) {
       for (const f of pre.fatal) cb(`  PRE-RUN CHECK · ${f}`, "err");
@@ -137,6 +138,15 @@ export async function generateAndDeliverReport(params: GenerateReportParams): Pr
     if (pre.checked.length) cb(`  PRE-RUN CHECK · ${pre.checked.join(", ")} reachable`, "ok");
   }
 
+  // Keep what the run collected (durably when GitHub storage is set up), so a failed or
+  // aborted run — or a corrected rule — never has to be paid for twice.
+  if (!cfg.onCheckpoint) {
+    cfg.onCheckpoint = async (name: string, data: Buffer) => {
+      if (!isGithubStorageConfigured()) return;
+      const ok = await uploadCheckpoint(name, data);
+      cb(ok ? `  CHECKPOINT · also stored in GitHub (raw/${name})` : `  CHECKPOINT · GitHub upload failed — kept on local disk only`, ok ? "ok" : "warn");
+    };
+  }
   const result = await run(cfg, cb);
 
   // Benchmark / snapshot: the pipeline always analyses the whole cohort (the

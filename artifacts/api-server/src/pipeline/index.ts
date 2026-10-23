@@ -33,6 +33,10 @@ export interface RunConfig {
   IG_BUSINESS_ACCOUNT_ID?: string;
   /** Subject-matter framework id (air-quality, climate, sustainability). Defaults to air-quality. */
   FRAMEWORK?: string;
+  /** A parsed checkpoint (see pipeline/checkpoint.js): steps 1–4b are skipped and the run resumes from it. */
+  resumeCheckpoint?: unknown;
+  /** Called with the gzipped checkpoint right after step 4b, so it can be stored durably. */
+  onCheckpoint?: (name: string, data: Buffer) => Promise<void>;
   outDir: string;
   /** Cooperative-cancellation signal — checked between pipeline stages. */
   signal?: AbortSignal;
@@ -87,3 +91,13 @@ export interface FrameworkSummary {
 }
 export const listFrameworks: () => FrameworkSummary[] = fwMod.listFrameworks ?? fwMod.default?.listFrameworks;
 export const frameworkIds: () => string[] = fwMod.frameworkIds ?? fwMod.default?.frameworkIds;
+
+// @ts-ignore — CommonJS module, same interop as above
+import _checkpoint from "./checkpoint.js";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const cpMod = _checkpoint as any;
+export interface CheckpointInfo { framework: string; dateFrom: string; dateTo: string; orgCount: number; hash: string }
+export const parseCheckpointName: (name: string) => CheckpointInfo | null = cpMod.parseName ?? cpMod.default?.parseName;
+export const unpackCheckpoint: (buf: Buffer) => { savedAt: string; fingerprint: { orgs: string[] } } = cpMod.unpack ?? cpMod.default?.unpack;
+export const checkpointMismatch: (chk: unknown, fp: unknown) => string[] = cpMod.mismatch ?? cpMod.default?.mismatch;
+export const checkpointFingerprint: (cfg: unknown, frameworkId: string) => unknown = cpMod.fingerprint ?? cpMod.default?.fingerprint;

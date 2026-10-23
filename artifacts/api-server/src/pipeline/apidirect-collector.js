@@ -29,7 +29,7 @@ const BASE = 'https://apidirect.io/v1';
 // Structure: { "<normalised company URL>": { company_id, name, cachedAt } }
 // The linkedin/company resolution call costs ~$0.006 and is idempotent, so
 // caching it means it runs once per org ever, not once per report run.
-const CACHE_FILE = path.join(__dirname, 'linkedin-company-id-cache.json');
+const CACHE_FILE = process.env.LINKEDIN_CACHE_FILE || path.join(__dirname, 'linkedin-company-id-cache.json');
 
 let _companyIdCache = null;
 
@@ -303,6 +303,57 @@ function oldestInBatch(batch, ...fields) {
 // This keeps cost to ~$0.15–0.25/org regardless of posting frequency.
 //
 // Person profiles (/in/ URLs) are supported via the `author` param instead.
+// ── LinkedIn: read the company's own posts instead of 21 keyword searches ────
+// The keyword search cost 21+ calls per organisation (the largest part of a run's
+// APIdirect bill) and, like the X search, is not exhaustive: it reported zero for
+// organisations that had posted. A company page's posts are listed newest first
+// (10 a page), so the report window is read in a few pages and filtered locally
+// with the same keyword rule.
+//   LI_MODE = timeline (default; falls back to the keyword search if the read fails) | search
+//   LI_TIMELINE_PAGES = page limit per company (default 6, 10 posts a page)
+function linkedinMode() {
+  return String(process.env.LI_MODE || 'timeline').toLowerCase() === 'search' ? 'search' : 'timeline';
+}
+const LI_TIMELINE_MAX_PAGES = Math.max(1, parseInt(process.env.LI_TIMELINE_PAGES || '6', 10) || 6);
+
+// A post carries a term in its own text, or as a hashtag for multi-word terms
+// (#AirPollution, #CleanAir). NFKC folds the bold letters LinkedIn posts often use.
+function liPostText(post) {
+  return `${post.snippet || ''} ${post.text || ''} ${post.title || ''}`.normalize('NFKC').toLowerCase();
+}
+function liHasTerm(postText, k) {
+  const flatText = postText.replace(/[^a-z0-9.]+/g, '');
+  return FW.termMatches(postText, k) || (/[\s-]/.test(k) && flatText.includes(k.replace(/[^a-z0-9.]+/g, '')));
+}
+
+async function fetchLinkedInTimeline(companyUrl, dateRange, apiKey) {
+  const out = [];
+  const seen = new Set();
+  let pages = 0;
+  let exhausted = false;
+  for (let page = 1; page <= LI_TIMELINE_MAX_PAGES; page++) {
+    const r = await apiFetch('linkedin/company/posts', { url: companyUrl, page }, apiKey);
+    const batch = Array.isArray(r?.posts) ? r.posts : Array.isArray(r?.data) ? r.data : Array.isArray(r?.items) ? r.items : null;
+    // No list at all is a failed read, never "no posts" — the caller falls back.
+    if (!batch) throw new Error('linkedin/company/posts returned no post list');
+    if (!batch.length) { exhausted = true; break; }
+    pages++;
+    let fresh = 0;
+    for (const post of batch) {
+      const key = post.url || `${post.date}:${(post.snippet || post.text || '').slice(0, 80)}`;
+      if (seen.has(key)) continue;
+      seen.add(key); out.push(post); fresh++;
+    }
+    if (fresh === 0) { exhausted = true; break; } // a repeated page
+    const newest = newestInBatch(batch, 'date');
+    if (dateRange?.from && newest && newest < dateRange.from) { exhausted = true; break; }
+  }
+  // Posts that cannot be placed in time cannot be placed in the window.
+  const undated = out.filter(p => !parseDate(p.date)).length;
+  if (out.length && undated / out.length > 0.5) throw new Error('linkedin/company/posts returned posts without dates');
+  return { posts: out, pages, capHit: !exhausted };
+}
+
 async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
   const EMPTY = { postCount: 0, totalLikes: 0, totalComments: 0, totalShares: 0, totalViews: 0, followers: 0, er: 0, topPosts: [] };
   const handle = liHandle ? liHandle.replace(/^@/, '').trim() : null;
@@ -319,6 +370,7 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
     return { ...EMPTY, noHandle: true };
   }
   let filterParam;
+  let companyUrl = null;
   let followers = 0;
   try {
     if (isPersonUrl) {
@@ -329,7 +381,7 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
       // no follower count available via this endpoint, so ER falls back to
       // avg-engagement-per-post for these.
     } else {
-      const companyUrl = handle.startsWith('http') ? handle : `https://www.linkedin.com/company/${handle}`;
+      companyUrl = handle.startsWith('http') ? handle : `https://www.linkedin.com/company/${handle}`;
       const { company_id, name, followers: liFollowers } = await resolveCompanyId(companyUrl, apiKey,
         (msg) => cb?.(`  [APIdirect/LI] ${org}: ${msg.replace(/^\s+\[APIdirect\/LI\]\s*/, '')}`));
       filterParam = { from_company: String(company_id) };
@@ -343,42 +395,68 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
 
   // ── Step 2: search per keyword, deduplicate ──
   // seen: url → { post, keywords: Set<string> }
+
   const seen = new Map();
   const MAX_PAGES_PER_KW = 5;
+  let source = 'search', timelinePages = 0, capHit = false, searchFallback = false;
 
-  for (const keyword of AQ_KEYWORDS_SEARCH) {
-    for (let page = 1; page <= MAX_PAGES_PER_KW; page++) {
-      let data;
-      try {
-        data = await apiFetch('linkedin/posts', { query: keyword, sort_by: 'most_recent', page, ...filterParam }, apiKey);
-      } catch (e) {
-        cb?.(`  [APIdirect/LI] ${org} "${keyword}" p${page}: ${e.message}`, 'warn');
-        break;
-      }
-      const batch = data.posts || [];
-      if (!batch.length) break;
-
-      for (const post of batch) {
-        if (!inDateRange(post.date, dateRange?.from, dateRange?.to)) continue;
-        // The search endpoint matches loosely (fuzzy/semantic), so a hit for
-        // "health impact" can be any of the org's posts — e.g. a dentistry
-        // podcast. Only count it as an AQ post if its own text carries the
-        // keyword searched for or one of the base AQ terms.
-        // NFKC folds the mathematical-bold letters LinkedIn posts often use
-        // (e.g. '𝗔𝗶𝗿 𝗤𝘂𝗮𝗹𝗶𝘁𝘆') back to plain text so they still match.
-        const postText = `${post.snippet || ''} ${post.text || ''} ${post.title || ''}`.normalize('NFKC').toLowerCase();
-        // Multi-word terms also match as hashtags (#AirPollution, #CleanAir).
-        const flatText = postText.replace(/[^a-z0-9.]+/g, '');
-        const hasTerm = (k) => FW.termMatches(postText, k) || (/[\s-]/.test(k) && flatText.includes(k.replace(/[^a-z0-9.]+/g, '')));
-        if (!hasTerm(keyword) && !AQ_KW_BASE.some(hasTerm)) continue;
+  if (companyUrl && linkedinMode() === 'timeline') {
+    try {
+      const tl = await fetchLinkedInTimeline(companyUrl, dateRange, apiKey);
+      timelinePages = tl.pages; capHit = tl.capHit;
+      const terms = [...new Set([...AQ_KEYWORDS_SEARCH, ...(aqKw || AQ_KW_BASE)])];
+      for (const post of tl.posts) {
+        if (!parseDate(post.date) || !inDateRange(post.date, dateRange?.from, dateRange?.to)) continue;
+        const postText = liPostText(post);
+        const kws = terms.filter(k => liHasTerm(postText, k));
+        if (!kws.length) continue;
         const key = post.url || `${post.date}:${(post.snippet || '').slice(0, 80)}`;
-        if (!seen.has(key)) seen.set(key, { post, keywords: new Set() });
-        seen.get(key).keywords.add(keyword);
+        if (!seen.has(key)) seen.set(key, { post, keywords: new Set(kws) });
       }
+      source = 'timeline';
+      if (capHit) cb?.(`  [APIdirect/LI] ${org}: stopped at the page limit — the count may be lower than the true number`, 'warn');
+    } catch (e) {
+      searchFallback = true;
+      seen.clear();
+      cb?.(`  [APIdirect/LI] ${org}: reading the company's posts failed (${e.message}) — using the keyword search instead`, 'warn');
+    }
+  }
 
-      // Stop paginating this keyword once we've passed the date window start
-      const oldest = oldestInBatch(batch, 'date');
-      if (dateRange?.from && oldest && oldest < dateRange.from) break;
+  if (source !== 'timeline') {
+    for (const keyword of AQ_KEYWORDS_SEARCH) {
+      for (let page = 1; page <= MAX_PAGES_PER_KW; page++) {
+        let data;
+        try {
+          data = await apiFetch('linkedin/posts', { query: keyword, sort_by: 'most_recent', page, ...filterParam }, apiKey);
+        } catch (e) {
+          cb?.(`  [APIdirect/LI] ${org} "${keyword}" p${page}: ${e.message}`, 'warn');
+          break;
+        }
+        const batch = data.posts || [];
+        if (!batch.length) break;
+
+        for (const post of batch) {
+          if (!inDateRange(post.date, dateRange?.from, dateRange?.to)) continue;
+          // The search endpoint matches loosely (fuzzy/semantic), so a hit for
+          // "health impact" can be any of the org's posts — e.g. a dentistry
+          // podcast. Only count it as an AQ post if its own text carries the
+          // keyword searched for or one of the base AQ terms.
+          // NFKC folds the mathematical-bold letters LinkedIn posts often use
+          // (e.g. '𝗔𝗶𝗿 𝗤𝘂𝗮𝗹𝗶𝘁𝘆') back to plain text so they still match.
+          const postText = `${post.snippet || ''} ${post.text || ''} ${post.title || ''}`.normalize('NFKC').toLowerCase();
+          // Multi-word terms also match as hashtags (#AirPollution, #CleanAir).
+          const flatText = postText.replace(/[^a-z0-9.]+/g, '');
+          const hasTerm = (k) => FW.termMatches(postText, k) || (/[\s-]/.test(k) && flatText.includes(k.replace(/[^a-z0-9.]+/g, '')));
+          if (!hasTerm(keyword) && !AQ_KW_BASE.some(hasTerm)) continue;
+          const key = post.url || `${post.date}:${(post.snippet || '').slice(0, 80)}`;
+          if (!seen.has(key)) seen.set(key, { post, keywords: new Set() });
+          seen.get(key).keywords.add(keyword);
+        }
+
+        // Stop paginating this keyword once we've passed the date window start
+        const oldest = oldestInBatch(batch, 'date');
+        if (dateRange?.from && oldest && oldest < dateRange.from) break;
+      }
     }
   }
 
@@ -409,8 +487,8 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
     }));
 
   const erVal = er(totalEngage, followers, posts.length);
-  cb?.(`  [APIdirect/LI] ${org}: ${posts.length} AQ posts (${AQ_KEYWORDS_SEARCH.length} keyword searches), ${totalEngage} engagements${followers > 0 ? `, ${followers.toLocaleString()} followers` : ''}, ER=${erVal}${followers > 0 ? '%' : ''}`, posts.length > 0 ? 'ok' : 'warn');
-  return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers, er: erVal, topPosts, fetched: posts.length, inRangeCount: posts.length };
+  cb?.(`  [APIdirect/LI] ${org}: ${posts.length} AQ posts (${source === 'timeline' ? `company posts, ${timelinePages} page${timelinePages === 1 ? '' : 's'}` : `${AQ_KEYWORDS_SEARCH.length} keyword searches`}), ${totalEngage} engagements${followers > 0 ? `, ${followers.toLocaleString()} followers` : ''}, ER=${erVal}${followers > 0 ? '%' : ''}`, posts.length > 0 ? 'ok' : 'warn');
+  return { postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers, er: erVal, topPosts, fetched: posts.length, inRangeCount: posts.length, source, timelinePages, capHit, searchFallback };
 }
 
 // Identity of a tweet, so the same tweet returned twice is counted once.

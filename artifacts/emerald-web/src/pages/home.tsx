@@ -151,6 +151,7 @@ function defaultDateRange(): { from: string; to: string } {
   return { from: iso(from), to: iso(to) };
 }
 
+interface SavedData { name: string; framework: string; dateFrom: string; dateTo: string; orgCount: number; }
 interface FrameworkInfo { id: string; name: string; short: string; defaultScope: string[]; aeoQuestions: string[]; }
 
 const DEFAULT_SCOPE = [
@@ -420,6 +421,10 @@ export default function Home() {
   // from the chosen framework's defaults and stay editable.
   const [frameworks, setFrameworks] = useState<FrameworkInfo[]>([]);
   const [framework, setFramework] = useState("air-quality");
+  // Data a previous run collected (steps 1–4b). Ticking "use saved data" re-runs from it
+  // without fetching anything again; the server checks it was saved for exactly this run.
+  const [savedData, setSavedData] = useState<SavedData[]>([]);
+  const [useSaved, setUseSaved] = useState(false);
   const [aeoInput, setAeoInput] = useState("");
   const [aeoEditIdx, setAeoEditIdx] = useState<number | null>(null);
   const [aeoEditVal, setAeoEditVal] = useState("");
@@ -599,6 +604,15 @@ export default function Home() {
   }, []);
 
   useEffect(() => { loadPrev(); }, [loadPrev]);
+
+  const loadSavedData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/checkpoints", { credentials: "include" });
+      const body = (await res.json()) as { checkpoints?: SavedData[] };
+      setSavedData(Array.isArray(body.checkpoints) ? body.checkpoints : []);
+    } catch {}
+  }, []);
+  useEffect(() => { if (!running) loadSavedData(); }, [running, loadSavedData]);
 
   useEffect(() => {
     (async () => {
@@ -1085,6 +1099,8 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
     }
   }
 
+  const matchingSaved = savedData.find((c) => c.framework === framework && c.dateFrom === dateFrom && c.dateTo === dateTo && c.orgCount === selectedOrgs.length);
+
   async function startRun() {
     if (!selectedOrgs.length) { alert("Select at least one organisation."); return; }
     if (reportType !== "full") {
@@ -1094,7 +1110,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
     setRunning(true); setStopping(false); setLogs([]); setProgress(0); setResult(null); setTrendStatus(null);
     runIdRef.current = null;
 
-    const payload = { orgs: selectedOrgs, orgYtHandles: allOrgHandles, orgTwHandles: allTwHandles, orgIgHandles: allIgHandles, orgLiHandles: allLiHandles, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries, framework, reportType, subjectOrg: reportType === "full" ? undefined : subjectOrg };
+    const payload = { orgs: selectedOrgs, orgYtHandles: allOrgHandles, orgTwHandles: allTwHandles, orgIgHandles: allIgHandles, orgLiHandles: allLiHandles, dateFrom, dateTo, clientName, scopeKeywords, aeoQueries, framework, resumeFrom: matchingSaved && useSaved ? matchingSaved.name : undefined, reportType, subjectOrg: reportType === "full" ? undefined : subjectOrg };
     const TOTAL_STEPS = 60;
     let stepCount = 0;
 
@@ -1899,6 +1915,15 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
 
         {/* ── Generate button ─────────────────────────────────────────── */}
         <SlideUp delay={430}>
+          {matchingSaved && (
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 20, padding: "12px 14px", border: `1px solid ${useSaved ? C.gold : C.border}`, borderRadius: 10, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif", fontSize: 14, color: C.text }}>
+              <input type="checkbox" checked={useSaved} onChange={(e) => setUseSaved(e.target.checked)} disabled={running} style={{ marginTop: 3 }} />
+              <span>
+                <strong>Use saved data</strong> — data from an earlier run for {matchingSaved.dateFrom} to {matchingSaved.dateTo} ({matchingSaved.orgCount} organisations) is saved. Ticking this builds the report from it and fetches nothing again (no APIdirect, Exa, OpenAI or YouTube cost; the summary and actions are still written fresh).
+                <span style={{ display: "block", fontSize: 12, color: C.muted, marginTop: 4 }}>It is used only if the organisations, keywords and questions are exactly the same as when it was saved; otherwise the run is refused and nothing is spent.</span>
+              </span>
+            </label>
+          )}
           <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
             <button
               onClick={startRun}
