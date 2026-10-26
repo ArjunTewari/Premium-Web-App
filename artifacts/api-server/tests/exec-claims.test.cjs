@@ -20,6 +20,16 @@ v = Sentinel.validateExecSummary([f("x", "TERI: 100% data-specific coverage.")],
 eq("a correct '% data-specific' passes", v.issues.length, 0);
 v = Sentinel.validateExecSummary([f("x", "TERI: 0% authoritative coverage.")], data, ORGS);
 eq("a correct '% authoritative' passes", v.issues.length, 0);
+// 26 Oct: a headline that ends in a figure for a GROUP, with no organisation named in the headline, was pinned on the
+// first organisation of the detail and "corrected" to that organisation's figure ("9 organisations recorded 10/10").
+const grp = [f("Social presence: CREA 9/10; 9 organisations recorded 0/10", "CREA recorded 9/10 social presence. 9 organisations recorded 0/10.")];
+v = Sentinel.validateExecSummary(grp, data, ORGS);
+eq("a group figure in a headline is not pinned on an organisation of the detail", [v.issues.length, Sentinel.applyCorrections(grp, v.issues)[0].headline], [0, grp[0].headline]);
+const grp2 = [f("Nine organisations recorded 0/10 social presence", "CREA recorded 9/10 social presence.")];
+v = Sentinel.validateExecSummary(grp2, data, ORGS);
+eq("a headline with no organisation named is left alone, and the detail is still checked", [v.issues.length, Sentinel.applyCorrections(grp2, v.issues)[0].headline], [0, grp2[0].headline]);
+v = Sentinel.validateExecSummary([f("Social presence", "CREA recorded 4/10 social presence.")], data, ORGS);
+eq("a wrong number in the detail is still caught", [v.issues.length, v.issues[0].correctedValue], [1, "9"]);
 v = Sentinel.validateExecSummary([f("x", "CREA: 50% authoritative citations.")], data, ORGS);
 eq("'50% authoritative' is checked against authPct", [v.issues.length, v.issues[0].actual, v.issues[0].correctedValue], [1, "authPct=0", "0"]);
 

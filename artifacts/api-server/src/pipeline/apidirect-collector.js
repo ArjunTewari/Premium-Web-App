@@ -784,7 +784,7 @@ function buildTwitterResult({ org, handle, followers, unique, fromTimeline, meta
 
   const topPosts = [...tagged]
     .sort((a, b) => ((b.likes || 0) + (b.replies || 0) + (b.retweets || 0)) - ((a.likes || 0) + (a.replies || 0) + (a.retweets || 0)))
-    .slice(0, 5)
+    .slice(0, process.env.KEEP_ALL_POSTS ? 1e9 : 5)
     .map(t => ({
       url:            t.url || '',
       snippet:        tweetText(t).slice(0, 250),
@@ -939,7 +939,7 @@ function buildInstagramResult({ org, followers, posts: allPosts, meta, aqKw, dat
   const totalEngage   = totalLikes + totalComments;
   const topPosts = [...posts]
     .sort((a, b) => ((b.likes || 0) + (b.comments || 0)) - ((a.likes || 0) + (a.comments || 0)))
-    .slice(0, 5)
+    .slice(0, process.env.KEEP_ALL_POSTS ? 1e9 : 5)
     .map(p => ({
       url:      p.url || '',
       snippet:  igText(p).slice(0, 250),
