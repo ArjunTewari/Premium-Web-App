@@ -15,7 +15,7 @@
  *
  * Config keys used:
  *   cfg.ORGS            string[]  — org names to track
- *   cfg.OPENAI_KEY?     string    — OpenAI API key (optional, AEO)
+ *   cfg.OPENAI_KEY?     string    — truthy marker that the ChatGPT probe is on; ChatGPT runs through the Codex CLI, no API key is read
  *   cfg.PERPLEXITY_KEY? string    — Perplexity API key (optional, AEO)
  *   cfg.GEMINI_KEY?     string    — Google Gemini API key (optional, AEO)
  */
@@ -85,28 +85,30 @@ async function runAEO(cfg, orgs, cb) {
 
   // Run all 3 LLMs in parallel
   await Promise.allSettled([
-    // OpenAI GPT-4o mini
+    // ChatGPT — through the Codex CLI signed in with ChatGPT (never the OpenAI API). The questions go
+    // in batches (one Codex call is an agent turn of ~15-30 s and a ChatGPT plan has usage limits).
     cfg.OPENAI_KEY && (async () => {
-      cb(`  Probing OpenAI GPT-4o mini — ${queriesUsed.length} questions...`);
-      const responses = await Promise.allSettled(
-        queriesUsed.map(q =>
-          axios.post('https://api.openai.com/v1/chat/completions',
-            { model: 'gpt-4o-mini', max_tokens: 300, messages: [{ role: 'system', content: 'Reply in 1-2 sentences maximum. List only organisation names, no explanations.' }, { role: 'user', content: q }] },
-            { headers: { 'Authorization': `Bearer ${cfg.OPENAI_KEY}`, 'Content-Type': 'application/json' }, timeout: 30000 }
-          )
-        )
-      );
-      costTracker.openaiCalls += responses.filter(r => r.status === 'fulfilled').length;
-      let gptErrors = 0;
-      const texts = responses.map((r, i) => {
-        if (r.status === 'rejected') {
-          gptErrors++;
-          if (i === 0) cb(`  GPT-4o error: ${r.reason?.response?.data?.error?.message || r.reason?.message || 'unknown'}`, 'warn');
-          return '';
+      const Codex = require('./codex-cli');
+      const batchSize = Math.max(1, parseInt(process.env.AEO_CHATGPT_BATCH || '5', 10) || 5);
+      const batches = [];
+      for (let i = 0; i < queriesUsed.length; i += batchSize) batches.push({ start: i, qs: queriesUsed.slice(i, i + batchSize) });
+      cb(`  Probing ChatGPT (Codex CLI) — ${queriesUsed.length} questions in ${batches.length} call${batches.length === 1 ? '' : 's'}...`);
+      const texts = queriesUsed.map(() => '');
+      let gptErrors = 0, firstError = '';
+      await Promise.all(batches.map(async ({ start, qs }) => {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const answers = await Codex.askChatGPTBatch(qs);
+            answers.forEach((a, j) => { texts[start + j] = a; });
+            costTracker.openaiCalls += 1;
+            return;
+          } catch (e) {
+            if (!firstError) firstError = e.message;
+            if (e.auth || attempt === 2) { gptErrors += qs.length; return; }
+          }
         }
-        return r.value.data.choices[0].message.content || '';
-      });
-      if (gptErrors > 0) cb(`  GPT-4o mini: ${gptErrors}/${queriesUsed.length} calls failed`, 'warn');
+      }));
+      if (gptErrors > 0) cb(`  ChatGPT: ${gptErrors}/${queriesUsed.length} questions got no answer — ${firstError}`, 'warn');
       for (const org of orgs) {
         let count = 0;
         texts.forEach((text, qi) => {
@@ -115,12 +117,12 @@ async function runAEO(cfg, orgs, cb) {
             count++;
             if (!results[org].topResponse) results[org].topResponse = text.slice(0, 220);
           }
-          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'GPT-4o mini', cited: mentioned, text });
+          results[org].questionResults[`Q${qi + 1}`].push({ llm: 'ChatGPT', cited: mentioned, text });
         });
-        results[org].llmBreakdown['GPT-4o mini'] = {
-          mentions: count, total: queriesUsed.length
+        results[org].llmBreakdown['ChatGPT'] = {
+          mentions: count, total: queriesUsed.length, failed: gptErrors,
         };
-        cb(`  GPT-4o → ${org}: ${count}/${queriesUsed.length}`, count > 0 ? 'ok' : 'warn');
+        cb(`  ChatGPT → ${org}: ${count}/${queriesUsed.length}`, count > 0 ? 'ok' : 'warn');
       }
     })(),
 
@@ -202,7 +204,7 @@ async function runAEO(cfg, orgs, cb) {
   for (const org of orgs) {
     results[org].mentions = Object.values(results[org].llmBreakdown)
       .reduce((a, b) => a + b.mentions, 0);
-    // Must match the 3 LLMs actually probed above (GPT-4o mini, Perplexity,
+    // Must match the 3 LLMs actually probed above (ChatGPT via Codex CLI, Perplexity,
     // Claude Haiku) — was checking APIDIRECT_KEY (a social-media API key,
     // unrelated to AEO probing) instead of CLAUDE_KEY, which silently
     // miscounted maxPossible whenever APIDIRECT_KEY wasn't configured even
@@ -298,7 +300,7 @@ function buildAEOHtml(aeoResults, orgs, queriesOverride) {
 
   // ── Q×Org matrix table ────────────────────────────────────────────────────
   const llmLinks = {
-    'GPT-4o mini':      (q) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`,
+    'ChatGPT':          (q) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`,
     'Perplexity':       (q) => `https://www.perplexity.ai/search?q=${encodeURIComponent(q)}`,
     'Claude':           (q) => `https://claude.ai/new?q=${encodeURIComponent(q)}`,
   };

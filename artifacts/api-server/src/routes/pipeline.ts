@@ -8,7 +8,7 @@ import { requireAuth } from "../middleware/require-auth.js";
 import { type ReportTrendSummary, frameworkIds, listFrameworks, parseCheckpointName, unpackCheckpoint, checkpointMismatch, checkpointFingerprint } from "../pipeline/index.js";
 import { generateAndDeliverReport, loadReportHtml, persistReportToGithub, OUT_DIR } from "../lib/generate-report.js";
 import { getCheckpoint, listCheckpoints, isConfigured as isGithubConfigured } from "../lib/report-storage.js";
-import { CLAUDE_VIA_CLI } from "../lib/preflight.js";
+import { CLAUDE_VIA_CLI, CHATGPT_VIA_CLI } from "../lib/preflight.js";
 import { deriveReport, listReportOrgs, parseReportType, priceForType, reportPeriod, reportTypeOfName, reportTypeOfHtml } from "../lib/report-types.js";
 import { toClientView } from "../lib/client-view.js";
 import { sendReportFileEmail } from "../lib/mailer.js";
@@ -97,7 +97,7 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     AEO_QUERIES: Array.isArray(body.aeoQueries) && body.aeoQueries.length > 0 ? body.aeoQueries.filter(Boolean) : [],
     SERPER_KEY: body.serperKey || process.env.SERPER_KEY || "",
     CLAUDE_KEY: CLAUDE_VIA_CLI, // Claude runs through the Claude CLI; no API key is used
-    OPENAI_KEY: body.openaiKey || process.env.OPENAI_KEY || "",
+    OPENAI_KEY: CHATGPT_VIA_CLI, // ChatGPT runs through the Codex CLI; no OpenAI API key is used
     PERPLEXITY_KEY: body.perplexityKey || process.env.PERPLEXITY_KEY || "",
     GEMINI_KEY: body.geminiKey || process.env.GEMINI_KEY || "",
     EXA_API_KEY: process.env.EXA_API_KEY || "",

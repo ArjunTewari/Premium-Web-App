@@ -187,7 +187,7 @@ export async function sendAdminReportEmail(
         ["Serper queries", apiCost.counts.serperQueries, apiCost.linesUSD.serper],
         ["APIdirect calls", apiCost.counts.apidirectCalls, apiCost.linesUSD.apidirect],
         ["Perplexity queries", apiCost.counts.perplexityCalls, apiCost.linesUSD.perplexity],
-        ["OpenAI queries", apiCost.counts.openaiCalls, apiCost.linesUSD.openai],
+        ["ChatGPT calls (Codex CLI, plan)", apiCost.counts.openaiCalls, apiCost.linesUSD.openai],
         ["Gemini queries", apiCost.counts.geminiCalls, apiCost.linesUSD.gemini],
         ["YouTube API calls", apiCost.counts.youtubeApiCalls, apiCost.linesUSD.youtube],
       ]

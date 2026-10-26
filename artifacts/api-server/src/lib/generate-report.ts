@@ -128,7 +128,7 @@ export async function generateAndDeliverReport(params: GenerateReportParams): Pr
   // Stop before spending anything if a service the report depends on is unusable
   // (dead key, no credit, blocked account). Set SKIP_PREFLIGHT=1 to bypass.
   if (process.env.SKIP_PREFLIGHT !== "1") {
-    // A resumed run fetches nothing from APIdirect / YouTube / OpenAI, so only Claude is checked.
+    // A resumed run fetches nothing from APIdirect / YouTube / ChatGPT, so only Claude is checked.
     const pre = await preflight(cfg.resumeCheckpoint ? { CLAUDE_KEY: cfg.CLAUDE_KEY } : cfg);
     for (const w of pre.warnings) cb(`  PRE-RUN CHECK · warning: ${w}`, "warn");
     if (pre.fatal.length) {

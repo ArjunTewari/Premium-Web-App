@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, reportSchedulesTable, orgHandlesTable, type ReportSchedule } from "@workspace/db";
 import { logger } from "./logger.js";
 import { generateAndDeliverReport } from "./generate-report.js";
-import { CLAUDE_VIA_CLI } from "./preflight.js";
+import { CLAUDE_VIA_CLI, CHATGPT_VIA_CLI } from "./preflight.js";
 import type { RunConfig } from "../pipeline/index.js";
 
 // Fires each active schedule at most once per (IST) Monday, generating the
@@ -79,7 +79,7 @@ async function fireSchedule(schedule: ReportSchedule, mondayDateKey: string): Pr
     SCOPE_KEYWORDS: schedule.scopeKeywords ?? [],
     SERPER_KEY: process.env.SERPER_KEY || "",
     CLAUDE_KEY: CLAUDE_VIA_CLI, // Claude runs through the Claude CLI; no API key is used
-    OPENAI_KEY: process.env.OPENAI_KEY || "",
+    OPENAI_KEY: CHATGPT_VIA_CLI, // ChatGPT runs through the Codex CLI; no OpenAI API key is used
     PERPLEXITY_KEY: process.env.PERPLEXITY_KEY || "",
     GEMINI_KEY: process.env.GEMINI_KEY || "",
     EXA_API_KEY: process.env.EXA_API_KEY || "",

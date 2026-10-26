@@ -52,7 +52,7 @@ The legacy per-org Firecrawl/Serper search path was removed — `DISCOVERY`,
 `FIRECRAWL_KEY`, and `SERPER_KEY` no longer do anything.
 
 Used when present (report sections degrade gracefully if missing):
-`OPENAI_KEY`, `PERPLEXITY_KEY`, `GEMINI_KEY`, `YOUTUBE_KEY`, `X_BEARER_TOKEN`,
+`PERPLEXITY_KEY`, `GEMINI_KEY`, `YOUTUBE_KEY`, `X_BEARER_TOKEN`,
 `APIDIRECT_KEY`, `META_ACCESS_TOKEN`, `IG_BUSINESS_ACCOUNT_ID`.
 
 Report cost emails (per generated report — admin gets the real API cost + client
@@ -117,3 +117,11 @@ healthcheck config above and domain
 `workspaceapi-server-production-79c5.up.railway.app`, and a **`Postgres`** service
 (`ed62e6bd-…`) is provisioned with a managed volume. The 4 other auto-imported
 workspace services are all `FAILED` — ignore or delete them.
+
+## ChatGPT (AI-visibility probe) runs through the Codex CLI — no OpenAI API key
+
+`OPENAI_KEY` is no longer read. On a machine where you are signed in to ChatGPT in Codex (`codex login`), copy the whole
+contents of `~/.codex/auth.json` into the Railway variable `CODEX_AUTH_JSON` (it must be a ChatGPT sign-in, not an API key).
+The app writes it to a private `CODEX_HOME` the first time it is needed. Codex refreshes its tokens in that folder, so set
+`CODEX_HOME` to a path on a Railway **volume** (for example `/data/codex`) so the refreshed sign-in survives redeploys;
+without a volume, re-copy `auth.json` if the sign-in ever expires. The pre-run check fails clearly if Codex is not usable.
