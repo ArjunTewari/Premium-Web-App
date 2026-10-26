@@ -21,7 +21,7 @@ const { StateGraph, Annotation, START, END } = require('@langchain/langgraph');
 const ClaudeClient = require('../claude-client');
 const Sentinel = require('../sentinel');
 
-const MAX_RETRIES = 2; // worst case: 1 initial + 2 corrective = 3 total Claude calls
+const MAX_RETRIES = 1; // worst case: 1 initial + 1 corrective = 2 Claude calls (each takes ~1 minute)
 
 const State = Annotation.Root({
   execF: Annotation({ reducer: (_a, b) => b, default: () => [] }),
@@ -99,6 +99,10 @@ async function factCheck(state, config) {
 // after having tried to fix it first.
 function routeAfterFactCheck(state) {
   if (!state.execAudit.issues.length) return END;
+  // Numbers that can be corrected deterministically (one unambiguous field) are corrected in
+  // code after the loop — asking the model again costs about a minute and gambles on it getting
+  // the number right. Regenerate only when something is left that code cannot correct.
+  if (state.execAudit.issues.every((iss) => iss.correctedValue != null)) return END;
   if (state.retryCount < MAX_RETRIES) return 'generateSummary';
   return END;
 }

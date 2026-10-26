@@ -792,7 +792,7 @@ function reprocessTwitter(org, d, aqKw, dateRange, cb) {
 // nearly every org) under a longer-than-default ceiling, and only escalate to
 // the 10-page max when that smaller pull hit its cap AND still hadn't reached
 // the start of the report window.
-const IG_FIRST_PAGES   = parseInt(process.env.IG_FIRST_PAGES  || '6', 10);   // 72 posts
+const IG_FIRST_PAGES   = parseInt(process.env.IG_FIRST_PAGES  || '2', 10);   // 24 posts; escalates to IG_MAX_PAGES while still inside the window
 const IG_MAX_PAGES     = 10;                                                  // API ceiling — 120 posts
 const IG_POSTS_TIMEOUT = parseInt(process.env.IG_POSTS_TIMEOUT || '75000', 10);
 
@@ -847,38 +847,80 @@ async function fetchInstagram(org, igHandle, apiKey, dateRange, aqKw, cb) {
       cb?.(`  [APIdirect/IG] ${org}: hit the ${reqPages}-page/${reqPages * 12}-post ceiling while still inside the date window — org posts frequently, older in-range posts may exist beyond this cap`, 'warn');
     }
 
-    // 1) date range — no authorship filter needed, this is the account's own feed
-    let posts = allPosts.filter(p => inDateRange(p.date, dateRange?.from, dateRange?.to));
-    const inRange = posts.length;
-
-    // 2) AQ relevance — use the same 21 hardcoded keywords as LinkedIn
-    posts = posts.filter(p => isAQ(`${p.snippet || ''} ${p.title || ''}`, AQ_KEYWORDS_SEARCH));
-
-    // 3) metrics + ER
-    const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
-    const totalComments = posts.reduce((s, p) => s + (p.comments || 0), 0);
-    const totalViews    = posts.reduce((s, p) => s + (p.views    || 0), 0);
-    const totalEngage   = totalLikes + totalComments;
-    const topPosts = [...posts]
-      .sort((a, b) => ((b.likes || 0) + (b.comments || 0)) - ((a.likes || 0) + (a.comments || 0)))
-      .slice(0, 5)
-      .map(p => ({
-        url:      p.url || '',
-        snippet:  (p.snippet || '').slice(0, 250),
-        author:   p.author || p.author_name || '',
-        likes:    p.likes    || 0,
-        comments: p.comments || 0,
-        views:    p.views    || 0,
-        date:     p.date     || '',
-        isVideo:  !!p.is_video,
-      }));
-    const erVal = er(totalEngage, followers, posts.length);
-    cb?.(`  [APIdirect/IG] ${org}: ${fetched} fetched → ${inRange} in range → ${posts.length} AQ posts, ${followers.toLocaleString()} followers, ER=${erVal}%`, posts.length > 0 ? 'ok' : 'warn');
-    return { postCount: posts.length, totalLikes, totalComments, totalViews, followers, er: erVal, topPosts, fetched, inRangeCount: inRange, truncated };
+    return buildInstagramResult({ org, followers, posts: allPosts, meta: { fetched, truncated, reqPages }, aqKw, dateRange, cb });
   } catch (e) {
     cb?.(`  [APIdirect/IG] ${org}: ${e.message}`, 'warn');
     return failResult(EMPTY, e);
   }
+}
+
+function igText(p) { return String(p.snippet || p.caption || p.text || p.title || ''); }
+function igKey(p) { return String(p.id || p.url || `${p.date}:${igText(p).slice(0, 80)}`); }
+
+function slimInstagramPost(p) {
+  return {
+    id: String(p.id || ''), url: p.url || '', snippet: igText(p).slice(0, 1500), date: p.date || '',
+    likes: p.likes || 0, comments: p.comments || 0, views: p.views || 0,
+    author: p.author || p.author_name || '', is_video: !!p.is_video,
+  };
+}
+
+// Window, no repeats, and the post's own caption carries a keyword (same rule as X and LinkedIn:
+// own text only, short acronyms stand alone, hashtags as hashtags). Pure given its inputs, so the
+// same function re-counts saved posts (reprocessInstagram) without any API call.
+function buildInstagramResult({ org, followers, posts: allPosts, meta, aqKw, dateRange, cb }) {
+  const seen = new Set();
+  const unique = [];
+  let duplicatesRemoved = 0;
+  for (const p of allPosts) {
+    const k = igKey(p);
+    if (seen.has(k)) { duplicatesRemoved++; continue; }
+    seen.add(k); unique.push(p);
+  }
+  const windowPosts = unique.filter(p => inDateRange(p.date, dateRange?.from, dateRange?.to));
+  const inRange = windowPosts.length;
+  const terms = [...new Set([...AQ_KEYWORDS_SEARCH, ...(aqKw || AQ_KW_BASE)])];
+  const posts = [];
+  for (const p of windowPosts) {
+    const kws = keywordsInText(igText(p), terms);
+    if (kws.length) posts.push({ ...p, keywords_found: kws });
+  }
+  const droppedNoKeyword = inRange - posts.length;
+  if (duplicatesRemoved > 0) cb?.(`  [APIdirect/IG] ${org}: ${duplicatesRemoved} repeated post(s) from the API removed`, 'warn');
+
+  const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
+  const totalComments = posts.reduce((s, p) => s + (p.comments || 0), 0);
+  const totalViews    = posts.reduce((s, p) => s + (p.views    || 0), 0);
+  const totalEngage   = totalLikes + totalComments;
+  const topPosts = [...posts]
+    .sort((a, b) => ((b.likes || 0) + (b.comments || 0)) - ((a.likes || 0) + (a.comments || 0)))
+    .slice(0, 5)
+    .map(p => ({
+      url:      p.url || '',
+      snippet:  igText(p).slice(0, 250),
+      author:   p.author || p.author_name || '',
+      likes:    p.likes    || 0,
+      comments: p.comments || 0,
+      views:    p.views    || 0,
+      date:     p.date     || '',
+      isVideo:  !!p.is_video,
+      keywords_found: p.keywords_found,
+    }));
+  const erVal = er(totalEngage, followers, posts.length);
+  cb?.(`  [APIdirect/IG] ${org}: ${meta.fetched} fetched → ${inRange} in range → ${posts.length} AQ posts, ${followers.toLocaleString()} followers, ER=${erVal}%`, posts.length > 0 ? 'ok' : 'warn');
+  return {
+    postCount: posts.length, totalLikes, totalComments, totalViews, followers, er: erVal, topPosts,
+    fetched: meta.fetched, inRangeCount: inRange, truncated: meta.truncated, duplicatesRemoved, droppedNoKeyword,
+    rawPosts: windowPosts.map(slimInstagramPost),
+    rawMeta: { followers, fetched: meta.fetched, truncated: meta.truncated, reqPages: meta.reqPages },
+  };
+}
+
+/** Count a saved Instagram result again under the current rules, from its saved posts. No API call. */
+function reprocessInstagram(org, d, aqKw, dateRange, cb) {
+  if (!d || !Array.isArray(d.rawPosts) || !d.rawMeta) return d;
+  const m = d.rawMeta;
+  return buildInstagramResult({ org, followers: m.followers ?? d.followers ?? 0, posts: d.rawPosts, meta: { fetched: m.fetched ?? d.rawPosts.length, truncated: m.truncated, reqPages: m.reqPages }, aqKw, dateRange, cb });
 }
 
 // ── YouTube channel resolution + subscriber count ─────────────────────────────
@@ -992,7 +1034,7 @@ module.exports = {
   run,
   // Individual fetchers + helpers exported for the sentinel's targeted retries
   fetchLinkedIn, fetchTwitter, fetchInstagram, fetchYouTubeChannel,
-  reprocessTwitter, reprocessLinkedIn,
+  reprocessTwitter, reprocessLinkedIn, reprocessInstagram,
   buildAqKeywords, parseDate, inDateRange, isAQ,
   AQ_KEYWORDS_SEARCH,
 };

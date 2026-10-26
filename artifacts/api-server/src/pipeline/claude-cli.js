@@ -25,7 +25,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createRequire } = require("node:module");
 
-const CONCURRENCY = Math.max(1, parseInt(process.env.CLAUDE_CLI_CONCURRENCY || "3", 10) || 3);
+const CONCURRENCY = Math.max(1, parseInt(process.env.CLAUDE_CLI_CONCURRENCY || "6", 10) || 6);
 const TIMEOUT_MS = Math.max(10000, parseInt(process.env.CLAUDE_CLI_TIMEOUT_MS || "180000", 10) || 180000);
 const RETRY_DELAYS_MS = [3000, 10000];
 

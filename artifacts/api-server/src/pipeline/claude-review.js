@@ -9,13 +9,13 @@
  * runs with tools switched off, so it can only read the prompt.
  *
  * Independence: the review is a separate call with its own instructions and the
- * strongest model alias (AUDIT_CLAUDE_MODEL, default "opus"), not the model that
+ * strongest model alias (AUDIT_CLAUDE_MODEL, default "sonnet"), not the model that
  * wrote the summary. The rule checks in audit.js do not depend on any model.
  */
 
 const { askClaude } = require("./claude-cli");
 
-const MODEL = process.env.AUDIT_CLAUDE_MODEL || "opus";
+const MODEL = process.env.AUDIT_CLAUDE_MODEL || "sonnet";
 const TIMEOUT_MS = Math.max(60000, parseInt(process.env.AUDIT_CLAUDE_TIMEOUT_MS || "420000", 10) || 420000);
 const ATTEMPTS = 2;
 
