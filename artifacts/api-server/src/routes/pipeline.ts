@@ -138,6 +138,13 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     if (!buf) return res.status(404).json({ error: "The saved data was not found." });
     let chk;
     try { chk = unpackCheckpoint(buf); } catch (e) { return res.status(400).json({ error: (e as Error).message }); }
+    // The saved data defines its own scope keywords and AI-search questions (the scheduled Monday run
+    // and the form use different lists, and the data was collected with whichever ran). Resuming uses
+    // the saved ones, so the report states exactly what was used; only the subject area, dates and
+    // organisations must match.
+    const saved = (chk as { fingerprint: { scopeKeywords?: string[]; aeoQueries?: string[] } }).fingerprint;
+    cfg.SCOPE_KEYWORDS = [...(saved.scopeKeywords || [])];
+    cfg.AEO_QUERIES = [...(saved.aeoQueries || [])];
     const why = checkpointMismatch(chk, checkpointFingerprint(cfg, cfg.FRAMEWORK));
     if (why.length) return res.status(400).json({ error: `The saved data was collected for a different run (${why.join("; ")}).` });
     (cfg as { resumeCheckpoint?: unknown }).resumeCheckpoint = chk;

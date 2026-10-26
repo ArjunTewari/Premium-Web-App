@@ -1920,7 +1920,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
               <input type="checkbox" checked={useSaved} onChange={(e) => setUseSaved(e.target.checked)} disabled={running} style={{ marginTop: 3 }} />
               <span>
                 <strong>Use saved data</strong> — data from an earlier run for {matchingSaved.dateFrom} to {matchingSaved.dateTo} ({matchingSaved.orgCount} organisations) is saved. Ticking this builds the report from it and fetches nothing again (no APIdirect, Exa, OpenAI or YouTube cost; the summary and actions are still written fresh).
-                <span style={{ display: "block", fontSize: 12, color: C.muted, marginTop: 4 }}>It is used only if the organisations, keywords and questions are exactly the same as when it was saved; otherwise the run is refused and nothing is spent.</span>
+                <span style={{ display: "block", fontSize: 12, color: C.muted, marginTop: 4 }}>It is used with the keywords and questions it was saved with (the report shows them); it is refused, and nothing is spent, only if the organisations differ from when it was saved.</span>
               </span>
             </label>
           )}
