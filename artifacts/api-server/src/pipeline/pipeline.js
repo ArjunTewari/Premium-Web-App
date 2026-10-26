@@ -1219,50 +1219,81 @@ ${batchText}`;
   };
   const base = `TMP-${fwNow().id === "air-quality" ? "" : fwNow().short + "-"}${monthLabel(DATE_FROM, DATE_TO)}-${ORGS.length}orgs`;
   const htmlFile = path.join(cfg.outDir, `${base}.html`);
-  let html;
-  try {
-    html = buildHTML(
-      data,
-      {},
-      emerging,
-      execF,
-      actions,
-      arts,
-      aeoResults,
-      cfg,
-      socialERHtml,
-      socialERResults,
-      youtubeERResults,
-      spikeAnnotations,
-      aeoQueriesUsed,
-      execAudit,
-    );
-  } catch (e) {
-    cb(`  HTML build error: ${e.message}\n${e.stack?.split("\n").slice(0,4).join("\n")}`, "err");
-    throw e;
-  }
-  // ── SENTINEL (report): post-build audit — self-heal section numbering ────
-  try {
-    const audit = Sentinel.auditSectionNumbering(html);
-    if (audit.fixes.length) {
-      html = audit.html;
-      cb(`  SENTINEL · report: fixed ${audit.fixes.length} section-number gap(s): ${audit.fixes.join(", ")}`, "ok");
-    } else {
-      cb(`  SENTINEL · report: section numbering contiguous ✓`, "ok");
+  // The finished report page: built, section numbers checked, subject wording applied. A function, because the
+  // audit below can have the executive summary written again, and the page is then built again from it.
+  const buildFinalHtml = () => {
+    let h;
+    try {
+      h = buildHTML(
+        data,
+        {},
+        emerging,
+        execF,
+        actions,
+        arts,
+        aeoResults,
+        cfg,
+        socialERHtml,
+        socialERResults,
+        youtubeERResults,
+        spikeAnnotations,
+        aeoQueriesUsed,
+        execAudit,
+      );
+    } catch (e) {
+      cb(`  HTML build error: ${e.message}\n${e.stack?.split("\n").slice(0,4).join("\n")}`, "err");
+      throw e;
     }
-  } catch (e) {
-    cb(`  SENTINEL · report audit skipped: ${e.message}`, "warn");
-  }
-
-  html = FW.fwText(html);
-  html = html.replace("<title>", `<meta name="emerald-framework" content="${fwNow().id}">\n<title>`);
+    // ── SENTINEL (report): post-build audit — self-heal section numbering ────
+    try {
+      const audit = Sentinel.auditSectionNumbering(h);
+      if (audit.fixes.length) {
+        h = audit.html;
+        cb(`  SENTINEL · report: fixed ${audit.fixes.length} section-number gap(s): ${audit.fixes.join(", ")}`, "ok");
+      } else {
+        cb(`  SENTINEL · report: section numbering contiguous ✓`, "ok");
+      }
+    } catch (e) {
+      cb(`  SENTINEL · report audit skipped: ${e.message}`, "warn");
+    }
+    h = FW.fwText(h);
+    h = h.replace("<title>", `<meta name="emerald-framework" content="${fwNow().id}">\n<title>`);
+    return h;
+  };
+  let html = buildFinalHtml();
 
   // ── AUDIT: last gate. Rule checks + independent Claude CLI review. A failed or
   // incomplete audit stops the run here — nothing is written, stored or sent.
-  const auditResult = await Audit.runAudit(
-    { ORGS, data, socialERResults, youtubeERResults, execF, actions, html, dateFrom: DATE_FROM, dateTo: DATE_TO, subject: fwNow().subject },
-    cb,
-  );
+  const auditCtx = () => ({ ORGS, data, socialERResults, youtubeERResults, aeoResults, execF, actions, html, dateFrom: DATE_FROM, dateTo: DATE_TO, subject: fwNow().subject });
+  let auditResult = await Audit.runAudit(auditCtx(), cb);
+
+  // An error about the executive summary's TEXT can be repaired: write it again with what the reviewer found
+  // (round 1), then take out the findings the reviewer still names (round 2), and audit again each time. An
+  // error about the DATA (a post, a count, a share) cannot be repaired by editing text: the report stays stopped.
+  for (let round = 1; !auditResult.passed && round <= 2; round++) {
+    const plan = Audit.repairPlan(auditResult.errors, execF);
+    if (!plan.repairable) {
+      if (plan.other.length) cb(`  AUDIT · ${plan.other.length} error(s) concern the data, not the summary's wording — they cannot be repaired by rewriting text`, "err");
+      break;
+    }
+    try {
+      if (round === 1 || !plan.flagged.length) {
+        cb(`  AUDIT · repair round ${round}: the executive summary is written again using the reviewer's findings...`, "warn");
+        const r = await require("./graphs/exec-summary-graph").run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb, feedback: plan.feedback });
+        if (r.execF.length) { execF = r.execF; execAudit = r.execAudit; }
+      } else {
+        const gone = plan.flagged.map((i) => execF[i]?.headline).filter(Boolean);
+        cb(`  AUDIT · repair round ${round}: finding(s) the reviewer still names are removed: ${gone.map((h) => `"${h}"`).join("; ")}`, "warn");
+        execF = execF.filter((_, i) => !plan.flagged.includes(i));
+        execAudit = { ...execAudit, dropped: [...(execAudit.dropped || []), ...gone.map((headline) => ({ headline, claims: ["removed after the independent review"] }))] };
+      }
+    } catch (e) {
+      cb(`  AUDIT · repair round ${round} failed: ${e.message}`, "err");
+      break;
+    }
+    html = buildFinalHtml();
+    auditResult = await Audit.runAudit(auditCtx(), cb);
+  }
   if (!auditResult.passed) throw new Error(Audit.failureMessage(auditResult));
   html = html.replace("<title>", `<meta name="emerald-audit" content="${Audit.stamp(auditResult)}">\n<title>`);
   fs.writeFileSync(htmlFile, html, "utf8");

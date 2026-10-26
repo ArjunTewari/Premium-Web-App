@@ -99,5 +99,6 @@ const cpMod = _checkpoint as any;
 export interface CheckpointInfo { framework: string; dateFrom: string; dateTo: string; orgCount: number; hash: string }
 export const parseCheckpointName: (name: string) => CheckpointInfo | null = cpMod.parseName ?? cpMod.default?.parseName;
 export const unpackCheckpoint: (buf: Buffer) => { savedAt: string; fingerprint: { orgs: string[] } } = cpMod.unpack ?? cpMod.default?.unpack;
+export const checkpointRecountable: (chk: unknown) => boolean = cpMod.recountable ?? cpMod.default?.recountable;
 export const checkpointMismatch: (chk: unknown, fp: unknown) => string[] = cpMod.mismatch ?? cpMod.default?.mismatch;
 export const checkpointFingerprint: (cfg: unknown, frameworkId: string) => unknown = cpMod.fingerprint ?? cpMod.default?.fingerprint;

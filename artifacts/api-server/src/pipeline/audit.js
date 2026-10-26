@@ -206,6 +206,32 @@ function summarise(a) {
   return `${a.checks} rule checks, ${a.errors.length} error(s), ${a.warnings.length} warning(s); ${rv}`;
 }
 
+/**
+ * Which audit errors can be repaired by writing the executive summary again, and which cannot.
+ * An error about the summary's text can; an error about the data (a post, a count, a share) cannot be
+ * repaired by editing text, so any of those means the report stays stopped.
+ */
+function repairPlan(errors, execF) {
+  const aboutSummary = (e) => /executive summary/i.test(`${e.where || ""}`);
+  const summaryErrs = errors.filter(aboutSummary);
+  const other = errors.filter((e) => !aboutSummary(e));
+  const flagged = new Set();
+  (execF || []).forEach((f, i) => {
+    const h = String(f.headline || "").toLowerCase();
+    for (const e of summaryErrs) {
+      const hay = `${e.where || ""} ${e.issue || ""}`.toLowerCase();
+      const n = /finding (\d+)/i.exec(e.where || "");
+      if ((h && hay.includes(h)) || (n && Number(n[1]) === i + 1)) flagged.add(i);
+    }
+  });
+  return {
+    repairable: summaryErrs.length > 0 && other.length === 0,
+    feedback: summaryErrs.map((e) => `${e.where}: ${e.issue}`).join(" | ").slice(0, 1800),
+    flagged: [...flagged].sort((a, b) => a - b),
+    other,
+  };
+}
+
 function failureMessage(a) {
   const lines = a.errors.slice(0, 8).map((e) => `- ${e.org} · ${e.where}: ${e.issue}`);
   return `AUDIT FAILED — the report was not stored or sent.\n${lines.join("\n")}${a.errors.length > 8 ? `\n…and ${a.errors.length - 8} more` : ""}`;
@@ -216,4 +242,4 @@ function stamp(a) {
   return `${a.passed ? "passed" : "failed"}; ${a.summary}`.replace(/"/g, "'");
 }
 
-module.exports = { checkDeterministic, buildEvidencePack, runAudit, failureMessage, stamp };
+module.exports = { checkDeterministic, buildEvidencePack, runAudit, repairPlan, failureMessage, stamp };

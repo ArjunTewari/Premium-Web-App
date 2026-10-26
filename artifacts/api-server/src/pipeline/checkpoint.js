@@ -70,4 +70,16 @@ function mismatch(chk, fp) {
   return why;
 }
 
-module.exports = { VERSION, fingerprint, name, parseName, pack, unpack, mismatch };
+/**
+ * Whether the saved social results can be counted again under the current rules. Data saved before the
+ * posts were kept holds only counts made under the OLD rules (off-topic and repeated posts included), which
+ * the audit rejects and which cannot be corrected: it must not be resumed.
+ */
+function recountable(chk) {
+  const res = (chk && chk.state && chk.state.socialERResults) || [];
+  const counted = res.some((r) => (r.twData?.postCount || 0) + (r.liData?.postCount || 0) + (r.igData?.postCount || 0) > 0);
+  if (!counted) return true; // nothing was counted, so nothing is stale
+  return res.some((r) => Array.isArray(r.twData?.rawTweets) || Array.isArray(r.liData?.rawPosts) || Array.isArray(r.igData?.rawPosts));
+}
+
+module.exports = { VERSION, fingerprint, name, parseName, pack, unpack, mismatch, recountable };
