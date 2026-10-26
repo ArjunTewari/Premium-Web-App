@@ -31,10 +31,11 @@ const State = Annotation.Root({
 
 // Identical wording to pipeline.js's original STEP 5b prompt — must stay
 // byte-identical on the base (first-attempt) path for behavioral parity.
-function buildPrompt({ ORGS, DATE_FROM, DATE_TO, orgSummary }, execAudit) {
+function buildPrompt({ ORGS, DATE_FROM, DATE_TO, orgSummary, reviewFeedback }, execAudit) {
   const base = `Write 3 comparative findings for a media intelligence report comparing these orgs on Indian air quality coverage ${DATE_FROM} to ${DATE_TO}.\nOrgs: ${ORGS.join(", ")}\n\nDATA (includes AEO/LLM visibility and social media):\n${orgSummary}\n\nRULES — follow strictly:\n- State facts directly. NEVER use inferential or interpretive language: banned words include "reflects", "indicates", "demonstrates", "shows", "suggests", "implies", "highlights", "underscores", "signals", "points to", "speaks to", "reveals", "evidences".\n- Do NOT editorialize about what numbers mean. Report the numbers and let the reader draw conclusions.\n- Cite ONLY directly observable counts and scores. NEVER use these phrases: "authoritative tone", "institutional credibility", "greater credibility", "more trustworthy".\n- When EITHER compared value is below 10, use raw counts (e.g. "4 vs 1 articles") not percentages. Use "Nx" ratios only when BOTH values are ≥5.\n- Each headline max 12 words. Each detail 2-3 sentences with specific numbers only.\n- When you list organisations that share a value (for example every organisation at 0/10), use the FACTS lines: name all of them or give only the count. An organisation whose line says a cell was not collected has a score that counts that cell as 0; say so, and do not present it as a measured zero.\n- section_ref must be one of: "§03 AQ Press Analytics", "§05 Topic Ownership", "§06 Narrative Position", "§07 Citation Quality", "§AEO LLM Visibility", "§Social Media".\nReturn ONLY JSON array of 3: [{"headline":"...","detail":"...","section_ref":"§03 AQ Press Analytics"}]`;
 
-  if (!execAudit || !execAudit.issues.length) return base;
+  const reviewed = reviewFeedback ? `\n\nAn independent reviewer found these problems in an earlier draft: ${reviewFeedback}\nWrite the 3 findings again so that none of them occurs. Use ONLY the DATA and FACTS lines above.` : '';
+  if (!execAudit || !execAudit.issues.length) return base + reviewed;
 
   // Corrective feedback built directly from validateExecSummary's own
   // diagnostic fields — turns existing diagnosis output into regeneration
@@ -42,7 +43,7 @@ function buildPrompt({ ORGS, DATE_FROM, DATE_TO, orgSummary }, execAudit) {
   const feedback = execAudit.issues
     .map((iss) => `Finding #${iss.findingIdx + 1} claimed ${iss.claimed} ${iss.metric} for ${iss.org}, but the correct value from the DATA above is ${iss.actual}.`)
     .join(' ');
-  return `${base}\n\nYour previous attempt had errors — ${feedback} Regenerate all 3 findings using ONLY the exact numbers shown in DATA above.`;
+  return `${base}${reviewed}\n\nYour previous attempt had errors — ${feedback} Regenerate all 3 findings using ONLY the exact numbers shown in DATA above.`;
 }
 
 // 1. generateSummary — pipeline.js's original callClaude+parseJ block
@@ -50,13 +51,13 @@ function buildPrompt({ ORGS, DATE_FROM, DATE_TO, orgSummary }, execAudit) {
 //    from a failed fact-check. retryCount only increments on a corrective
 //    pass (execAudit had issues going in) — stays 0 on the very first call.
 async function generateSummary(state, config) {
-  const { cb, cfg, ORGS, DATE_FROM, DATE_TO, orgSummary } = config.configurable;
+  const { cb, cfg, ORGS, DATE_FROM, DATE_TO, orgSummary, feedback } = config.configurable;
   const isCorrective = !!(state.execAudit && state.execAudit.issues.length);
   const retryCount = isCorrective ? state.retryCount + 1 : state.retryCount;
 
   cb?.(isCorrective ? `  Executive summary (corrective retry ${retryCount}/${MAX_RETRIES})...` : '  Executive summary...');
   try {
-    const prompt = buildPrompt({ ORGS, DATE_FROM, DATE_TO, orgSummary }, state.execAudit);
+    const prompt = buildPrompt({ ORGS, DATE_FROM, DATE_TO, orgSummary, reviewFeedback: feedback }, state.execAudit);
     const r = await ClaudeClient.callClaude(require("../frameworks").fwText(prompt), cfg.CLAUDE_KEY, 1200);
     const execF = ClaudeClient.parseJ(r) || [];
     cb?.(`  ${execF.length} findings`, execF.length > 0 ? 'ok' : 'err');
@@ -119,10 +120,10 @@ const graph = new StateGraph(State)
  * Returns { execF, execAudit } — pipeline.js assigns both from this in
  * place of its original inline generate+audit block.
  */
-async function run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb }) {
+async function run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb, feedback }) {
   const finalState = await graph.invoke(
     {},
-    { configurable: { cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb }, recursionLimit: 15 },
+    { configurable: { cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb, feedback }, recursionLimit: 15 },
   );
   let execF = finalState.execF;
   let execAudit = finalState.execAudit;

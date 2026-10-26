@@ -40,7 +40,9 @@ Rules:
 - verdict is "fail" if there is at least one error finding, otherwise "pass".
 
 Reply with ONLY a JSON object of exactly this shape, no other text:
-{"verdict":"pass"|"fail","findings":[{"severity":"error"|"warning","org":"...","where":"...","issue":"...","evidence":"..."}]}`;
+{"verdict":"pass"|"fail","findings":[{"severity":"error"|"warning","org":"...","where":"...","issue":"...","evidence":"...","post_urls":["..."]}]}
+
+"post_urls" is optional: when a finding is that specific counted posts are not about the subject (or are repeats), list those posts' urls exactly as they appear in the pack; otherwise leave it out or empty.`;
 
 class ReviewError extends Error {
   constructor(message) { super(message); this.name = "ReviewError"; }
@@ -55,7 +57,7 @@ function parseReview(text) {
   if (!j || (j.verdict !== "pass" && j.verdict !== "fail") || !Array.isArray(j.findings)) throw new ReviewError("the reviewer returned a reply that does not follow the required format");
   const findings = j.findings
     .filter((f) => f && typeof f.issue === "string" && f.issue.trim())
-    .map((f) => ({ severity: f.severity === "error" ? "error" : "warning", org: String(f.org || ""), where: String(f.where || ""), issue: f.issue.trim(), evidence: String(f.evidence || "").trim() }));
+    .map((f) => ({ postUrls: Array.isArray(f.post_urls) ? f.post_urls.filter((u) => typeof u === "string" && u.trim()).map((u) => u.trim()) : [], severity: f.severity === "error" ? "error" : "warning", org: String(f.org || ""), where: String(f.where || ""), issue: f.issue.trim(), evidence: String(f.evidence || "").trim() }));
   return { verdict: j.verdict, findings };
 }
 

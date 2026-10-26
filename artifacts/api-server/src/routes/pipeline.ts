@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, usersTable, orgHandlesTable, reportLogsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/require-auth.js";
-import { type ReportTrendSummary, frameworkIds, listFrameworks, parseCheckpointName, unpackCheckpoint, checkpointMismatch, checkpointFingerprint } from "../pipeline/index.js";
+import { type ReportTrendSummary, frameworkIds, listFrameworks, parseCheckpointName, unpackCheckpoint, checkpointMismatch, checkpointFingerprint, checkpointRecountable } from "../pipeline/index.js";
 import { generateAndDeliverReport, loadReportHtml, persistReportToGithub, OUT_DIR } from "../lib/generate-report.js";
 import { getCheckpoint, listCheckpoints, isConfigured as isGithubConfigured } from "../lib/report-storage.js";
 import { CLAUDE_VIA_CLI } from "../lib/preflight.js";
@@ -138,6 +138,9 @@ router.post("/run", requireAuth, async (req: Request, res: Response) => {
     if (!buf) return res.status(404).json({ error: "The saved data was not found." });
     let chk;
     try { chk = unpackCheckpoint(buf); } catch (e) { return res.status(400).json({ error: (e as Error).message }); }
+    if (!checkpointRecountable(chk)) {
+      return res.status(400).json({ error: "This saved data was collected before posts were kept with it, so the current counting rules cannot be applied to it. It holds posts counted under the old rules (off-topic and repeated posts included), which the audit rejects, and it cannot be corrected. Run a normal fetch for this window instead; saved data from 19-25 Oct onwards can be resumed." });
+    }
     // The saved data defines its own scope keywords and AI-search questions (the scheduled Monday run
     // and the form use different lists, and the data was collected with whichever ran). Resuming uses
     // the saved ones, so the report states exactly what was used; only the subject area, dates and

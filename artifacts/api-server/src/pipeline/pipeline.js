@@ -652,6 +652,9 @@ async function run(cfg, cb) {
   const Checkpoint = require("./checkpoint");
   const RESUMED = !!cfg.resumeCheckpoint;
   const cpFingerprint = Checkpoint.fingerprint(cfg, fwNow().id);
+  // Posts the independent review named as not being about the subject (this run, or an earlier run of the same data).
+  const excludePosts = [...new Set([...(cfg.excludePosts || []), ...(((cfg.resumeCheckpoint || {}).state || {}).excludePosts || [])])];
+  let checkpointObj = cfg.resumeCheckpoint || null;
   const cls = {};
   let aeoResults = {};
   let aeoQueriesUsed;
@@ -1037,7 +1040,7 @@ ${batchText}`;
     youtubeERResults = st.youtubeERResults;
     // The counting rules may have changed since the data was saved: count the saved posts again.
     try {
-      socialERResults = SocialER.regate(st.socialERResults, cfg, cb).results;
+      socialERResults = SocialER.regate(st.socialERResults, { ...cfg, excludePosts }, cb).results;
     } catch (e) {
       cb(`  Re-counting the saved social posts failed (${e.message}) — using the figures as saved`, "warn");
       socialERResults = st.socialERResults;
@@ -1067,6 +1070,7 @@ ${batchText}`;
       const cpName = Checkpoint.name(cpFingerprint);
       fs.writeFileSync(path.join(cfg.outDir, cpName), buf);
       cb(`  CHECKPOINT · collected data saved (${cpName}, ${Math.round(buf.length / 1024)}KB) — a failed or aborted run can resume from here without fetching again`, "ok");
+      checkpointObj = Checkpoint.unpack(buf);
       if (cfg.onCheckpoint) await cfg.onCheckpoint(cpName, buf);
     } catch (e) {
       cb(`  CHECKPOINT · could not save the collected data: ${e.message}`, "warn");
@@ -1219,52 +1223,106 @@ ${batchText}`;
   };
   const base = `TMP-${fwNow().id === "air-quality" ? "" : fwNow().short + "-"}${monthLabel(DATE_FROM, DATE_TO)}-${ORGS.length}orgs`;
   const htmlFile = path.join(cfg.outDir, `${base}.html`);
-  let html;
-  try {
-    html = buildHTML(
-      data,
-      {},
-      emerging,
-      execF,
-      actions,
-      arts,
-      aeoResults,
-      cfg,
-      socialERHtml,
-      socialERResults,
-      youtubeERResults,
-      spikeAnnotations,
-      aeoQueriesUsed,
-      execAudit,
-    );
-  } catch (e) {
-    cb(`  HTML build error: ${e.message}\n${e.stack?.split("\n").slice(0,4).join("\n")}`, "err");
-    throw e;
-  }
-  // ── SENTINEL (report): post-build audit — self-heal section numbering ────
-  try {
-    const audit = Sentinel.auditSectionNumbering(html);
-    if (audit.fixes.length) {
-      html = audit.html;
-      cb(`  SENTINEL · report: fixed ${audit.fixes.length} section-number gap(s): ${audit.fixes.join(", ")}`, "ok");
-    } else {
-      cb(`  SENTINEL · report: section numbering contiguous ✓`, "ok");
+  // The finished report page: built, section numbers checked, subject wording applied. A function, because the
+  // audit below can have the executive summary written again, and the page is then built again from it.
+  const buildFinalHtml = () => {
+    let h;
+    try {
+      h = buildHTML(
+        data,
+        {},
+        emerging,
+        execF,
+        actions,
+        arts,
+        aeoResults,
+        cfg,
+        socialERHtml,
+        socialERResults,
+        youtubeERResults,
+        spikeAnnotations,
+        aeoQueriesUsed,
+        execAudit,
+      );
+    } catch (e) {
+      cb(`  HTML build error: ${e.message}\n${e.stack?.split("\n").slice(0,4).join("\n")}`, "err");
+      throw e;
     }
-  } catch (e) {
-    cb(`  SENTINEL · report audit skipped: ${e.message}`, "warn");
-  }
-
-  html = FW.fwText(html);
-  html = html.replace("<title>", `<meta name="emerald-framework" content="${fwNow().id}">\n<title>`);
+    // ── SENTINEL (report): post-build audit — self-heal section numbering ────
+    try {
+      const audit = Sentinel.auditSectionNumbering(h);
+      if (audit.fixes.length) {
+        h = audit.html;
+        cb(`  SENTINEL · report: fixed ${audit.fixes.length} section-number gap(s): ${audit.fixes.join(", ")}`, "ok");
+      } else {
+        cb(`  SENTINEL · report: section numbering contiguous ✓`, "ok");
+      }
+    } catch (e) {
+      cb(`  SENTINEL · report audit skipped: ${e.message}`, "warn");
+    }
+    h = FW.fwText(h);
+    h = h.replace("<title>", `<meta name="emerald-framework" content="${fwNow().id}">\n<title>`);
+    return h;
+  };
+  let html = buildFinalHtml();
 
   // ── AUDIT: last gate. Rule checks + independent Claude CLI review. A failed or
   // incomplete audit stops the run here — nothing is written, stored or sent.
-  const auditResult = await Audit.runAudit(
-    { ORGS, data, socialERResults, youtubeERResults, execF, actions, html, dateFrom: DATE_FROM, dateTo: DATE_TO, subject: fwNow().subject },
-    cb,
-  );
+  const auditCtx = () => ({ ORGS, data, socialERResults, youtubeERResults, aeoResults, execF, actions, html, dateFrom: DATE_FROM, dateTo: DATE_TO, subject: fwNow().subject });
+  let auditResult = await Audit.runAudit(auditCtx(), cb);
+
+  // An error about the executive summary's TEXT can be repaired: write it again with what the reviewer found
+  // (round 1), then take out the findings the reviewer still names (round 2), and audit again each time. An
+  // error about the DATA (a post, a count, a share) cannot be repaired by editing text: the report stays stopped.
+  // An error about the DATA that names specific counted posts as not being about the subject: those posts are left
+  // out of the counts and steps 5-6 are run again on the same saved data (nothing is fetched), then audited again.
+  // Bounded (two rounds, a few posts); every excluded post is logged and the report states how many were excluded.
+  if (!auditResult.passed && checkpointObj && (cfg._repairDepth || 0) < 2) {
+    const ex = Audit.exclusionPlan(auditResult.errors, socialERResults, excludePosts);
+    if (ex.urls.length) {
+      cb(`  AUDIT · ${ex.urls.length} counted post(s) were named as not being about the subject: they are left out and the report is built again from the same data (nothing is fetched)`, "warn");
+      for (const u of ex.urls) cb(`    excluded: ${u}`, "warn");
+      const state = { ...checkpointObj.state, excludePosts: [...excludePosts, ...ex.urls] };
+      return await run({ ...cfg, excludePosts: [...excludePosts, ...ex.urls], resumeCheckpoint: { ...checkpointObj, state }, _repairDepth: (cfg._repairDepth || 0) + 1 }, cb);
+    }
+    if (ex.reason) cb(`  AUDIT · not repaired by leaving posts out: ${ex.reason}`, "warn");
+  }
+  for (let round = 1; !auditResult.passed && round <= 2; round++) {
+    const plan = Audit.repairPlan(auditResult.errors, execF);
+    if (!plan.repairable) {
+      if (plan.other.length) cb(`  AUDIT · ${plan.other.length} error(s) concern the data, not the summary's wording — they cannot be repaired by rewriting text`, "err");
+      break;
+    }
+    try {
+      if (round === 1 || !plan.flagged.length) {
+        cb(`  AUDIT · repair round ${round}: the executive summary is written again using the reviewer's findings...`, "warn");
+        const r = await require("./graphs/exec-summary-graph").run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb, feedback: plan.feedback });
+        if (r.execF.length) { execF = r.execF; execAudit = r.execAudit; }
+      } else {
+        const gone = plan.flagged.map((i) => execF[i]?.headline).filter(Boolean);
+        cb(`  AUDIT · repair round ${round}: finding(s) the reviewer still names are removed: ${gone.map((h) => `"${h}"`).join("; ")}`, "warn");
+        execF = execF.filter((_, i) => !plan.flagged.includes(i));
+        execAudit = { ...execAudit, dropped: [...(execAudit.dropped || []), ...gone.map((headline) => ({ headline, claims: ["removed after the independent review"] }))] };
+      }
+    } catch (e) {
+      cb(`  AUDIT · repair round ${round} failed: ${e.message}`, "err");
+      break;
+    }
+    html = buildFinalHtml();
+    auditResult = await Audit.runAudit(auditCtx(), cb);
+  }
   if (!auditResult.passed) throw new Error(Audit.failureMessage(auditResult));
-  html = html.replace("<title>", `<meta name="emerald-audit" content="${Audit.stamp(auditResult)}">\n<title>`);
+  html = html.replace("<title>", `<meta name="emerald-audit" content="${Audit.stamp(auditResult)}${excludePosts.length ? `; ${excludePosts.length} post(s) left out after the independent review` : ""}">\n<title>`);
+  if ((cfg.excludePosts || []).length && checkpointObj) {
+    try {
+      const buf2 = Checkpoint.pack(cpFingerprint, { ...checkpointObj.state, excludePosts }, checkpointObj.cost || {});
+      fs.writeFileSync(path.join(cfg.outDir, Checkpoint.name(cpFingerprint)), buf2);
+      if (cfg.onCheckpoint) await cfg.onCheckpoint(Checkpoint.name(cpFingerprint), buf2);
+      cb(`  CHECKPOINT · the ${excludePosts.length} excluded post(s) are kept with the saved data`, "ok");
+    } catch (e) {
+      cb(`  CHECKPOINT · could not update the saved data: ${e.message}`, "warn");
+    }
+  }
   fs.writeFileSync(htmlFile, html, "utf8");
   cb(`  HTML: ${base}.html (${Math.round(html.length / 1024)}KB)`, "ok");
 

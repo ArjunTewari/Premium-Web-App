@@ -359,8 +359,19 @@ function validateExecSummary(execF, data, ORGS) {
 
         if (!nearestOrg || bestDist > 120) continue; // too far to attribute confidently
 
+        // "A and B each recorded N": the number is a claim about every organisation in the list, not only
+        // the nearest one (26 Oct: "CREA and TERI each published 1 article" was checked against TERI alone).
+        let listed = [nearestOrg];
+        const lead = text.slice(Math.max(0, m.index - 160), m.index);
+        if (/\b(each|both)\b[^.;]*$/i.test(lead)) {
+          const cut = Math.max(lead.lastIndexOf('. '), lead.lastIndexOf('; '));
+          const clause = lead.slice(cut + 1);
+          const inClause = orgsByLen.filter((o) => clause.includes(o));
+          if (inClause.length > 1) listed = inClause;
+        }
+        for (const orgN of listed) {
         checked++;
-        const truth = data[nearestOrg];
+        const truth = data[orgN];
         if (!truth) continue;
         // "%" can mean the data-specific share or the authoritative share. The words
         // right around the number usually say which ("50% data-specific"); only when
@@ -375,13 +386,13 @@ function validateExecSummary(execF, data, ORGS) {
         }
         const matches = useFields.some((f) => truth[f] != null && Math.abs(truth[f] - val) < 0.6);
         if (!matches) {
-          const singleField = useFields.length === 1 ? useFields[0] : null;
+          const singleField = useFields.length === 1 && listed.length === 1 ? useFields[0] : null;
           const correctedValue = singleField != null && truth[singleField] != null
             ? String(truth[singleField]) : null;
           issues.push({
             findingIdx: fi,
             headline: finding.headline || '',
-            org: nearestOrg,
+            org: orgN,
             claimed: val,
             metric: label,
             actual: useFields.map((f) => `${f}=${truth[f] ?? 'n/a'}`).join(', '),
@@ -389,6 +400,7 @@ function validateExecSummary(execF, data, ORGS) {
             matchEnd: gEnd,
             correctedValue,
           });
+        }
         }
       }
     }

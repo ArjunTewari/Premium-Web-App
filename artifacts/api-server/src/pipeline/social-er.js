@@ -161,6 +161,7 @@ function regate(saved, cfg, cb) {
   const APIdirect = require('./apidirect-collector');
   const aqKw = APIdirect.buildAqKeywords(cfg.SCOPE_KEYWORDS);
   const dateRange = { from: APIdirect.parseDate(cfg.DATE_FROM), to: APIdirect.parseDate(cfg.DATE_TO) };
+  APIdirect.setExcludedPosts(cfg.excludePosts || []);
   let recounted = 0, asSaved = 0;
   const quiet = () => {};
   const raw = saved.map((r) => {
