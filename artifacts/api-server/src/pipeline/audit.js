@@ -126,6 +126,13 @@ function checkDeterministic({ ORGS, data, socialERResults = [], execF, html = ""
 // The evidence pack the independent reviewer sees: figures and post excerpts, nothing else.
 function buildEvidencePack({ ORGS, data, socialERResults = [], youtubeERResults = [], execF = [], actions = [], dateFrom, dateTo, subject }) {
   const clip = (s, n) => String(s || "").replace(/\s+/g, " ").slice(0, n);
+  const excerpt = (text, kw) => {
+    const t = String(text || "");
+    const i = t.toLowerCase().indexOf(String(kw).toLowerCase());
+    if (i < 0) return "";
+    return (i > 90 ? "…" : "") + t.slice(Math.max(0, i - 90), i + String(kw).length + 90).replace(/\s+/g, " ") + (i + kw.length + 90 < t.length ? "…" : "");
+  };
+  const rawOf = (d) => [...(d?.rawPosts || []), ...(d?.rawTweets || [])];
   const platform = (d) => d && (d.failed || d.noHandle) ? {
     collected: false,
     note: d.noHandle
@@ -133,10 +140,11 @@ function buildEvidencePack({ ORGS, data, socialERResults = [], youtubeERResults 
       : "collection FAILED; the report shows the cell as unavailable (a cross), not as a measured zero. The organisation's presence points count it as 0, so its score is a lower bound",
   } : d && {
     collected: true,
+    topPostsListed: `${Math.min(5, d.postCount || 0)} of ${d.postCount || 0} counted posts (only the highest-engagement posts are listed)`,
     posts: d.postCount, followers: d.followers, engagementRatePct: d.er,
     likes: d.totalLikes, comments: d.totalComments ?? d.totalReplies, shares: d.totalShares ?? d.totalRetweets, views: d.totalViews,
     removedRepeats: d.duplicatesRemoved || 0, leftOutNoKeyword: d.droppedNoKeyword || 0, stoppedAtPageLimit: !!d.capHit, foundOnlyByTimeline: d.timelineAdded || 0, timelineCrossChecked: d.timelineRan === true, failed: !!d.failed, noHandle: !!d.noHandle,
-    topPosts: (d.topPosts || []).map((t) => ({ url: t.url, date: t.date, text: clip(t.snippet, 220), keywordsMatched: t.keywords_found, likes: t.likes, comments: t.comments ?? t.replies, shares: t.shares ?? t.retweets })),
+    topPosts: (d.topPosts || []).map((t) => ({ url: t.url, date: t.date, text: clip(t.snippet, 220), keywordsMatched: t.keywords_found, matchExcerpts: (t.keywords_found || []).slice(0, 3).map((k) => ({ keyword: k, excerpt: excerpt((rawOf(d).find((r) => r.url && r.url === t.url) || {}).text || (rawOf(d).find((r) => r.url && r.url === t.url) || {}).snippet || t.snippet, k) })).filter((m) => m.excerpt), likes: t.likes, comments: t.comments ?? t.replies, shares: t.shares ?? t.retweets })),
   };
   return {
     subject, reportPeriod: { from: dateFrom, to: dateTo },

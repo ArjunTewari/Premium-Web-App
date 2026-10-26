@@ -449,11 +449,20 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
 function buildLinkedInResult({ org, followers, raw, source, timelinePages, capHit, searchFallback, aqKw, cb }) {
   const terms = [...new Set([...AQ_KEYWORDS_SEARCH, ...(aqKw || AQ_KW_BASE)])];
   const entries = [];
+  const sameMessage = new Set();
+  let duplicatesRemoved = 0;
   for (const post of raw) {
     const kws = terms.filter(k => liHasTerm(liPostText(post), k));
-    if (kws.length) entries.push({ post, keywords: new Set(kws) });
+    if (!kws.length) continue;
+    // The same message posted twice (two activity ids, identical text and identical engagement) is
+    // one post, not two: counting both doubled an organisation's posts and engagement.
+    const msgKey = `${liPostText(post).replace(/\s+/g, ' ').trim().slice(0, 200)}|${post.likes || 0}|${post.comments || 0}|${post.shares || 0}`;
+    if (sameMessage.has(msgKey)) { duplicatesRemoved++; continue; }
+    sameMessage.add(msgKey);
+    entries.push({ post, keywords: new Set(kws) });
   }
-  const droppedNoKeyword = raw.length - entries.length;
+  const droppedNoKeyword = raw.length - entries.length - duplicatesRemoved;
+  if (duplicatesRemoved > 0) cb?.(`  [APIdirect/LI] ${org}: ${duplicatesRemoved} post(s) repeating another post's text and engagement counted once`, 'warn');
   const posts   = entries.map(e => e.post);
 
   const totalLikes    = posts.reduce((s, p) => s + (p.likes    || 0), 0);
@@ -483,7 +492,7 @@ function buildLinkedInResult({ org, followers, raw, source, timelinePages, capHi
   if (droppedNoKeyword > 0) cb?.(`  [APIdirect/LI] ${org}: ${droppedNoKeyword} post(s) of the window left out — their text has none of the keywords`);
   return {
     postCount: posts.length, totalLikes, totalComments, totalShares, totalViews: 0, followers, er: erVal, topPosts,
-    fetched: raw.length, inRangeCount: posts.length, droppedNoKeyword, source, timelinePages, capHit, searchFallback,
+    fetched: raw.length, inRangeCount: posts.length, droppedNoKeyword, duplicatesRemoved, source, timelinePages, capHit, searchFallback,
     rawPosts: raw.map(slimLinkedInPost),
     rawMeta: { followers, source, timelinePages, capHit, searchFallback },
   };
