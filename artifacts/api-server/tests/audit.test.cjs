@@ -44,6 +44,15 @@ eq("posts found only by the timeline, and a failed cross-check, are warnings", [
 const z = social(false); z[1].twData = { postCount: 0, followers: 4500, topPosts: [] };
 const lf = social(false); lf[1].liData = { postCount: 0, searchFallback: true, topPosts: [] };
 eq("a LinkedIn count that fell back to the keyword search is a warning", A.checkDeterministic({ ORGS, data: data(false), socialERResults: lf, execF: [], html: "" }).warnings.some((x) => /company's posts failed/.test(x.issue)), true);
+// the reviewer is shown the text around the matched keyword, not only the first characters of a post
+{
+  const longText = "Hot brun pao or ladi pav with the Sunday halsane evokes nostalgia. " + "x".repeat(300) + " WRI India's submission to the National Clean Air Programme (NCAP) best-practices compendium covers bakery emissions.";
+  const li = { postCount: 1, followers: 10, topPosts: [{ url: "https://li/1", snippet: longText.slice(0, 250), keywords_found: ["ncap"], likes: 96 }], rawPosts: [{ url: "https://li/1", text: longText }] };
+  const pack = A.buildEvidencePack({ ORGS: ["WRI India"], data: { "WRI India": {} }, socialERResults: [{ org: "WRI India", liData: li, twData: { postCount: 0 }, igData: { postCount: 0 } }], youtubeERResults: [], execF: [], actions: [], dateFrom: "a", dateTo: "b", subject: "air quality" });
+  const t = pack.organisations[0].social.linkedin.topPosts[0];
+  eq("the pack shows the text around the matched keyword (the post's first 220 characters do not contain it)", [/ncap/i.test(t.text), /National Clean Air Programme \(NCAP\)/.test(t.matchExcerpts[0].excerpt)], [false, true]);
+  eq("the pack says how many posts exist when only the top ones are listed", /1 of 1 counted posts/.test(pack.organisations[0].social.linkedin.topPostsListed), true);
+}
 eq("a zero that was not cross-checked is flagged", A.checkDeterministic({ ORGS, data: data(false), socialERResults: z, execF: [], html: "" }).warnings.some((x) => /not cross-checked/.test(x.issue)), true);
 z[1].twData.timelineRan = true;
 eq("a zero that was cross-checked is not flagged", A.checkDeterministic({ ORGS, data: data(false), socialERResults: z, execF: [], html: "" }).warnings.some((x) => /not cross-checked/.test(x.issue)), false);

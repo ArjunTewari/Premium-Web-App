@@ -52,8 +52,16 @@ const run = async (s, handle = "org-x") => { script = s; calls.length = 0; const
 
   // page limit
   let id = 100;
-  o = await run(route({ posts: () => ({ posts: [post(id++, "air quality", 14), post(id++, "air quality", 15)] }) }));
+  o = await run(route({ posts: () => ({ posts: [post(id++, `air quality note ${id}`, 14), post(id++, `air quality brief ${id}`, 15)] }) }));
   eq("page limit (10) reached inside the window -> flagged", [n("linkedin/company/posts"), o.r.capHit, o.r.postCount], [10, true, 20]);
+
+  // the same message posted twice (two activity ids, identical text and engagement) is one post
+  o = await run(route({ posts: (pg) => pg === 1 ? { posts: [
+    post(901, "Help India's clean air find its funders. A-PAG works alongside governments", 14, { likes: 32, comments: 5, shares: 5 }),
+    post(902, "Help India's clean air find its funders. A-PAG works alongside governments", 14, { likes: 32, comments: 5, shares: 5 }),
+    post(903, "Help India's clean air find its funders. A-PAG works alongside governments", 14, { likes: 12, comments: 1, shares: 0 }),
+  ] } : { posts: [] } }));
+  eq("identical text and engagement is one post; the same text with different engagement is another", [o.r.postCount, o.r.duplicatesRemoved], [2, 1]);
 
   // LI_MODE=search keeps the old behaviour
   process.env.LI_MODE = "search";

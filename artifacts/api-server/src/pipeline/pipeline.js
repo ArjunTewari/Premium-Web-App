@@ -1129,6 +1129,26 @@ ${batchText}`;
   // on articles, so nothing downstream needed to change.
   cb(`\nSTEP 5/6 — AI analysis (executive summary, actions)...`, "head");
   checkAbort();
+  // Cells that were not collected are marked on the organisation's line, and the lists of organisations that
+  // share a value are written out in full, so the summary neither lists some of them and omits others
+  // (26 Oct: "four organisations at 0/10" when six were) nor presents a failed cell as a measured zero.
+  const flagsFor = (o) => {
+    const er = socialERResults.find((r) => r.org === o);
+    const f = [];
+    if (er?.liData?.failed) f.push("LinkedIn collection failed");
+    else if (er?.liData?.noHandle) f.push("no LinkedIn page the data source can read");
+    if (er?.twData?.failed) f.push("X collection failed");
+    else if (er?.twData?.noHandle) f.push("no X handle");
+    if (er?.igData?.failed) f.push("Instagram collection failed");
+    else if (er?.igData?.noHandle) f.push("no Instagram handle");
+    return f.length ? ` [${f.join("; ")} — counted as 0 in the Social Presence score, not a measured zero]` : "";
+  };
+  const namesWhere = (fn) => ORGS.filter(fn);
+  const list = (xs) => (xs.length ? xs.join(", ") : "none");
+  const zeroArts = namesWhere((o) => !data[o].total);
+  const zeroSocial = namesWhere((o) => !data[o].social);
+  const zeroAeo = namesWhere((o) => !data[o].aeo);
+  const factsBlock = `\nFACTS (complete lists; use these, not memory):\nOrganisations with 0 articles (${zeroArts.length}): ${list(zeroArts)}\nOrganisations with Social Presence 0/10 (${zeroSocial.length}): ${list(zeroSocial)}\nOrganisations with AEO score 0/100 (${zeroAeo.length}): ${list(zeroAeo)}`;
   const orgSummary = ORGS.map((o) => {
     const er = socialERResults.find((r) => r.org === o);
     const yt = youtubeERResults.find((r) => r.org === o);
@@ -1137,8 +1157,8 @@ ${batchText}`;
         .filter(([, v]) => v >= 2)
         .map(([k]) => k)
         .join(",") || "none"
-    }`;
-  }).join("\n");
+    }${flagsFor(o)}`;
+  }).join("\n") + factsBlock;
   let emerging = [],
     execF = [],
     actions = [];
