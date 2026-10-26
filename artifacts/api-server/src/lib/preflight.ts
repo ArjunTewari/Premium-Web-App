@@ -10,7 +10,7 @@
 //
 // Fatal  — the report would be wrong or empty without it (aborts the run):
 //          Claude (article classification, summary, actions), APIdirect
-//          (LinkedIn / X / Instagram), OpenAI when a key is set.
+//          (LinkedIn / X / Instagram), the Codex CLI (ChatGPT) when the ChatGPT probe is on.
 // Warning — the report is still useful and the gap is visible in it:
 //          YouTube (cells show ✕), Perplexity (not checked: no free endpoint).
 
@@ -18,6 +18,10 @@
 // cfg.CLAUDE_KEY being truthy, so this marker stands in for a key: no Anthropic API
 // key is read, sent or needed anywhere.
 export const CLAUDE_VIA_CLI = "claude-cli";
+
+// ChatGPT is used only through the Codex CLI (signed in with ChatGPT), never the OpenAI API. The pipeline
+// gates the ChatGPT probe on cfg.OPENAI_KEY being truthy, so this marker stands in for a key.
+export const CHATGPT_VIA_CLI = "codex-cli";
 
 export interface PreflightResult {
   fatal: string[];
@@ -56,7 +60,18 @@ async function defaultAsk(): Promise<AskFn> {
   return (mod.askClaude ?? mod.default!.askClaude) as AskFn;
 }
 
-export async function preflight(cfg: PreflightConfig, fetchImpl: FetchFn = fetch, askImpl?: AskFn): Promise<PreflightResult> {
+async function defaultCodexPing(): Promise<() => Promise<unknown>> {
+  // @ts-ignore — CommonJS module, same interop as ../pipeline/index.ts
+  const mod = (await import("../pipeline/codex-cli.js")) as { ping?: () => Promise<unknown>; default?: { ping: () => Promise<unknown> } };
+  return (mod.ping ?? mod.default!.ping) as () => Promise<unknown>;
+}
+
+export async function preflight(
+  cfg: PreflightConfig,
+  fetchImpl: FetchFn = fetch,
+  askImpl?: AskFn,
+  codexPingImpl?: () => Promise<unknown>,
+): Promise<PreflightResult> {
   const out: PreflightResult = { fatal: [], warnings: [], checked: [] };
   const signal = () => AbortSignal.timeout(15000);
 
@@ -81,17 +96,12 @@ export async function preflight(cfg: PreflightConfig, fetchImpl: FetchFn = fetch
 
   if (cfg.OPENAI_KEY) {
     tasks.push((async () => {
-      out.checked.push("OpenAI");
+      out.checked.push("Codex CLI (ChatGPT)");
       try {
-        const res = await fetchImpl("https://api.openai.com/v1/models", { headers: { Authorization: `Bearer ${cfg.OPENAI_KEY}` }, signal: signal() });
-        if (res.ok || res.status === 429) return;
-        if (res.status === 401 || res.status === 403) {
-          out.fatal.push(`OpenAI key was refused: ${await body(res) || `HTTP ${res.status}`}`);
-        } else {
-          out.warnings.push(`OpenAI check returned HTTP ${res.status}; continuing.`);
-        }
+        const ping = codexPingImpl ?? (await defaultCodexPing());
+        await ping();
       } catch (e) {
-        out.warnings.push(`OpenAI could not be reached to check it (${(e as Error).message}); continuing.`);
+        out.fatal.push(`Codex CLI is not usable — ChatGPT cannot be asked, so the AI-visibility figures would be missing: ${(e as Error).message}`);
       }
     })());
   }

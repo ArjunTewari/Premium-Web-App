@@ -30,7 +30,7 @@ const PLATFORMS = [
 const isCount = (n) => Number.isFinite(n) && n >= 0 && Math.floor(n) === n;
 const sum = (xs) => xs.reduce((s, v) => s + (Number(v) || 0), 0);
 
-function checkDeterministic({ ORGS, data, socialERResults = [], execF, html = "" }) {
+function checkDeterministic({ ORGS, data, socialERResults = [], aeoResults = {}, execF, html = "" }) {
   const errors = [];
   const warnings = [];
   let checks = 0;
@@ -92,6 +92,15 @@ function checkDeterministic({ ORGS, data, socialERResults = [], execF, html = ""
       const inPage = [...html.matchAll(p.htmlRe)].map((m) => Number(m[1])).sort((a, b) => a - b);
       const inData = [...shown[p.key]].sort((a, b) => a - b);
       check(JSON.stringify(inPage) === JSON.stringify(inData), "(all)", `${p.name} counts in the report`, `the report page shows ${p.name} counts [${inPage}] but the data holds [${inData}]`);
+    }
+  }
+
+  // ── AI assistants: a probe that got no answers is missing data, not "0 mentions" ──
+  for (const org of ORGS) {
+    for (const [llm, b] of Object.entries(aeoResults?.[org]?.llmBreakdown || {})) {
+      if (!b || !(b.failed > 0)) continue;
+      if (b.failed >= b.total) check(false, org, `AI visibility (${llm})`, `${llm} returned no answers (${b.failed} of ${b.total} questions failed), so its 0 mentions are missing data, not a result`);
+      else warn(org, `AI visibility (${llm})`, `${b.failed} of ${b.total} questions to ${llm} got no answer`);
     }
   }
 

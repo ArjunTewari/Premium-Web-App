@@ -24,7 +24,7 @@ const costTracker = {
   apidirectCalls: 0,       // APIdirect.io endpoint calls         ($0.01 each)
   youtubeApiCalls: 0,      // YouTube Data API v3 requests        (quota, ~free)
   perplexityCalls: 0,      // Perplexity sonar AEO probes         ($0.001 each)
-  openaiCalls: 0,          // OpenAI gpt-4o-mini AEO probes       ($0.0003 each)
+  openaiCalls: 0,          // ChatGPT AEO probe calls via Codex CLI (plan; no per-call charge)
   geminiCalls: 0,          // Gemini flash AEO probes             (~free tier)
   claudeAeoCalls: 0,       // Claude Haiku AEO probes (~300 tok)  ($0.0006 each)
   exaSearches: 0,          // Exa /search corpus queries (+text)  (~$0.04 each)
