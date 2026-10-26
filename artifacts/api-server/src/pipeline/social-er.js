@@ -166,13 +166,15 @@ function regate(saved, cfg, cb) {
   const raw = saved.map((r) => {
     const hasX = r.twData && Array.isArray(r.twData.rawTweets);
     const hasLi = r.liData && Array.isArray(r.liData.rawPosts);
+    const hasIg = r.igData && Array.isArray(r.igData.rawPosts);
     hasX ? recounted++ : asSaved++;
     hasLi ? recounted++ : asSaved++;
+    hasIg ? recounted++ : asSaved++;
     return {
       org: r.org,
       li: hasLi ? APIdirect.reprocessLinkedIn(r.org, r.liData, aqKw, quiet) : r.liData,
       tw: hasX ? APIdirect.reprocessTwitter(r.org, r.twData, aqKw, dateRange, quiet) : r.twData,
-      ig: r.igData,
+      ig: hasIg ? APIdirect.reprocessInstagram(r.org, r.igData, aqKw, dateRange, quiet) : r.igData,
       yt: r.ytChData,
     };
   });

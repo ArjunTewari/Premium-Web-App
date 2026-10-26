@@ -47,10 +47,14 @@ const Graph = require(path.join(dir, "graphs", "exec-summary-graph.js"));
 (async () => {
   const msgs = [];
   const r = await Graph.run({ cfg: { CLAUDE_KEY: "x" }, data, ORGS, DATE_FROM: "2026-10-12", DATE_TO: "2026-10-18", orgSummary: "", cb: (m) => msgs.push(m) });
-  eq("the model was asked 3 times (1 + 2 corrective)", calls, 3);
+  eq("the model was asked twice (1 + 1 corrective) when something cannot be corrected in code", calls, 2);
   eq("the finding with the unverifiable number is removed; the verified ones stay", r.execF.map((x) => x.headline), ["TERI AI visibility", "Press"]);
   eq("nothing unverified remains and the removal is recorded", [r.execAudit.issues.length, r.execAudit.dropped.length, r.execAudit.dropped[0].headline], [0, 1, "CREA is ahead"]);
   eq("the removal is logged", msgs.some((m) => /finding removed because a number in it could not be verified/.test(m)), true);
+  // numbers that code can correct are corrected in code: one model call, no regeneration
+  calls = 0; CC.parseJ = () => [f("a", "CREA has 7 articles."), f("b", "TERI scores 47/100 on AEO."), f("c", "CREA: 100% data-specific.")];
+  const fast = await Graph.run({ cfg: { CLAUDE_KEY: "x" }, data, ORGS, DATE_FROM: "2026-10-12", DATE_TO: "2026-10-18", orgSummary: "", cb: () => {} });
+  eq("correctable wrong numbers: ONE model call, fixed in the text", [calls, fast.execF[0].headline + "|" + fast.execF[0].detail, fast.execF[1].detail, fast.execAudit.issues.length], [1, "a|CREA has 2 articles.", "TERI scores 31/100 on AEO.", 0]);
   // and a clean summary is untouched
   calls = 0; CC.parseJ = () => [f("a", "CREA has 2 articles."), f("b", "TERI scores 31/100 on AEO."), f("c", "CREA: 100% data-specific.")];
   const ok = await Graph.run({ cfg: { CLAUDE_KEY: "x" }, data, ORGS, DATE_FROM: "2026-10-12", DATE_TO: "2026-10-18", orgSummary: "", cb: () => {} });

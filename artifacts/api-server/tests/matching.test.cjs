@@ -86,5 +86,23 @@ const runX = async (o) => { script = route(o); calls.length = 0; return C.fetchT
   eq("a result saved without posts is kept exactly as saved", [b.twData.postCount, rg.asSaved > 0], [2, true]);
   eq("results are re-ranked", rg.results.map((x) => x.rank).every((n) => Number.isInteger(n)), true);
 
+  // ── Instagram: same rules, no repeats, saved posts can be re-counted ──
+  const ig = (id, caption, extra = {}) => ({ id: String(id), url: `https://www.instagram.com/p/${id}/`, snippet: caption, date: day(14), likes: 10, comments: 2, views: 0, ...extra });
+  const igRoute = (posts) => (ep) => ep === "instagram/user" ? { user: { follower_count: 4975 } } : ep === "instagram/user/posts" ? { posts } : {};
+  const runIg = async (posts) => { script = igRoute(posts); calls.length = 0; return C.fetchInstagram("Org", "org_ig", "k", range, kw, () => {}); };
+  const I = await runIg([
+    ig(1, "8 issues down! Unboxing the last 8 issues of ON AIR magazine"),
+    ig(2, "Delhi AQI crossed 400 today. #AirPollution #CleanAir"),
+    ig(2, "Delhi AQI crossed 400 today. #AirPollution #CleanAir"),
+    ig(3, "Campus photography and painting competition"),
+    ig(4, "Our new report", { title: "Chintan on Instagram: air quality", snippet: "Our new report" }),
+  ]);
+  eq("Instagram: repeated post counted once; off-topic captions (magazine, photography, a title with the account's words) are not counted", [I.postCount, I.duplicatesRemoved, I.droppedNoKeyword], [1, 1, 3]);
+  eq("Instagram: counted posts carry their matched keywords", I.topPosts[0].keywords_found.length > 0, true);
+  const I2 = C.reprocessInstagram("Org", JSON.parse(JSON.stringify(I)), kw, range, () => {});
+  eq("Instagram re-count with the same rules gives the same figures", [I2.postCount, I2.totalLikes], [I.postCount, I.totalLikes]);
+  const I3 = C.reprocessInstagram("Org", I, kw.filter((k) => k !== "aqi" && k !== "air pollution" && k !== "clean air"), range, () => {});
+  eq("Instagram re-count under a stricter rule changes the count", I3.postCount, 0);
+
   console.log(fail ? `${fail} FAILED` : "all passed"); process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });
