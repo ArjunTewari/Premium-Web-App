@@ -21,7 +21,7 @@ if (!/name="emerald-audit"/.test(html.toString("utf8"))) { console.error("refusi
 
 const gh = (args, input) => execFileSync("gh", args, { input, maxBuffer: 1 << 28 });
 const api = (p, extra = []) => JSON.parse(gh(["api", `repos/${REPO}/${p}`, ...extra]).toString());
-const exists = (p) => { try { return api(`contents/${p}`).sha; } catch { return null; } };
+const exists = (p) => { try { return JSON.parse(execFileSync("gh", ["api", `repos/${REPO}/contents/${p}`], { stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 }).toString()).sha; } catch { return null; } };
 const put = (p, buf, message) => {
   const sha = exists(p);
   const body = JSON.stringify({ message, content: buf.toString("base64"), branch: "main", ...(sha ? { sha } : {}) });
