@@ -184,7 +184,7 @@ async function runAudit(ctx, cb = () => {}) {
     const review = await Reviewer.review(pack, { cb });
     out.review = { ran: true, verdict: review.verdict, model: review.model, findings: review.findings };
     for (const f of review.findings) {
-      const item = { source: "review", severity: f.severity === "error" ? "error" : "warning", org: f.org || "(report)", where: f.where || "", issue: `${f.issue}${f.evidence ? ` — ${f.evidence}` : ""}` };
+      const item = { postUrls: f.postUrls || [], source: "review", severity: f.severity === "error" ? "error" : "warning", org: f.org || "(report)", where: f.where || "", issue: `${f.issue}${f.evidence ? ` — ${f.evidence}` : ""}` };
       (item.severity === "error" ? out.errors : out.warnings).push(item);
       cb(`    ${item.severity === "error" ? "✗" : "!"} Review · ${item.org} · ${item.where}: ${item.issue}`, item.severity === "error" ? "err" : "warn");
     }
@@ -232,6 +232,33 @@ function repairPlan(errors, execF) {
   };
 }
 
+/**
+ * Posts to exclude, from reviewer errors about the DATA that name specific posts. Only when EVERY data error names
+ * posts (otherwise excluding some would still leave a stopped report), every named url is a counted post of the
+ * report, and the exclusions stay small (at most 3 per organisation and 10 in all): a report that needs more than that
+ * has a data-quality problem, not a few stray posts.
+ */
+function exclusionPlan(errors, socialERResults, already = []) {
+  const aboutSummary = (e) => /executive summary/i.test(`${e.where || ""}`);
+  const dataErrs = errors.filter((e) => !aboutSummary(e));
+  if (!dataErrs.length || !dataErrs.every((e) => (e.postUrls || []).length)) return { urls: [], reason: "not every data error names posts" };
+  const known = new Map(); // url -> org, counted posts only
+  for (const r of socialERResults || []) {
+    for (const d of [r.liData, r.twData, r.igData]) for (const t of (d && d.topPosts) || []) if (t.url) known.set(t.url, r.org);
+  }
+  const have = new Set(already);
+  const urls = [], perOrg = {};
+  for (const e of dataErrs) for (const u of e.postUrls) {
+    if (have.has(u) || urls.includes(u)) continue;
+    const org = known.get(u);
+    if (!org) return { urls: [], reason: `a named post is not one of the report's counted posts: ${u}` };
+    urls.push(u); perOrg[org] = (perOrg[org] || 0) + 1;
+  }
+  if (!urls.length) return { urls: [], reason: "the named posts are already excluded" };
+  if (Object.values(perOrg).some((n) => n > 3) || urls.length + have.size > 10) return { urls: [], reason: `too many posts (${urls.length}) to exclude one by one` };
+  return { urls, perOrg };
+}
+
 function failureMessage(a) {
   const lines = a.errors.slice(0, 8).map((e) => `- ${e.org} · ${e.where}: ${e.issue}`);
   return `AUDIT FAILED — the report was not stored or sent.\n${lines.join("\n")}${a.errors.length > 8 ? `\n…and ${a.errors.length - 8} more` : ""}`;
@@ -242,4 +269,4 @@ function stamp(a) {
   return `${a.passed ? "passed" : "failed"}; ${a.summary}`.replace(/"/g, "'");
 }
 
-module.exports = { checkDeterministic, buildEvidencePack, runAudit, repairPlan, failureMessage, stamp };
+module.exports = { checkDeterministic, buildEvidencePack, runAudit, repairPlan, exclusionPlan, failureMessage, stamp };

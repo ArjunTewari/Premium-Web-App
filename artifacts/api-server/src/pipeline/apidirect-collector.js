@@ -447,12 +447,13 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
 // The counting rule, engagement and top posts. Pure given its inputs: the same function
 // re-counts saved posts (reprocessLinkedIn) without any API call.
 function buildLinkedInResult({ org, followers, raw, source, timelinePages, capHit, searchFallback, aqKw, cb }) {
+  raw = raw.filter(notExcluded);
   const terms = [...new Set([...AQ_KEYWORDS_SEARCH, ...(aqKw || AQ_KW_BASE)])];
   const entries = [];
   const sameMessage = new Set();
   let duplicatesRemoved = 0;
   for (const post of raw) {
-    const kws = terms.filter(k => liHasTerm(liPostText(post), k));
+    const kws = keywordsInText(String(post.text || post.snippet || post.title || ''), terms);
     if (!kws.length) continue;
     // The same message posted twice (two activity ids, identical text and identical engagement) is
     // one post, not two: counting both doubled an organisation's posts and engagement.
@@ -521,6 +522,12 @@ function tweetKey(t) {
   return `${t.date || t.created_at || ''}|${(t.text || t.snippet || t.title || '').slice(0, 120)}`;
 }
 
+// Posts the independent review named as not being about the subject. They are left out of every count, and the
+// report says how many were left out. Set by the re-count before it builds a result.
+let excludedPosts = new Set();
+function setExcludedPosts(urls) { excludedPosts = new Set(urls || []); }
+const notExcluded = (p) => !(p && p.url && excludedPosts.has(p.url));
+
 // A term is in a post's text if it matches there, or — for a multi-word term — as an actual
 // hashtag (#AirPollution, #CleanAir). A hashtag is NOT "the letters appear somewhere once the
 // spaces are removed": that matched "cleanair" inside a link (energyandcleanair.org).
@@ -538,8 +545,35 @@ function termInText(text, k) {
 // a result's title or snippet can carry the author's name ("Centre for Research on Energy and
 // Clean Air on X: ..."), which would make every post of that account match "clean air".
 function keywordsInText(raw, terms) {
-  const text = String(raw || '').normalize('NFKC').toLowerCase();
-  return terms.filter(k => termInText(text, k));
+  const original = String(raw || '').normalize('NFKC');
+  const text = original.toLowerCase();
+  return terms.filter(k => termInText(text, k) && !onlyInNameLists(original, text, k));
+}
+
+// A keyword that appears only inside a list of names — "...WRI India WRI Air Quality Ola Electric Ather Energy
+// TERI - The Energy and Resources Institute OMI Foundation..." (an attendee or partner list) — is the name of an
+// organisation, not the post being about the subject. On 26 Oct five RaahGiri posts counted as air quality for that
+// reason alone. A window of words around the occurrence in which almost every word is capitalised is a list of names;
+// hashtags and ordinary sentences are not.
+function isNameList(original, pos, len) {
+  const win = original.slice(Math.max(0, pos - 90), pos + len + 90);
+  const words = win.split(/\s+/).filter(w => /[A-Za-z]/.test(w));
+  if (words.length < 10) return false;
+  const caps = words.filter(w => /^[A-Z]/.test(w)).length;
+  return caps / words.length >= 0.8;
+}
+function onlyInNameLists(original, lower, term) {
+  const k = String(term).toLowerCase();
+  if (!k || k.startsWith('re:')) return false;
+  let from = 0, found = 0, listed = 0;
+  for (;;) {
+    const i = lower.indexOf(k, from);
+    if (i === -1) break;
+    found++;
+    if (isNameList(original, i, k.length)) listed++;
+    from = i + k.length;
+  }
+  return found > 0 && listed === found; // no literal occurrence (a hashtag form, a pattern) is never judged here
 }
 
 function tweetText(t) { return String(t.text || t.snippet || t.title || ''); }
@@ -732,6 +766,7 @@ async function fetchTwitter(org, twitterHandle, apiKey, dateRange, aqKw, cb) {
 // Everything after the fetching: count rules, engagement, top posts. Pure given its inputs,
 // so the same function re-counts saved posts (reprocessTwitter) without any API call.
 function buildTwitterResult({ org, handle, followers, unique, fromTimeline, meta, aqKw, dateRange, cb }) {
+  unique = unique.filter(notExcluded);
   const { kept: tagged, dropped: droppedNoKeyword, retweets: droppedRetweets } = gateTweets(unique, aqKw, dateRange);
   const timelineAdded = tagged.filter(t => fromTimeline.has(tweetKey(t))).length;
   // The count is complete only if whichever source covered the window was not cut short.
@@ -878,6 +913,7 @@ function slimInstagramPost(p) {
 // own text only, short acronyms stand alone, hashtags as hashtags). Pure given its inputs, so the
 // same function re-counts saved posts (reprocessInstagram) without any API call.
 function buildInstagramResult({ org, followers, posts: allPosts, meta, aqKw, dateRange, cb }) {
+  allPosts = allPosts.filter(notExcluded);
   const seen = new Set();
   const unique = [];
   let duplicatesRemoved = 0;
@@ -1043,7 +1079,7 @@ module.exports = {
   run,
   // Individual fetchers + helpers exported for the sentinel's targeted retries
   fetchLinkedIn, fetchTwitter, fetchInstagram, fetchYouTubeChannel,
-  reprocessTwitter, reprocessLinkedIn, reprocessInstagram,
+  reprocessTwitter, reprocessLinkedIn, reprocessInstagram, setExcludedPosts,
   buildAqKeywords, parseDate, inDateRange, isAQ,
   AQ_KEYWORDS_SEARCH,
 };
