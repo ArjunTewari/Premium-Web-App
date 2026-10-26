@@ -29,6 +29,15 @@ eq("an unlabelled % that matches neither is an issue and is not auto-corrected",
 v = Sentinel.validateExecSummary([f("x", "CREA: 100% overall.")], data, ORGS);
 eq("an unlabelled % that matches one of the two passes", v.issues.length, 0);
 
+// "5 article-publishing organizations" is a count of organisations, not "5 articles": it must not be
+// attributed to an organisation or "corrected" (the 26 Oct run turned it into "0 article-publishing organizations")
+v = Sentinel.validateExecSummary([f("Social media", "The 5 article-publishing organizations averaged 5.6/10 social presence (CREA 9/10, TERI 6/10); CREA had 2 articles.")], data, ORGS);
+eq("'N article-publishing organizations' is not an article claim", v.issues.map((i) => i.metric + ":" + i.claimed), []);
+v = Sentinel.validateExecSummary([f("x", "CREA: 7 article-published pieces and 2 articles.")], data, ORGS);
+eq("a real '2 articles' claim is still checked", v.issues.length, 0);
+v = Sentinel.validateExecSummary([f("x", "CREA published 7 articles in the period.")], data, ORGS);
+eq("a wrong '7 articles' claim is still caught and corrected", [v.issues.length, v.issues[0].correctedValue], [1, "2"]);
+
 // the graph: a model that keeps writing an unverifiable number loses that finding, loudly
 const CC = require(path.join(dir, "claude-client.js"));
 let calls = 0;

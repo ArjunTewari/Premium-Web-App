@@ -248,7 +248,7 @@ function validateExecSummary(execF, data, ORGS) {
   // group matched — needed both to dedup overlapping patterns below and to
   // splice a corrected value directly into the finding text later.
   const UNIT_PATTERNS = [
-    { re: /(\d+(?:\.\d+)?)\s*articles?\b/gid, fields: ['total'], label: 'articles' },
+    { re: /(\d+(?:\.\d+)?)\s*articles?(?![-\w])/gid, fields: ['total'], label: 'articles' },
     { re: /(\d+(?:\.\d+)?)\s*%/gd, fields: ['dataPct', 'authPct'], label: '%' },
     { re: /(\d+(?:\.\d+)?)\s*\/\s*10\b/gd, fields: ['social'], label: '/10 social' },
     { re: /(\d+(?:\.\d+)?)\s*\/\s*100\b/gd, fields: ['aeo'], label: '/100 AEO score' },
