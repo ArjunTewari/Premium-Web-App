@@ -43,9 +43,16 @@ gh auth login           # the GitHub CLI is used to read raw/ and (only on publi
    stamp says the review was Claude Code's, how many posts were read and how many were left out.
    After building, check that the summary in the page is the text that was written (the checker can only
    correct numbers, never reword).
-7. **Publish** (only when the user says so) — `node publish.cjs work/report --name TMP-Oct12-18-2026-21orgs.html`
-   is a dry run; add `--yes` to write `reports/<name>.html`, `reports/<name>.json` and the manifest entry.
-   A weekly name must be distinct (the app's own name is per month, so two weeks of one month would overwrite
-   each other); the tool refuses to overwrite unless `--replace`.
+7. **Publish** (only when the user says so) — `node publish.cjs work/report --subject AQ` is a dry run; add `--yes` to
+   write `reports/<name>.html`, `reports/<name>.json` and the manifest entry. The name is made from the report's own
+   dates and organisation count by the app's `pipeline/report-naming.js` (the app names its own runs the same way):
+   `<AQ|Climt|Sust>-<Full|Snap|Bench>-<period>-<n>orgs.html`.
+   - one week (7 days): week of the month it starts in + month + year — `AQ-Full-2-Oct26-21orgs.html`
+     (start day 1-7 → 1, 8-14 → 2, 15-21 → 3, 22-28 → 4, 29-31 → 5)
+   - whole calendar month(s): `AQ-Full-Oct26-21orgs.html`, `AQ-Full-Aug-Sep26-20orgs.html`
+   - any other window is written out: `AQ-Full-14Sep-11Oct26-20orgs.html`
+   - snapshot / benchmark of one organisation: the organisation replaces the count — `AQ-Snap-cstep-Aug26.html`
+   The tool refuses to overwrite unless `--replace`; `--remove <old-name.html>` deletes an older copy after the new one is in.
+   `rename-stored.cjs` (dry run; `--yes` = one commit, revertible) moved every report already stored to this scheme.
 
 Keep `review.json`, `text.json` and `posts-to-review.md` with the report: they are the record of what was checked.

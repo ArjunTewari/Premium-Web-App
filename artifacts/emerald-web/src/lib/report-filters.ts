@@ -15,11 +15,12 @@ export const REPORT_TYPE_HINTS: Record<ReportType, string> = {
   snapshot: "One organisation's scorecard only (the benchmark's first section).",
 };
 
-// Benchmark / snapshot files are stored as aq-benchmark-… / aq-snapshot-…;
-// full reports keep the pipeline's aq-report-… name.
+// Benchmark / snapshot files are stored as AQ-Bench-… / AQ-Snap-… (Climt-, Sust- for the other subjects; older files:
+// aq-benchmark-… / aq-snapshot-…); full reports are <Subject>-Full-<period>-<n>orgs.html.
 export function reportTypeOfName(name: string): ReportType {
-  const m = /^aq-(benchmark|snapshot)-/i.exec(name);
-  return m ? (m[1].toLowerCase() as ReportType) : "full";
+  const m = /^(?:(?:aq|climt|sust)-(bench|snap)|aq-(benchmark|snapshot))-/i.exec(name);
+  if (!m) return "full";
+  return /^b/i.test(m[1] || m[2]) ? "benchmark" : "snapshot";
 }
 
 export type ReportsSort = "newest" | "oldest";

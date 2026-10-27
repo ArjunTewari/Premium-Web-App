@@ -1,5 +1,7 @@
 // @ts-ignore — CommonJS module, same interop as ../pipeline/index.ts
 import _dashboard from "../pipeline/single-org-dashboard.js";
+// @ts-ignore — CommonJS module
+import _naming from "../pipeline/report-naming.js";
 import raahgiriProfile from "../pipeline/single-org-profiles/raahgiri.json";
 
 // Report types. "full" is the multi-organisation report the pipeline writes.
@@ -36,13 +38,10 @@ export function parseReportType(v: unknown): ReportType | null {
   return (REPORT_TYPES as readonly string[]).includes(s) ? (s as ReportType) : null;
 }
 
-// Derived reports are stored as aq-benchmark-<org>-<from>-to-<to>.html /
-// aq-snapshot-…; full reports keep the pipeline's aq-report-… name.
-const DERIVED_NAME = /^aq-(benchmark|snapshot)-/i;
-
+// Derived reports are stored as AQ-Bench-<org>-<period>.html / AQ-Snap-… (older ones: aq-benchmark-… / aq-snapshot-…);
+// full reports are <Subject>-Full-<period>-<n>orgs.html. See pipeline/report-naming.js.
 export function reportTypeOfName(htmlName: string): ReportType {
-  const m = DERIVED_NAME.exec(htmlName);
-  return m ? (m[1].toLowerCase() as DerivedReportType) : "full";
+  return (naming.derivedKindOfName(htmlName) as DerivedReportType | null) ?? "full";
 }
 
 // A derived report carries <meta name="emerald-report-type"> — the check the
@@ -70,6 +69,13 @@ interface Dashboard {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const dash = ((_dashboard as any).buildSingleOrgDashboard ? _dashboard : (_dashboard as any).default) as Dashboard;
 
+interface Naming {
+  reportName(o: { subject?: string; kind: string; dateFrom: string; dateTo: string; orgs?: number; org?: string }): string;
+  subjectOfFramework(id: string): string;
+  derivedKindOfName(name: string): "benchmark" | "snapshot" | null;
+}
+const naming = ((_naming as any).reportName ? _naming : (_naming as any).default) as Naming;
+
 /** The period a full report covers (ISO dates, inclusive). */
 export function reportPeriod(fullHtml: string): { from: string; to: string } {
   const { from, to } = dash.parseBaseReport(fullHtml).meta;
@@ -81,9 +87,6 @@ export function listReportOrgs(fullHtml: string): string[] {
   return dash.listOrgs(fullHtml);
 }
 
-function slug(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
 
 export interface DerivedReport {
   html: string;
@@ -120,6 +123,7 @@ export function deriveReport(
   });
   const from = range ? range.from : base.meta.from;
   const to = range ? range.to : base.meta.to;
-  const htmlName = `aq-${type}-${slug(subject)}-${from}-to-${to}.html`;
+  const fwId = (/<meta name="emerald-framework" content="([a-z-]+)"/.exec(fullHtml.slice(0, 20000)) || [])[1] || "air-quality";
+  const htmlName = naming.reportName({ subject: naming.subjectOfFramework(fwId), kind: type, dateFrom: from, dateTo: to, org: subject });
   return { html, htmlName, org: subject };
 }

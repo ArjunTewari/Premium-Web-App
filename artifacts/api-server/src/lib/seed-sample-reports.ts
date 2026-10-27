@@ -15,14 +15,16 @@ const OUT_DIR = path.join(process.cwd(), "outputs");
 // A fixed, old mtime so real generated reports always sort above the sample(s).
 const SAMPLE_MTIME = new Date("2026-01-01T00:00:00Z");
 
-// One-time cleanup: filenames the samples used before adopting the
-// TMP-<period>-<orgs>orgs scheme (see pipeline.js). On a Railway deploy with
-// a persistent volume at outputs/, a copy under the old name would otherwise
-// survive this rename forever as a stale duplicate. Harmless no-op once
+// One-time cleanup: filenames the samples used before the current naming scheme
+// (<Subject>-Full-<period>-<n>orgs, see pipeline/report-naming.js). On a Railway
+// deploy with a persistent volume at outputs/, a copy under the old name would
+// otherwise survive a rename forever as a stale duplicate. Harmless no-op once
 // removed — safe to delete this list later.
 const LEGACY_SAMPLE_NAMES = [
   "emerald-sample-report.html",
   "emerald-sample-report-feb-may-2026.html",
+  "TMP-Aug2026-17orgs.html",
+  "TMP-Feb-May2026-13orgs.html",
 ];
 
 // Built-in samples are re-copied from the repo on every boot, so deleting one

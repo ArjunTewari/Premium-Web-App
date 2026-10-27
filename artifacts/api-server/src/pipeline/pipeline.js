@@ -1205,23 +1205,11 @@ ${batchText}`;
   // ── STEP 6: Build outputs ─────────────────────────────────
   cb(`\nSTEP 6/6 — Building report files...`, "head");
   checkAbort();
-  // Filename: TMP-<report period>-<org count>orgs. The period is the report's
-  // own DATE_FROM→DATE_TO window (not the generation time) and always spells
-  // the month out — "Aug2026", or "Aug-Sep2026" when the window crosses a
-  // calendar month — never a numeric month. Short, sortable, filesystem-safe,
-  // and no org names — the old scheme ("aq-report-OrgA-vs-OrgB-vs-OrgC-and-
-  // 13-more-2026-09-06") became unreadable past 3 orgs.
-  const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const monthLabel = (fromStr, toStr) => {
-    const from = new Date(fromStr);
-    const to = new Date(toStr);
-    const fm = MONTH_NAMES[from.getUTCMonth()], fy = from.getUTCFullYear();
-    const tm = MONTH_NAMES[to.getUTCMonth()], ty = to.getUTCFullYear();
-    if (fy === ty && fm === tm) return `${fm}${fy}`;
-    if (fy === ty) return `${fm}-${tm}${ty}`;
-    return `${fm}${fy}-${tm}${ty}`;
-  };
-  const base = `TMP-${fwNow().id === "air-quality" ? "" : fwNow().short + "-"}${monthLabel(DATE_FROM, DATE_TO)}-${ORGS.length}orgs`;
+  // Filename: <Subject>-Full-<period>-<n>orgs, e.g. AQ-Full-2-Oct26-21orgs (2nd week of October 2026, 21 organisations).
+  // The period is the report's own DATE_FROM→DATE_TO window, never the generation time. See report-naming.js.
+  const base = require("./report-naming").reportName({
+    subject: require("./report-naming").subjectOfFramework(fwNow().id), kind: "Full", dateFrom: DATE_FROM, dateTo: DATE_TO, orgs: ORGS.length,
+  }).replace(/\.html$/, "");
   const htmlFile = path.join(cfg.outDir, `${base}.html`);
   // The finished report page: built, section numbers checked, subject wording applied. A function, because the
   // audit below can have the executive summary written again, and the page is then built again from it.
