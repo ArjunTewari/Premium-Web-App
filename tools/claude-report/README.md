@@ -43,9 +43,13 @@ gh auth login           # the GitHub CLI is used to read raw/ and (only on publi
    stamp says the review was Claude Code's, how many posts were read and how many were left out.
    After building, check that the summary in the page is the text that was written (the checker can only
    correct numbers, never reword).
-7. **Publish** (only when the user says so) — `node publish.cjs work/report --name TMP-Oct12-18-2026-21orgs.html`
-   is a dry run; add `--yes` to write `reports/<name>.html`, `reports/<name>.json` and the manifest entry.
-   A weekly name must be distinct (the app's own name is per month, so two weeks of one month would overwrite
-   each other); the tool refuses to overwrite unless `--replace`.
+7. **Publish** (only when the user says so) — `node publish.cjs work/report --subject AQ` is a dry run; add `--yes` to
+   write `reports/<name>.html`, `reports/<name>.json` and the manifest entry. The name is made from the report's own
+   dates and organisation count (`naming.cjs`): `<AQ|Climt|Sust>-<Full|Snap|Bench>-<week>-<Mon><yy>-<n>orgs.html`,
+   e.g. `AQ-Full-2-Oct26-21orgs.html` = full air-quality report, 2nd week of October 2026, 21 organisations; a whole
+   calendar month drops the week (`AQ-Full-Oct26-21orgs.html`). The week is the one the report starts in
+   (start day 1-7 → 1, 8-14 → 2, 15-21 → 3, 22-28 → 4, 29-31 → 5). A period that is neither one week nor one whole
+   month needs `--name`. The tool refuses to overwrite unless `--replace`; `--remove <old-name.html>` deletes an older
+   copy of the same report after the new one is in.
 
 Keep `review.json`, `text.json` and `posts-to-review.md` with the report: they are the record of what was checked.
