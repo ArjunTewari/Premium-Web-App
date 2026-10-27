@@ -267,6 +267,11 @@ function validateExecSummary(execF, data, ORGS) {
 
   execF.forEach((finding, fi) => {
     const text = `${finding.headline || ''}. ${finding.detail || ''}`;
+    // A number belongs to an organisation named in the SAME part of the finding (headline or detail). Without this, a
+    // headline that ends in a figure for a group ("... 9 organisations recorded 0/10") was pinned on the first
+    // organisation of the detail and then "corrected" to that organisation's figure (26 Oct: "ranged from 51 to 51").
+    const segBoundary = (finding.headline || '').length + 2;
+    const segOf = (pos) => (pos < segBoundary ? 0 : 1);
 
     // Index every org-name occurrence so numbers can be attributed to one.
     const orgHits = [];
@@ -322,12 +327,13 @@ function validateExecSummary(execF, data, ORGS) {
         // named next in the same sentence.
         let nearestOrg = null, bestDist = Infinity;
         for (const h of orgHits) {
-          if (h.pos > m.index) continue;
+          if (h.pos > m.index || segOf(h.pos) !== segOf(m.index)) continue;
           const d = m.index - h.pos;
           if (d < bestDist) { bestDist = d; nearestOrg = h.org; }
         }
         if (!nearestOrg) {
           for (const h of orgHits) {
+            if (segOf(h.pos) !== segOf(m.index)) continue;
             const d = h.pos - m.index;
             if (d > 0 && d < bestDist) { bestDist = d; nearestOrg = h.org; }
           }
