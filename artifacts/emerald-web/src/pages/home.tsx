@@ -2095,6 +2095,11 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
             {reportTypeOfName(result.htmlName) !== "full" ? (
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                 <a
+                  href={`/api/view/${encodeURIComponent(result.htmlName)}`}
+                  target="_blank" rel="noopener"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: "rgba(76,175,116,.15)", color: C.green, border: `1px solid rgba(76,175,116,.35)`, fontFamily: "'Space Grotesk', sans-serif" }}
+                >👁 View</a>
+                <a
                   href={`/api/download/${encodeURIComponent(result.htmlName)}`}
                   download={result.htmlName}
                   style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: C.green, color: C.bg, fontFamily: "'Space Grotesk', sans-serif", border: "none" }}
@@ -2102,6 +2107,17 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
               </div>
             ) : (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+              {/* Open in the browser, no download */}
+              <a
+                href={`/api/view/${encodeURIComponent(result.htmlName)}?view=client`}
+                target="_blank" rel="noopener"
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: "rgba(76,175,116,.15)", color: C.green, border: `1px solid rgba(76,175,116,.35)`, fontFamily: "'Space Grotesk', sans-serif" }}
+              >👁 View Client View</a>
+              <a
+                href={`/api/view/${encodeURIComponent(result.htmlName)}`}
+                target="_blank" rel="noopener"
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 20px", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", textDecoration: "none", background: "rgba(76,175,116,.15)", color: C.green, border: `1px solid rgba(76,175,116,.35)`, fontFamily: "'Space Grotesk', sans-serif" }}
+              >👁 View Restricted</a>
               {/* Client View report (strips Action Matrix) */}
               <button
                 onClick={() => downloadClientReport(result.htmlName)}
@@ -2248,6 +2264,34 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 6, flexShrink: 0, marginLeft: 16 }}>
+                        {f.name.endsWith(".html") && (
+                          <a
+                            href={`/api/view/${encodeURIComponent(f.name)}`}
+                            target="_blank" rel="noopener"
+                            title="Open this report in a new tab"
+                            style={{
+                              padding: "7px 14px", borderRadius: 8,
+                              background: "rgba(76,175,116,.12)", color: C.green,
+                              border: `1px solid rgba(76,175,116,.25)`,
+                              fontSize: 18, fontWeight: 600, textDecoration: "none",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >👁 View</a>
+                        )}
+                        {f.name.endsWith(".html") && reportTypeOfName(f.name) === "full" && (
+                          <a
+                            href={`/api/view/${encodeURIComponent(f.name)}?view=client`}
+                            target="_blank" rel="noopener"
+                            title="Open the Client View in a new tab"
+                            style={{
+                              padding: "7px 14px", borderRadius: 8,
+                              background: "rgba(76,175,116,.12)", color: C.green,
+                              border: `1px solid rgba(76,175,116,.25)`,
+                              fontSize: 18, fontWeight: 600, textDecoration: "none",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >👁 Client view</a>
+                        )}
                         {f.name.endsWith(".html") && (
                           <button
                             onClick={() => emailReport(f.name)}
