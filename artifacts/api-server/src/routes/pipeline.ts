@@ -9,7 +9,7 @@ import { type ReportTrendSummary, frameworkIds, listFrameworks, parseCheckpointN
 import { generateAndDeliverReport, loadReportHtml, persistReportToGithub, OUT_DIR } from "../lib/generate-report.js";
 import { getCheckpoint, listCheckpoints, isConfigured as isGithubConfigured } from "../lib/report-storage.js";
 import { CLAUDE_VIA_CLI } from "../lib/preflight.js";
-import { deriveReport, listReportOrgs, parseReportType, priceForType, reportPeriod, reportTypeOfName, reportTypeOfHtml } from "../lib/report-types.js";
+import { currentReportName, deriveReport, listReportOrgs, parseReportType, priceForType, reportPeriod, reportTypeOfName, reportTypeOfHtml } from "../lib/report-types.js";
 import { toClientView } from "../lib/client-view.js";
 import { sendReportFileEmail } from "../lib/mailer.js";
 import {
@@ -330,7 +330,8 @@ router.get("/outputs", requireAuth, async (_req: Request, res: Response) => {
     const logs = await db.select({ htmlName: reportLogsTable.htmlName, costInr: reportLogsTable.costInr }).from(reportLogsTable);
     const costMap: Record<string, string> = {};
     for (const log of logs) {
-      if (log.htmlName && log.costInr) costMap[log.htmlName] = log.costInr;
+      // Rows logged under an older file name are matched to the renamed file too.
+      if (log.htmlName && log.costInr) { costMap[log.htmlName] = log.costInr; costMap[currentReportName(log.htmlName)] ??= log.costInr; }
     }
 
     // Run-log cost first; benchmark / snapshot reports fall back to the price stored in the manifest.
