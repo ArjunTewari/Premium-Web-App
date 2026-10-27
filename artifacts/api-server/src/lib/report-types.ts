@@ -40,6 +40,11 @@ export function parseReportType(v: unknown): ReportType | null {
 
 // Derived reports are stored as AQ-Bench-<org>-<period>.html / AQ-Snap-… (older ones: aq-benchmark-… / aq-snapshot-…);
 // full reports are <Subject>-Full-<period>-<n>orgs.html. See pipeline/report-naming.js.
+/** The current name of a report stored under the older scheme (matches old run-log rows to renamed files). */
+export function currentReportName(name: string): string {
+  return naming.currentName(name);
+}
+
 export function reportTypeOfName(htmlName: string): ReportType {
   return (naming.derivedKindOfName(htmlName) as DerivedReportType | null) ?? "full";
 }
@@ -73,6 +78,7 @@ interface Naming {
   reportName(o: { subject?: string; kind: string; dateFrom: string; dateTo: string; orgs?: number; org?: string }): string;
   subjectOfFramework(id: string): string;
   derivedKindOfName(name: string): "benchmark" | "snapshot" | null;
+  currentName(name: string): string;
 }
 const naming = ((_naming as any).reportName ? _naming : (_naming as any).default) as Naming;
 

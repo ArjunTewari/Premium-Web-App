@@ -65,4 +65,15 @@ function subjectOfName(name) {
   return "AQ";
 }
 
-module.exports = { reportName, period, slug, subjectOfFramework, derivedKindOfName, subjectOfName, DERIVED_NAME };
+/**
+ * The current name of a report that was stored under the older scheme (aq-snapshot-<org>-<from>-to-<to>.html), so records
+ * that still carry the old file name (the run log's cost) can be matched to the renamed file. Full reports cannot be
+ * derived from their old name (it has no dates); a name already in the new scheme is returned unchanged.
+ */
+function currentName(name) {
+  const d = /^aq-(snapshot|benchmark)-(.+)-(\d{4}-\d\d-\d\d)-to-(\d{4}-\d\d-\d\d)\.html$/i.exec(String(name));
+  if (!d) return name;
+  try { return reportName({ subject: "AQ", kind: d[1], dateFrom: d[3], dateTo: d[4], org: d[2] }); } catch { return name; }
+}
+
+module.exports = { reportName, period, slug, subjectOfFramework, derivedKindOfName, subjectOfName, currentName, DERIVED_NAME };

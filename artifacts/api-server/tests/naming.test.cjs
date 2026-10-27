@@ -24,5 +24,12 @@ eq("a snapshot without an organisation is refused", (() => { try { N.reportName(
 eq("type of a stored name, new and older", ["AQ-Full-2-Oct26-21orgs.html", "AQ-Snap-cstep-Aug26.html", "Sust-Bench-x-Oct26.html", "aq-snapshot-cstep-2026-08-01-to-2026-08-31.html", "aq-benchmark-x-2026-08-01-to-2026-08-31.html", "TMP-Sep2026-20orgs.html"].map(N.derivedKindOfName),
   [null, "snapshot", "benchmark", "snapshot", "benchmark", null]);
 eq("subject of a stored name", ["AQ-Full-2-Oct26-21orgs.html", "Climt-Snap-x-Oct26.html", "TMP-Climate-Sep-Oct2026-3orgs.html", "TMP-Sep2026-20orgs.html"].map(N.subjectOfName), ["AQ", "Climt", "Climt", "AQ"]);
+eq("a report stored under the older scheme is matched to its current name", [
+  N.currentName("aq-snapshot-cstep-2026-08-01-to-2026-08-31.html"),
+  N.currentName("aq-benchmark-chintan-environmental-research-and-action-group-2026-08-01-to-2026-08-31.html"),
+  N.currentName("aq-snapshot-raahgiri-2026-09-07-to-2026-09-13.html"),
+  N.currentName("AQ-Snap-cstep-Aug26.html"),
+  N.currentName("TMP-Sep2026-20orgs.html"),
+], ["AQ-Snap-cstep-Aug26.html", "AQ-Bench-chintan-environmental-research-and-action-group-Aug26.html", "AQ-Snap-raahgiri-1-Sep26.html", "AQ-Snap-cstep-Aug26.html", "TMP-Sep2026-20orgs.html"]);
 eq("names are safe file names", /^[\w.-]+$/.test(full("2026-09-14", "2026-10-11", 20)), true);
 console.log(fail ? `${fail} FAILED` : "all passed"); process.exit(fail ? 1 : 0);
