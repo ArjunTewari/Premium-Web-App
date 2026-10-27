@@ -359,6 +359,29 @@ router.get("/download/:file", requireAuth, async (req: Request, res: Response) =
   return res.send(content);
 });
 
+// ── GET /view/:file — open a report in the browser instead of downloading it ──
+// ?view=client shows the Client View (no Executive Summary / Action Matrix), the same file the client is sent.
+// The report is a self-contained page with its own script, so it is served in a CSP sandbox WITHOUT allow-same-origin:
+// it runs with an opaque origin and cannot read this app's cookies or call its API as the signed-in user.
+router.get("/view/:file", requireAuth, async (req: Request, res: Response) => {
+  const fname = path.basename(String(req.params.file || "").trim());
+  if (!/^[\w. \-]+\.html$/i.test(fname)) return res.status(400).send("Invalid report file");
+  try {
+    let html = await loadReportHtml(fname);
+    if (html == null) return res.status(404).send("Report not found");
+    if (String(req.query.view || "") === "client" && reportTypeOfName(fname) === "full") html = toClientView(html);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Disposition", "inline");
+    res.setHeader("Content-Security-Policy", "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "private, no-store");
+    return res.send(html);
+  } catch (e) {
+    console.error("View report failed:", e);
+    return res.status(500).send("Could not open the report");
+  }
+});
+
 // ── POST /outputs/email — email an existing report as an attachment ─────────
 // Admins may send to any address; other accounts only to their own signup
 // email, so this can't be used to relay reports (or spam) to arbitrary people.
