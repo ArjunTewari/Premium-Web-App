@@ -4,6 +4,7 @@
 //
 // text.json    { "exec": [3 × {headline, detail, section_ref}], "actions": { "<org>": [4 × {priority, area, action, rationale}] } }
 // review.json  { "reviewer": "Claude Code", "postsRead": <number of counted posts read in posts-to-review.md>,
+//                "postsNotAvailable": <optional: counted posts whose text is not in the saved data, with the reason in notes>,
 //                "excludePosts": [urls of counted posts that are not about the subject], "notes": "what was checked" }
 //
 // The rule checks (totals, shares, repeats, summary numbers vs data) run for real. The independent review is the
@@ -49,12 +50,13 @@ const Rev = L.pipe("claude-review.js");
 let reviewProblem = "";
 Rev.review = async (pack) => {
   const counted = pack.organisations.reduce((s, o) => s + ["linkedin", "x", "instagram"].reduce((a, k) => a + ((o.social[k] && o.social[k].posts) || 0), 0), 0);
+  const na = review.postsNotAvailable || 0;
   const expected = counted + (review.excludePosts || []).length;
-  if (review.postsRead !== expected) {
-    reviewProblem = `the review says ${review.postsRead} posts were read, but the report counts ${counted} and ${(review.excludePosts || []).length} were left out (${expected} in all). Read the full list again (digest.cjs) and fix postsRead.`;
+  if (review.postsRead + na !== expected) {
+    reviewProblem = `the review accounts for ${review.postsRead} posts read + ${na} not available, but the report counts ${counted} and ${(review.excludePosts || []).length} were left out (${expected} in all). Read the full list again (digest.cjs) and fix postsRead.`;
     return { verdict: "fail", findings: [{ severity: "error", org: "(report)", where: "review", issue: reviewProblem, evidence: "" }], model: "Claude Code review" };
   }
-  return { verdict: "pass", findings: [], model: `${review.reviewer} review of the evidence (${review.postsRead} posts read, ${(review.excludePosts || []).length} left out); not the Claude CLI reviewer` };
+  return { verdict: "pass", findings: [], model: `${review.reviewer} review of the evidence (${review.postsRead} posts read, ${(review.excludePosts || []).length} left out${na ? `, ${na} counted post(s) not readable in the saved data` : ""}); not the Claude CLI reviewer` };
 };
 
 const P = L.pipe("pipeline.js");
