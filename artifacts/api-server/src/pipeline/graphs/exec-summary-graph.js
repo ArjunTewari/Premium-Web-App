@@ -21,7 +21,9 @@ const { StateGraph, Annotation, START, END } = require('@langchain/langgraph');
 const ClaudeClient = require('../claude-client');
 const Sentinel = require('../sentinel');
 
-const MAX_RETRIES = 1; // worst case: 1 initial + 1 corrective = 2 Claude calls (each takes ~1 minute)
+// No regeneration: a second call costs about a minute and gambles on the model getting the number right. A finding whose
+// numbers cannot be verified is REPLACED by one built from the data (exec-facts.js), which is true by construction.
+const MAX_RETRIES = 0;
 
 const State = Annotation.Root({
   execF: Annotation({ reducer: (_a, b) => b, default: () => [] }),
@@ -100,10 +102,6 @@ async function factCheck(state, config) {
 // after having tried to fix it first.
 function routeAfterFactCheck(state) {
   if (!state.execAudit.issues.length) return END;
-  // Numbers that can be corrected deterministically (one unambiguous field) are corrected in
-  // code after the loop — asking the model again costs about a minute and gambles on it getting
-  // the number right. Regenerate only when something is left that code cannot correct.
-  if (state.execAudit.issues.every((iss) => iss.correctedValue != null)) return END;
   if (state.retryCount < MAX_RETRIES) return 'generateSummary';
   return END;
 }
@@ -120,42 +118,36 @@ const graph = new StateGraph(State)
  * Returns { execF, execAudit } — pipeline.js assigns both from this in
  * place of its original inline generate+audit block.
  */
-async function run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb, feedback }) {
+async function run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb, feedback, notCollected }) {
   const finalState = await graph.invoke(
     {},
     { configurable: { cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb, feedback }, recursionLimit: 15 },
   );
   let execF = finalState.execF;
   let execAudit = finalState.execAudit;
+  const ExecFacts = require('../exec-facts');
 
-  // Deterministic final patch: regeneration (above) tries to get Claude to
-  // restate the right number, but there's no need to gamble on that when the
-  // correct value is already known — every issue with an unambiguous single
-  // field (articles/AEO/social; NOT the two-field "%" case, which stays
-  // flagged rather than guessed) gets its digits spliced directly into the
-  // finding text. Runs regardless of whether the loop above converged or hit
-  // MAX_RETRIES, so a report never ships a known-wrong number just because
-  // Claude didn't happen to restate it correctly within the retry budget.
-  if (execAudit.issues.some((iss) => iss.correctedValue != null)) {
-    const corrected = Sentinel.applyCorrections(execF, execAudit.issues);
-    const reAudit = Sentinel.validateExecSummary(corrected, data, ORGS);
-    const fixedCount = execAudit.issues.length - reAudit.issues.length;
-    cb?.(`  SENTINEL · exec summary: auto-corrected ${fixedCount} numeric claim(s) directly in the text`, fixedCount > 0 ? 'ok' : 'warn');
-    execF = corrected;
-    execAudit = reAudit;
-  }
-
-  // Whatever still disagrees with the computed data after regeneration and correction
-  // cannot be verified (an ambiguous "%", or a claim the model keeps getting wrong).
-  // A report must not carry a number it cannot stand behind, so those findings are
-  // taken out, logged, and recorded in execAudit.dropped (the audit shows it).
-  if (execAudit.issues.length) {
-    const bad = new Set(execAudit.issues.map((iss) => iss.findingIdx));
-    const dropped = [...bad].sort((a, b) => a - b).map((i) => ({ headline: execF[i]?.headline || '', claims: execAudit.issues.filter((iss) => iss.findingIdx === i).map((iss) => `${iss.org}: ${iss.claimed} ${iss.metric}, data ${iss.actual}`) }));
-    execF = execF.filter((_, i) => !bad.has(i));
-    for (const d of dropped) cb?.(`  SENTINEL · exec summary: finding removed because a number in it could not be verified — "${d.headline}" (${d.claims.join('; ')})`, 'warn');
-    const finalAudit = Sentinel.validateExecSummary(execF, data, ORGS);
-    execAudit = { ...finalAudit, dropped };
+  // The model's text is NEVER edited. (An earlier version spliced the "correct" number into a sentence it had judged wrong;
+  // deciding which organisation a number belongs to is a guess, and a wrong guess wrote false sentences into the report:
+  // "ranged from 51 to 51", "collectively published 1 articles", "scored 33/100 and 33/100".)
+  // A finding with a number that does not match the computed data cannot be verified, so it is replaced by a finding built
+  // from the data itself (exec-facts.js): same section, every number read from the data. If the model wrote nothing at all,
+  // the report gets all three. The replacement is logged and recorded in execAudit.replaced.
+  const bad = new Set(execAudit.issues.map((iss) => iss.findingIdx));
+  if (bad.size || !execF.length) {
+    const r = ExecFacts.replace(execF, [...bad], data, ORGS, { notCollected });
+    for (const x of r.replaced) cb?.(`  SENTINEL · exec summary: finding "${x.headline}" had a number that could not be verified; replaced by a finding built from the data — "${x.with}"`, 'warn');
+    for (const x of r.dropped) cb?.(`  SENTINEL · exec summary: finding "${x.headline}" removed (could not be verified, nothing to replace it with)`, 'warn');
+    const dropped = [...execAudit.issues.reduce((m, iss) => m.set(iss.findingIdx, [...(m.get(iss.findingIdx) || []), `${iss.org}: ${iss.claimed} ${iss.metric}, data ${iss.actual}`]), new Map())]
+      .map(([i, claims]) => ({ headline: (execF[i] && execF[i].headline) || '', claims }));
+    execF = r.execF;
+    // What is in the report now must verify clean; anything the checker still objects to is taken out rather than kept.
+    const again = Sentinel.validateExecSummary(execF, data, ORGS);
+    if (again.issues.length) {
+      const stillBad = new Set(again.issues.map((iss) => iss.findingIdx));
+      execF = execF.filter((_, i) => !stillBad.has(i));
+    }
+    execAudit = { ...Sentinel.validateExecSummary(execF, data, ORGS), dropped, replaced: r.replaced };
   }
 
   return { execF, execAudit };

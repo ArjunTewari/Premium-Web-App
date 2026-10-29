@@ -415,47 +415,8 @@ function validateExecSummary(execF, data, ORGS) {
   return { issues, checked };
 }
 
-/**
- * Deterministically splice the correct computed value into finding text for
- * every issue that has an unambiguous correctedValue (see validateExecSummary
- * — single-field units only, not the two-field "%" case). Used as the final
- * step after the regenerate-and-recheck loop in graphs/exec-summary-graph.js
- * either converges or exhausts its retries: rather than leaving a
- * known-wrong number in the report with just a warning, patch it directly.
- * Returns a NEW execF array (does not mutate the input) — findings with no
- * correctable issues are returned unchanged (same object reference).
- */
-function applyCorrections(execF, issues) {
-  const byFinding = new Map();
-  for (const iss of issues) {
-    if (iss.correctedValue == null) continue;
-    if (!byFinding.has(iss.findingIdx)) byFinding.set(iss.findingIdx, []);
-    byFinding.get(iss.findingIdx).push(iss);
-  }
-  if (!byFinding.size) return execF;
+// (There is deliberately NO function that edits a finding's text to "correct" a number. Which organisation a number belongs
+// to is a guess, and a wrong guess turns a true sentence into a false one — it did, three times. A finding that fails
+// validateExecSummary is REPLACED by one built from the data: see exec-facts.js and graphs/exec-summary-graph.js.)
 
-  return execF.map((finding, fi) => {
-    const fixes = byFinding.get(fi);
-    if (!fixes) return finding;
-    const headline = finding.headline || '';
-    const detail = finding.detail || '';
-    const boundary = headline.length + 2; // matches the ". " joiner used to build `text` during detection
-
-    let newHeadline = headline;
-    const inHeadline = fixes.filter((f) => f.matchStart < headline.length).sort((a, b) => b.matchStart - a.matchStart);
-    for (const f of inHeadline) {
-      newHeadline = newHeadline.slice(0, f.matchStart) + f.correctedValue + newHeadline.slice(f.matchEnd);
-    }
-
-    let newDetail = detail;
-    const inDetail = fixes.filter((f) => f.matchStart >= boundary).sort((a, b) => b.matchStart - a.matchStart);
-    for (const f of inDetail) {
-      const s = f.matchStart - boundary, e = f.matchEnd - boundary;
-      newDetail = newDetail.slice(0, s) + f.correctedValue + newDetail.slice(e);
-    }
-
-    return { ...finding, headline: newHeadline, detail: newDetail };
-  });
-}
-
-module.exports = { classifyError, RETRYABLE, diagnoseZero, validateSocial, socialSentinel, socialSentinelLegacy, auditSectionNumbering, validateExecSummary, applyCorrections };
+module.exports = { classifyError, RETRYABLE, diagnoseZero, validateSocial, socialSentinel, socialSentinelLegacy, auditSectionNumbering, validateExecSummary };

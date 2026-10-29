@@ -221,7 +221,8 @@ function repairPlan(errors, execF) {
     for (const e of summaryErrs) {
       const hay = `${e.where || ""} ${e.issue || ""}`.toLowerCase();
       const n = /finding (\d+)/i.exec(e.where || "");
-      if ((h && hay.includes(h)) || (n && Number(n[1]) === i + 1)) flagged.add(i);
+      const d = String(f.detail || "").toLowerCase().replace(/\s+/g, " ").slice(0, 40);
+      if ((h && hay.includes(h)) || (d.length >= 20 && hay.replace(/\s+/g, " ").includes(d)) || (n && Number(n[1]) === i + 1)) flagged.add(i);
     }
   });
   return {

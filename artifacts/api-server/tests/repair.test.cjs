@@ -1,13 +1,14 @@
 // Run: node tests/repair.test.cjs  (needs the app's node_modules). No network, no Claude.
-// When the audit finds an error in the executive summary's TEXT, the summary is written again with what the
-// reviewer found (then flagged findings are removed) and the report is audited again; an error in the DATA is not
+// When the audit finds an error in the executive summary's TEXT, the findings it names are REPLACED by findings built from
+// the data (all of them when it names none we can identify; removed if it still objects) with no model call, and the report is
+// audited again; an error in the DATA is not
 // "repaired" by editing text; data saved before posts were kept is refused; "A and B each ..." is checked for both.
 const Module = require("module"); const path = require("path"); const os = require("os"); const fs = require("fs");
 const dir = path.join(__dirname, "..", "src", "pipeline");
 const prompts = [];
 let execVersion = 0;
 const goodExec = [{ headline: "CREA recorded 2 articles", detail: "CREA recorded 2 articles at 100% data-specific coverage.", section_ref: "§03 AQ Press Analytics" }, { headline: "TERI recorded 1 article", detail: "TERI recorded 1 article.", section_ref: "§03 AQ Press Analytics" }, { headline: "Social presence", detail: "CREA recorded 4/10 social presence.", section_ref: "§Social Media" }];
-const badExec = [{ headline: "Articles by organisation", detail: "CREA and TERI each published 1 article.", section_ref: "§03 AQ Press Analytics" }, goodExec[1], goodExec[2]];
+const badExec = [{ headline: "Articles by organisation", detail: "CREA and TERI had the same article coverage.", section_ref: "§03 AQ Press Analytics" }, goodExec[1], goodExec[2]];
 const claudeStub = { askClaude: async (p) => {
   prompts.push(p);
   if (/Write 3 comparative findings/.test(p)) { execVersion++; return JSON.stringify(/independent reviewer found/.test(p) ? goodExec : badExec); }
@@ -67,11 +68,11 @@ const cfgFor = (out, chk) => ({ ORGS, DATE_FROM: fp.dateFrom, DATE_TO: fp.dateTo
   const msgs = [];
   let r;
   try { r = await P.run(cfgFor(out, chk), (m) => msgs.push(m)); } catch (e) { msgs.push("ERR " + e.message.slice(0, 300)); }
-  const repaired = msgs.some((m) => /repair round 1: the executive summary is written again/.test(m));
+  const repaired = msgs.some((m) => /repair round 1: finding\(s\) the reviewer names replaced by findings built from the data/.test(m));
   const html = r ? fs.readFileSync(path.join(out, r.htmlName), "utf8") : "";
-  eq("a summary error is repaired: summary written again, audited again, report written", [repaired, !!r, reviews, /emerald-audit" content="passed/.test(html)], [true, true, 2, true]);
-  eq("the second summary request carried the reviewer's finding", prompts.some((p) => /Write 3 comparative findings/.test(p) && /independent reviewer found these problems/.test(p) && /CREA published 2 articles, not 1/.test(p)), true);
-  eq("the report carries the corrected summary, not the wrong one", [/CREA and TERI each published 1 article/.test(html), /recorded 2 articles/.test(html)], [false, true]);
+  eq("a summary error is repaired: the flagged finding is replaced from the data, audited again, report written", [repaired, !!r, reviews, /emerald-audit" content="passed/.test(html)], [true, true, 2, true]);
+  eq("no second summary request is made (nothing to gamble on)", prompts.filter((p) => /Write 3 comparative findings/.test(p)).length, 1);
+  eq("the report carries a finding built from the data, not the one the reviewer flagged", [/had the same article coverage/.test(html), /of 2 organisations recorded articles|scored above zero|recorded social presence/.test(html)], [false, true]);
 
   // reviewer keeps naming the same finding: it is removed in round 2
   prompts.length = 0; execVersion = 0;
@@ -85,8 +86,23 @@ const cfgFor = (out, chk) => ({ ORGS, DATE_FROM: fp.dateFrom, DATE_TO: fp.dateTo
   const html2 = r ? fs.readFileSync(path.join(out, r.htmlName), "utf8") : "";
   // (here the rewrite itself still contains a number the data contradicts, which the summary step already removes;
   // either way the finding must be gone and the report written)
-  eq("a finding that stays wrong after a rewrite does not reach the report, and the report is written", [!!r, /Articles by organisation/.test(html2), /CREA and TERI each published 1 article/.test(html2)], [true, false, false]);
+  eq("a finding that stays wrong after a rewrite does not reach the report, and the report is written", [!!r, /Articles by organisation/.test(html2), /had the same article coverage/.test(html2)], [true, false, false]);
   claudeStub.askClaude = claude2;
+
+  // the reviewer's error names no finding we can identify: every finding is replaced from the data; no model call is made
+  prompts.length = 0; reviews = 0;
+  Reviewer.review = async (pack) => { reviews++; return reviews === 1 ? { verdict: "fail", findings: [{ severity: "error", org: "(report)", where: "report · executive summary", issue: "the summary misstates the picture", evidence: "x" }], model: "stub" } : { verdict: "pass", findings: [], model: "stub" }; };
+  out = fs.mkdtempSync(path.join(os.tmpdir(), "repair4-")); const msgs4 = []; r = null;
+  try { r = await P.run(cfgFor(out, chk), (m) => msgs4.push(m)); } catch (e) { msgs4.push("ERR " + e.message.slice(0, 300)); }
+  const html4 = r ? fs.readFileSync(path.join(out, r.htmlName), "utf8") : "";
+  eq("an unnamed summary error: all findings come from the data, one summary request only, report written", [!!r, reviews, prompts.filter((p) => /Write 3 comparative findings/.test(p)).length, /2 of 2 organisations recorded articles/.test(html4), /CREA and TERI had the same article coverage/.test(html4)], [true, 2, 1, true, false]);
+
+  // the reviewer objects to the replaced findings too: they are removed in round 2 and the report is still written
+  prompts.length = 0; reviews = 0;
+  Reviewer.review = async (pack) => { reviews++; return (pack.executiveSummary || []).length ? { verdict: "fail", findings: [{ severity: "error", org: "(report)", where: "report · executive summary", issue: "still objects", evidence: "x" }], model: "stub" } : { verdict: "pass", findings: [], model: "stub" }; };
+  out = fs.mkdtempSync(path.join(os.tmpdir(), "repair5-")); r = null; const msgs5 = [];
+  try { r = await P.run(cfgFor(out, chk), (m) => msgs5.push(m)); } catch (e) { msgs5.push("ERR " + e.message.slice(0, 300)); }
+  eq("a summary that keeps being objected to ends up with no findings, and the report is written (the summary cannot stop it)", [!!r, reviews, msgs5.some((m) => /repair round 2: finding\(s\) the reviewer still names are removed/.test(m))], [true, 3, true]);
 
   // an error about the data is not repaired
   prompts.length = 0;
