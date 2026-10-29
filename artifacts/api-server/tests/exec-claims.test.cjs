@@ -30,6 +30,19 @@ v = Sentinel.validateExecSummary(grp2, data, ORGS);
 eq("a headline with no organisation named is left alone, and the detail is still checked", [v.issues.length, Sentinel.applyCorrections(grp2, v.issues)[0].headline], [0, grp2[0].headline]);
 v = Sentinel.validateExecSummary([f("Social presence", "CREA recorded 4/10 social presence.")], data, ORGS);
 eq("a wrong number in the detail is still caught", [v.issues.length, v.issues[0].correctedValue], [1, "9"]);
+// 28 Oct (12-18 Oct run): organisations named TOGETHER are one subject. A correct collective total or "respectively" pair was
+// "corrected" into a false number by pinning it on the last organisation of the list; the reviewer then stopped the run.
+const ORGS5 = ["Centre for Science and Environment", "CREA", "EnviroCatalysts", "IIT Kanpur", "TERI"];
+const data5 = { "Centre for Science and Environment": { total: 2, aeo: 51 }, CREA: { total: 2, aeo: 2 }, EnviroCatalysts: { total: 1, aeo: 0 }, "IIT Kanpur": { total: 1, aeo: 4 }, TERI: { total: 1, aeo: 33 } };
+const five = "Centre for Science and Environment, CREA, EnviroCatalysts, IIT Kanpur, and TERI";
+const good = [f("Five organisations published articles", `${five} collectively published 7 articles. Centre for Science and Environment and TERI scored 51/100 and 33/100 on AEO metrics respectively.`)];
+v = Sentinel.validateExecSummary(good, data5, ORGS5);
+eq("a correct collective total and a 'respectively' pair are left exactly as written", [v.issues.length, Sentinel.applyCorrections(good, v.issues)[0].detail === good[0].detail], [0, true]);
+const bad = [f("x", `${five} collectively published 5 articles.`)];
+v = Sentinel.validateExecSummary(bad, data5, ORGS5);
+eq("a wrong collective total is corrected to the SUM of the listed organisations, not to the last one", [v.issues.length, Sentinel.applyCorrections(bad, v.issues)[0].detail.endsWith("collectively published 7 articles.")], [1, true]);
+v = Sentinel.validateExecSummary([f("x", "IIT Kanpur recorded 3 articles and EnviroCatalysts 3. TERI scored 40/100 and CREA 2/100.")], data5, ORGS5);
+eq("clauses about one organisation are still checked", v.issues.map((i) => [i.org, i.claimed, i.correctedValue]), [["IIT Kanpur", 3, "1"], ["TERI", 40, "33"]]);
 v = Sentinel.validateExecSummary([f("x", "CREA: 50% authoritative citations.")], data, ORGS);
 eq("'50% authoritative' is checked against authPct", [v.issues.length, v.issues[0].actual, v.issues[0].correctedValue], [1, "authPct=0", "0"]);
 
