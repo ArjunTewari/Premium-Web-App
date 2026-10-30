@@ -6,7 +6,7 @@ import {
   reportTypeOfName, applyReportFilters, typeCounts, monthOptions, isDefaultFilters,
 } from "@/lib/report-filters";
 import { useLocation } from "wouter";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Customized } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const LOADING_QUOTES = [
   { text: "Clean air is not a privilege — it is a right.", author: "UN Environment Programme" },
@@ -238,69 +238,51 @@ function trendPeriodLabel(from: string, to: string, long = false): string {
 }
 const trendNum = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
-// X-axis tick: bold and coloured when the focused organisation has a point at this period.
-function TrendXTick(p: { x?: number; y?: number; payload?: { value: string }; labels: Record<string, string>; hot: Set<string>; color: string; turn?: boolean }) {
-  const { x = 0, y = 0, payload, labels, hot, color, turn } = p;
+// X-axis tick; turned when there are many periods.
+function TrendXTick(p: { x?: number; y?: number; payload?: { value: string }; labels: Record<string, string>; turn?: boolean }) {
+  const { x = 0, y = 0, payload, labels, turn } = p;
   const key = payload?.value ?? "";
-  const on = hot.has(key);
   return (
-    <text x={x} y={y + 12} textAnchor={turn ? "end" : "middle"} transform={turn ? `rotate(-35 ${x} ${y + 12})` : undefined} style={{ fill: on ? color : "var(--text-sub)", fontSize: on ? 13 : 12, fontWeight: on ? 700 : 400, fontFamily: "'DM Mono', monospace", transition: "fill .35s ease" }}>
+    <text x={x} y={y + 12} textAnchor={turn ? "end" : "middle"} transform={turn ? `rotate(-35 ${x} ${y + 12})` : undefined} style={{ fill: "var(--text-sub)", fontSize: 12, fontFamily: "'DM Mono', monospace" }}>
       {labels[key] ?? key}
     </text>
   );
 }
 
-// Drawn inside the chart (recharts <Customized>): for each point of the focused organisation, dashed guides to both axes,
-// a marker and the value on the Y axis, a marker on the X axis, and a ring around the point.
-function TrendFocusLayer(props: any) {
-  const { xAxisMap, yAxisMap, offset, org, color, rows } = props as { xAxisMap: any; yAxisMap: any; offset: any; org: string; color: string; rows: Record<string, string | number>[] };
-  const xa: any = xAxisMap && Object.values(xAxisMap)[0], ya: any = yAxisMap && Object.values(yAxisMap)[0];
-  if (!xa || !ya || !offset) return null;
-  const bw = xa.scale.bandwidth ? xa.scale.bandwidth() : 0;
-  const bottom = offset.top + offset.height, left = offset.left;
-  const pts = rows.filter((r) => typeof r[org] === "number").map((r) => ({ px: xa.scale(r.key as string) + bw / 2, py: ya.scale(r[org] as number), v: r[org] as number }))
-    .filter((p) => Number.isFinite(p.px) && Number.isFinite(p.py));
-  // Badges (one per point) at least BH apart, pushed up again if they run past the bottom; a short line joins a moved badge to its point.
-  const BH = 20, STEP = BH + 2, limit = bottom - BH / 2;
-  const order = pts.map((p, i) => ({ i, y: p.py })).sort((a, b) => a.y - b.y);
-  for (let k = 1; k < order.length; k++) if (order[k].y < order[k - 1].y + STEP) order[k].y = order[k - 1].y + STEP;
-  for (let k = order.length - 1; k >= 0; k--) {
-    if (order[k].y > limit - (order.length - 1 - k) * STEP) order[k].y = limit - (order.length - 1 - k) * STEP;
-  }
-  const badgeY: Record<number, number> = {};
-  order.forEach((o) => { badgeY[o.i] = o.y; });
-  return (
-    <g className="trend-focus" key={org}>
-      {pts.map((p, i) => (
-        <g key={i}>
-          <line x1={left} y1={p.py} x2={p.px} y2={p.py} stroke={color} strokeWidth={1.5} strokeDasharray="4 4" strokeOpacity={0.85} />
-          <line x1={p.px} y1={p.py} x2={p.px} y2={bottom} stroke={color} strokeWidth={1.5} strokeDasharray="4 4" strokeOpacity={0.85} />
-          <circle cx={p.px} cy={p.py} r={9} fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.4} />
-          <circle cx={left} cy={p.py} r={4} fill={color} />
-          <circle cx={p.px} cy={bottom} r={4} fill={color} />
-          {Math.abs(badgeY[i] - p.py) > 1 && <line x1={left - 10} y1={badgeY[i]} x2={left} y2={p.py} stroke={color} strokeWidth={1.5} />}
-          <g transform={`translate(${left - 8}, ${badgeY[i]})`}>
-            <rect x={-40} y={-10} width={38} height={20} rx={5} fill={color} />
-            <text x={-21} y={4} textAnchor="middle" style={{ fill: "#ffffff", fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>{trendNum(p.v)}</text>
-          </g>
-        </g>
-      ))}
-    </g>
-  );
-}
-
-function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; focused: string | null; labels: Record<string, string>; colorOf: (org: string) => string }) {
-  const { active, payload, label, focused, labels, colorOf } = p;
+// Hover card. With organisations selected it lists only those, each with its SoV percentage AND the absolute numbers behind it
+// (articles, AI-visibility score, social-presence points) and the three shares the SoV is the average of. With none selected it
+// lists every organisation's value for the metric on show.
+function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; selected: Set<string>; labels: Record<string, string>; colorOf: (org: string) => string; scores: Record<string, Record<string, TrendScores>>; metric: { label: string; pct: boolean } }) {
+  const { active, payload, label, selected, labels, colorOf, scores, metric } = p;
   if (!active || !payload || !payload.length) return null;
-  const items = focused ? payload.filter((x) => x.dataKey === focused) : payload;
+  const items = selected.size ? payload.filter((x) => selected.has(String(x.dataKey))) : payload;
   if (!items.length) return null;
+  const unit = metric.pct ? "%" : "";
+  const dim: React.CSSProperties = { color: "var(--text-sub)" };
   return (
-    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-col)", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontFamily: "'DM Mono', monospace", color: "var(--text-main)", boxShadow: "0 8px 24px rgba(0,0,0,.25)" }}>
-      <div style={{ fontWeight: 600, marginBottom: 4 }}>{labels[label ?? ""] ?? label}</div>
-      {items.map((x) => (
+    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-col)", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontFamily: "'DM Mono', monospace", color: "var(--text-main)", boxShadow: "0 8px 24px rgba(0,0,0,.25)", maxWidth: 330 }}>
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>{labels[label ?? ""] ?? label}</div>
+      {selected.size ? items.map((x) => {
+        const org = String(x.dataKey), s = scores[label ?? ""]?.[org];
+        return (
+          <div key={org} style={{ marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: colorOf(org), flexShrink: 0 }} />{org}
+            </div>
+            {s ? (
+              <div style={{ paddingLeft: 14, lineHeight: 1.55 }}>
+                <div><strong>SoV {trendNum(s.sovScore)}%</strong></div>
+                <div style={dim}>{s.articles} {s.articles === 1 ? "article" : "articles"} · AI visibility {s.aeo}/100 · social {s.social}/10</div>
+                <div style={dim}>press {trendNum(s.pressShare)}% · AI {trendNum(s.llmShare)}% · social {trendNum(s.socialShare)}%</div>
+                {metric.label !== "SoV Score" && <div>{metric.label}: {trendNum(Number(x.value))}{unit}</div>}
+              </div>
+            ) : <div style={{ paddingLeft: 14, ...dim }}>{metric.label}: {trendNum(Number(x.value))}{unit}</div>}
+          </div>
+        );
+      }) : items.map((x) => (
         <div key={x.dataKey} style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: colorOf(String(x.dataKey)), flexShrink: 0 }} />
-          <span>{x.dataKey}: {trendNum(Number(x.value))}</span>
+          <span>{x.dataKey}: {trendNum(Number(x.value))}{unit}</span>
         </div>
       ))}
     </div>
@@ -599,8 +581,8 @@ export default function Home() {
   const [trendReports, setTrendReports] = useState<TrendReport[]>([]);
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendMetric, setTrendMetric] = useState<typeof TREND_METRICS[number]["key"]>("sovScore");
-  // The organisation selected in the Trends chart; the others are greyed out. null = all shown normally.
-  const [focusedTrendOrg, setFocusedTrendOrg] = useState<string | null>(null);
+  // The organisations selected in the Trends chart (one or several); the others are greyed out. Empty = all shown normally.
+  const [focusedTrendOrgs, setFocusedTrendOrgs] = useState<string[]>([]);
 
   // ── Scheduler tab ──────────────────────────────────────────────────────────
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -661,10 +643,10 @@ export default function Home() {
   });
   const trendLongLabels: Record<string, string> = Object.fromEntries(trendSorted.map((r, idx) => [`${r.dateFrom}|${r.dateTo}|${idx}`, trendPeriodLabel(r.dateFrom, r.dateTo, true)]));
   const trendColorOf = (org: string) => ORG_COLORS[Math.max(0, trendOrgs.indexOf(org)) % ORG_COLORS.length];
-  const focusedOrg = focusedTrendOrg && trendOrgs.includes(focusedTrendOrg) ? focusedTrendOrg : null;
-  const focusedKeys = new Set(trendChartData.filter((r) => focusedOrg && typeof r[focusedOrg] === "number").map((r) => r.key as string));
+  const focusedSet = new Set(focusedTrendOrgs.filter((o) => trendOrgs.includes(o)));
+  const trendScoresByKey: Record<string, Record<string, TrendScores>> = Object.fromEntries(trendSorted.map((r, idx) => [`${r.dateFrom}|${r.dateTo}|${idx}`, r.scores]));
   function toggleTrendOrg(org: string) {
-    setFocusedTrendOrg((cur) => (cur === org ? null : org));
+    setFocusedTrendOrgs((cur) => (cur.includes(org) ? cur.filter((o) => o !== org) : [...cur, org]));
   }
 
   // Derived handle maps — read from orgHandleOverrides (user-editable)
@@ -2510,17 +2492,17 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                 <Card style={{ padding: "24px 20px 12px" }}>
                   <div className="trend-chart" style={{ width: "100%", height: 380 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={trendChartData} margin={{ top: 12, right: 40, left: 24, bottom: 8 }} onClick={(e: any) => { if (!e || !e.activePayload) setFocusedTrendOrg(null); }}>
+                      <LineChart data={trendChartData} margin={{ top: 12, right: 40, left: 24, bottom: 8 }} onClick={(e: any) => { if (!e || !e.activePayload) setFocusedTrendOrgs([]); }}>
                         <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
                         <XAxis
                           dataKey="key"
-                          tick={(tp: any) => <TrendXTick {...tp} labels={trendLabels} hot={focusedKeys} turn={trendChartData.length > 7} color={focusedOrg ? trendColorOf(focusedOrg) : "var(--text-sub)"} />}
+                          tick={(tp: any) => <TrendXTick {...tp} labels={trendLabels} turn={trendChartData.length > 7} />}
                           axisLine={{ stroke: C.border }} tickLine={false} interval={trendChartData.length > 24 ? "preserveStartEnd" : 0} height={trendChartData.length > 7 ? 54 : 30}
                         />
                         <YAxis tick={{ fill: "var(--text-sub)", fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: C.border }} tickLine={false} width={48} />
-                        <Tooltip content={<TrendTooltip focused={focusedOrg} labels={trendLongLabels} colorOf={trendColorOf} />} cursor={{ stroke: "var(--text-dim)", strokeDasharray: "3 3" }} />
+                        <Tooltip content={<TrendTooltip selected={focusedSet} labels={trendLongLabels} colorOf={trendColorOf} scores={trendScoresByKey} metric={{ label: TREND_METRICS.find((m) => m.key === trendMetric)?.label ?? "", pct: trendMetric !== "articles" }} />} cursor={{ stroke: "var(--text-dim)", strokeDasharray: "3 3" }} />
                         {trendOrgs.map((org) => {
-                          const isFocus = focusedOrg === org, dim = !!focusedOrg && !isFocus;
+                          const isFocus = focusedSet.has(org), dim = focusedSet.size > 0 && !isFocus;
                           const color = trendColorOf(org);
                           const grey = "var(--text-dim)";
                           return (
@@ -2539,24 +2521,23 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                             />
                           );
                         })}
-                        {focusedOrg && <Customized component={<TrendFocusLayer org={focusedOrg} color={trendColorOf(focusedOrg)} rows={trendChartData} />} />}
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 4px 0", flexWrap: "wrap" }}>
                     <div style={{ fontSize: 13, color: "var(--text-sub)" }}>
-                      {focusedOrg ? <>Showing <strong style={{ color: trendColorOf(focusedOrg) }}>{focusedOrg}</strong>; the other organisations are greyed out.</> : "Select an organisation (a name below, or its line) to focus on it."}
+                      {focusedSet.size ? <>Showing {[...focusedSet].map((o, i) => <span key={o}>{i > 0 ? ", " : ""}<strong style={{ color: trendColorOf(o) }}>{o}</strong></span>)}; the other organisations are greyed out. Click a name again to deselect it.</> : "Select one or more organisations (a name below, or its line) to focus on them. Hover for the absolute numbers."}
                     </div>
-                    {focusedOrg && (
+                    {focusedSet.size > 0 && (
                       <button
-                        onClick={() => setFocusedTrendOrg(null)}
+                        onClick={() => setFocusedTrendOrgs([])}
                         style={{ padding: "5px 12px", borderRadius: 8, background: "transparent", color: "var(--text-main)", border: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
                       >Show all</button>
                     )}
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "12px 4px 16px" }}>
                     {trendOrgs.map((org) => {
-                      const selected = focusedOrg === org, dim = !!focusedOrg && !selected;
+                      const selected = focusedSet.has(org), dim = focusedSet.size > 0 && !selected;
                       const color = trendColorOf(org);
                       return (
                         <button

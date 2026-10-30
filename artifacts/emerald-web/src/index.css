@@ -352,9 +352,6 @@ select option:disabled { color: var(--text-sub); }
 /* ─── Trends: focusing one organisation ─────────────────────────────────────── */
 .trend-chart .recharts-line-curve { transition: stroke .3s ease, stroke-width .3s ease, stroke-opacity .3s ease; cursor: pointer; }
 .trend-chart .recharts-dot { transition: fill .3s ease, stroke .3s ease, r .3s ease, opacity .3s ease; cursor: pointer; }
-@keyframes trendFocusIn { from { opacity: 0; } to { opacity: 1; } }
-.trend-focus { animation: trendFocusIn .3s ease both; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
   .trend-chart .recharts-line-curve, .trend-chart .recharts-dot { transition: none; }
-  .trend-focus { animation: none; }
 }
