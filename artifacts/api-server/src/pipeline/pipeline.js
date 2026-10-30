@@ -2157,7 +2157,7 @@ async function buildPPTX(
         align: "center",
       });
       sl.addText(
-        "Add OPENAI_KEY, PERPLEXITY_KEY, or GEMINI_KEY to enable LLM probing.",
+        "Add OPENAI_KEY or PERPLEXITY_KEY to enable LLM probing.",
         {
           x: 0.5,
           y: 3.0,
@@ -2264,7 +2264,7 @@ async function buildPPTX(
       });
     }
     sl.addText(
-      "AEO questions sent verbatim to GPT-4o mini, Perplexity Sonar, and Gemini 1.5 Flash. Metric = raw LLM mentions.",
+      "AEO questions sent verbatim to GPT-4o mini, Claude, and Perplexity Sonar. Metric = raw LLM mentions.",
       {
         x: 0.5,
         y: 6.98,
@@ -3277,8 +3277,8 @@ ${orgsByTotal((o) => outletTotal(o, activeOutlets)).map(({ org, i, total }) => `
         : `display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px`;
     return `
 <section class="sec" id="aeo"><div class="sh"><div class="se">LLM Visibility</div><h2 class="st">LLM Visibility</h2>
-<div class="sd">How often is each organisation cited when AI models (GPT-4o, Perplexity, Gemini) are asked about Indian air quality? ${hasAEO ? "Probed with " + AEO_QUESTIONS.length + " standard questions per LLM." : "No LLM API keys provided — add keys to enable."}</div><div class="sdiv"></div></div>
-${!hasAEO ? `<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:18px;color:var(--muted2)"><strong style="color:var(--warn)">⚠ AEO data not available</strong> — Add OpenAI, Perplexity, or Gemini API keys and re-run to populate this section.</div>` : ""}
+<div class="sd">How often is each organisation cited when AI models (GPT-4o mini, Claude, Perplexity) are asked about Indian air quality? ${hasAEO ? "Probed with " + AEO_QUESTIONS.length + " standard questions per LLM." : "No LLM API keys provided — add keys to enable."}</div><div class="sdiv"></div></div>
+${!hasAEO ? `<div style="background:rgba(212,160,23,.08);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:18px;color:var(--muted2)"><strong style="color:var(--warn)">⚠ AEO data not available</strong> — Add OpenAI or Perplexity API keys and re-run to populate this section.</div>` : ""}
 ${hasAEO ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px"><div style="font-size:17px;font-weight:600;color:var(--text);margin-bottom:10px">LLM Mention Ranking</div>${aeoRankBar}</div>` : ""}
 <div style="${grid}">${cards}</div>
 <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px">
@@ -3697,7 +3697,7 @@ ${execAudit.issues.length
 <div style="margin-top:20px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);font-size:16px;color:var(--muted2);line-height:1.7">
   <strong style="font-weight:600;letter-spacing:.04em">METHODOLOGY</strong> &mdash;
   Serper News API for media coverage &middot; Claude Sonnet 4.6 for article classification &middot;
-  LLM probing (GPT-4o, Perplexity Sonar, Gemini 1.5 Flash) for AEO visibility &middot;
+  LLM probing (GPT-4o mini, Claude, Perplexity Sonar) for AEO visibility &middot;
   Serper web search for Social Media presence (LinkedIn + X/Twitter) &middot;
   Articles filtered to 8 core outlets: TOI, HT, The Hindu, NDTV, News18, India Today, India TV, ABP News &middot;
   Only articles where the organisation is mentioned in scraped body text and classified as AQ-primary by Claude are included.
