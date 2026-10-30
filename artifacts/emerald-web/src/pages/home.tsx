@@ -6,7 +6,7 @@ import {
   reportTypeOfName, applyReportFilters, typeCounts, monthOptions, isDefaultFilters,
 } from "@/lib/report-filters";
 import { useLocation } from "wouter";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Customized } from "recharts";
 
 const LOADING_QUOTES = [
   { text: "Clean air is not a privilege — it is a right.", author: "UN Environment Programme" },
@@ -219,6 +219,94 @@ const TREND_METRICS = [
   { key: "articles" as const, label: "Articles" },
 ];
 
+// ── Trends: period labels and the focus layer ──────────────────────────────
+const TREND_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// "12–18 Oct" for a week, "Oct 2026" for a whole month, "14 Sep–11 Oct" otherwise. Several reports can fall in one
+// month, so the axis is keyed by the report's own period, never by its month.
+function trendPeriodLabel(from: string, to: string, long = false): string {
+  const a = new Date(`${from}T00:00:00Z`), b = new Date(`${to}T00:00:00Z`);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return `${from} – ${to}`;
+  const days = Math.round((b.getTime() - a.getTime()) / 864e5) + 1;
+  const am = TREND_MONTHS[a.getUTCMonth()], bm = TREND_MONTHS[b.getUTCMonth()];
+  const lastDay = new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth() + 1, 0)).getUTCDate();
+  const yr = long ? ` ${b.getUTCFullYear()}` : "";
+  if (a.getUTCDate() === 1 && b.getUTCDate() === lastDay) {
+    return a.getUTCMonth() === b.getUTCMonth() && a.getUTCFullYear() === b.getUTCFullYear() ? `${am} ${a.getUTCFullYear()}` : `${am}–${bm} ${b.getUTCFullYear()}`;
+  }
+  if (days <= 31 && a.getUTCMonth() === b.getUTCMonth()) return `${a.getUTCDate()}–${b.getUTCDate()} ${am}${yr}`;
+  return `${a.getUTCDate()} ${am}–${b.getUTCDate()} ${bm}${yr}`;
+}
+const trendNum = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+
+// X-axis tick: bold and coloured when the focused organisation has a point at this period.
+function TrendXTick(p: { x?: number; y?: number; payload?: { value: string }; labels: Record<string, string>; hot: Set<string>; color: string; turn?: boolean }) {
+  const { x = 0, y = 0, payload, labels, hot, color, turn } = p;
+  const key = payload?.value ?? "";
+  const on = hot.has(key);
+  return (
+    <text x={x} y={y + 12} textAnchor={turn ? "end" : "middle"} transform={turn ? `rotate(-35 ${x} ${y + 12})` : undefined} style={{ fill: on ? color : "var(--text-sub)", fontSize: on ? 13 : 12, fontWeight: on ? 700 : 400, fontFamily: "'DM Mono', monospace", transition: "fill .35s ease" }}>
+      {labels[key] ?? key}
+    </text>
+  );
+}
+
+// Drawn inside the chart (recharts <Customized>): for each point of the focused organisation, dashed guides to both axes,
+// a marker and the value on the Y axis, a marker on the X axis, and a ring around the point.
+function TrendFocusLayer(props: any) {
+  const { xAxisMap, yAxisMap, offset, org, color, rows } = props as { xAxisMap: any; yAxisMap: any; offset: any; org: string; color: string; rows: Record<string, string | number>[] };
+  const xa: any = xAxisMap && Object.values(xAxisMap)[0], ya: any = yAxisMap && Object.values(yAxisMap)[0];
+  if (!xa || !ya || !offset) return null;
+  const bw = xa.scale.bandwidth ? xa.scale.bandwidth() : 0;
+  const bottom = offset.top + offset.height, left = offset.left;
+  const pts = rows.filter((r) => typeof r[org] === "number").map((r) => ({ px: xa.scale(r.key as string) + bw / 2, py: ya.scale(r[org] as number), v: r[org] as number }))
+    .filter((p) => Number.isFinite(p.px) && Number.isFinite(p.py));
+  // Badges (one per point) at least BH apart, pushed up again if they run past the bottom; a short line joins a moved badge to its point.
+  const BH = 20, STEP = BH + 2, limit = bottom - BH / 2;
+  const order = pts.map((p, i) => ({ i, y: p.py })).sort((a, b) => a.y - b.y);
+  for (let k = 1; k < order.length; k++) if (order[k].y < order[k - 1].y + STEP) order[k].y = order[k - 1].y + STEP;
+  for (let k = order.length - 1; k >= 0; k--) {
+    if (order[k].y > limit - (order.length - 1 - k) * STEP) order[k].y = limit - (order.length - 1 - k) * STEP;
+  }
+  const badgeY: Record<number, number> = {};
+  order.forEach((o) => { badgeY[o.i] = o.y; });
+  return (
+    <g className="trend-focus" key={org}>
+      {pts.map((p, i) => (
+        <g key={i}>
+          <line x1={left} y1={p.py} x2={p.px} y2={p.py} stroke={color} strokeWidth={1.5} strokeDasharray="4 4" strokeOpacity={0.85} />
+          <line x1={p.px} y1={p.py} x2={p.px} y2={bottom} stroke={color} strokeWidth={1.5} strokeDasharray="4 4" strokeOpacity={0.85} />
+          <circle cx={p.px} cy={p.py} r={9} fill="none" stroke={color} strokeWidth={2} strokeOpacity={0.4} />
+          <circle cx={left} cy={p.py} r={4} fill={color} />
+          <circle cx={p.px} cy={bottom} r={4} fill={color} />
+          {Math.abs(badgeY[i] - p.py) > 1 && <line x1={left - 10} y1={badgeY[i]} x2={left} y2={p.py} stroke={color} strokeWidth={1.5} />}
+          <g transform={`translate(${left - 8}, ${badgeY[i]})`}>
+            <rect x={-40} y={-10} width={38} height={20} rx={5} fill={color} />
+            <text x={-21} y={4} textAnchor="middle" style={{ fill: "#ffffff", fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>{trendNum(p.v)}</text>
+          </g>
+        </g>
+      ))}
+    </g>
+  );
+}
+
+function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; focused: string | null; labels: Record<string, string>; colorOf: (org: string) => string }) {
+  const { active, payload, label, focused, labels, colorOf } = p;
+  if (!active || !payload || !payload.length) return null;
+  const items = focused ? payload.filter((x) => x.dataKey === focused) : payload;
+  if (!items.length) return null;
+  return (
+    <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-col)", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontFamily: "'DM Mono', monospace", color: "var(--text-main)", boxShadow: "0 8px 24px rgba(0,0,0,.25)" }}>
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>{labels[label ?? ""] ?? label}</div>
+      {items.map((x) => (
+        <div key={x.dataKey} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: colorOf(String(x.dataKey)), flexShrink: 0 }} />
+          <span>{x.dataKey}: {trendNum(Number(x.value))}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface Schedule {
   id: number;
   label: string;
@@ -321,9 +409,11 @@ const inputStyle: React.CSSProperties = {
   outline: "none",
   width: "100%",
   boxSizing: "border-box",
-  colorScheme: "light dark",
   transition: "border-color .2s",
 };
+
+// Inputs inside dialogs sit on a solid card: a solid field and solid text colour (the shared style is a see-through tint).
+const dialogInputStyle: React.CSSProperties = { ...inputStyle, background: "var(--bg-inset)", color: "var(--text-main)", fontSize: 16 };
 
 /* ── Module-level card/label components (must be outside Home to avoid remount on re-render) ── */
 function Card({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) {
@@ -509,7 +599,8 @@ export default function Home() {
   const [trendReports, setTrendReports] = useState<TrendReport[]>([]);
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendMetric, setTrendMetric] = useState<typeof TREND_METRICS[number]["key"]>("sovScore");
-  const [hiddenTrendOrgs, setHiddenTrendOrgs] = useState<Set<string>>(new Set());
+  // The organisation selected in the Trends chart; the others are greyed out. null = all shown normally.
+  const [focusedTrendOrg, setFocusedTrendOrg] = useState<string | null>(null);
 
   // ── Scheduler tab ──────────────────────────────────────────────────────────
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -556,22 +647,24 @@ export default function Home() {
 
   // ── Trends tab — derived chart data ───────────────────────────────────────
   const trendOrgs = Array.from(new Set(trendReports.flatMap((r) => r.orgs)));
-  const trendChartData = trendReports.map((r) => {
-    const row: Record<string, string | number> = {
-      period: new Date(r.dateFrom).toLocaleDateString("en-US", { month: "short", year: "numeric" }),
-    };
+  const trendSorted = [...trendReports].sort((a, b) => a.dateFrom.localeCompare(b.dateFrom) || a.dateTo.localeCompare(b.dateTo));
+  const trendLabels: Record<string, string> = {};
+  const trendChartData = trendSorted.map((r, idx) => {
+    const key = `${r.dateFrom}|${r.dateTo}|${idx}`;
+    trendLabels[key] = trendPeriodLabel(r.dateFrom, r.dateTo);
+    const row: Record<string, string | number> = { key };
     for (const org of trendOrgs) {
       const s = r.scores[org];
       if (s) row[org] = s[trendMetric];
     }
     return row;
   });
+  const trendLongLabels: Record<string, string> = Object.fromEntries(trendSorted.map((r, idx) => [`${r.dateFrom}|${r.dateTo}|${idx}`, trendPeriodLabel(r.dateFrom, r.dateTo, true)]));
+  const trendColorOf = (org: string) => ORG_COLORS[Math.max(0, trendOrgs.indexOf(org)) % ORG_COLORS.length];
+  const focusedOrg = focusedTrendOrg && trendOrgs.includes(focusedTrendOrg) ? focusedTrendOrg : null;
+  const focusedKeys = new Set(trendChartData.filter((r) => focusedOrg && typeof r[focusedOrg] === "number").map((r) => r.key as string));
   function toggleTrendOrg(org: string) {
-    setHiddenTrendOrgs((prev) => {
-      const next = new Set(prev);
-      if (next.has(org)) next.delete(org); else next.add(org);
-      return next;
-    });
+    setFocusedTrendOrg((cur) => (cur === org ? null : org));
   }
 
   // Derived handle maps — read from orgHandleOverrides (user-editable)
@@ -1253,14 +1346,14 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
       {deriveState && (
         <div
           onClick={() => !deriveState.busy && setDeriveState(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px" }}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.62)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px" }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: "var(--elevate-2)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "28px 28px 22px", maxWidth: 480, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column", gap: 16 }}
+            style={{ background: "var(--bg-card)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "28px 28px 22px", maxWidth: 480, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column", gap: 16 }}
           >
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: C.gold }}>Benchmark / Snapshot</div>
-            <div style={{ fontSize: 12, color: C.muted, fontFamily: "'DM Mono', monospace", wordBreak: "break-all" }}>{deriveState.file}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--accent-on-card)" }}>Benchmark / Snapshot</div>
+            <div style={{ fontSize: 13, color: "var(--text-main)", fontFamily: "'DM Mono', monospace", wordBreak: "break-all" }}>{deriveState.file}</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {(["benchmark", "snapshot"] as const).map((t) => (
                 <button
@@ -1270,49 +1363,49 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                   style={{
                     padding: "7px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer",
                     fontFamily: "'Space Grotesk', sans-serif",
-                    background: deriveState.type === t ? C.gold : "transparent",
-                    color: deriveState.type === t ? "var(--bg-app)" : C.muted,
-                    border: `1px solid ${deriveState.type === t ? C.gold : C.border}`,
+                    background: deriveState.type === t ? "var(--btn-gold-bg)" : "transparent",
+                    color: deriveState.type === t ? "var(--btn-gold-text)" : "var(--text-main)",
+                    border: `1px solid ${deriveState.type === t ? "var(--btn-gold-bg)" : C.border}`,
                   }}
                 >{REPORT_TYPE_LABELS[t]}</button>
               ))}
             </div>
-            <div style={{ fontSize: 10, color: C.muted, fontFamily: "'DM Mono', monospace" }}>{REPORT_TYPE_HINTS[deriveState.type]}</div>
-            <select value={deriveState.org} onChange={(e) => setDeriveState({ ...deriveState, org: e.target.value })} style={inputStyle}>
+            <div style={{ fontSize: 12, color: "var(--text-sub)", fontFamily: "'DM Mono', monospace" }}>{REPORT_TYPE_HINTS[deriveState.type]}</div>
+            <select value={deriveState.org} onChange={(e) => setDeriveState({ ...deriveState, org: e.target.value })} style={dialogInputStyle}>
               {deriveState.orgs.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
             {deriveState.type === "snapshot" && deriveState.period && (
               <div>
-                <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--text-sub)", marginBottom: 5, fontFamily: "'DM Mono', monospace" }}>
                   PERIOD — WITHIN THE REPORT'S {deriveState.period.from} → {deriveState.period.to}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <input type="date" value={deriveState.from} min={deriveState.period.from} max={deriveState.period.to} onChange={(e) => setDeriveState({ ...deriveState, from: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
+                  <input type="date" value={deriveState.from} min={deriveState.period.from} max={deriveState.period.to} onChange={(e) => setDeriveState({ ...deriveState, from: e.target.value })} style={{ ...dialogInputStyle, flex: 1 }} />
                   <span style={{ color: C.muted }}>→</span>
-                  <input type="date" value={deriveState.to} min={deriveState.period.from} max={deriveState.period.to} onChange={(e) => setDeriveState({ ...deriveState, to: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
+                  <input type="date" value={deriveState.to} min={deriveState.period.from} max={deriveState.period.to} onChange={(e) => setDeriveState({ ...deriveState, to: e.target.value })} style={{ ...dialogInputStyle, flex: 1 }} />
                 </div>
                 {(deriveState.from !== deriveState.period.from || deriveState.to !== deriveState.period.to) ? (
-                  <div style={{ fontSize: 10, color: C.muted, marginTop: 6, fontFamily: "'DM Mono', monospace", lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 12, color: "var(--text-sub)", marginTop: 6, fontFamily: "'DM Mono', monospace", lineHeight: 1.6 }}>
                     Counted from the dated items in this report. AI visibility and YouTube are not dated, so they stay at the whole-report values; the snapshot says so.{" "}
-                    <button type="button" onClick={() => setDeriveState({ ...deriveState, from: deriveState.period!.from, to: deriveState.period!.to })} style={{ background: "none", border: "none", color: C.gold, cursor: "pointer", textDecoration: "underline", padding: 0, fontSize: 10, fontFamily: "'DM Mono', monospace" }}>Use the whole period</button>
+                    <button type="button" onClick={() => setDeriveState({ ...deriveState, from: deriveState.period!.from, to: deriveState.period!.to })} style={{ background: "none", border: "none", color: "var(--accent-on-card)", cursor: "pointer", textDecoration: "underline", padding: 0, fontSize: 12, fontFamily: "'DM Mono', monospace" }}>Use the whole period</button>
                   </div>
                 ) : (
-                  <div style={{ fontSize: 10, color: C.muted, marginTop: 6, fontFamily: "'DM Mono', monospace" }}>Whole report period. Pick a shorter window to cut the snapshot to part of it.</div>
+                  <div style={{ fontSize: 12, color: "var(--text-sub)", marginTop: 6, fontFamily: "'DM Mono', monospace" }}>Whole report period. Pick a shorter window to cut the snapshot to part of it.</div>
                 )}
               </div>
             )}
-            <div style={{ fontSize: 10, color: C.muted, fontFamily: "'DM Mono', monospace" }}>Built from this report's data — no new analysis. Priced ₹{deriveState.type === "snapshot" ? "40–45" : "90–100"}.</div>
+            <div style={{ fontSize: 12, color: "var(--text-sub)", fontFamily: "'DM Mono', monospace" }}>Built from this report's data — no new analysis. Priced ₹{deriveState.type === "snapshot" ? "40–45" : "90–100"}.</div>
             {deriveState.error && <div style={{ fontSize: 13, color: "#e05a5a" }}>{deriveState.error}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button
                 onClick={() => setDeriveState(null)}
                 disabled={deriveState.busy}
-                style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+                style={{ background: "transparent", color: "var(--text-main)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
               >Cancel</button>
               <button
                 onClick={submitDerive}
                 disabled={deriveState.busy || !deriveState.org}
-                style={{ background: C.gold, color: "var(--bg-app)", border: "none", borderRadius: 8, padding: "8px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: deriveState.busy ? 0.6 : 1, fontFamily: "'Space Grotesk', sans-serif" }}
+                style={{ background: "var(--btn-gold-bg)", color: "var(--btn-gold-text)", border: "none", borderRadius: 8, padding: "8px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: deriveState.busy ? 0.6 : 1, fontFamily: "'Space Grotesk', sans-serif" }}
               >{deriveState.busy ? "Building…" : "Create"}</button>
             </div>
           </div>
@@ -1323,27 +1416,27 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
       {confirmState && (
         <div
           onClick={() => setConfirmState(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px" }}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.62)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px" }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: "var(--elevate-2)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "28px 28px 22px", maxWidth: 440, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column", gap: 20 }}
+            style={{ background: "var(--bg-card)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "28px 28px 22px", maxWidth: 440, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column", gap: 20 }}
           >
             <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
               <span style={{ fontSize: 22, lineHeight: 1, marginTop: 2 }}>⚠</span>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Confirm Change</div>
+                <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--accent-on-card)", marginBottom: 8 }}>Confirm Change</div>
                 <div style={{ fontSize: 15, color: C.text, lineHeight: 1.65, whiteSpace: "pre-wrap", fontFamily: "'DM Mono', monospace" }}>{confirmState.message}</div>
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button
                 onClick={() => setConfirmState(null)}
-                style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+                style={{ background: "transparent", color: "var(--text-main)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
               >Cancel</button>
               <button
                 onClick={() => { confirmState.onConfirm(); setConfirmState(null); }}
-                style={{ background: C.gold, color: "var(--bg-app)", border: "none", borderRadius: 8, padding: "8px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+                style={{ background: "var(--btn-gold-bg)", color: "var(--btn-gold-text)", border: "none", borderRadius: 8, padding: "8px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
               >Confirm</button>
             </div>
           </div>
@@ -1354,14 +1447,14 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
       {pwOpen && (
         <div
           onClick={closePwModal}
-          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px" }}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.62)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px" }}
         >
           <form
             onSubmit={handleChangePassword}
             onClick={(e) => e.stopPropagation()}
-            style={{ background: "var(--elevate-2)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "28px 28px 22px", maxWidth: 400, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column", gap: 16 }}
+            style={{ background: "var(--bg-card)", border: `1px solid ${C.border}`, borderRadius: 14, padding: "28px 28px 22px", maxWidth: 400, width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.55)", display: "flex", flexDirection: "column", gap: 16 }}
           >
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: C.gold }}>Change Password</div>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--accent-on-card)" }}>Change Password</div>
 
             {pwSaved ? (
               <>
@@ -1370,7 +1463,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                   <button
                     type="button"
                     onClick={closePwModal}
-                    style={{ background: C.gold, color: "var(--bg-app)", border: "none", borderRadius: 8, padding: "8px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+                    style={{ background: "var(--btn-gold-bg)", color: "var(--btn-gold-text)", border: "none", borderRadius: 8, padding: "8px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
                   >Done</button>
                 </div>
               </>
@@ -1385,7 +1478,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                       value={i === 0 ? pwCurrent : i === 1 ? pwNew : pwConfirm}
                       onChange={(e) => (i === 0 ? setPwCurrent : i === 1 ? setPwNew : setPwConfirm)(e.target.value)}
                       required
-                      style={{ background: "var(--elevate-1)", border: `1px solid var(--border-col)`, borderRadius: 7, padding: "8px 10px", fontSize: 15, color: C.text, fontFamily: "'DM Mono', monospace" }}
+                      style={{ ...dialogInputStyle, fontSize: 15, padding: "8px 10px", borderRadius: 7 }}
                     />
                   </div>
                 ))}
@@ -1394,12 +1487,12 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                   <button
                     type="button"
                     onClick={closePwModal}
-                    style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+                    style={{ background: "transparent", color: "var(--text-main)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
                   >Cancel</button>
                   <button
                     type="submit"
                     disabled={pwSaving}
-                    style={{ background: C.gold, color: "var(--bg-app)", border: "none", borderRadius: 8, padding: "8px 22px", fontSize: 14, fontWeight: 700, cursor: pwSaving ? "wait" : "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+                    style={{ background: "var(--btn-gold-bg)", color: "var(--btn-gold-text)", border: "none", borderRadius: 8, padding: "8px 22px", fontSize: 14, fontWeight: 700, cursor: pwSaving ? "wait" : "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
                   >{pwSaving ? "Saving…" : "Save"}</button>
                 </div>
               </>
@@ -1440,7 +1533,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
         .mo-icon-btn:hover { background: var(--elevate-2) !important; color: var(--text-main) !important; }
         .mo-stat:hover { transform: translateY(-3px); border-color: rgba(201,146,42,.2) !important; }
         .mo-collapse-btn:hover { color: var(--accent-amber) !important; }
-        input[type=date] { color-scheme: light dark; }
+        input[type=date] { color-scheme: inherit; }
         @keyframes quote-fade { 0%,100%{opacity:0;transform:translateY(10px)} 12%,88%{opacity:1;transform:translateY(0)} }
         @keyframes phase-pulse { 0%,100%{opacity:.45} 50%{opacity:1} }
         @keyframes loader-orbit { to{transform:rotate(360deg)} }
@@ -2415,52 +2508,75 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
             ) : (
               <SlideUp delay={80}>
                 <Card style={{ padding: "24px 20px 12px" }}>
-                  <div style={{ width: "100%", height: 380 }}>
+                  <div className="trend-chart" style={{ width: "100%", height: 380 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={trendChartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                      <LineChart data={trendChartData} margin={{ top: 12, right: 40, left: 24, bottom: 8 }} onClick={(e: any) => { if (!e || !e.activePayload) setFocusedTrendOrg(null); }}>
                         <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                        <XAxis dataKey="period" tick={{ fill: C.muted, fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: C.border }} tickLine={false} />
-                        <YAxis tick={{ fill: C.muted, fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: C.border }} tickLine={false} />
-                        <Tooltip
-                          contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, fontFamily: "'DM Mono', monospace" }}
-                          labelStyle={{ color: C.text, fontWeight: 600 }}
+                        <XAxis
+                          dataKey="key"
+                          tick={(tp: any) => <TrendXTick {...tp} labels={trendLabels} hot={focusedKeys} turn={trendChartData.length > 7} color={focusedOrg ? trendColorOf(focusedOrg) : "var(--text-sub)"} />}
+                          axisLine={{ stroke: C.border }} tickLine={false} interval={trendChartData.length > 24 ? "preserveStartEnd" : 0} height={trendChartData.length > 7 ? 54 : 30}
                         />
-                        {trendOrgs.map((org, i) => (
-                          hiddenTrendOrgs.has(org) ? null : (
+                        <YAxis tick={{ fill: "var(--text-sub)", fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: C.border }} tickLine={false} width={48} />
+                        <Tooltip content={<TrendTooltip focused={focusedOrg} labels={trendLongLabels} colorOf={trendColorOf} />} cursor={{ stroke: "var(--text-dim)", strokeDasharray: "3 3" }} />
+                        {trendOrgs.map((org) => {
+                          const isFocus = focusedOrg === org, dim = !!focusedOrg && !isFocus;
+                          const color = trendColorOf(org);
+                          const grey = "var(--text-dim)";
+                          return (
                             <Line
                               key={org}
                               type="monotone"
                               dataKey={org}
-                              stroke={ORG_COLORS[i % ORG_COLORS.length]}
-                              strokeWidth={2}
-                              dot={{ r: 3 }}
+                              stroke={dim ? grey : color}
+                              strokeOpacity={dim ? 0.28 : 1}
+                              strokeWidth={isFocus ? 3.5 : dim ? 1.5 : 2}
+                              dot={{ r: isFocus ? 5 : dim ? 2 : 3, fill: dim ? grey : color, stroke: isFocus ? "var(--bg-card)" : dim ? grey : color, strokeWidth: isFocus ? 2 : 1, opacity: dim ? 0.35 : 1 }}
+                              activeDot={{ r: isFocus ? 7 : dim ? 3 : 5 }}
                               connectNulls
+                              onClick={() => toggleTrendOrg(org)}
+                              isAnimationActive={false}
                             />
-                          )
-                        ))}
+                          );
+                        })}
+                        {focusedOrg && <Customized component={<TrendFocusLayer org={focusedOrg} color={trendColorOf(focusedOrg)} rows={trendChartData} />} />}
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 4px 0", flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 13, color: "var(--text-sub)" }}>
+                      {focusedOrg ? <>Showing <strong style={{ color: trendColorOf(focusedOrg) }}>{focusedOrg}</strong>; the other organisations are greyed out.</> : "Select an organisation (a name below, or its line) to focus on it."}
+                    </div>
+                    {focusedOrg && (
+                      <button
+                        onClick={() => setFocusedTrendOrg(null)}
+                        style={{ padding: "5px 12px", borderRadius: 8, background: "transparent", color: "var(--text-main)", border: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+                      >Show all</button>
+                    )}
+                  </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "12px 4px 16px" }}>
-                    {trendOrgs.map((org, i) => {
-                      const hidden = hiddenTrendOrgs.has(org);
+                    {trendOrgs.map((org) => {
+                      const selected = focusedOrg === org, dim = !!focusedOrg && !selected;
+                      const color = trendColorOf(org);
                       return (
                         <button
                           key={org}
                           onClick={() => toggleTrendOrg(org)}
+                          aria-pressed={selected}
                           style={{
                             display: "flex", alignItems: "center", gap: 6,
                             padding: "5px 10px", borderRadius: 20,
-                            background: hidden ? "transparent" : "var(--elevate-1)",
-                            border: `1px solid ${C.border}`,
-                            color: hidden ? C.muted : C.text,
-                            opacity: hidden ? 0.5 : 1,
-                            fontSize: 13, cursor: "pointer",
+                            background: selected ? "var(--elevate-2)" : "var(--elevate-1)",
+                            border: `1px solid ${selected ? color : C.border}`,
+                            boxShadow: selected ? `0 0 0 2px ${color}33` : "none",
+                            color: dim ? "var(--text-sub)" : "var(--text-main)",
+                            opacity: dim ? 0.55 : 1,
+                            fontSize: 13, fontWeight: selected ? 700 : 400, cursor: "pointer",
                             fontFamily: "'Space Grotesk', sans-serif",
-                            transition: "opacity .15s",
+                            transition: "opacity .3s ease, border-color .3s ease, box-shadow .3s ease, background .3s ease",
                           }}
                         >
-                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: ORG_COLORS[i % ORG_COLORS.length], flexShrink: 0 }} />
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: dim ? "var(--text-dim)" : color, flexShrink: 0, transition: "background .35s ease" }} />
                           {org}
                         </button>
                       );
