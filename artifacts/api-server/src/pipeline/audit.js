@@ -140,7 +140,7 @@ function buildEvidencePack({ ORGS, data, socialERResults = [], youtubeERResults 
       : "collection FAILED; the report shows the cell as unavailable (a cross), not as a measured zero. The organisation's presence points count it as 0, so its score is a lower bound",
   } : d && {
     collected: true,
-    topPostsListed: `${Math.min(5, d.postCount || 0)} of ${d.postCount || 0} counted posts (only the highest-engagement posts are listed)`,
+    topPostsListed: (() => { const shown = (d.topPosts || []).length, all = d.postCount || 0; return `${shown} of ${all} counted posts${shown < all ? " (only the highest-engagement posts are listed)" : " (all of them are listed)"}`; })(),
     posts: d.postCount, followers: d.followers, engagementRatePct: d.er,
     likes: d.totalLikes, comments: d.totalComments ?? d.totalReplies, shares: d.totalShares ?? d.totalRetweets, views: d.totalViews,
     removedRepeats: d.duplicatesRemoved || 0, leftOutNoKeyword: d.droppedNoKeyword || 0, stoppedAtPageLimit: !!d.capHit, foundOnlyByTimeline: d.timelineAdded || 0, timelineCrossChecked: d.timelineRan === true, failed: !!d.failed, noHandle: !!d.noHandle,
@@ -183,12 +183,18 @@ async function runAudit(ctx, cb = () => {}) {
     const pack = buildEvidencePack(ctx);
     const review = await Reviewer.review(pack, { cb });
     out.review = { ran: true, verdict: review.verdict, model: review.model, findings: review.findings };
+    let packLabelOnly = 0;
     for (const f of review.findings) {
-      const item = { postUrls: f.postUrls || [], source: "review", severity: f.severity === "error" ? "error" : "warning", org: f.org || "(report)", where: f.where || "", issue: `${f.issue}${f.evidence ? ` — ${f.evidence}` : ""}` };
+      // How the evidence pack labels its own lists ("topPostsListed") is not a fact about the report; it cannot be repaired by
+      // changing data and must not stop a report (26-29 Oct: "the listing label undercounts the posts shown").
+      const aboutPackLabel = /topPostsListed|listing label|label undercounts|label overcounts/i.test(`${f.where || ""} ${f.issue || ""}`);
+      if (aboutPackLabel && f.severity === "error") packLabelOnly++;
+      const item = { postUrls: f.postUrls || [], source: "review", severity: f.severity === "error" && !aboutPackLabel ? "error" : "warning", org: f.org || "(report)", where: f.where || "", issue: `${f.issue}${f.evidence ? ` — ${f.evidence}` : ""}` };
       (item.severity === "error" ? out.errors : out.warnings).push(item);
       cb(`    ${item.severity === "error" ? "✗" : "!"} Review · ${item.org} · ${item.where}: ${item.issue}`, item.severity === "error" ? "err" : "warn");
     }
-    if (review.verdict === "fail" && !out.errors.some((e) => e.source === "review")) {
+    // A "fail" whose only errors were about the pack's own labels is not a failure of the report.
+    if (review.verdict === "fail" && !packLabelOnly && !out.errors.some((e) => e.source === "review")) {
       out.errors.push({ source: "review", severity: "error", org: "(report)", where: "verdict", issue: "the reviewer returned a fail verdict without listing a finding" });
     }
   } catch (e) {
@@ -233,22 +239,46 @@ function repairPlan(errors, execF) {
 }
 
 /**
- * Posts to exclude, from reviewer errors about the DATA that name specific posts. Only when EVERY data error names
- * posts (otherwise excluding some would still leave a stopped report), every named url is a counted post of the
- * report, and the exclusions stay small (at most 3 per organisation and 10 in all): a report that needs more than that
- * has a data-quality problem, not a few stray posts.
+ * The counted posts a reviewer error is about. The reviewer lists them (post_urls) when it can; when it only quotes the post's
+ * text ("Post text: '🌱 I look forward to speaking at the 4th World Biogas…'") the post is found from the quote, and "the only
+ * post behind this organisation's score" resolves to that one post. Only the organisations the error names are searched.
+ */
+function resolvePosts(e, socialERResults) {
+  const norm = (s) => String(s || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").replace(/\s+/g, " ").trim();
+  const said = norm(`${e.issue || ""}`);
+  const named = `${e.org || ""} ${e.where || ""}`;
+  const urls = [...(e.postUrls || [])];
+  for (const r of socialERResults || []) {
+    if (!named.includes(r.org)) continue;
+    const posts = [r.liData, r.twData, r.igData].flatMap((d) => (d && d.topPosts) || []).filter((t) => t.url);
+    for (const t of posts) {
+      const head = norm(t.snippet).split(" ").slice(0, 8).join(" ");
+      if (head.length >= 25 && said.includes(head)) urls.push(t.url);
+    }
+    const counted = [r.liData, r.twData, r.igData].reduce((n, d) => n + ((d && d.postCount) || 0), 0);
+    if (counted === 1 && posts.length === 1 && /\b(only|single|sole|entire|one)\b/i.test(e.issue || "")) urls.push(posts[0].url);
+  }
+  return [...new Set(urls)];
+}
+
+/**
+ * Posts to exclude, from reviewer errors about the DATA. Only when EVERY data error is about specific counted posts (named, or
+ * found from the text the error quotes — otherwise excluding some would still leave a stopped report), every one is a counted
+ * post of the report, and the exclusions stay small (at most 3 per organisation and 10 in all): a report that needs more than
+ * that has a data-quality problem, not a few stray posts.
  */
 function exclusionPlan(errors, socialERResults, already = []) {
   const aboutSummary = (e) => /executive summary/i.test(`${e.where || ""}`);
   const dataErrs = errors.filter((e) => !aboutSummary(e));
-  if (!dataErrs.length || !dataErrs.every((e) => (e.postUrls || []).length)) return { urls: [], reason: "not every data error names posts" };
+  const resolved = dataErrs.map((e) => ({ e, urls: resolvePosts(e, socialERResults) }));
+  if (!dataErrs.length || !resolved.every((x) => x.urls.length)) return { urls: [], reason: "not every data error is about specific posts" };
   const known = new Map(); // url -> org, counted posts only
   for (const r of socialERResults || []) {
     for (const d of [r.liData, r.twData, r.igData]) for (const t of (d && d.topPosts) || []) if (t.url) known.set(t.url, r.org);
   }
   const have = new Set(already);
   const urls = [], perOrg = {};
-  for (const e of dataErrs) for (const u of e.postUrls) {
+  for (const x of resolved) for (const u of x.urls) {
     if (have.has(u) || urls.includes(u)) continue;
     const org = known.get(u);
     if (!org) return { urls: [], reason: `a named post is not one of the report's counted posts: ${u}` };

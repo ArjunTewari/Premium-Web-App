@@ -35,6 +35,27 @@ eq("a named post that is not a counted post is refused", A.exclusionPlan([err("C
 eq("more than 3 posts for one organisation is refused", A.exclusionPlan([err("CREA", ["a", "b", "c", "d"])], [mkRes("CREA", ["a", "b", "c", "d"])]).urls, []);
 eq("summary errors do not count as data errors", A.exclusionPlan([err("CREA", ["u1"]), { source: "review", severity: "error", org: "CREA", where: "CREA · executive summary ('x')", issue: "y" }], [mkRes("CREA", ["u1"])]).urls, ["u1"]);
 
+// ── 29 Oct: the reviewer quoted the post's text but gave no post_urls; and it complained about how the pack labels its own list ──
+const withSnip = (org, posts) => ({ org, twData: { postCount: 0, topPosts: [] }, igData: { postCount: 0, topPosts: [] }, liData: { postCount: posts.length, topPosts: posts } });
+const biogas = { url: "https://www.linkedin.com/feed/update/urn:li:activity:1", snippet: "🌱 I look forward to speaking at the 4th World Biogas Association India Congress 2026 on scaling biomethane and compressed biogas (CBG)" };
+const brazil = { url: "https://www.linkedin.com/feed/update/urn:li:activity:2", snippet: "⚡Zero-emission heavy-duty vehicle sales in Brazil reached 751 units in the first half of this year, a 42% increase" };
+const real = { url: "https://www.linkedin.com/feed/update/urn:li:activity:3", snippet: "Delhi air quality turned severe this week as stubble burning continued across Punjab and Haryana" };
+const res3 = [withSnip("TERI", [biogas]), withSnip("ICCT", [brazil]), withSnip("CSTEP", [real, { url: "https://www.linkedin.com/feed/update/urn:li:activity:4", snippet: "Second CSTEP post about PM2.5 source apportionment in Bengaluru and Chennai this month" }])];
+const q = (org, issue) => ({ source: "review", severity: "error", org, where: `${org} · ${org} LinkedIn posts`, issue });
+plan = A.exclusionPlan([
+  q("TERI", "TERI's entire social presence score rests on a single counted post, which is not about air quality — it promotes a biogas industry conference. — Post text: '🌱 I look forward to speaking at the 4th World Biogas Association India Congress 2026... scaling biomethane' keywordsMatched:['methane']"),
+  q("ICCT", "ICCT's entire LinkedIn presence (its only social post) is about zero-emission heavy-duty vehicle sales in Brazil, not air quality. — Post text: '⚡Zero-emission heavy-duty vehicle sales in Brazil reached 751 units in the first half of this year...'"),
+], res3);
+eq("posts the reviewer only QUOTES are found from the quote, so the error is repairable", plan.urls, [biogas.url, brazil.url]);
+plan = A.exclusionPlan([q("ICCT", "ICCT's only counted post is about vehicle sales and not about air quality")], res3);
+eq("'the only post' of an organisation with one counted post resolves to that post", plan.urls, [brazil.url]);
+plan = A.exclusionPlan([q("CSTEP", "one of CSTEP's posts is not about air quality")], res3);
+eq("an error about an organisation with several posts that quotes none is NOT guessed at", [plan.urls, plan.reason], [[], "not every data error is about specific posts"]);
+plan = A.exclusionPlan([q("TERI", "the single post is off topic. Post text: '🌱 I look forward to speaking at the 4th World Biogas Association India Congress 2026'"), q("CSTEP", "a CSTEP post is wrong but is not quoted")], res3);
+eq("if ANY data error cannot be tied to posts the report is not changed by guessing", plan.urls, []);
+const pk = (n, listed) => A.buildEvidencePack({ ORGS: ["X"], data: { X: {} }, socialERResults: [{ org: "X", liData: { postCount: n, topPosts: Array.from({ length: listed }, (_, i) => ({ url: "u" + i, snippet: "s" })) } }] }).organisations[0].social.linkedin.topPostsListed;
+eq("the evidence pack's own label is right (it said '5 of 8' while listing all 8)", [pk(8, 8), pk(8, 5), pk(2, 2)], ["8 of 8 counted posts (all of them are listed)", "5 of 8 counted posts (only the highest-engagement posts are listed)", "2 of 2 counted posts (all of them are listed)"]);
+
 // ── the exclusion is applied by a re-count ──
 const tw = (id, text) => ({ id: String(id), url: `https://twitter.com/a/status/${id}`, text, date: "2026-10-14", likes: 7, replies: 1, retweets: 2, views: 0, author: "", is_retweet: false });
 const rawTweets = [tw(1, "PM2.5 in Delhi today"), tw(2, "NCAP funding for clean air")];
