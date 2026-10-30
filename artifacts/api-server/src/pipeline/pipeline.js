@@ -1265,7 +1265,7 @@ ${batchText}`;
   // An error about the DATA that names specific counted posts as not being about the subject: those posts are left
   // out of the counts and steps 5-6 are run again on the same saved data (nothing is fetched), then audited again.
   // Bounded (two rounds, a few posts); every excluded post is logged and the report states how many were excluded.
-  if (!auditResult.passed && checkpointObj && (cfg._repairDepth || 0) < 2) {
+  if (!auditResult.passed && checkpointObj && (cfg._repairDepth || 0) < 3) {
     const ex = Audit.exclusionPlan(auditResult.errors, socialERResults, excludePosts);
     if (ex.urls.length) {
       cb(`  AUDIT · ${ex.urls.length} counted post(s) were named as not being about the subject: they are left out and the report is built again from the same data (nothing is fetched)`, "warn");
