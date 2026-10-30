@@ -327,3 +327,34 @@
   .border.hover-elevate-2:not(.no-hover-interaction-elevate)::after,
   .border.active-elevate-2:not(.no-active-interaction-elevate)::after { inset: -1px; }
 }
+
+
+/* ─── Native form controls follow the app theme ──────────────────────────────
+   Without a declared colour scheme the browser draws a <select>'s option list on white while the text colour is the
+   (near-white) dark-mode text: the options were invisible. Declare the scheme, and give the list a solid background. */
+:root { color-scheme: light; }
+.dark { color-scheme: dark; }
+select, select option, select optgroup { background-color: var(--bg-card); color: var(--text-main); }
+select option:disabled { color: var(--text-sub); }
+
+/* ─── Dialogs: solid panel, text colours that pass 4.5:1 in both themes ─────── */
+:root {
+  --accent-on-card: #8a5a12;   /* amber text on a white card: 6.6:1 (the app amber is 4.1:1) */
+  --btn-gold-bg:    #8a5a12;
+  --btn-gold-text:  #ffffff;
+}
+.dark {
+  --accent-on-card: #d9a23a;
+  --btn-gold-bg:    #c9922a;
+  --btn-gold-text:  #0a0e17;
+}
+
+/* ─── Trends: focusing one organisation ─────────────────────────────────────── */
+.trend-chart .recharts-line-curve { transition: stroke .3s ease, stroke-width .3s ease, stroke-opacity .3s ease; cursor: pointer; }
+.trend-chart .recharts-dot { transition: fill .3s ease, stroke .3s ease, r .3s ease, opacity .3s ease; cursor: pointer; }
+@keyframes trendFocusIn { from { opacity: 0; } to { opacity: 1; } }
+.trend-focus { animation: trendFocusIn .3s ease both; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .trend-chart .recharts-line-curve, .trend-chart .recharts-dot { transition: none; }
+  .trend-focus { animation: none; }
+}
