@@ -13,8 +13,7 @@ const f = (headline, detail) => ({ headline, detail });
 // "%" with a word that says which share it is
 let v = Sentinel.validateExecSummary([f("CREA leads on substance", "CREA: 50% data-specific content across its articles.")], data, ORGS);
 eq("'50% data-specific' against dataPct=100 is an issue about dataPct only", [v.issues.length, v.issues[0] && v.issues[0].actual, v.issues[0] && v.issues[0].correctedValue], [1, "dataPct=100", "100"]);
-const fixed = Sentinel.applyCorrections([f("CREA leads on substance", "CREA: 50% data-specific content across its articles.")], v.issues);
-eq("it is corrected in the text", fixed[0].detail, "CREA: 100% data-specific content across its articles.");
+eq("the issue carries the data value; the text itself is never edited", v.issues[0].correctedValue, "100");
 
 v = Sentinel.validateExecSummary([f("x", "TERI: 100% data-specific coverage.")], data, ORGS);
 eq("a correct '% data-specific' passes", v.issues.length, 0);
@@ -24,10 +23,10 @@ eq("a correct '% authoritative' passes", v.issues.length, 0);
 // first organisation of the detail and "corrected" to that organisation's figure ("9 organisations recorded 10/10").
 const grp = [f("Social presence: CREA 9/10; 9 organisations recorded 0/10", "CREA recorded 9/10 social presence. 9 organisations recorded 0/10.")];
 v = Sentinel.validateExecSummary(grp, data, ORGS);
-eq("a group figure in a headline is not pinned on an organisation of the detail", [v.issues.length, Sentinel.applyCorrections(grp, v.issues)[0].headline], [0, grp[0].headline]);
+eq("a group figure in a headline is not pinned on an organisation of the detail", v.issues.length, 0);
 const grp2 = [f("Nine organisations recorded 0/10 social presence", "CREA recorded 9/10 social presence.")];
 v = Sentinel.validateExecSummary(grp2, data, ORGS);
-eq("a headline with no organisation named is left alone, and the detail is still checked", [v.issues.length, Sentinel.applyCorrections(grp2, v.issues)[0].headline], [0, grp2[0].headline]);
+eq("a headline with no organisation named is left alone, and the detail is still checked", v.issues.length, 0);
 v = Sentinel.validateExecSummary([f("Social presence", "CREA recorded 4/10 social presence.")], data, ORGS);
 eq("a wrong number in the detail is still caught", [v.issues.length, v.issues[0].correctedValue], [1, "9"]);
 v = Sentinel.validateExecSummary([f("x", "CREA: 50% authoritative citations.")], data, ORGS);
@@ -48,7 +47,8 @@ eq("a real '2 articles' claim is still checked", v.issues.length, 0);
 v = Sentinel.validateExecSummary([f("x", "CREA published 7 articles in the period.")], data, ORGS);
 eq("a wrong '7 articles' claim is still caught and corrected", [v.issues.length, v.issues[0].correctedValue], [1, "2"]);
 
-// the graph: a model that keeps writing an unverifiable number loses that finding, loudly
+// the graph: the model's text is NEVER edited. A finding with a number that cannot be verified is REPLACED by a finding
+// built from the data (exec-facts.js), loudly; one model call, no regeneration.
 const CC = require(path.join(dir, "claude-client.js"));
 let calls = 0;
 CC.callClaude = async () => { calls++; return "unused"; };
@@ -57,17 +57,22 @@ const Graph = require(path.join(dir, "graphs", "exec-summary-graph.js"));
 (async () => {
   const msgs = [];
   const r = await Graph.run({ cfg: { CLAUDE_KEY: "x" }, data, ORGS, DATE_FROM: "2026-10-12", DATE_TO: "2026-10-18", orgSummary: "", cb: (m) => msgs.push(m) });
-  eq("the model was asked twice (1 + 1 corrective) when something cannot be corrected in code", calls, 2);
-  eq("the finding with the unverifiable number is removed; the verified ones stay", r.execF.map((x) => x.headline), ["TERI AI visibility", "Press"]);
-  eq("nothing unverified remains and the removal is recorded", [r.execAudit.issues.length, r.execAudit.dropped.length, r.execAudit.dropped[0].headline], [0, 1, "CREA is ahead"]);
-  eq("the removal is logged", msgs.some((m) => /finding removed because a number in it could not be verified/.test(m)), true);
-  // numbers that code can correct are corrected in code: one model call, no regeneration
+  eq("one model call, no regeneration", calls, 1);
+  eq("the finding with the unverifiable number is replaced by one built from the data; the verified ones are untouched", r.execF.map((x) => x.headline), ["2 of 2 organisations recorded articles in the period", "TERI AI visibility", "Press"]);
+  eq("the replacement is recorded and nothing unverified remains", [r.execAudit.issues.length, r.execAudit.replaced.length, r.execAudit.dropped[0].headline], [0, 1, "CREA is ahead"]);
+  eq("the replacement is logged", msgs.some((m) => /had a number that could not be verified; replaced by a finding built from the data/.test(m)), true);
+  // wrong numbers are NOT corrected in the text (no guessing which organisation a number belongs to): the finding is replaced
   calls = 0; CC.parseJ = () => [f("a", "CREA has 7 articles."), f("b", "TERI scores 47/100 on AEO."), f("c", "CREA: 100% data-specific.")];
   const fast = await Graph.run({ cfg: { CLAUDE_KEY: "x" }, data, ORGS, DATE_FROM: "2026-10-12", DATE_TO: "2026-10-18", orgSummary: "", cb: () => {} });
-  eq("correctable wrong numbers: ONE model call, fixed in the text", [calls, fast.execF[0].headline + "|" + fast.execF[0].detail, fast.execF[1].detail, fast.execAudit.issues.length], [1, "a|CREA has 2 articles.", "TERI scores 31/100 on AEO.", 0]);
+  const all = fast.execF.map((x) => x.headline + " " + x.detail).join(" | ");
+  eq("wrong numbers: one model call, the sentences are replaced, never edited", [calls, fast.execF.length, /7 articles|47\/100/.test(all), /CREA recorded 2 articles\./.test(all), /TERI scored 31\/100\./.test(all), fast.execAudit.issues.length], [1, 3, false, true, true, 0]);
+  // a model that wrote nothing: the report still gets a summary, built from the data
+  calls = 0; CC.parseJ = () => [];
+  const none = await Graph.run({ cfg: { CLAUDE_KEY: "x" }, data, ORGS, DATE_FROM: "2026-10-12", DATE_TO: "2026-10-18", orgSummary: "", cb: () => {} });
+  eq("nothing written: all three findings come from the data and verify clean", [none.execF.length, none.execAudit.issues.length, none.execF.map((x) => x.section_ref)], [3, 0, ["§03 AQ Press Analytics", "§AEO LLM Visibility", "§Social Media"]]);
   // and a clean summary is untouched
   calls = 0; CC.parseJ = () => [f("a", "CREA has 2 articles."), f("b", "TERI scores 31/100 on AEO."), f("c", "CREA: 100% data-specific.")];
   const ok = await Graph.run({ cfg: { CLAUDE_KEY: "x" }, data, ORGS, DATE_FROM: "2026-10-12", DATE_TO: "2026-10-18", orgSummary: "", cb: () => {} });
-  eq("a summary whose numbers are all right is untouched (1 call)", [calls, ok.execF.length, !!ok.execAudit.dropped], [1, 3, false]);
+  eq("a summary whose numbers are all right is untouched (1 call)", [calls, ok.execF.length, !!ok.execAudit.dropped, ok.execF[0].detail], [1, 3, false, "CREA has 2 articles."]);
   console.log(fail ? `${fail} FAILED` : "all passed"); process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(2); });

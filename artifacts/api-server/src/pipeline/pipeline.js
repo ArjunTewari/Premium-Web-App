@@ -1174,7 +1174,7 @@ ${batchText}`;
   const ExecSummaryGraph = require("./graphs/exec-summary-graph");
   let execAudit = { issues: [], checked: 0 };
   try {
-    const result = await ExecSummaryGraph.run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb });
+    const result = await ExecSummaryGraph.run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb, notCollected: ORGS.filter((o) => flagsFor(o)) });
     execF = result.execF;
     execAudit = result.execAudit;
   } catch (e) {
@@ -1282,14 +1282,21 @@ ${batchText}`;
       break;
     }
     try {
-      if (round === 1 || !plan.flagged.length) {
-        cb(`  AUDIT · repair round ${round}: the executive summary is written again using the reviewer's findings...`, "warn");
-        const r = await require("./graphs/exec-summary-graph").run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb, feedback: plan.feedback });
-        if (r.execF.length) { execF = r.execF; execAudit = r.execAudit; }
+      // No model call in the repair: asking the model to write the summary again is slow and may give the reviewer something
+      // new to object to. The findings the reviewer names (or, when it names none we can identify, all of them) are replaced
+      // by findings built from the data (exec-facts.js: true by construction); if the reviewer still objects in round 2,
+      // those findings are removed. The summary can no longer stop a report.
+      const all = execF.map((_, i) => i);
+      const target = plan.flagged.length ? plan.flagged : all;
+      const gone = target.map((i) => execF[i]?.headline).filter(Boolean);
+      if (round === 1) {
+        cb(`  AUDIT · repair round ${round}: ${plan.flagged.length ? "finding(s) the reviewer names" : "the findings (the reviewer's error does not name one)"} replaced by findings built from the data: ${gone.map((h) => `"${h}"`).join("; ")}`, "warn");
+        const r = require("./exec-facts").replace(execF, target, data, ORGS, { notCollected: ORGS.filter((o) => flagsFor(o)) });
+        execF = r.execF;
+        execAudit = { ...execAudit, issues: [], replaced: [...(execAudit.replaced || []), ...r.replaced], dropped: [...(execAudit.dropped || []), ...gone.map((headline) => ({ headline, claims: ["replaced after the independent review"] }))] };
       } else {
-        const gone = plan.flagged.map((i) => execF[i]?.headline).filter(Boolean);
         cb(`  AUDIT · repair round ${round}: finding(s) the reviewer still names are removed: ${gone.map((h) => `"${h}"`).join("; ")}`, "warn");
-        execF = execF.filter((_, i) => !plan.flagged.includes(i));
+        execF = execF.filter((_, i) => !target.includes(i));
         execAudit = { ...execAudit, dropped: [...(execAudit.dropped || []), ...gone.map((headline) => ({ headline, claims: ["removed after the independent review"] }))] };
       }
     } catch (e) {
