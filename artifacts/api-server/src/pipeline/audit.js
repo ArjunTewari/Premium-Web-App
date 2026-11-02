@@ -74,7 +74,7 @@ function checkDeterministic({ ORGS, data, socialERResults = [], execF, html = ""
         warn(r.org, where, `post count and engagement totals are all multiples of 5 (${d.postCount} posts) — the pattern left by a repeated page`);
       }
       if (d.duplicatesRemoved > 0) warn(r.org, where, `${d.duplicatesRemoved} repeated post(s) returned by the data source were removed before counting`);
-      if (d.droppedNoKeyword > 0) warn(r.org, where, `${d.droppedNoKeyword} post(s) returned by the search were left out because their text has none of the keywords`);
+      if (d.droppedNoKeyword > 0) warn(r.org, where, `${d.droppedNoKeyword} post(s) returned by the search were left out because their text has no subject keyword (a general word such as 'emission' on its own does not count)`);
       if (d.capHit) warn(r.org, where, `fetching stopped at its page limit inside the report period — the true count may be higher`);
       if (p.key === "liData" && d.searchFallback) warn(r.org, where, `reading the company's posts failed; the count comes from the keyword search, which can miss posts`);
       if (p.key === "twData") {

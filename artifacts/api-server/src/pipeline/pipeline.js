@@ -1139,14 +1139,19 @@ ${batchText}`;
   const flagsFor = (o) => {
     const er = socialERResults.find((r) => r.org === o);
     const f = [];
+    const na = [];
     if (er?.liData?.failed) f.push("LinkedIn collection failed");
-    else if (er?.liData?.noHandle) f.push("no LinkedIn page the data source can read");
+    else if (er?.liData?.noHandle) na.push("no LinkedIn page the data source can read");
     if (er?.twData?.failed) f.push("X collection failed");
-    else if (er?.twData?.noHandle) f.push("no X handle");
+    else if (er?.twData?.noHandle) na.push("no X handle");
     if (er?.igData?.failed) f.push("Instagram collection failed");
-    else if (er?.igData?.noHandle) f.push("no Instagram handle");
-    return f.length ? ` [${f.join("; ")} — counted as 0 in the Social Presence score, not a measured zero]` : "";
+    else if (er?.igData?.noHandle) na.push("no Instagram handle");
+    // Two different things, worded as the evidence given to the reviewer words them: a FAILED collection is counted as 0 (a
+    // lower bound); a platform the organisation has no handle on is shown as not applicable, not as a zero.
+    return (f.length ? ` [${f.join("; ")} — counted as 0 in the Social Presence score, not a measured zero]` : "")
+      + (na.length ? ` [${na.join("; ")} — shown as not applicable, not as a zero]` : "");
   };
+  const failedCollection = (o) => { const er = socialERResults.find((r) => r.org === o); return !!(er?.liData?.failed || er?.twData?.failed || er?.igData?.failed); };
   const namesWhere = (fn) => ORGS.filter(fn);
   const list = (xs) => (xs.length ? xs.join(", ") : "none");
   const zeroArts = namesWhere((o) => !data[o].total);
@@ -1174,7 +1179,7 @@ ${batchText}`;
   const ExecSummaryGraph = require("./graphs/exec-summary-graph");
   let execAudit = { issues: [], checked: 0 };
   try {
-    const result = await ExecSummaryGraph.run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb, notCollected: ORGS.filter((o) => flagsFor(o)) });
+    const result = await ExecSummaryGraph.run({ cfg, data, ORGS, DATE_FROM, DATE_TO, orgSummary, cb, notCollected: ORGS.filter(failedCollection) });
     execF = result.execF;
     execAudit = result.execAudit;
   } catch (e) {
@@ -1291,7 +1296,7 @@ ${batchText}`;
       const gone = target.map((i) => execF[i]?.headline).filter(Boolean);
       if (round === 1) {
         cb(`  AUDIT · repair round ${round}: ${plan.flagged.length ? "finding(s) the reviewer names" : "the findings (the reviewer's error does not name one)"} replaced by findings built from the data: ${gone.map((h) => `"${h}"`).join("; ")}`, "warn");
-        const r = require("./exec-facts").replace(execF, target, data, ORGS, { notCollected: ORGS.filter((o) => flagsFor(o)) });
+        const r = require("./exec-facts").replace(execF, target, data, ORGS, { notCollected: ORGS.filter(failedCollection) });
         execF = r.execF;
         execAudit = { ...execAudit, issues: [], replaced: [...(execAudit.replaced || []), ...r.replaced], dropped: [...(execAudit.dropped || []), ...gone.map((headline) => ({ headline, claims: ["replaced after the independent review"] }))] };
       } else {

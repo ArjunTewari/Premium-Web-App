@@ -547,7 +547,10 @@ function termInText(text, k) {
 function keywordsInText(raw, terms) {
   const original = String(raw || '').normalize('NFKC');
   const text = original.toLowerCase();
-  return terms.filter(k => termInText(text, k) && !onlyInNameLists(original, text, k));
+  const found = terms.filter(k => termInText(text, k) && !onlyInNameLists(original, text, k));
+  // A post that matches only general terms (the framework's weakTerms, e.g. "emission") is not about the subject.
+  const weak = new Set(((FW.getActiveFramework() || {}).weakTerms || []).map(t => String(t).toLowerCase()));
+  return found.some(k => !weak.has(String(k).toLowerCase())) ? found : [];
 }
 
 // A keyword that appears only inside a list of names — "...WRI India WRI Air Quality Ola Electric Ather Energy
@@ -557,8 +560,12 @@ function keywordsInText(raw, terms) {
 // hashtags and ordinary sentences are not.
 function isNameList(original, pos, len) {
   const win = original.slice(Math.max(0, pos - 90), pos + len + 90);
-  const words = win.split(/\s+/).filter(w => /[A-Za-z]/.test(w));
-  if (words.length < 10) return false;
+  // The small words inside names ("Commission for Air Quality Management", "Association of Road Safety") neither make a list
+  // nor break one: 30 Oct, nine RaahGiri conference posts counted as air quality because "for" and "of" pulled a partner
+  // list under the threshold.
+  const LINK = /^(for|of|and|the|on|in|to|at|by|with|&|-|–|—|\|)$/i;
+  const words = win.split(/\s+/).filter(w => /[A-Za-z]/.test(w) && !LINK.test(w));
+  if (words.length < 8) return false;
   const caps = words.filter(w => /^[A-Z]/.test(w)).length;
   return caps / words.length >= 0.8;
 }
