@@ -56,6 +56,21 @@ eq("if ANY data error cannot be tied to posts the report is not changed by guess
 const pk = (n, listed) => A.buildEvidencePack({ ORGS: ["X"], data: { X: {} }, socialERResults: [{ org: "X", liData: { postCount: n, topPosts: Array.from({ length: listed }, (_, i) => ({ url: "u" + i, snippet: "s" })) } }] }).organisations[0].social.linkedin.topPostsListed;
 eq("the evidence pack's own label is right (it said '5 of 8' while listing all 8)", [pk(8, 8), pk(8, 5), pk(2, 2)], ["8 of 8 counted posts (all of them are listed)", "5 of 8 counted posts (only the highest-engagement posts are listed)", "2 of 2 counted posts (all of them are listed)"]);
 
+// ── 30 Oct: LinkedIn lists the same message under several activity ids (identical text and engagement); the app counts it once.
+// Excluding the one that was counted must exclude its copies too, or a copy starts to count the moment its twin is left out.
+{
+  const msg = "Road safety, air quality, mobility, ecology and health must be considered together when we design school zones for children.";
+  const post = (id) => ({ url: `https://www.linkedin.com/feed/update/urn:li:activity:${id}`, text: msg, date: "2026-10-28T09:00:00Z", likes: 5, comments: 1, shares: 0 });
+  const meta = { rawMeta: { followers: 1000, source: "timeline", timelinePages: 1 } };
+  const posts = [post(1), post(2), post(3)];
+  C.setExcludedPosts([]);
+  const before = C.reprocessLinkedIn("Org", { rawPosts: posts, ...meta }, kw, () => {});
+  C.setExcludedPosts([posts[0].url]);
+  const after = C.reprocessLinkedIn("Org", { rawPosts: posts, ...meta }, kw, () => {});
+  C.setExcludedPosts([]);
+  eq("three copies of one message count once; excluding that post leaves none of the copies", [before.postCount, after.postCount], [1, 0]);
+}
+
 // ── the exclusion is applied by a re-count ──
 const tw = (id, text) => ({ id: String(id), url: `https://twitter.com/a/status/${id}`, text, date: "2026-10-14", likes: 7, replies: 1, retweets: 2, views: 0, author: "", is_retweet: false });
 const rawTweets = [tw(1, "PM2.5 in Delhi today"), tw(2, "NCAP funding for clean air")];

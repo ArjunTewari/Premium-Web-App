@@ -447,7 +447,11 @@ async function fetchLinkedIn(org, liHandle, apiKey, dateRange, aqKw, cb) {
 // The counting rule, engagement and top posts. Pure given its inputs: the same function
 // re-counts saved posts (reprocessLinkedIn) without any API call.
 function buildLinkedInResult({ org, followers, raw, source, timelinePages, capHit, searchFallback, aqKw, cb }) {
-  raw = raw.filter(notExcluded);
+  // The same message posted twice (two activity ids, identical text and identical engagement) is one post. Excluding a post
+  // therefore excludes its copies too: leaving them in made the copy count the moment its twin was left out (30 Oct, RaahGiri).
+  const messageKey = (post) => `${liPostText(post).replace(/\s+/g, ' ').trim().slice(0, 200)}|${post.likes || 0}|${post.comments || 0}|${post.shares || 0}`;
+  const excludedMessages = new Set(raw.filter((p) => !notExcluded(p)).map(messageKey));
+  raw = raw.filter((p) => notExcluded(p) && !excludedMessages.has(messageKey(p)));
   const terms = [...new Set([...AQ_KEYWORDS_SEARCH, ...(aqKw || AQ_KW_BASE)])];
   const entries = [];
   const sameMessage = new Set();
@@ -457,7 +461,7 @@ function buildLinkedInResult({ org, followers, raw, source, timelinePages, capHi
     if (!kws.length) continue;
     // The same message posted twice (two activity ids, identical text and identical engagement) is
     // one post, not two: counting both doubled an organisation's posts and engagement.
-    const msgKey = `${liPostText(post).replace(/\s+/g, ' ').trim().slice(0, 200)}|${post.likes || 0}|${post.comments || 0}|${post.shares || 0}`;
+    const msgKey = messageKey(post);
     if (sameMessage.has(msgKey)) { duplicatesRemoved++; continue; }
     sameMessage.add(msgKey);
     entries.push({ post, keywords: new Set(kws) });
