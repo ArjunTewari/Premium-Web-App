@@ -33,6 +33,10 @@ module.exports = {
   "evidencePhrase": "an air quality topic",
   "specificity": "source, pollutant type, or policy",
   "catchAll": "General AQ",
+  // Terms that only count together with another subject term in the same post. "emission" alone is a climate / energy /
+  // vehicle word: a post about UNEP's Emissions Gap Report, EU car CO2 rules or a job titled "Emissions Accounting Expert" is
+  // not about air quality (26 Oct - 1 Nov run: CSE, ICCT and TERI scores rested on such posts). Same for the other three.
+  "weakTerms": ["emission", "methane", "health impact", "thermal power"],
   "matchMode": "substring",
   "terms": null,
   "topics": [
