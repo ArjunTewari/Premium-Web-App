@@ -95,3 +95,14 @@ export function monthOptions(files: FilterableReport[], type: "all" | ReportType
   }
   return [...byMonth.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([key, count]) => ({ key, label: monthLabel(key), count }));
 }
+
+// The subject a stored report belongs to, from its file name (AQ-Full-…, Climt-Full-…, older TMP-Climate-…).
+export const TREND_SUBJECT_LABELS: Record<string, string> = { AQ: "Air quality", Climt: "Climate", Sust: "Sustainability" };
+export function trendSubjectOfFile(file?: string): string {
+  const f = file ?? "";
+  const m = /^(AQ|Climt|Sust)-/i.exec(f);
+  if (m) return Object.keys(TREND_SUBJECT_LABELS).find((k) => k.toLowerCase() === m[1].toLowerCase()) ?? "AQ";
+  if (/^TMP-Climate-/i.test(f)) return "Climt";
+  if (/^TMP-Sust/i.test(f)) return "Sust";
+  return "AQ";
+}
