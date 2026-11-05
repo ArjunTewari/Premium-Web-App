@@ -6,6 +6,7 @@ import {
   reportTypeOfName, applyReportFilters, typeCounts, monthOptions, isDefaultFilters,
 } from "@/lib/report-filters";
 import { useLocation } from "wouter";
+import { orgColour } from "@/lib/org-colors";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const LOADING_QUOTES = [
@@ -203,13 +204,6 @@ interface TrendReport {
   scores: Record<string, TrendScores>;
 }
 
-// Same 13-colour palette the report HTML itself uses per org slot, so an
-// org's line color is consistent between the report and this dashboard.
-const ORG_COLORS = [
-  "#3d8ef0", "#e05c3a", "#4caf74", "#c9922a", "#a371f7",
-  "#e05c5c", "#14b8a6", "#f97316", "#8b5cf6", "#06b6d4",
-  "#84cc16", "#ef4444", "#ec4899",
-];
 
 const TREND_METRICS = [
   { key: "sovScore" as const, label: "SoV Score" },
@@ -642,7 +636,8 @@ export default function Home() {
     return row;
   });
   const trendLongLabels: Record<string, string> = Object.fromEntries(trendSorted.map((r, idx) => [`${r.dateFrom}|${r.dateTo}|${idx}`, trendPeriodLabel(r.dateFrom, r.dateTo, true)]));
-  const trendColorOf = (org: string) => ORG_COLORS[Math.max(0, trendOrgs.indexOf(org)) % ORG_COLORS.length];
+  // One distinct colour per organisation (lib/org-colours.ts); an organisation keeps its colour when others are added.
+  const trendColorOf = (org: string) => orgColour(Math.max(0, trendOrgs.indexOf(org)));
   const focusedSet = new Set(focusedTrendOrgs.filter((o) => trendOrgs.includes(o)));
   const trendScoresByKey: Record<string, Record<string, TrendScores>> = Object.fromEntries(trendSorted.map((r, idx) => [`${r.dateFrom}|${r.dateTo}|${idx}`, r.scores]));
   function toggleTrendOrg(org: string) {
