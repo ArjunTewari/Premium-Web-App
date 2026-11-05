@@ -206,11 +206,11 @@ interface TrendReport {
 
 
 const TREND_METRICS = [
-  { key: "sovScore" as const, label: "SoV Score" },
-  { key: "pressShare" as const, label: "Press Share" },
-  { key: "llmShare" as const, label: "LLM Share" },
-  { key: "socialShare" as const, label: "Social Share" },
-  { key: "articles" as const, label: "Articles" },
+  { key: "sovScore" as const, label: "SoV Score", note: "Overall share of voice: the average of the three shares below, as a % of all organisations." },
+  { key: "pressShare" as const, label: "Press Share", note: "Share of news coverage: articles found for the period (2.5 points each, up to 100), as a % of all organisations' points." },
+  { key: "llmShare" as const, label: "LLM Share", note: "Share of AI-assistant visibility: the 0–100 visibility score, as a % of all organisations' scores." },
+  { key: "socialShare" as const, label: "Social Share", note: "Share of social media activity: the 0–10 presence score (posts, platforms, relevance), as a % of all organisations' scores." },
+  { key: "articles" as const, label: "Articles", note: "Number of news articles found for the period on the report's subject. A count, not a %." },
 ];
 
 // ── Trends: period labels and the focus layer ──────────────────────────────
@@ -2452,6 +2452,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                     <button
                       key={m.key}
                       onClick={() => setTrendMetric(m.key)}
+                      title={m.note}
                       style={{
                         padding: "7px 14px", borderRadius: 8,
                         background: trendMetric === m.key ? "rgba(201,146,42,.15)" : "transparent",
@@ -2464,6 +2465,13 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                     >{m.label}</button>
                   ))}
                 </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "6px 28px", marginBottom: 24 }}>
+                {TREND_METRICS.map((m) => (
+                  <div key={m.key} style={{ fontSize: 13.5, lineHeight: 1.45, color: trendMetric === m.key ? C.textHi : C.muted }}>
+                    <span style={{ fontWeight: 600, color: trendMetric === m.key ? C.gold : C.muted }}>{m.label}</span> — {m.note}
+                  </div>
+                ))}
               </div>
             </SlideUp>
 
