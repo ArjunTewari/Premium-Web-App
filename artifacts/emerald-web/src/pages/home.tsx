@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/auth";
 import {
   type ReportType, type ReportFilters,
   REPORT_TYPE_LABELS, REPORT_TYPE_HINTS, DEFAULT_REPORT_FILTERS,
-  reportTypeOfName, applyReportFilters, typeCounts, monthOptions, isDefaultFilters,
+  reportTypeOfName, trendSubjectOfFile, TREND_SUBJECT_LABELS, applyReportFilters, typeCounts, monthOptions, isDefaultFilters,
 } from "@/lib/report-filters";
 import { useLocation } from "wouter";
 import { orgColour } from "@/lib/org-colors";
@@ -202,6 +202,7 @@ interface TrendReport {
   generatedAt: string;
   orgs: string[];
   scores: Record<string, TrendScores>;
+  file?: string;
 }
 
 
@@ -246,11 +247,15 @@ function TrendXTick(p: { x?: number; y?: number; payload?: { value: string }; la
 // Hover card. With organisations selected it lists only those, each with its SoV percentage AND the absolute numbers behind it
 // (articles, AI-visibility score, social-presence points) and the three shares the SoV is the average of. With none selected it
 // lists every organisation's value for the metric on show.
-function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; selected: Set<string>; labels: Record<string, string>; colorOf: (org: string) => string; scores: Record<string, Record<string, TrendScores>>; metric: { label: string; pct: boolean } }) {
-  const { active, payload, label, selected, labels, colorOf, scores, metric } = p;
+function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; selected: Set<string>; labels: Record<string, string>; colorOf: (org: string) => string; scores: Record<string, Record<string, TrendScores>>; metric: { label: string; pct: boolean }; ranked: boolean }) {
+  const { active, payload, label, selected, labels, colorOf, scores, metric, ranked } = p;
   if (!active || !payload || !payload.length) return null;
-  const items = selected.size ? payload.filter((x) => selected.has(String(x.dataKey))) : payload;
-  if (!items.length) return null;
+  const shown = selected.size ? payload.filter((x) => selected.has(String(x.dataKey))) : payload;
+  if (!shown.length) return null;
+  // Ranked: highest first, tied values share a rank number.
+  const items = ranked ? [...shown].sort((a, b) => Number(b.value) - Number(a.value)) : shown;
+  const rankOf = (x: any) => items.findIndex((y) => Number(y.value) === Number(x.value)) + 1;
+  const place = (x: any) => (ranked ? <span style={{ color: "var(--text-sub)", fontWeight: 400, minWidth: 22, display: "inline-block" }}>{rankOf(x)}.</span> : null);
   const unit = metric.pct ? "%" : "";
   const dim: React.CSSProperties = { color: "var(--text-sub)" };
   return (
@@ -261,7 +266,7 @@ function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; se
         return (
           <div key={org} style={{ marginBottom: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: colorOf(org), flexShrink: 0 }} />{org}
+              {place(x)}<span style={{ width: 8, height: 8, borderRadius: "50%", background: colorOf(org), flexShrink: 0 }} />{org}
             </div>
             {s ? (
               <div style={{ paddingLeft: 14, lineHeight: 1.55 }}>
@@ -275,7 +280,7 @@ function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; se
         );
       }) : items.map((x) => (
         <div key={x.dataKey} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: colorOf(String(x.dataKey)), flexShrink: 0 }} />
+          {place(x)}<span style={{ width: 8, height: 8, borderRadius: "50%", background: colorOf(String(x.dataKey)), flexShrink: 0 }} />
           <span>{x.dataKey}: {trendNum(Number(x.value))}{unit}</span>
         </div>
       ))}
@@ -577,6 +582,11 @@ export default function Home() {
   const [trendMetric, setTrendMetric] = useState<typeof TREND_METRICS[number]["key"]>("sovScore");
   // The organisations selected in the Trends chart (one or several); the others are greyed out. Empty = all shown normally.
   const [focusedTrendOrgs, setFocusedTrendOrgs] = useState<string[]>([]);
+  // Hover list in rank order (highest first); remembered in this browser.
+  const [trendRanked, setTrendRankedState] = useState<boolean>(() => { try { return localStorage.getItem("trendRanked") === "1"; } catch { return false; } });
+  const setTrendRanked = (v: boolean) => { setTrendRankedState(v); try { localStorage.setItem("trendRanked", v ? "1" : "0"); } catch { /* optional */ } };
+  // Which subject's reports are plotted (reports of different subjects are not comparable).
+  const [trendSubject, setTrendSubject] = useState<string | null>(null);
 
   // ── Scheduler tab ──────────────────────────────────────────────────────────
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -622,8 +632,11 @@ export default function Home() {
   const orgCount = selectedOrgs.length;
 
   // ── Trends tab — derived chart data ───────────────────────────────────────
-  const trendOrgs = Array.from(new Set(trendReports.flatMap((r) => r.orgs)));
-  const trendSorted = [...trendReports].sort((a, b) => a.dateFrom.localeCompare(b.dateFrom) || a.dateTo.localeCompare(b.dateTo));
+  const trendSubjects = Array.from(new Set(trendReports.map((r) => trendSubjectOfFile(r.file)))).sort();
+  const trendSubjectActive = trendSubject && trendSubjects.includes(trendSubject) ? trendSubject : trendSubjects.includes("AQ") ? "AQ" : trendSubjects[0] ?? "AQ";
+  const trendShown = trendReports.filter((r) => trendSubjectOfFile(r.file) === trendSubjectActive);
+  const trendOrgs = Array.from(new Set(trendShown.flatMap((r) => r.orgs)));
+  const trendSorted = [...trendShown].sort((a, b) => a.dateFrom.localeCompare(b.dateFrom) || a.dateTo.localeCompare(b.dateTo));
   const trendLabels: Record<string, string> = {};
   const trendChartData = trendSorted.map((r, idx) => {
     const key = `${r.dateFrom}|${r.dateTo}|${idx}`;
@@ -2447,7 +2460,24 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                     Every generated report's scores, plotted by organisation across report periods.
                   </p>
                 </div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  {trendSubjects.length > 1 && (
+                    <div style={{ display: "flex", gap: 6, marginRight: 10, paddingRight: 10, borderRight: `1px solid ${C.border}` }}>
+                      {trendSubjects.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => { setTrendSubject(s); setFocusedTrendOrgs([]); }}
+                          style={{
+                            padding: "7px 14px", borderRadius: 8,
+                            background: trendSubjectActive === s ? "var(--elevate-2)" : "transparent",
+                            color: trendSubjectActive === s ? "var(--text-main)" : C.muted,
+                            border: `1px solid ${trendSubjectActive === s ? "var(--text-main)" : C.border}`,
+                            fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >{TREND_SUBJECT_LABELS[s] ?? s}</button>
+                      ))}
+                    </div>
+                  )}
                   {TREND_METRICS.map((m) => (
                     <button
                       key={m.key}
@@ -2503,7 +2533,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                           axisLine={{ stroke: C.border }} tickLine={false} interval={trendChartData.length > 24 ? "preserveStartEnd" : 0} height={trendChartData.length > 7 ? 54 : 30}
                         />
                         <YAxis tick={{ fill: "var(--text-sub)", fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: C.border }} tickLine={false} width={48} />
-                        <Tooltip content={<TrendTooltip selected={focusedSet} labels={trendLongLabels} colorOf={trendColorOf} scores={trendScoresByKey} metric={{ label: TREND_METRICS.find((m) => m.key === trendMetric)?.label ?? "", pct: trendMetric !== "articles" }} />} cursor={{ stroke: "var(--text-dim)", strokeDasharray: "3 3" }} />
+                        <Tooltip content={<TrendTooltip selected={focusedSet} labels={trendLongLabels} colorOf={trendColorOf} scores={trendScoresByKey} metric={{ label: TREND_METRICS.find((m) => m.key === trendMetric)?.label ?? "", pct: trendMetric !== "articles" }} ranked={trendRanked} />} cursor={{ stroke: "var(--text-dim)", strokeDasharray: "3 3" }} />
                         {trendOrgs.map((org) => {
                           const isFocus = focusedSet.has(org), dim = focusedSet.size > 0 && !isFocus;
                           const color = trendColorOf(org);
@@ -2531,12 +2561,30 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                     <div style={{ fontSize: 13, color: "var(--text-sub)" }}>
                       {focusedSet.size ? <>Showing {[...focusedSet].map((o, i) => <span key={o}>{i > 0 ? ", " : ""}<strong style={{ color: trendColorOf(o) }}>{o}</strong></span>)}; the other organisations are greyed out. Click a name again to deselect it.</> : "Select one or more organisations (a name below, or its line) to focus on them. Hover for the absolute numbers."}
                     </div>
-                    {focusedSet.size > 0 && (
-                      <button
-                        onClick={() => setFocusedTrendOrgs([])}
-                        style={{ padding: "5px 12px", borderRadius: 8, background: "transparent", color: "var(--text-main)", border: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
-                      >Show all</button>
-                    )}
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <div role="group" aria-label="Order of the hover list" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-sub)" }}>
+                        Hover list:
+                        {([[false, "Chart order"], [true, "Highest first"]] as const).map(([v, label]) => (
+                          <button
+                            key={label}
+                            onClick={() => setTrendRanked(v)}
+                            aria-pressed={trendRanked === v}
+                            style={{
+                              padding: "5px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif",
+                              background: trendRanked === v ? "var(--elevate-2)" : "transparent",
+                              color: trendRanked === v ? "var(--text-main)" : "var(--text-sub)",
+                              border: `1px solid ${trendRanked === v ? "var(--text-main)" : C.border}`,
+                            }}
+                          >{label}</button>
+                        ))}
+                      </div>
+                      {focusedSet.size > 0 && (
+                        <button
+                          onClick={() => setFocusedTrendOrgs([])}
+                          style={{ padding: "5px 12px", borderRadius: 8, background: "transparent", color: "var(--text-main)", border: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif" }}
+                        >Show all</button>
+                      )}
+                    </div>
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "12px 4px 16px" }}>
                     {trendOrgs.map((org) => {

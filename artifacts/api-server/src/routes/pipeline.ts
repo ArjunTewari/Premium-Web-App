@@ -510,16 +510,20 @@ router.get("/trends", requireAuth, async (_req: Request, res: Response) => {
     }
 
     const names = await listReportDataFiles();
+    // Only FULL reports are trend points: a snapshot or benchmark is a one-organisation view of a report that is already
+    // plotted (two "Aug 2026" points were the Chintan snapshot and benchmark of one August report).
     const parsed = await Promise.all(
-      names.map(async (name) => {
-        const raw = await getReportContent(name);
-        if (!raw) return null;
-        try {
-          return JSON.parse(raw) as ReportTrendSummary;
-        } catch {
-          return null;
-        }
-      }),
+      names
+        .filter((name) => reportTypeOfName(name.replace(/\.json$/i, ".html")) === "full")
+        .map(async (name) => {
+          const raw = await getReportContent(name);
+          if (!raw) return null;
+          try {
+            return { ...(JSON.parse(raw) as ReportTrendSummary), file: name };
+          } catch {
+            return null;
+          }
+        }),
     );
     const reports = parsed
       .filter((r): r is ReportTrendSummary => r != null)

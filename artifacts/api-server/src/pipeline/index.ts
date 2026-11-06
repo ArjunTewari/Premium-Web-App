@@ -64,6 +64,8 @@ export interface ReportTrendSummary {
   generatedAt: string;
   orgs: string[];
   scores: Record<string, ReportTrendScores>;
+  /** The stored trend-data file this came from (set by GET /trends). */
+  file?: string;
 }
 export interface RunResult {
   htmlName: string;
