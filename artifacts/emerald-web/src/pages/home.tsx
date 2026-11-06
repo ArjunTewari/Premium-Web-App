@@ -6,6 +6,7 @@ import {
   reportTypeOfName, trendSubjectOfFile, TREND_SUBJECT_LABELS, applyReportFilters, typeCounts, monthOptions, isDefaultFilters,
 } from "@/lib/report-filters";
 import { useLocation } from "wouter";
+import { orgColour } from "@/lib/org-colors";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const LOADING_QUOTES = [
@@ -204,20 +205,13 @@ interface TrendReport {
   file?: string;
 }
 
-// Same 13-colour palette the report HTML itself uses per org slot, so an
-// org's line color is consistent between the report and this dashboard.
-const ORG_COLORS = [
-  "#3d8ef0", "#e05c3a", "#4caf74", "#c9922a", "#a371f7",
-  "#e05c5c", "#14b8a6", "#f97316", "#8b5cf6", "#06b6d4",
-  "#84cc16", "#ef4444", "#ec4899",
-];
 
 const TREND_METRICS = [
-  { key: "sovScore" as const, label: "SoV Score" },
-  { key: "pressShare" as const, label: "Press Share" },
-  { key: "llmShare" as const, label: "LLM Share" },
-  { key: "socialShare" as const, label: "Social Share" },
-  { key: "articles" as const, label: "Articles" },
+  { key: "sovScore" as const, label: "SoV Score", note: "Overall share of voice: the average of the three shares below, as a % of all organisations." },
+  { key: "pressShare" as const, label: "Press Share", note: "Share of news coverage: articles found for the period (2.5 points each, up to 100), as a % of all organisations' points." },
+  { key: "llmShare" as const, label: "LLM Share", note: "Share of AI-assistant visibility: the 0–100 visibility score, as a % of all organisations' scores." },
+  { key: "socialShare" as const, label: "Social Share", note: "Share of social media activity: the 0–10 presence score (posts, platforms, relevance), as a % of all organisations' scores." },
+  { key: "articles" as const, label: "Articles", note: "Number of news articles found for the period on the report's subject. A count, not a %." },
 ];
 
 // ── Trends: period labels and the focus layer ──────────────────────────────
@@ -586,6 +580,17 @@ export default function Home() {
   const [trendReports, setTrendReports] = useState<TrendReport[]>([]);
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendMetric, setTrendMetric] = useState<typeof TREND_METRICS[number]["key"]>("sovScore");
+  // Width of the Trends chart, measured, so the period labels are turned only when they do not fit side by side.
+  const [trendBox, setTrendBox] = useState<HTMLDivElement | null>(null);
+  const [trendWidth, setTrendWidth] = useState(0);
+  useEffect(() => {
+    if (!trendBox) return;
+    const read = () => setTrendWidth(trendBox.getBoundingClientRect().width);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(trendBox);
+    return () => ro.disconnect();
+  }, [trendBox]);
   // The organisations selected in the Trends chart (one or several); the others are greyed out. Empty = all shown normally.
   const [focusedTrendOrgs, setFocusedTrendOrgs] = useState<string[]>([]);
   // Hover list in rank order (highest first); remembered in this browser.
@@ -644,6 +649,8 @@ export default function Home() {
   const trendOrgs = Array.from(new Set(trendShown.flatMap((r) => r.orgs)));
   const trendSorted = [...trendShown].sort((a, b) => a.dateFrom.localeCompare(b.dateFrom) || a.dateTo.localeCompare(b.dateTo));
   const trendLabels: Record<string, string> = {};
+  // A label is up to ~14 characters (about 105px): keep them flat while each period has that much room, otherwise turn them.
+  const trendTurn = trendSorted.length > 1 && trendWidth > 0 && (trendWidth - 110) / trendSorted.length < 112;
   const trendChartData = trendSorted.map((r, idx) => {
     const key = `${r.dateFrom}|${r.dateTo}|${idx}`;
     trendLabels[key] = trendPeriodLabel(r.dateFrom, r.dateTo);
@@ -655,7 +662,8 @@ export default function Home() {
     return row;
   });
   const trendLongLabels: Record<string, string> = Object.fromEntries(trendSorted.map((r, idx) => [`${r.dateFrom}|${r.dateTo}|${idx}`, trendPeriodLabel(r.dateFrom, r.dateTo, true)]));
-  const trendColorOf = (org: string) => ORG_COLORS[Math.max(0, trendOrgs.indexOf(org)) % ORG_COLORS.length];
+  // One distinct colour per organisation (lib/org-colours.ts); an organisation keeps its colour when others are added.
+  const trendColorOf = (org: string) => orgColour(Math.max(0, trendOrgs.indexOf(org)));
   const focusedSet = new Set(focusedTrendOrgs.filter((o) => trendOrgs.includes(o)));
   const trendScoresByKey: Record<string, Record<string, TrendScores>> = Object.fromEntries(trendSorted.map((r, idx) => [`${r.dateFrom}|${r.dateTo}|${idx}`, r.scores]));
   function toggleTrendOrg(org: string) {
@@ -2487,6 +2495,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                     <button
                       key={m.key}
                       onClick={() => setTrendMetric(m.key)}
+                      title={m.note}
                       style={{
                         padding: "7px 14px", borderRadius: 8,
                         background: trendMetric === m.key ? "rgba(201,146,42,.15)" : "transparent",
@@ -2499,6 +2508,13 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                     >{m.label}</button>
                   ))}
                 </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "6px 28px", marginBottom: 24 }}>
+                {TREND_METRICS.map((m) => (
+                  <div key={m.key} style={{ fontSize: 13.5, lineHeight: 1.45, color: trendMetric === m.key ? C.textHi : C.muted }}>
+                    <span style={{ fontWeight: 600, color: trendMetric === m.key ? C.gold : C.muted }}>{m.label}</span> — {m.note}
+                  </div>
+                ))}
               </div>
             </SlideUp>
 
@@ -2520,14 +2536,14 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
             ) : (
               <SlideUp delay={80}>
                 <Card style={{ padding: "24px 20px 12px" }}>
-                  <div className="trend-chart" style={{ width: "100%", height: 380 }}>
+                  <div className="trend-chart" ref={setTrendBox} style={{ width: "100%", height: trendTurn ? 420 : 380 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={trendChartData} margin={{ top: 12, right: 40, left: 24, bottom: 8 }} onClick={(e: any) => { if (!e || !e.activePayload) setFocusedTrendOrgs([]); }}>
+                      <LineChart data={trendChartData} margin={{ top: 12, right: trendTurn ? 32 : 60, left: trendTurn ? 40 : 16, bottom: 8 }} onClick={(e: any) => { if (!e || !e.activePayload) setFocusedTrendOrgs([]); }}>
                         <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
                         <XAxis
                           dataKey="key"
-                          tick={(tp: any) => <TrendXTick {...tp} labels={trendLabels} turn={trendChartData.length > 7} />}
-                          axisLine={{ stroke: C.border }} tickLine={false} interval={trendChartData.length > 24 ? "preserveStartEnd" : 0} height={trendChartData.length > 7 ? 54 : 30}
+                          tick={(tp: any) => <TrendXTick {...tp} labels={trendLabels} turn={trendTurn} />}
+                          axisLine={{ stroke: C.border }} tickLine={false} interval={trendChartData.length > 24 ? "preserveStartEnd" : 0} height={trendTurn ? 82 : 30}
                         />
                         <YAxis tick={{ fill: "var(--text-sub)", fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: C.border }} tickLine={false} width={48} />
                         <Tooltip content={<TrendTooltip selected={focusedSet} labels={trendLongLabels} colorOf={trendColorOf} scores={trendScoresByKey} metric={{ label: TREND_METRICS.find((m) => m.key === trendMetric)?.label ?? "", pct: trendMetric !== "articles" }} ranked={trendRanked} />} cursor={{ stroke: "var(--text-dim)", strokeDasharray: "3 3" }} />
