@@ -231,6 +231,17 @@ function trendPeriodLabel(from: string, to: string, long = false): string {
   if (days <= 31 && a.getUTCMonth() === b.getUTCMonth()) return `${a.getUTCDate()}–${b.getUTCDate()} ${am}${yr}`;
   return `${a.getUTCDate()} ${am}–${b.getUTCDate()} ${bm}${yr}`;
 }
+// Reports of different lengths overlap (a week sits inside the month that contains it), so a chart holds one length at a time.
+type TrendKind = "week" | "month" | "range";
+const TREND_KIND_LABELS: Record<TrendKind, string> = { week: "Weekly", month: "Monthly", range: "Other date ranges" };
+function trendKindOf(from: string, to: string): TrendKind {
+  const a = new Date(`${from}T00:00:00Z`), b = new Date(`${to}T00:00:00Z`);
+  const days = Math.round((b.getTime() - a.getTime()) / 864e5) + 1;
+  if (days <= 7) return "week";
+  const lastDay = new Date(Date.UTC(b.getUTCFullYear(), b.getUTCMonth() + 1, 0)).getUTCDate();
+  if (a.getUTCDate() === 1 && b.getUTCDate() === lastDay && a.getUTCMonth() === b.getUTCMonth() && a.getUTCFullYear() === b.getUTCFullYear()) return "month";
+  return "range";
+}
 const trendNum = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 // X-axis tick; turned when there are many periods.
@@ -598,6 +609,7 @@ export default function Home() {
   const setTrendRanked = (v: boolean) => { setTrendRankedState(v); try { localStorage.setItem("trendRanked", v ? "1" : "0"); } catch { /* optional */ } };
   // Which subject's reports are plotted (reports of different subjects are not comparable).
   const [trendSubject, setTrendSubject] = useState<string | null>(null);
+  const [trendKind, setTrendKind] = useState<TrendKind | null>(null);
 
   // ── Scheduler tab ──────────────────────────────────────────────────────────
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -645,7 +657,10 @@ export default function Home() {
   // ── Trends tab — derived chart data ───────────────────────────────────────
   const trendSubjects = Array.from(new Set(trendReports.map((r) => trendSubjectOfFile(r.file)))).sort();
   const trendSubjectActive = trendSubject && trendSubjects.includes(trendSubject) ? trendSubject : trendSubjects.includes("AQ") ? "AQ" : trendSubjects[0] ?? "AQ";
-  const trendShown = trendReports.filter((r) => trendSubjectOfFile(r.file) === trendSubjectActive);
+  const trendOfSubject = trendReports.filter((r) => trendSubjectOfFile(r.file) === trendSubjectActive);
+  const trendKinds = (["week", "month", "range"] as TrendKind[]).filter((k) => trendOfSubject.some((r) => trendKindOf(r.dateFrom, r.dateTo) === k));
+  const trendKindActive: TrendKind = trendKind && trendKinds.includes(trendKind) ? trendKind : trendKinds[0] ?? "week";
+  const trendShown = trendOfSubject.filter((r) => trendKindOf(r.dateFrom, r.dateTo) === trendKindActive);
   const trendOrgs = Array.from(new Set(trendShown.flatMap((r) => r.orgs)));
   const trendSorted = [...trendShown].sort((a, b) => a.dateFrom.localeCompare(b.dateFrom) || a.dateTo.localeCompare(b.dateTo));
   const trendLabels: Record<string, string> = {};
@@ -2509,6 +2524,25 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                   ))}
                 </div>
               </div>
+              {trendKinds.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+                  <span style={{ fontSize: 13.5, color: C.muted, marginRight: 6 }}>Report length:</span>
+                  {trendKinds.map((k) => (
+                    <button
+                      key={k}
+                      onClick={() => { setTrendKind(k); setFocusedTrendOrgs([]); }}
+                      style={{
+                        padding: "5px 12px", borderRadius: 8,
+                        background: trendKindActive === k ? "var(--elevate-2)" : "transparent",
+                        color: trendKindActive === k ? "var(--text-main)" : C.muted,
+                        border: `1px solid ${trendKindActive === k ? "var(--text-main)" : C.border}`,
+                        fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >{TREND_KIND_LABELS[k]}</button>
+                  ))}
+                  <span style={{ fontSize: 13.5, color: C.muted, marginLeft: 6 }}>Each chart compares reports of the same length, so the periods never overlap.</span>
+                </div>
+              )}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "6px 28px", marginBottom: 24 }}>
                 {TREND_METRICS.map((m) => (
                   <div key={m.key} style={{ fontSize: 13.5, lineHeight: 1.45, color: trendMetric === m.key ? C.textHi : C.muted }}>
