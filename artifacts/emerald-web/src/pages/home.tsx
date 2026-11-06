@@ -580,6 +580,17 @@ export default function Home() {
   const [trendReports, setTrendReports] = useState<TrendReport[]>([]);
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendMetric, setTrendMetric] = useState<typeof TREND_METRICS[number]["key"]>("sovScore");
+  // Width of the Trends chart, measured, so the period labels are turned only when they do not fit side by side.
+  const [trendBox, setTrendBox] = useState<HTMLDivElement | null>(null);
+  const [trendWidth, setTrendWidth] = useState(0);
+  useEffect(() => {
+    if (!trendBox) return;
+    const read = () => setTrendWidth(trendBox.getBoundingClientRect().width);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(trendBox);
+    return () => ro.disconnect();
+  }, [trendBox]);
   // The organisations selected in the Trends chart (one or several); the others are greyed out. Empty = all shown normally.
   const [focusedTrendOrgs, setFocusedTrendOrgs] = useState<string[]>([]);
   // Hover list in rank order (highest first); remembered in this browser.
@@ -638,6 +649,8 @@ export default function Home() {
   const trendOrgs = Array.from(new Set(trendShown.flatMap((r) => r.orgs)));
   const trendSorted = [...trendShown].sort((a, b) => a.dateFrom.localeCompare(b.dateFrom) || a.dateTo.localeCompare(b.dateTo));
   const trendLabels: Record<string, string> = {};
+  // A label is up to ~14 characters (about 105px): keep them flat while each period has that much room, otherwise turn them.
+  const trendTurn = trendSorted.length > 1 && trendWidth > 0 && (trendWidth - 110) / trendSorted.length < 112;
   const trendChartData = trendSorted.map((r, idx) => {
     const key = `${r.dateFrom}|${r.dateTo}|${idx}`;
     trendLabels[key] = trendPeriodLabel(r.dateFrom, r.dateTo);
@@ -2523,14 +2536,14 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
             ) : (
               <SlideUp delay={80}>
                 <Card style={{ padding: "24px 20px 12px" }}>
-                  <div className="trend-chart" style={{ width: "100%", height: 380 }}>
+                  <div className="trend-chart" ref={setTrendBox} style={{ width: "100%", height: trendTurn ? 420 : 380 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={trendChartData} margin={{ top: 12, right: 40, left: 24, bottom: 8 }} onClick={(e: any) => { if (!e || !e.activePayload) setFocusedTrendOrgs([]); }}>
+                      <LineChart data={trendChartData} margin={{ top: 12, right: trendTurn ? 32 : 60, left: trendTurn ? 40 : 16, bottom: 8 }} onClick={(e: any) => { if (!e || !e.activePayload) setFocusedTrendOrgs([]); }}>
                         <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
                         <XAxis
                           dataKey="key"
-                          tick={(tp: any) => <TrendXTick {...tp} labels={trendLabels} turn={trendChartData.length > 7} />}
-                          axisLine={{ stroke: C.border }} tickLine={false} interval={trendChartData.length > 24 ? "preserveStartEnd" : 0} height={trendChartData.length > 7 ? 54 : 30}
+                          tick={(tp: any) => <TrendXTick {...tp} labels={trendLabels} turn={trendTurn} />}
+                          axisLine={{ stroke: C.border }} tickLine={false} interval={trendChartData.length > 24 ? "preserveStartEnd" : 0} height={trendTurn ? 82 : 30}
                         />
                         <YAxis tick={{ fill: "var(--text-sub)", fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: C.border }} tickLine={false} width={48} />
                         <Tooltip content={<TrendTooltip selected={focusedSet} labels={trendLongLabels} colorOf={trendColorOf} scores={trendScoresByKey} metric={{ label: TREND_METRICS.find((m) => m.key === trendMetric)?.label ?? "", pct: trendMetric !== "articles" }} ranked={trendRanked} />} cursor={{ stroke: "var(--text-dim)", strokeDasharray: "3 3" }} />
