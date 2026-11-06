@@ -208,10 +208,10 @@ interface TrendReport {
 
 const TREND_METRICS = [
   { key: "sovScore" as const, label: "SoV Score", note: "Overall share of voice: the average of the three shares below, as a % of all organisations." },
-  { key: "pressShare" as const, label: "Press Share", note: "Share of news coverage: articles found for the period (2.5 points each, up to 100), as a % of all organisations' points." },
+  { key: "pressShare" as const, label: "TV digital", note: "Share of online news coverage: articles found for the period (2.5 points each, up to 100), as a % of all organisations' points. TV and print outlets are counted together." },
   { key: "llmShare" as const, label: "LLM Share", note: "Share of AI-assistant visibility: the 0–100 visibility score, as a % of all organisations' scores." },
   { key: "socialShare" as const, label: "Social Share", note: "Share of social media activity: the 0–10 presence score (posts, platforms, relevance), as a % of all organisations' scores." },
-  { key: "articles" as const, label: "Articles", note: "Number of news articles found for the period on the report's subject. A count, not a %." },
+  { key: "articles" as const, label: "Print digital", note: "Number of online news articles found for the period on the report's subject. A count, not a %. TV and print outlets are counted together." },
 ];
 
 // ── Trends: period labels and the focus layer ──────────────────────────────
