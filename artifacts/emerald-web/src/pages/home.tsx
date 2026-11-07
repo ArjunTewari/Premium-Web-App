@@ -2632,7 +2632,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                           return (
                             <Line
                               key={org}
-                              type="linear"
+                              type="monotone"
                               dataKey={org}
                               stroke={dim ? grey : color}
                               strokeOpacity={dim ? 0.28 : 1}
