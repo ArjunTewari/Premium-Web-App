@@ -206,13 +206,26 @@ interface TrendReport {
 }
 
 
+// Raw numbers, not shares: nothing here depends on how the other organisations did.
+const pressScoreOf = (articles: number) => Math.min(100, articles * 2.5);
 const TREND_METRICS = [
-  { key: "sovScore" as const, label: "SoV Score", note: "Overall share of voice: the average of the three shares below, as a % of all organisations." },
-  { key: "pressShare" as const, label: "TV digital", alias: "Press Share", note: "Share of online news coverage: articles found for the period (2.5 points each, up to 100), as a % of all organisations' points. TV and print outlets are counted together." },
-  { key: "llmShare" as const, label: "LLM Share", note: "Share of AI-assistant visibility: the 0–100 visibility score, as a % of all organisations' scores." },
-  { key: "socialShare" as const, label: "Social Share", note: "Share of social media activity: the 0–10 presence score (posts, platforms, relevance), as a % of all organisations' scores." },
-  { key: "articles" as const, label: "Print digital", alias: "Articles", note: "Number of online news articles found for the period on the report's subject. A count, not a %. TV and print outlets are counted together." },
+  { key: "overall" as const, label: "Overall score", unit: "/100", note: "Average of the three 0–100 scores below (social presence ×10). Each organisation on its own." },
+  { key: "press" as const, label: "TV digital", alias: "Press score", unit: "/100", note: "Online news coverage: articles found × 2.5, up to 100 (40 articles = 100). TV and print outlets are counted together." },
+  { key: "llm" as const, label: "LLM visibility", unit: "/100", note: "How often ChatGPT, Perplexity and Claude name the organisation across the set of questions asked, as a % of all possible answers." },
+  { key: "social" as const, label: "Social presence", unit: "/10", note: "Relevant posts on LinkedIn, X and Instagram: volume (0–4) + platforms used (0–3) + relevance (3 if any post)." },
+  { key: "articles" as const, label: "Print digital", alias: "Articles", unit: "", note: "Number of online news articles found for the period on the report's subject. A count. TV and print outlets are counted together." },
 ];
+type TrendMetricKey = typeof TREND_METRICS[number]["key"];
+function trendValueOf(s: TrendScores, key: TrendMetricKey): number {
+  const press = pressScoreOf(s.articles);
+  switch (key) {
+    case "overall": return Math.round(((press + s.aeo + s.social * 10) / 3) * 10) / 10;
+    case "press": return press;
+    case "llm": return s.aeo;
+    case "social": return s.social;
+    case "articles": return s.articles;
+  }
+}
 
 // ── Trends: period labels and the focus layer ──────────────────────────────
 const TREND_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -255,10 +268,9 @@ function TrendXTick(p: { x?: number; y?: number; payload?: { value: string }; la
   );
 }
 
-// Hover card. With organisations selected it lists only those, each with its SoV percentage AND the absolute numbers behind it
-// (articles, AI-visibility score, social-presence points) and the three shares the SoV is the average of. With none selected it
-// lists every organisation's value for the metric on show.
-function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; selected: Set<string>; labels: Record<string, string>; colorOf: (org: string) => string; scores: Record<string, Record<string, TrendScores>>; metric: { label: string; pct: boolean }; ranked: boolean }) {
+// Hover card. With organisations selected it lists only those, each with the metric on show AND the other raw numbers (articles,
+// press score, AI-visibility score, social-presence points). With none selected it lists every organisation's value for the metric.
+function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; selected: Set<string>; labels: Record<string, string>; colorOf: (org: string) => string; scores: Record<string, Record<string, TrendScores>>; metric: { label: string; unit: string }; ranked: boolean }) {
   const { active, payload, label, selected, labels, colorOf, scores, metric, ranked } = p;
   if (!active || !payload || !payload.length) return null;
   const shown = selected.size ? payload.filter((x) => selected.has(String(x.dataKey))) : payload;
@@ -267,7 +279,7 @@ function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; se
   const items = ranked ? [...shown].sort((a, b) => Number(b.value) - Number(a.value)) : shown;
   const rankOf = (x: any) => items.findIndex((y) => Number(y.value) === Number(x.value)) + 1;
   const place = (x: any) => (ranked ? <span style={{ color: "var(--text-sub)", fontWeight: 400, minWidth: 22, display: "inline-block" }}>{rankOf(x)}.</span> : null);
-  const unit = metric.pct ? "%" : "";
+  const unit = metric.unit;
   const dim: React.CSSProperties = { color: "var(--text-sub)" };
   return (
     <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-col)", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontFamily: "'DM Mono', monospace", color: "var(--text-main)", boxShadow: "0 8px 24px rgba(0,0,0,.25)", maxWidth: 330 }}>
@@ -281,10 +293,9 @@ function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; se
             </div>
             {s ? (
               <div style={{ paddingLeft: 14, lineHeight: 1.55 }}>
-                <div><strong>SoV {trendNum(s.sovScore)}%</strong></div>
-                <div style={dim}>{s.articles} {s.articles === 1 ? "article" : "articles"} · AI visibility {s.aeo}/100 · social {s.social}/10</div>
-                <div style={dim}>press {trendNum(s.pressShare)}% · AI {trendNum(s.llmShare)}% · social {trendNum(s.socialShare)}%</div>
-                {metric.label !== "SoV Score" && <div>{metric.label}: {trendNum(Number(x.value))}{unit}</div>}
+                <div><strong>{metric.label}: {trendNum(Number(x.value))}{unit}</strong></div>
+                <div style={dim}>{s.articles} {s.articles === 1 ? "article" : "articles"} · press score {trendNum(pressScoreOf(s.articles))}/100</div>
+                <div style={dim}>AI visibility {s.aeo}/100 · social {s.social}/10</div>
               </div>
             ) : <div style={{ paddingLeft: 14, ...dim }}>{metric.label}: {trendNum(Number(x.value))}{unit}</div>}
           </div>
@@ -590,7 +601,7 @@ export default function Home() {
   const [prevReports, setPrevReports] = useState<ReportFile[]>([]);
   const [trendReports, setTrendReports] = useState<TrendReport[]>([]);
   const [trendsLoading, setTrendsLoading] = useState(false);
-  const [trendMetric, setTrendMetric] = useState<typeof TREND_METRICS[number]["key"]>("sovScore");
+  const [trendMetric, setTrendMetric] = useState<TrendMetricKey>("overall");
   // Width of the Trends chart, measured, so the period labels are turned only when they do not fit side by side.
   const [trendBox, setTrendBox] = useState<HTMLDivElement | null>(null);
   const [trendWidth, setTrendWidth] = useState(0);
@@ -672,7 +683,7 @@ export default function Home() {
     const row: Record<string, string | number> = { key };
     for (const org of trendOrgs) {
       const s = r.scores[org];
-      if (s) row[org] = s[trendMetric];
+      if (s) row[org] = trendValueOf(s, trendMetric);
     }
     return row;
   });
@@ -2482,10 +2493,10 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                     Trends
                   </div>
                   <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: "-.02em", color: C.textHi, margin: 0 }}>
-                    Share of Voice Over Time
+                    Scores Over Time
                   </h2>
                   <p style={{ fontSize: 15, color: C.muted, marginTop: 6 }}>
-                    Every generated report's scores, plotted by organisation across report periods.
+                    Raw numbers for each report period, plotted by organisation. They are not converted to shares of the group.
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -2579,8 +2590,8 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                           tick={(tp: any) => <TrendXTick {...tp} labels={trendLabels} turn={trendTurn} />}
                           axisLine={{ stroke: C.border }} tickLine={false} interval={trendChartData.length > 24 ? "preserveStartEnd" : 0} height={trendTurn ? 82 : 30}
                         />
-                        <YAxis tick={{ fill: "var(--text-sub)", fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: C.border }} tickLine={false} width={48} />
-                        <Tooltip content={<TrendTooltip selected={focusedSet} labels={trendLongLabels} colorOf={trendColorOf} scores={trendScoresByKey} metric={{ label: TREND_METRICS.find((m) => m.key === trendMetric)?.label ?? "", pct: trendMetric !== "articles" }} ranked={trendRanked} />} cursor={{ stroke: "var(--text-dim)", strokeDasharray: "3 3" }} />
+                        <YAxis domain={[0, "auto"]} allowDecimals={false} tick={{ fill: "var(--text-sub)", fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: C.border }} tickLine={false} width={48} />
+                        <Tooltip content={<TrendTooltip selected={focusedSet} labels={trendLongLabels} colorOf={trendColorOf} scores={trendScoresByKey} metric={{ label: TREND_METRICS.find((m) => m.key === trendMetric)?.label ?? "", unit: TREND_METRICS.find((m) => m.key === trendMetric)?.unit ?? "" }} ranked={trendRanked} />} cursor={{ stroke: "var(--text-dim)", strokeDasharray: "3 3" }} />
                         {trendOrgs.map((org) => {
                           const isFocus = focusedSet.has(org), dim = focusedSet.size > 0 && !isFocus;
                           const color = trendColorOf(org);
@@ -2588,7 +2599,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                           return (
                             <Line
                               key={org}
-                              type="monotone"
+                              type="linear"
                               dataKey={org}
                               stroke={dim ? grey : color}
                               strokeOpacity={dim ? 0.28 : 1}
