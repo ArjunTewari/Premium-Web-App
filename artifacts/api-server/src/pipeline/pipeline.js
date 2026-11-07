@@ -1404,6 +1404,21 @@ ${batchText}`;
   // headline share-of-voice metric; it's normalized to sum to ~100% across
   // the tracked orgs, so it's directly comparable across reports even when
   // the org line-up changes between runs.
+  const trendCounts = (o) => {
+    const er = socialERResults.find((r) => r.org === o) || {};
+    const yt = youtubeERResults.find((r) => r.org === o) || {};
+    const oc = data[o].outletCounts || {};
+    const sum = (names) => names.reduce((n, k) => n + (oc[k] || 0), 0);
+    return {
+      tv: sum(ALL_TV_CHANNELS),
+      print: sum(PRINT_OUTLETS),
+      mentions: aeoResults[o]?.mentions || 0,
+      li: er.linkedinPosts || 0,
+      x: er.twitterPosts || 0,
+      ig: er.instagramPosts || 0,
+      yt: yt.videoCount || 0,
+    };
+  };
   const trendSummary = {
     dateFrom: DATE_FROM,
     dateTo: DATE_TO,
@@ -1420,6 +1435,10 @@ ${batchText}`;
           articles: data[o].total,
           aeo: data[o].aeo,
           social: data[o].social,
+          // The real counts behind the scores, so the Trends tab can plot them (a score hides what was counted):
+          // articles from TV channels / from the five print outlets, LLM answers that name the organisation
+          // (all assistants and questions together), and posts per platform (YouTube = videos).
+          ...trendCounts(o),
         },
       ]),
     ),

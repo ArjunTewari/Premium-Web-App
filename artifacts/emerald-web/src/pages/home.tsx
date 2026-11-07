@@ -194,6 +194,14 @@ interface TrendScores {
   articles: number;
   aeo: number;
   social: number;
+  // real counts; absent in reports stored before they were kept
+  tv?: number;
+  print?: number;
+  mentions?: number;
+  li?: number;
+  x?: number;
+  ig?: number;
+  yt?: number;
 }
 
 interface TrendReport {
@@ -206,25 +214,29 @@ interface TrendReport {
 }
 
 
-// Raw numbers, not shares: nothing here depends on how the other organisations did.
-const pressScoreOf = (articles: number) => Math.min(100, articles * 2.5);
+// Counts only: no score, no share. Each tab plots how many were found.
 const TREND_METRICS = [
-  { key: "overall" as const, label: "Overall score", unit: "/100", note: "Average of the three 0–100 scores below (social presence ×10). Each organisation on its own." },
-  { key: "press" as const, label: "TV digital", alias: "Press score", unit: "/100", note: "Online news coverage: articles found × 2.5, up to 100 (40 articles = 100). TV and print outlets are counted together." },
-  { key: "llm" as const, label: "LLM visibility", unit: "/100", note: "How often ChatGPT, Perplexity and Claude name the organisation across the set of questions asked, as a % of all possible answers." },
-  { key: "social" as const, label: "Social presence", unit: "/10", note: "Relevant posts on LinkedIn, X and Instagram: volume (0–4) + platforms used (0–3) + relevance (3 if any post)." },
-  { key: "articles" as const, label: "Print digital", alias: "Articles", unit: "", note: "Number of online news articles found for the period on the report's subject. A count. TV and print outlets are counted together." },
+  { key: "tv" as const, label: "TV digital", unit: "", note: "Articles found on the TV channel sites NDTV, News18, India Today, India TV and ABP News. A count." },
+  { key: "print" as const, label: "Print digital", unit: "", note: "Articles found on Times of India, Hindustan Times, The Hindu, Indian Express and Deccan Herald. A count." },
+  { key: "mentions" as const, label: "LLM mentions", unit: "", note: "Total times ChatGPT, Perplexity and Claude named the organisation, across every question asked. A count." },
+  { key: "posts" as const, label: "Social posts", unit: "", note: "Posts found for the period (YouTube: videos). Pick a platform, or all. A count." },
 ];
 type TrendMetricKey = typeof TREND_METRICS[number]["key"];
-function trendValueOf(s: TrendScores, key: TrendMetricKey): number {
-  const press = pressScoreOf(s.articles);
-  switch (key) {
-    case "overall": return Math.round(((press + s.aeo + s.social * 10) / 3) * 10) / 10;
-    case "press": return press;
-    case "llm": return s.aeo;
-    case "social": return s.social;
-    case "articles": return s.articles;
-  }
+const TREND_PLATFORMS = [
+  { key: "all" as const, label: "All platforms" },
+  { key: "li" as const, label: "LinkedIn" },
+  { key: "x" as const, label: "X" },
+  { key: "ig" as const, label: "Instagram" },
+  { key: "yt" as const, label: "YouTube" },
+];
+type TrendPlatform = typeof TREND_PLATFORMS[number]["key"];
+// undefined = this report was stored without that count (shown as a gap, never as 0)
+function trendValueOf(s: TrendScores, key: TrendMetricKey, platform: TrendPlatform): number | undefined {
+  if (key === "tv") return s.tv;
+  if (key === "print") return s.print;
+  if (key === "mentions") return s.mentions;
+  if (platform === "all") return s.li === undefined ? undefined : (s.li ?? 0) + (s.x ?? 0) + (s.ig ?? 0) + (s.yt ?? 0);
+  return s[platform];
 }
 
 // ── Trends: period labels and the focus layer ──────────────────────────────
@@ -268,8 +280,8 @@ function TrendXTick(p: { x?: number; y?: number; payload?: { value: string }; la
   );
 }
 
-// Hover card. With organisations selected it lists only those, each with the metric on show AND the other raw numbers (articles,
-// press score, AI-visibility score, social-presence points). With none selected it lists every organisation's value for the metric.
+// Hover card. With organisations selected it lists only those, each with the metric on show AND the other counts (articles,
+// LLM mentions, posts per platform). With none selected it lists every organisation's value for the metric.
 function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; selected: Set<string>; labels: Record<string, string>; colorOf: (org: string) => string; scores: Record<string, Record<string, TrendScores>>; metric: { label: string; unit: string }; ranked: boolean }) {
   const { active, payload, label, selected, labels, colorOf, scores, metric, ranked } = p;
   if (!active || !payload || !payload.length) return null;
@@ -294,8 +306,9 @@ function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; se
             {s ? (
               <div style={{ paddingLeft: 14, lineHeight: 1.55 }}>
                 <div><strong>{metric.label}: {trendNum(Number(x.value))}{unit}</strong></div>
-                <div style={dim}>{s.articles} {s.articles === 1 ? "article" : "articles"} · press score {trendNum(pressScoreOf(s.articles))}/100</div>
-                <div style={dim}>AI visibility {s.aeo}/100 · social {s.social}/10</div>
+                <div style={dim}>articles: TV {s.tv ?? "–"} · print {s.print ?? "–"} · all {s.articles}</div>
+                <div style={dim}>LLM mentions {s.mentions ?? "–"}</div>
+                <div style={dim}>posts: LinkedIn {s.li ?? "–"} · X {s.x ?? "–"} · Instagram {s.ig ?? "–"} · YouTube {s.yt ?? "–"}</div>
               </div>
             ) : <div style={{ paddingLeft: 14, ...dim }}>{metric.label}: {trendNum(Number(x.value))}{unit}</div>}
           </div>
@@ -601,7 +614,8 @@ export default function Home() {
   const [prevReports, setPrevReports] = useState<ReportFile[]>([]);
   const [trendReports, setTrendReports] = useState<TrendReport[]>([]);
   const [trendsLoading, setTrendsLoading] = useState(false);
-  const [trendMetric, setTrendMetric] = useState<TrendMetricKey>("overall");
+  const [trendMetric, setTrendMetric] = useState<TrendMetricKey>("print");
+  const [trendPlatform, setTrendPlatform] = useState<TrendPlatform>("all");
   // Width of the Trends chart, measured, so the period labels are turned only when they do not fit side by side.
   const [trendBox, setTrendBox] = useState<HTMLDivElement | null>(null);
   const [trendWidth, setTrendWidth] = useState(0);
@@ -683,10 +697,11 @@ export default function Home() {
     const row: Record<string, string | number> = { key };
     for (const org of trendOrgs) {
       const s = r.scores[org];
-      if (s) row[org] = trendValueOf(s, trendMetric);
+      if (s) { const v = trendValueOf(s, trendMetric, trendPlatform); if (v !== undefined) row[org] = v; }
     }
     return row;
   });
+  const trendNoCounts = trendSorted.filter((r) => !Object.values(r.scores).some((sc) => trendValueOf(sc, trendMetric, trendPlatform) !== undefined)).map((r) => trendPeriodLabel(r.dateFrom, r.dateTo));
   const trendLongLabels: Record<string, string> = Object.fromEntries(trendSorted.map((r, idx) => [`${r.dateFrom}|${r.dateTo}|${idx}`, trendPeriodLabel(r.dateFrom, r.dateTo, true)]));
   // One distinct colour per organisation (lib/org-colours.ts); an organisation keeps its colour when others are added.
   const trendColorOf = (org: string) => orgColour(Math.max(0, trendOrgs.indexOf(org)));
@@ -2493,10 +2508,10 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                     Trends
                   </div>
                   <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: "-.02em", color: C.textHi, margin: 0 }}>
-                    Scores Over Time
+                    Counts Over Time
                   </h2>
                   <p style={{ fontSize: 15, color: C.muted, marginTop: 6 }}>
-                    Raw numbers for each report period, plotted by organisation. They are not converted to shares of the group.
+                    How many were found in each report period, plotted by organisation. Counts only: no scores, no shares of the group.
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -2535,6 +2550,24 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                   ))}
                 </div>
               </div>
+              {trendMetric === "posts" && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+                  <span style={{ fontSize: 13.5, color: C.muted, marginRight: 6 }}>Platform:</span>
+                  {TREND_PLATFORMS.map((pl) => (
+                    <button
+                      key={pl.key}
+                      onClick={() => setTrendPlatform(pl.key)}
+                      style={{
+                        padding: "5px 12px", borderRadius: 8,
+                        background: trendPlatform === pl.key ? "var(--elevate-2)" : "transparent",
+                        color: trendPlatform === pl.key ? "var(--text-main)" : C.muted,
+                        border: `1px solid ${trendPlatform === pl.key ? "var(--text-main)" : C.border}`,
+                        fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >{pl.label}</button>
+                  ))}
+                </div>
+              )}
               {trendKinds.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
                   <span style={{ fontSize: 13.5, color: C.muted, marginRight: 6 }}>Report length:</span>
@@ -2615,6 +2648,11 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
+                  {trendNoCounts.length > 0 && (
+                    <div style={{ fontSize: 13, color: "var(--text-sub)", padding: "8px 4px 0" }}>
+                      No count was stored for {trendNoCounts.join(", ")} (those reports were made before counts were kept). They are left out of the chart, not plotted as 0.
+                    </div>
+                  )}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 4px 0", flexWrap: "wrap" }}>
                     <div style={{ fontSize: 13, color: "var(--text-sub)" }}>
                       {focusedSet.size ? <>Showing {[...focusedSet].map((o, i) => <span key={o}>{i > 0 ? ", " : ""}<strong style={{ color: trendColorOf(o) }}>{o}</strong></span>)}; the other organisations are greyed out. Click a name again to deselect it.</> : "Select one or more organisations (a name below, or its line) to focus on them. Hover for the absolute numbers."}
