@@ -19,7 +19,7 @@ L.useAppModules();
 
 const yes = process.argv.includes("--yes");
 const reviewDir = L.arg("reviews");
-const gh = (args, opts = {}) => execFileSync("gh", args, { maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"], ...opts });
+const gh = (args, opts = {}) => execFileSync("gh", args, { maxBuffer: 1 << 28, stdio: [opts.input ? "pipe" : "ignore", "pipe", "pipe"], ...opts });
 const api = (p) => JSON.parse(gh(["api", `repos/${L.REPO}/${p}`]).toString());
 const NEW = ["tv", "print", "mentions", "li", "x", "ig", "yt"];
 
