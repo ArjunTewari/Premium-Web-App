@@ -214,12 +214,16 @@ interface TrendReport {
 }
 
 
-// Counts only: no score, no share. Each tab plots how many were found.
+// Two groups: the share of voice (a % of the whole group) and the real counts behind it.
 const TREND_METRICS = [
-  { key: "tv" as const, label: "TV digital", unit: "", note: "Articles found on the TV channel sites NDTV, News18, India Today, India TV and ABP News. A count." },
-  { key: "print" as const, label: "Print digital", unit: "", note: "Articles found on Times of India, Hindustan Times, The Hindu, Indian Express and Deccan Herald. A count." },
-  { key: "mentions" as const, label: "LLM mentions", unit: "", note: "Total times ChatGPT, Perplexity and Claude named the organisation, across every question asked. A count." },
-  { key: "posts" as const, label: "Social posts", unit: "", note: "Posts found for the period (YouTube: videos). Pick a platform, or all. A count." },
+  { key: "sov" as const, group: "Share of voice", label: "SoV Score", unit: "%", note: "Total share of voice: the average of the three shares below, as a % of all organisations." },
+  { key: "pressShare" as const, group: "Share of voice", label: "Press Share", unit: "%", note: "Share of news coverage: articles found (2.5 points each, up to 100), as a % of all organisations' points." },
+  { key: "llmShare" as const, group: "Share of voice", label: "LLM Share", unit: "%", note: "Share of AI-assistant visibility: how often the assistants name the organisation, as a % of all organisations' scores." },
+  { key: "socialShare" as const, group: "Share of voice", label: "Social Share", unit: "%", note: "Share of social media activity: the 0–10 presence score (posts, platforms, relevance), as a % of all organisations' scores." },
+  { key: "tv" as const, group: "Counts", label: "TV digital", unit: "", note: "Articles found on the TV channel sites NDTV, News18, India Today, India TV and ABP News. A count." },
+  { key: "print" as const, group: "Counts", label: "Print digital", unit: "", note: "Articles found on Times of India, Hindustan Times, The Hindu, Indian Express and Deccan Herald. A count." },
+  { key: "mentions" as const, group: "Counts", label: "LLM mentions", unit: "", note: "Total times ChatGPT, Perplexity and Claude named the organisation, across every question asked. A count." },
+  { key: "posts" as const, group: "Counts", label: "Social posts", unit: "", note: "Posts found for the period (YouTube: videos). Pick a platform, or all. A count." },
 ];
 type TrendMetricKey = typeof TREND_METRICS[number]["key"];
 const TREND_PLATFORMS = [
@@ -230,8 +234,12 @@ const TREND_PLATFORMS = [
   { key: "yt" as const, label: "YouTube" },
 ];
 type TrendPlatform = typeof TREND_PLATFORMS[number]["key"];
-// undefined = this report was stored without that count (shown as a gap, never as 0)
+// undefined = this report was stored without that count (the shares are always there) (shown as a gap, never as 0)
 function trendValueOf(s: TrendScores, key: TrendMetricKey, platform: TrendPlatform): number | undefined {
+  if (key === "sov") return s.sovScore;
+  if (key === "pressShare") return s.pressShare;
+  if (key === "llmShare") return s.llmShare;
+  if (key === "socialShare") return s.socialShare;
   if (key === "tv") return s.tv;
   if (key === "print") return s.print;
   if (key === "mentions") return s.mentions;
@@ -306,6 +314,7 @@ function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; se
             {s ? (
               <div style={{ paddingLeft: 14, lineHeight: 1.55 }}>
                 <div><strong>{metric.label}: {trendNum(Number(x.value))}{unit}</strong></div>
+                <div style={dim}>SoV {trendNum(s.sovScore)}% · press {trendNum(s.pressShare)}% · LLM {trendNum(s.llmShare)}% · social {trendNum(s.socialShare)}%</div>
                 <div style={dim}>articles: TV {s.tv ?? "–"} · print {s.print ?? "–"} · all {s.articles}</div>
                 <div style={dim}>LLM mentions {s.mentions ?? "–"}</div>
                 <div style={dim}>posts: LinkedIn {s.li ?? "–"} · X {s.x ?? "–"} · Instagram {s.ig ?? "–"} · YouTube {s.yt ?? "–"}</div>
@@ -614,7 +623,7 @@ export default function Home() {
   const [prevReports, setPrevReports] = useState<ReportFile[]>([]);
   const [trendReports, setTrendReports] = useState<TrendReport[]>([]);
   const [trendsLoading, setTrendsLoading] = useState(false);
-  const [trendMetric, setTrendMetric] = useState<TrendMetricKey>("print");
+  const [trendMetric, setTrendMetric] = useState<TrendMetricKey>("sov");
   const [trendPlatform, setTrendPlatform] = useState<TrendPlatform>("all");
   // Width of the Trends chart, measured, so the period labels are turned only when they do not fit side by side.
   const [trendBox, setTrendBox] = useState<HTMLDivElement | null>(null);
@@ -2508,10 +2517,10 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                     Trends
                   </div>
                   <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: "-.02em", color: C.textHi, margin: 0 }}>
-                    Counts Over Time
+                    Share of Voice and Counts Over Time
                   </h2>
                   <p style={{ fontSize: 15, color: C.muted, marginTop: 6 }}>
-                    How many were found in each report period, plotted by organisation. Counts only: no scores, no shares of the group.
+                    Total share of voice and its three shares, and the real counts behind them, for each report period, plotted by organisation.
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -2532,9 +2541,12 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                       ))}
                     </div>
                   )}
-                  {TREND_METRICS.map((m) => (
+                  {TREND_METRICS.map((m, mi) => (
+                    <span key={m.key} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    {(mi === 0 || TREND_METRICS[mi - 1].group !== m.group) && (
+                      <span style={{ fontSize: 12.5, color: C.muted, textTransform: "uppercase", letterSpacing: ".08em", marginLeft: mi === 0 ? 0 : 10, paddingLeft: mi === 0 ? 0 : 12, borderLeft: mi === 0 ? "none" : `1px solid ${C.border}` }}>{m.group}</span>
+                    )}
                     <button
-                      key={m.key}
                       onClick={() => setTrendMetric(m.key)}
                       title={m.note}
                       style={{
@@ -2547,6 +2559,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                         transition: "background .2s, color .2s, border-color .2s",
                       }}
                     >{m.label}</button>
+                    </span>
                   ))}
                 </div>
               </div>
