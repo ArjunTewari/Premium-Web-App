@@ -216,10 +216,7 @@ interface TrendReport {
 
 // Two groups: the share of voice (a % of the whole group) and the real counts behind it.
 const TREND_METRICS = [
-  { key: "sov" as const, group: "Share of voice", label: "SoV Score", unit: "%", note: "Total share of voice: the average of the three shares below, as a % of all organisations." },
-  { key: "pressShare" as const, group: "Share of voice", label: "Press Share", unit: "%", note: "Share of news coverage: articles found (2.5 points each, up to 100), as a % of all organisations' points." },
-  { key: "llmShare" as const, group: "Share of voice", label: "LLM Share", unit: "%", note: "Share of AI-assistant visibility: how often the assistants name the organisation, as a % of all organisations' scores." },
-  { key: "socialShare" as const, group: "Share of voice", label: "Social Share", unit: "%", note: "Share of social media activity: the 0–10 presence score (posts, platforms, relevance), as a % of all organisations' scores." },
+  { key: "sov" as const, group: "Share of voice", label: "SoV Score", unit: "%", note: "Total share of voice: the average of an organisation's news, AI-assistant and social shares, as a % of all organisations." },
   { key: "tv" as const, group: "Counts", label: "TV digital", unit: "", note: "Articles found on the TV channel sites NDTV, News18, India Today, India TV and ABP News. A count." },
   { key: "print" as const, group: "Counts", label: "Print digital", unit: "", note: "Articles found on Times of India, Hindustan Times, The Hindu, Indian Express and Deccan Herald. A count." },
   { key: "mentions" as const, group: "Counts", label: "LLM mentions", unit: "", note: "Total times ChatGPT, Perplexity and Claude named the organisation, across every question asked. A count." },
@@ -237,9 +234,6 @@ type TrendPlatform = typeof TREND_PLATFORMS[number]["key"];
 // undefined = this report was stored without that count (the shares are always there) (shown as a gap, never as 0)
 function trendValueOf(s: TrendScores, key: TrendMetricKey, platform: TrendPlatform): number | undefined {
   if (key === "sov") return s.sovScore;
-  if (key === "pressShare") return s.pressShare;
-  if (key === "llmShare") return s.llmShare;
-  if (key === "socialShare") return s.socialShare;
   if (key === "tv") return s.tv;
   if (key === "print") return s.print;
   if (key === "mentions") return s.mentions;
@@ -314,7 +308,7 @@ function TrendTooltip(p: { active?: boolean; payload?: any[]; label?: string; se
             {s ? (
               <div style={{ paddingLeft: 14, lineHeight: 1.55 }}>
                 <div><strong>{metric.label}: {trendNum(Number(x.value))}{unit}</strong></div>
-                <div style={dim}>SoV {trendNum(s.sovScore)}% · press {trendNum(s.pressShare)}% · LLM {trendNum(s.llmShare)}% · social {trendNum(s.socialShare)}%</div>
+                <div style={dim}>SoV {trendNum(s.sovScore)}%</div>
                 <div style={dim}>articles: TV {s.tv ?? "–"} · print {s.print ?? "–"} · all {s.articles}</div>
                 <div style={dim}>LLM mentions {s.mentions ?? "–"}</div>
                 <div style={dim}>posts: LinkedIn {s.li ?? "–"} · X {s.x ?? "–"} · Instagram {s.ig ?? "–"} · YouTube {s.yt ?? "–"}</div>
@@ -2520,7 +2514,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
                     Share of Voice and Counts Over Time
                   </h2>
                   <p style={{ fontSize: 15, color: C.muted, marginTop: 6 }}>
-                    Total share of voice and its three shares, and the real counts behind them, for each report period, plotted by organisation.
+                    Total share of voice and the real counts behind it, for each report period, plotted by organisation.
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
