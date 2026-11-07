@@ -208,10 +208,10 @@ interface TrendReport {
 
 const TREND_METRICS = [
   { key: "sovScore" as const, label: "SoV Score", note: "Overall share of voice: the average of the three shares below, as a % of all organisations." },
-  { key: "pressShare" as const, label: "TV digital", note: "Share of online news coverage: articles found for the period (2.5 points each, up to 100), as a % of all organisations' points. TV and print outlets are counted together." },
+  { key: "pressShare" as const, label: "TV digital", alias: "Press Share", note: "Share of online news coverage: articles found for the period (2.5 points each, up to 100), as a % of all organisations' points. TV and print outlets are counted together." },
   { key: "llmShare" as const, label: "LLM Share", note: "Share of AI-assistant visibility: the 0–100 visibility score, as a % of all organisations' scores." },
   { key: "socialShare" as const, label: "Social Share", note: "Share of social media activity: the 0–10 presence score (posts, platforms, relevance), as a % of all organisations' scores." },
-  { key: "articles" as const, label: "Print digital", note: "Number of online news articles found for the period on the report's subject. A count, not a %. TV and print outlets are counted together." },
+  { key: "articles" as const, label: "Print digital", alias: "Articles", note: "Number of online news articles found for the period on the report's subject. A count, not a %. TV and print outlets are counted together." },
 ];
 
 // ── Trends: period labels and the focus layer ──────────────────────────────
@@ -2546,7 +2546,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "6px 28px", marginBottom: 24 }}>
                 {TREND_METRICS.map((m) => (
                   <div key={m.key} style={{ fontSize: 13.5, lineHeight: 1.45, color: trendMetric === m.key ? C.textHi : C.muted }}>
-                    <span style={{ fontWeight: 600, color: trendMetric === m.key ? C.gold : C.muted }}>{m.label}</span> — {m.note}
+                    <span style={{ fontWeight: 600, color: trendMetric === m.key ? C.gold : C.muted }}>{m.label}</span>{"alias" in m ? ` (${m.alias})` : ""} — {m.note}
                   </div>
                 ))}
               </div>
