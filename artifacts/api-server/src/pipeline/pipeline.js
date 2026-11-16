@@ -1210,7 +1210,7 @@ ${batchText}`;
   // ── STEP 6: Build outputs ─────────────────────────────────
   cb(`\nSTEP 6/6 — Building report files...`, "head");
   checkAbort();
-  // Filename: <Subject>-Full-<period>-<n>orgs, e.g. AQ-Full-2-Oct26-21orgs (2nd week of October 2026, 21 organisations).
+  // Filename: <Subject>-Full-<period>-<n>orgs, e.g. AQ-Full-Wk2-Oct26-21orgs (2nd week of October 2026, 21 organisations).
   // The period is the report's own DATE_FROM→DATE_TO window, never the generation time. See report-naming.js.
   const base = require("./report-naming").reportName({
     subject: require("./report-naming").subjectOfFramework(fwNow().id), kind: "Full", dateFrom: DATE_FROM, dateTo: DATE_TO, orgs: ORGS.length,

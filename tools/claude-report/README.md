@@ -47,12 +47,14 @@ gh auth login           # the GitHub CLI is used to read raw/ and (only on publi
    write `reports/<name>.html`, `reports/<name>.json` and the manifest entry. The name is made from the report's own
    dates and organisation count by the app's `pipeline/report-naming.js` (the app names its own runs the same way):
    `<AQ|Climt|Sust>-<Full|Snap|Bench>-<period>-<n>orgs.html`.
-   - one week (7 days): week of the month it starts in + month + year — `AQ-Full-2-Oct26-21orgs.html`
-     (start day 1-7 → 1, 8-14 → 2, 15-21 → 3, 22-28 → 4, 29-31 → 5)
+   - one week (Monday to Sunday): `Wk<n>-<Mon><yy>` — week 1 starts on the month's first Monday, week 2 on the second, ...
+     `AQ-Full-Wk2-Oct26-21orgs.html`. A week belongs to the month its Monday is in (Mon 26 Oct - Sun 1 Nov is Wk4-Oct26).
+   - several whole weeks in a row (a "4-week report"): `AQ-Full-Wk1-4-Oct26-21orgs.html` (Mon 5 Oct - Sun 1 Nov);
+     across two months `AQ-Full-Wk2Sep-Wk1Oct26-21orgs.html`
    - whole calendar month(s): `AQ-Full-Oct26-21orgs.html`, `AQ-Full-Aug-Sep26-20orgs.html`
-   - any other window is written out: `AQ-Full-14Sep-11Oct26-20orgs.html`
+   - any other window (including a 7-day window that does not start on a Monday) is written out: `AQ-Full-11Sep-11Oct26-20orgs.html`
    - snapshot / benchmark of one organisation: the organisation replaces the count — `AQ-Snap-cstep-Aug26.html`
    The tool refuses to overwrite unless `--replace`; `--remove <old-name.html>` deletes an older copy after the new one is in.
-   `rename-stored.cjs` (dry run; `--yes` = one commit, revertible) moved every report already stored to this scheme.
+   `rename-stored.cjs` (dry run; `--yes` = one commit, revertible) moves every report already stored to this scheme.
 
 Keep `review.json`, `text.json` and `posts-to-review.md` with the report: they are the record of what was checked.

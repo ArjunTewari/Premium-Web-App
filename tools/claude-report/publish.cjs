@@ -2,7 +2,7 @@
 // Step 4 — put the finished report in the web app (the reports repo: reports/<name>.html, reports/<name>.json, manifest.json).
 //   node publish.cjs <report-folder> --subject AQ|Climt|Sust [--kind Full|Snap|Bench] [--replace] [--remove <old-name.html>] [--yes]
 //   node publish.cjs <report-folder> --name <file.html> ...        (an explicit name instead of the schema, see naming.cjs)
-// The name comes from the report's own dates and organisation count: AQ-Full-2-Oct26-21orgs.html.
+// The name comes from the report's own dates and organisation count: AQ-Full-Wk2-Oct26-21orgs.html.
 // Without --yes it only shows what would be written. It refuses to overwrite a report of the same name unless --replace.
 // --remove deletes an older copy of the same report (its html, its trend json and its manifest entry) after the new one is in.
 const { execFileSync } = require("child_process");
@@ -29,7 +29,7 @@ if (!name) {
   try { name = reportName({ subject: arg("subject"), kind: arg("kind", "Full"), dateFrom: t.dateFrom, dateTo: t.dateTo, orgs: (t.orgs || []).length }); }
   catch (e) { fail(`NOT PUBLISHED: ${e.message}`); }
 }
-if (!/^[\w.-]+\.html$/.test(name)) fail("the name must be like AQ-Full-2-Oct26-21orgs.html");
+if (!/^[\w.-]+\.html$/.test(name)) fail("the name must be like AQ-Full-Wk2-Oct26-21orgs.html");
 
 const gh = (args, input) => execFileSync("gh", args, { input, maxBuffer: 1 << 28 });
 const api = (p) => JSON.parse(gh(["api", `repos/${REPO}/${p}`]).toString());
