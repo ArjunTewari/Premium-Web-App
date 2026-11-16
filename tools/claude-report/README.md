@@ -58,3 +58,23 @@ gh auth login           # the GitHub CLI is used to read raw/ and (only on publi
    `rename-stored.cjs` (dry run; `--yes` = one commit, revertible) moves every report already stored to this scheme.
 
 Keep `review.json`, `text.json` and `posts-to-review.md` with the report: they are the record of what was checked.
+
+## A report over several weeks (a "4-week report") and a Benchmark of one organisation
+
+No new fetching is needed when each week was collected and saved (`raw/` in the reports repo, `node fetch.cjs list`).
+
+1. **Put the weeks together** — `node merge-weeks.cjs <wk1> <wk2> <wk3> <wk4> --out work/merged.json.gz`
+   (names from `raw/` work as they are). The weeks must follow one another with no gap and no overlap. Articles and saved
+   posts are pooled (one per address) and counted again for the whole period; YouTube videos likewise. The AI-assistant
+   probes are NOT added up (the questions differ from week to week and a score is one day's measurement): the latest week's
+   probes are used and the report says so.
+2. Then the usual steps 3-7 on `work/merged.json.gz`: `digest.cjs` (read every counted post; posts already read in a weekly
+   review keep their exclusions), `review.json`, `text.json`, `build.cjs`, `publish.cjs`. The name is made from the dates:
+   Mon 5 Oct - Sun 1 Nov is `AQ-Full-Wk1-4-Oct26-21orgs.html`.
+3. **Benchmark / Snapshot of one organisation** — `node derive.cjs <full-report.html> --org RaahGiri --type benchmark`
+   (add `--yes` to put it in the web app). It is the same free code as "◧ Benchmark / Snapshot" in the Reports tab, which can
+   also be used on any full report there. A benchmark always covers the whole period of the full report it is made from, so
+   a 4-week benchmark needs a 4-week full report.
+
+`add-counts.cjs` and `counts-from-report.cjs` add the real counts (TV / print articles, LLM mentions, posts per platform) to
+reports stored before those were kept.
