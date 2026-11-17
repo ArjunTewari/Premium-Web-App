@@ -76,5 +76,9 @@ No new fetching is needed when each week was collected and saved (`raw/` in the 
    also be used on any full report there. A benchmark always covers the whole period of the full report it is made from, so
    a 4-week benchmark needs a 4-week full report.
 
+`trim-period.cjs <collection> --from d --to d --out f` cuts a saved collection down to a shorter period inside it (e.g. the
+last week of a long run). A long run finds fewer articles per week than weekly runs do, so for a 4-week report prefer the
+weekly collections, and use `trim-period.cjs` to take just the missing week out of a longer run before `merge-weeks.cjs`.
+
 `add-counts.cjs` and `counts-from-report.cjs` add the real counts (TV / print articles, LLM mentions, posts per platform) to
 reports stored before those were kept.
