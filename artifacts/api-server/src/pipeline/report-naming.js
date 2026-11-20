@@ -64,6 +64,13 @@ function reportName({ subject = "AQ", kind = "Full", dateFrom, dateTo, orgs, org
   return `${s}-${k}-${slug(org)}-${p}.html`;
 }
 
+/** The interactive posts file of a period (what the Interactive tab reads): AQ-Posts-Wk1-Nov26-21orgs.json */
+function interactiveName({ subject = "AQ", dateFrom, dateTo, orgs }) {
+  const s = SUBJECTS.find((x) => x.toLowerCase() === String(subject).toLowerCase()) || SUBJECT_BY_FRAMEWORK[subject];
+  if (!s) throw new Error(`subject must be AQ, Climt or Sust (got ${subject})`);
+  return `${s}-Posts-${period(dateFrom, dateTo)}-${orgs}orgs.json`;
+}
+
 /** "Snap" / "Bench" files, new or legacy (aq-snapshot-…); null for a full report. */
 const DERIVED_NAME = /^(?:(?:aq|climt|sust)-(bench|snap)-|aq-(benchmark|snapshot)-)/i;
 function derivedKindOfName(name) {
@@ -96,4 +103,4 @@ function currentName(name) {
   try { return reportName({ subject: "AQ", kind: d[1], dateFrom: d[3], dateTo: d[4], org: d[2] }); } catch { return name; }
 }
 
-module.exports = { reportName, period, slug, subjectOfFramework, derivedKindOfName, subjectOfName, currentName, DERIVED_NAME };
+module.exports = { reportName, interactiveName, period, slug, subjectOfFramework, derivedKindOfName, subjectOfName, currentName, DERIVED_NAME };

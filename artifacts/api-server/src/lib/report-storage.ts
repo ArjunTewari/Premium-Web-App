@@ -231,6 +231,27 @@ export async function listReportDataFiles(): Promise<string[]> {
     .map((f) => f.name as string);
 }
 
+// ── Interactive posts: every social post of a period, each in one scope (see pipeline/post-scopes.js) ──
+// interactive/index.json lists them (what the Interactive tab shows); interactive/<name>.json is one period's posts.
+// Kept apart from reports/ so the Reports and Trends tabs never list them.
+export async function getInteractiveIndex(): Promise<unknown[]> {
+  if (!isConfigured()) return [];
+  const res = await githubRequest(`/contents/interactive/index.json?ref=${branch()}`, { headers: { Accept: "application/vnd.github.raw+json" } });
+  if (!res || !res.ok) return [];
+  try {
+    const body = JSON.parse(await res.text()) as { reports?: unknown[] };
+    return Array.isArray(body.reports) ? body.reports : [];
+  } catch { return []; }
+}
+
+export async function getInteractiveDataset(name: string): Promise<string | null> {
+  if (!isConfigured()) return null;
+  if (!/^[A-Za-z0-9._-]+\.json$/.test(name) || name === "index.json") return null;
+  const res = await githubRequest(`/contents/interactive/${encodeURIComponent(name)}?ref=${branch()}`, { headers: { Accept: "application/vnd.github.raw+json" } });
+  if (!res || !res.ok) return null;
+  return await res.text();
+}
+
 // ── Checkpoints: the data a run collected (gzipped JSON), kept under raw/ ──
 // Separate from reports/ so the Reports and Trends tabs never list them. See
 // pipeline/checkpoint.js: a later run can resume from one without fetching again.

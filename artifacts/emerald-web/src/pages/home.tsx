@@ -7,6 +7,7 @@ import {
 } from "@/lib/report-filters";
 import { useLocation } from "wouter";
 import { orgColour } from "@/lib/org-colors";
+import InteractiveReports from "@/components/InteractiveReports";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const LOADING_QUOTES = [
@@ -597,7 +598,7 @@ export default function Home() {
     }
   }
 
-  const [activeTab, setActiveTab] = useState<"dashboard" | "reports" | "trends" | "scheduler" | "handles">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "reports" | "interactive" | "trends" | "scheduler" | "handles">("dashboard");
 
   // Handles tab — new org add form
   const [hNewOrg, setHNewOrg]   = useState("");
@@ -1620,6 +1621,7 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
         <nav style={{ display: "flex", gap: 4 }}>
           <a onClick={() => setActiveTab("dashboard")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "dashboard" ? C.goldLight : C.muted, background: activeTab === "dashboard" ? "var(--elevate-2)" : "transparent" }}>Dashboard</a>
           <a onClick={() => setActiveTab("reports")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "reports" ? C.goldLight : C.muted, background: activeTab === "reports" ? "var(--elevate-2)" : "transparent" }}>Reports</a>
+          <a onClick={() => setActiveTab("interactive")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "interactive" ? C.goldLight : C.muted, background: activeTab === "interactive" ? "var(--elevate-2)" : "transparent" }}>Interactive</a>
           <a onClick={() => setActiveTab("trends")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "trends" ? C.goldLight : C.muted, background: activeTab === "trends" ? "var(--elevate-2)" : "transparent" }}>Trends</a>
           <a onClick={() => setActiveTab("scheduler")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "scheduler" ? C.goldLight : C.muted, background: activeTab === "scheduler" ? "var(--elevate-2)" : "transparent" }}>Scheduler</a>
           <a onClick={() => setActiveTab("handles")} className="mo-nav-link" style={{ padding: "6px 14px", borderRadius: 8, fontSize: 15, fontWeight: 500, textDecoration: "none", cursor: "pointer", transition: "color .2s, background .2s", color: activeTab === "handles" ? C.goldLight : C.muted, background: activeTab === "handles" ? "var(--elevate-2)" : "transparent" }}>Handles</a>
@@ -2500,6 +2502,9 @@ It is removed from the Reports list and from the Trends charts. This cannot be u
             )}
           </div>
         )}
+
+        {/* ── Interactive tab: every post of a period, sorted into scopes, explorable ── */}
+        {activeTab === "interactive" && <InteractiveReports />}
 
         {/* ── Trends tab ──────────────────────────────────────────────── */}
         {activeTab === "trends" && (

@@ -82,3 +82,11 @@ weekly collections, and use `trim-period.cjs` to take just the missing week out 
 
 `add-counts.cjs` and `counts-from-report.cjs` add the real counts (TV / print articles, LLM mentions, posts per platform) to
 reports stored before those were kept.
+
+## Interactive posts (the Interactive tab)
+
+`node scopes.cjs <collection.json.gz> [--cache scope-cache.json] [--yes]` takes EVERY social post of a collection's period (the keyword
+test only decides what is counted, the collection holds them all), puts each in one scope (air quality / climate / sustainability /
+other) with the Claude CLI, and writes `AQ-Posts-<period>-<n>orgs.json`. `--yes` puts it in the reports repo under `interactive/` (with
+`interactive/index.json`), which is what the web app's Interactive tab lists and draws. Labels already made are kept in `--cache`, so a
+second run costs nothing. A batch the model does not answer leaves posts unlabelled (never guessed) and `--yes` refuses until they are.

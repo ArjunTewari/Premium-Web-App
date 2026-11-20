@@ -17,6 +17,8 @@ import {
   listReportDataFiles,
   getReportContent,
   deleteReport,
+  getInteractiveIndex,
+  getInteractiveDataset,
 } from "../lib/report-storage.js";
 import { isSampleReport } from "../lib/seed-sample-reports.js";
 import { logger } from "../lib/logger.js";
@@ -534,6 +536,28 @@ router.get("/trends", requireAuth, async (_req: Request, res: Response) => {
   } catch {
     return res.json({ reports: [] });
   }
+});
+
+// ── Interactive posts: the period's social posts, each in one scope ─────────
+// GET /interactive          the list (name, size, date, counts)
+// GET /interactive/:name    one period's posts (the file the Interactive tab draws)
+router.get("/interactive", requireAuth, async (_req: Request, res: Response) => {
+  try {
+    const reports = (await getInteractiveIndex()) as { mtime?: string }[];
+    reports.sort((a, b) => String(b.mtime ?? "").localeCompare(String(a.mtime ?? "")));
+    return res.json({ reports });
+  } catch {
+    return res.json({ reports: [] });
+  }
+});
+
+router.get("/interactive/:name", requireAuth, async (req: Request, res: Response) => {
+  const name = String(req.params.name ?? "");
+  const body = await getInteractiveDataset(name);
+  if (!body) return res.status(404).json({ error: "Not found" });
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "private, max-age=300");
+  return res.send(body);
 });
 
 export default router;

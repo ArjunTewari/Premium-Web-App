@@ -40,5 +40,6 @@ eq("a report stored under the older scheme is matched to its current name", [
   N.currentName("AQ-Snap-cstep-1Feb-1May26.html"),
 ], ["AQ-Snap-cstep-Aug26.html", "AQ-Bench-chintan-environmental-research-and-action-group-Aug26.html", "AQ-Snap-raahgiri-Wk1-Sep26.html", "AQ-Snap-cstep-Aug26.html", "TMP-Sep2026-20orgs.html",
   "AQ-Snap-raahgiri-Wk2-Oct26.html", "AQ-Full-Wk4-Sep26-21orgs.html", "AQ-Full-Wk4-Sep26-21orgs.html", "AQ-Snap-cstep-1Feb-1May26.html"]);
+eq("the interactive posts file of a period", [N.interactiveName({ subject: "AQ", dateFrom: "2026-11-02", dateTo: "2026-11-08", orgs: 21 }), N.interactiveName({ subject: "Climt", dateFrom: "2026-10-05", dateTo: "2026-11-01", orgs: 3 })], ["AQ-Posts-Wk1-Nov26-21orgs.json", "Climt-Posts-Wk1-4-Oct26-3orgs.json"]);
 eq("names are safe file names", /^[\w.-]+$/.test(full("2026-09-14", "2026-10-11", 20)), true);
 console.log(fail ? `${fail} FAILED` : "all passed"); process.exit(fail ? 1 : 0);
