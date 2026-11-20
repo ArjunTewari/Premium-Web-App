@@ -369,11 +369,31 @@ function validateExecSummary(execF, data, ORGS) {
         // the nearest one (26 Oct: "CREA and TERI each published 1 article" was checked against TERI alone).
         let listed = [nearestOrg];
         const lead = text.slice(Math.max(0, m.index - 160), m.index);
+        const cut = Math.max(lead.lastIndexOf('. '), lead.lastIndexOf('; '));
+        const clause = lead.slice(cut + 1);
+        const inClause = orgsByLen.filter((o) => clause.includes(o));
         if (/\b(each|both)\b[^.;]*$/i.test(lead)) {
-          const cut = Math.max(lead.lastIndexOf('. '), lead.lastIndexOf('; '));
-          const clause = lead.slice(cut + 1);
-          const inClause = orgsByLen.filter((o) => clause.includes(o));
           if (inClause.length > 1) listed = inClause;
+        } else if (inClause.length > 1) {
+          // Organisations named TOGETHER ("A, B and C ... N") are one subject: a number after the list is not about the last
+          // one. A collective article total is checked against the sum; anything else about a group is left alone, never
+          // pinned on the nearest organisation (28 Oct: "A, B, C, D and E collectively published 7 articles" was "corrected"
+          // to the last one's 1; "A and B scored 51/100 and 33/100 respectively" to 33 and 33).
+          const hits = orgHits.filter((h) => h.pos < m.index && segOf(h.pos) === segOf(m.index)).sort((a, b) => a.pos - b.pos);
+          const last = hits[hits.length - 1], prev = hits[hits.length - 2];
+          const gap = prev && last ? text.slice(prev.pos + prev.org.length, last.pos) : '';
+          const enumerated = !!prev && /^\s*(,|and|&|,\s*and)?\s*$/i.test(gap);
+          if (enumerated) {
+            if (/\b(collectively|combined|together|in total|in all|altogether|a total of)\b/i.test(clause) && label === 'articles') {
+              const members = [...new Set(hits.map((h) => h.org))];
+              const sum = members.reduce((acc, o) => acc + ((data[o] && data[o].total) || 0), 0);
+              checked++;
+              if (Math.abs(sum - val) >= 0.6) {
+                issues.push({ findingIdx: fi, headline: finding.headline || '', org: members.join(', '), claimed: val, metric: label, actual: `total (sum of ${members.length}) = ${sum}`, matchStart: gStart, matchEnd: gEnd, correctedValue: String(sum) });
+              }
+            }
+            continue; // anything else about a group is left to the reviewer, not guessed at
+          }
         }
         for (const orgN of listed) {
         checked++;
