@@ -7,7 +7,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 interface IndexEntry { name: string; size: number; mtime: string; dateFrom: string; dateTo: string; orgs: number; posts: number; counts?: Record<string, number> }
 type Platform = "li" | "x" | "ig";
 interface Post { o: string; p: Platform; s: string | null; d: string; t: string; u: string; l: number; c: number; h: number; v: number }
-interface Dataset { report: string | null; dateFrom: string; dateTo: string; scopes: { id: string; label: string }[]; orgs: string[]; unlabelled: number; posts: Post[] }
+interface ScopeInfo { id: string; label: string; rule: string; keywords: string[] }
+interface Dataset { report: string | null; dateFrom: string; dateTo: string; scopes: { id: string; label: string }[]; scopeInfo?: ScopeInfo[]; orgs: string[]; unlabelled: number; posts: Post[] }
 
 const PLATFORMS: { id: Platform; label: string }[] = [{ id: "li", label: "LinkedIn" }, { id: "x", label: "X" }, { id: "ig", label: "Instagram" }];
 const PLATFORM_LABEL: Record<string, string> = { li: "LinkedIn", x: "X", ig: "Instagram" };
@@ -19,7 +20,10 @@ const SCOPE_NOTE: Record<string, string> = {
   sustainability: "Sustainability, energy transition, waste, water, biodiversity, sustainable cities and mobility.",
   other: "None of these: events, hiring, greetings, awards, organisation news.",
 };
-type SortKey = "total" | "name" | string;
+// "total" = posts in the scopes on show, "all" = posts in every scope, "name" = A to Z, or a scope id
+type SortKey = "total" | "all" | "name" | string;
+interface SortState { key: SortKey; dir: 1 | -1 }
+const DEFAULT_SORT: SortState = { key: "total", dir: -1 };
 
 const dim = "var(--text-sub)";
 const card: React.CSSProperties = { background: "var(--elevate-1)", border: "1px solid var(--border-col)", borderRadius: 14 };
@@ -33,6 +37,36 @@ const shortOrg = (o: string) => (o.length > 24 ? `${o.slice(0, 23)}…` : o);
 const fmtDate = (s: string) => s.slice(0, 10);
 const engagement = (p: Post) => p.l + p.c + p.h;
 const pct = (n: number, d: number) => (d ? `${Math.round((n / d) * 1000) / 10}%` : "0%");
+const median = (xs: number[]) => {
+  if (!xs.length) return 0;
+  const s = [...xs].sort((a, b) => a - b), m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+const num = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
+function downloadCsv(name: string, rows: (string | number)[][]) {
+  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// A named section of the explorer.
+function Section({ n, title, note, actions, children }: { n: number; title: string; note?: string; actions?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section style={{ marginTop: 26 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+        <div>
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 20, fontWeight: 700, color: "var(--text-main)" }}><span style={{ color: "var(--accent-amber)", ...mono, fontSize: 14, marginRight: 8 }}>{String(n).padStart(2, "0")}</span>{title}</div>
+          {note && <div style={{ fontSize: 13.5, color: dim, marginTop: 2 }}>{note}</div>}
+        </div>
+        {actions && <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>{actions}</div>}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function InteractiveReports() {
   const [list, setList] = useState<IndexEntry[] | null>(null);
@@ -91,8 +125,9 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
   const [scopes, setScopes] = useState<string[] | null>(null); // null = all
   const [focus, setFocus] = useState<string[]>([]);
   const [percent, setPercent] = useState(false);
-  const [sort, setSort] = useState<SortKey>("total");
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   const [shown, setShown] = useState(20);
+  const [showRules, setShowRules] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -120,8 +155,8 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
       const vis = visible.reduce((n, s) => n + counts[s], 0);
       return { org: o, counts, all, vis };
     });
-    const key = (r: (typeof out)[number]) => (sort === "total" ? r.vis : sort === "name" ? 0 : r.counts[sort] ?? 0);
-    return out.sort((a, b) => (sort === "name" ? a.org.localeCompare(b.org) : key(b) - key(a) || a.org.localeCompare(b.org)));
+    const value = (r: (typeof out)[number]) => (sort.key === "total" ? r.vis : sort.key === "all" ? r.all : r.counts[sort.key] ?? 0);
+    return out.sort((a, b) => (sort.key === "name" ? sort.dir * a.org.localeCompare(b.org) : sort.dir * (value(a) - value(b)) || a.org.localeCompare(b.org)));
   }, [ds, byPlatform, scopeIds, visible, sort]);
 
   const chartData = useMemo(() => rows.map((r) => {
@@ -148,8 +183,11 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
     });
     setShown(20);
   };
-  const dirty = focus.length > 0 || scopes !== null || platforms.length !== 3 || percent || sort !== "total";
-  const reset = () => { setFocus([]); setScopes(null); setPlatforms(["li", "x", "ig"]); setPercent(false); setSort("total"); setShown(20); };
+  // A column heading sorts by that column (largest first); the same heading again reverses it.
+  const sortBy = (key: SortKey) => setSort((cur) => (cur.key === key ? { key, dir: (cur.dir * -1) as 1 | -1 } : { key, dir: key === "name" ? 1 : -1 }));
+  const arrow = (key: SortKey) => (sort.key === key ? (sort.dir === -1 ? " ▼" : " ▲") : "");
+  const dirty = focus.length > 0 || scopes !== null || platforms.length !== 3 || percent || sort.key !== DEFAULT_SORT.key || sort.dir !== DEFAULT_SORT.dir;
+  const reset = () => { setFocus([]); setScopes(null); setPlatforms(["li", "x", "ig"]); setPercent(false); setSort(DEFAULT_SORT); setShown(20); };
 
   const focused = new Set(focus);
   const dimmed = (o: string) => focus.length > 0 && !focused.has(o);
@@ -158,8 +196,22 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
     .filter((p) => p.s && visible.includes(p.s) && (focus.length === 0 || focus.includes(p.o)))
     .sort((a, b) => engagement(b) - engagement(a) || b.d.localeCompare(a.d)), [byPlatform, visible, focus]);
 
+  // the benchmark table: total of the field, the median organisation, and the selected organisations
+  const benchmark = useMemo(() => {
+    const cols = [...scopeIds, "all"];
+    const val = (r: (typeof rows)[number], c: string) => (c === "all" ? r.all : r.counts[c]);
+    const total: Record<string, number> = {}, med: Record<string, number> = {};
+    for (const c of cols) { const xs = rows.map((r) => val(r, c)); total[c] = xs.reduce((a, b) => a + b, 0); med[c] = median(xs); }
+    const mine = focus.map((o) => rows.find((r) => r.org === o)).filter((r): r is (typeof rows)[number] => !!r);
+    return { cols, total, med, mine, val };
+  }, [rows, scopeIds, focus]);
+
   if (error) return <div style={{ paddingTop: 40 }}><button onClick={onBack} style={chip(false)}>← Back</button><div style={{ ...card, padding: 30, marginTop: 16, color: dim }}>{error}</div></div>;
   if (!ds) return <div style={{ paddingTop: 40 }}><button onClick={onBack} style={chip(false)}>← Back</button><div style={{ color: dim, padding: "40px 0", textAlign: "center" }}>Loading…</div></div>;
+
+  const baseName = entry.name.replace(/\.json$/, "");
+  const colLabel = (c: string) => (c === "all" ? "All posts" : labelOf(c));
+  const platformNote = platforms.length === 3 ? "all platforms" : platforms.map((p) => PLATFORM_LABEL[p]).join(" + ");
 
   const tip = (p: { active?: boolean; payload?: { payload: { org: string } }[] }) => {
     if (!p.active || !p.payload?.length) return null;
@@ -187,145 +239,241 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
   const maxCell: Record<string, number> = {};
   for (const s of scopeIds) maxCell[s] = Math.max(1, ...rows.map((r) => r.counts[s]));
 
+  const th: React.CSSProperties = { cursor: "pointer", fontWeight: 700, padding: "4px 8px", userSelect: "none", whiteSpace: "nowrap" };
+  const csvBenchmark = () => downloadCsv(`${baseName}-benchmark.csv`, [
+    ["", ...benchmark.cols.map(colLabel)],
+    ["Total (all organisations)", ...benchmark.cols.map((c) => benchmark.total[c])],
+    [`Median organisation (of ${rows.length})`, ...benchmark.cols.map((c) => benchmark.med[c])],
+    ...benchmark.mine.map((r) => [r.org, ...benchmark.cols.map((c) => benchmark.val(r, c))]),
+  ]);
+  const csvAll = () => downloadCsv(`${baseName}-organisations.csv`, [
+    ["Organisation", ...benchmark.cols.map(colLabel)],
+    ...rows.map((r) => [r.org, ...benchmark.cols.map((c) => benchmark.val(r, c))]),
+  ]);
+
   return (
     <div style={{ paddingTop: 32 }}>
       <button onClick={onBack} style={{ ...chip(false), marginBottom: 14 }}>← All interactive reports</button>
-      <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: "var(--accent-amber)", marginBottom: 8 }}>Interactive</div>
-      <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 30, fontWeight: 700, letterSpacing: "-.02em", color: "var(--text-main)", margin: 0, ...{ wordBreak: "break-all" } }}>{entry.name.replace(/\.json$/, "")}</h2>
+      <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: "var(--accent-amber)", marginBottom: 8 }}>Interactive · All Scope</div>
+      <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 30, fontWeight: 700, letterSpacing: "-.02em", color: "var(--text-main)", margin: 0, wordBreak: "break-all" }}>{baseName}</h2>
       <p style={{ fontSize: 15, color: dim, marginTop: 6 }}>
-        {ds.dateFrom} → {ds.dateTo} · {ds.posts.length} posts from {ds.orgs.length} organisations. Each post is in one scope. Click a scope, a bar, a number or a platform to filter everything on the page.
+        {ds.dateFrom} → {ds.dateTo} · {ds.posts.length} posts from {ds.orgs.length} organisations. Each post is in one scope. Click a scope, a bar, a number, a column heading or a platform to filter or sort everything on the page.
         {ds.unlabelled > 0 && <span style={{ color: "#e05a5a" }}> {ds.unlabelled} posts have no scope yet.</span>}
       </p>
-
-      {/* scope tiles */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10, margin: "18px 0" }}>
-        <button onClick={() => { setScopes(null); setShown(20); }} style={{ ...card, textAlign: "left", padding: "12px 14px", cursor: "pointer", borderColor: scopes === null ? "var(--text-main)" : undefined, color: "var(--text-main)" }}>
-          <div style={{ fontSize: 13, color: dim, textTransform: "uppercase", letterSpacing: ".08em" }}>All scopes</div>
-          <div style={{ fontSize: 30, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{totalAll}</div>
-          <div style={{ fontSize: 12.5, color: dim }}>posts{platforms.length !== 3 ? " on the chosen platforms" : ""}</div>
-        </button>
-        {ds.scopes.map((s) => {
-          const on = scopes === null || scopes.includes(s.id);
-          return (
-            <button key={s.id} title={SCOPE_NOTE[s.id]} onClick={() => toggleScope(s.id)} style={{ ...card, textAlign: "left", padding: "12px 14px", cursor: "pointer", opacity: on ? 1 : 0.45, borderColor: scopes !== null && on ? SCOPE_COLOUR[s.id] : undefined, color: "var(--text-main)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: dim, textTransform: "uppercase", letterSpacing: ".08em" }}><span style={{ width: 10, height: 10, borderRadius: "50%", background: SCOPE_COLOUR[s.id] }} />{s.label}</div>
-              <div style={{ fontSize: 30, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{totals[s.id]}</div>
-              <div style={{ fontSize: 12.5, color: dim }}>{pct(totals[s.id], totalAll)} of posts</div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* controls */}
-      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13.5, color: dim }}>Platform:</span>
-          {PLATFORMS.map((pl) => <button key={pl.id} style={chip(platforms.includes(pl.id))} onClick={() => { setPlatforms((cur) => { const n = toggle(cur, pl.id); return n.length === 0 ? cur : n; }); setShown(20); }}>{pl.label}</button>)}
-        </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <span style={{ fontSize: 13.5, color: dim }}>Show:</span>
-          <button style={chip(!percent)} onClick={() => setPercent(false)}>Posts</button>
-          <button style={chip(percent)} onClick={() => setPercent(true)}>% of each organisation's posts</button>
-        </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <span style={{ fontSize: 13.5, color: dim }}>Order:</span>
-          <select value={sort} onChange={(e) => setSort(e.target.value)} style={{ background: "var(--elevate-1)", border: "1px solid var(--border-col)", borderRadius: 8, padding: "6px 10px", color: "var(--text-main)", fontSize: 13.5 }}>
-            <option value="total">Most posts</option>
-            <option value="name">A to Z</option>
-            {ds.scopes.map((s) => <option key={s.id} value={s.id}>Most {s.label}</option>)}
-          </select>
-        </div>
-        {dirty && <button style={{ ...chip(false), color: "var(--accent-amber)" }} onClick={reset}>Reset</button>}
-      </div>
-
-      {/* organisation x scope chart */}
-      <div style={{ ...card, padding: "18px 12px 8px" }}>
-        <div style={{ width: "100%", height: Math.max(360, rows.length * 30 + 50) }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, left: 20, bottom: 4 }} barCategoryGap={4}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-col)" horizontal={false} />
-              <XAxis type="number" domain={percent ? [0, 100] : [0, "auto"]} allowDecimals={false} tick={{ fill: "var(--text-sub)", fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: "var(--border-col)" }} tickLine={false} unit={percent ? "%" : ""} />
-              <YAxis
-                type="category" dataKey="org" width={200} interval={0} axisLine={false} tickLine={false}
-                tick={(tp: { x: number; y: number; payload: { value: string } }) => (
-                  <text x={tp.x} y={tp.y} dy={4} textAnchor="end" onClick={() => toggleFocus(tp.payload.value)} style={{ cursor: "pointer", fill: dimmed(tp.payload.value) ? "var(--text-dim)" : "var(--text-main)", fontSize: 12.5, fontWeight: focused.has(tp.payload.value) ? 700 : 400, fontFamily: "'DM Mono', monospace" }}>
-                    {shortOrg(tp.payload.value)}
-                  </text>
-                )}
-              />
-              <Tooltip content={tip as never} cursor={{ fill: "rgba(128,128,128,.12)" }} />
-              {visible.map((s) => (
-                <Bar key={s} dataKey={s} stackId="s" fill={SCOPE_COLOUR[s]} cursor="pointer" onClick={(d: { org?: string }) => d?.org && toggleFocus(d.org)} isAnimationActive={false}>
-                  {chartData.map((r) => <Cell key={String(r.org)} fill={SCOPE_COLOUR[s]} fillOpacity={dimmed(String(r.org)) ? 0.22 : 1} />)}
-                </Bar>
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div style={{ fontSize: 13, color: dim, padding: "6px 8px 4px" }}>
-          {focus.length ? <>Showing {focus.map((o, i) => <span key={o}>{i ? ", " : ""}<strong style={{ color: "var(--text-main)" }}>{o}</strong></span>)}; the other organisations are faded. Click a name or bar again to deselect.</> : "Click an organisation (its name or bar) to focus on it. Hover for the numbers."}
-        </div>
-      </div>
-
-      {/* matrix */}
-      <div style={{ ...card, padding: 14, marginTop: 14, overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 3, fontSize: 14 }}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left", color: dim, fontWeight: 600, padding: "4px 8px" }}>Organisation</th>
-              {ds.scopes.map((s) => (
-                <th key={s.id} onClick={() => toggleScope(s.id)} style={{ cursor: "pointer", color: SCOPE_COLOUR[s.id], fontWeight: 700, padding: "4px 8px", opacity: visible.includes(s.id) ? 1 : 0.4 }}>{s.label}</th>
-              ))}
-              <th style={{ color: dim, fontWeight: 600, padding: "4px 8px" }}>All</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.org} style={{ opacity: dimmed(r.org) ? 0.4 : 1 }}>
-                <td onClick={() => toggleFocus(r.org)} style={{ cursor: "pointer", padding: "4px 8px", color: "var(--text-main)", fontWeight: focused.has(r.org) ? 700 : 400, ...mono, fontSize: 13, whiteSpace: "nowrap" }}>{r.org}</td>
-                {scopeIds.map((s) => {
-                  const v = r.counts[s];
-                  return (
-                    <td
-                      key={s}
-                      title={`${r.org}: ${v} ${labelOf(s)} posts (${pct(v, r.all)} of its ${r.all})`}
-                      onClick={() => { setFocus([r.org]); setScopes([s]); setShown(20); }}
-                      style={{ cursor: "pointer", textAlign: "center", padding: "5px 8px", borderRadius: 6, color: "var(--text-main)", fontWeight: v ? 700 : 400, ...mono, background: v ? `color-mix(in srgb, ${SCOPE_COLOUR[s]} ${Math.round(12 + 55 * (v / maxCell[s]))}%, transparent)` : "transparent", opacity: v ? 1 : 0.5 }}
-                    >{v}</td>
-                  );
-                })}
-                <td style={{ textAlign: "center", padding: "5px 8px", color: dim, ...mono }}>{r.all}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div style={{ fontSize: 13, color: dim, padding: "8px 8px 2px" }}>Click a number to see exactly those posts. Click a scope heading to show or hide it.</div>
-      </div>
-
-      {/* posts */}
-      <div style={{ ...card, padding: 16, marginTop: 14 }}>
-        <div style={{ fontWeight: 700, color: "var(--text-main)", fontSize: 17, marginBottom: 10 }}>
-          Posts in this view <span style={{ color: dim, fontWeight: 400 }}>({list.length}, most engagement first)</span>
-        </div>
-        {list.length === 0 ? <div style={{ color: dim }}>No posts match.</div> : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {list.slice(0, shown).map((p, i) => (
-              <div key={`${p.u}-${i}`} style={{ borderLeft: `3px solid ${SCOPE_COLOUR[p.s ?? "other"]}`, background: "var(--elevate-2)", borderRadius: "0 8px 8px 0", padding: "8px 12px" }}>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", fontSize: 12.5, color: dim, ...mono }}>
-                  <strong style={{ color: "var(--text-main)" }}>{p.o}</strong>
-                  <span>{PLATFORM_LABEL[p.p]}</span>
-                  <span style={{ color: SCOPE_COLOUR[p.s ?? "other"], fontWeight: 700 }}>{labelOf(p.s ?? "other")}</span>
-                  <span>{fmtDate(p.d)}</span>
-                  <span>♥ {p.l} · 💬 {p.c} · ↗ {p.h}{p.v ? ` · 👁 ${p.v}` : ""}</span>
-                  {p.u && <a href={p.u} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-amber)" }}>Open ↗</a>}
-                </div>
-                <div style={{ fontSize: 14, color: "var(--text-main)", marginTop: 4, lineHeight: 1.45 }}>{p.t.length > 260 ? `${p.t.slice(0, 260)}…` : p.t || "(no text)"}</div>
+      <button style={{ ...chip(showRules), marginTop: 4 }} onClick={() => setShowRules((v) => !v)}>{showRules ? "Hide" : "ⓘ How posts are sorted"}</button>
+      {showRules && (
+        <div style={{ ...card, padding: 16, marginTop: 10 }}>
+          <div style={{ fontSize: 14, color: "var(--text-main)", lineHeight: 1.5, marginBottom: 12 }}>
+            Each post is read as a whole and put in the ONE scope it is mainly about. A passing mention does not decide it: a festival greeting that says “clean air”, a hiring notice, or a newsletter of many subjects is <strong>Other</strong> unless one subject clearly leads. The keywords below are the ones the weekly reports use to find each subject's posts; they are shown for transparency and a keyword on its own does not set the scope.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+            {(ds.scopeInfo ?? ds.scopes.map((s) => ({ id: s.id, label: s.label, rule: SCOPE_NOTE[s.id] ?? "", keywords: [] }))).map((s) => (
+              <div key={s.id} style={{ borderTop: `3px solid ${SCOPE_COLOUR[s.id]}`, background: "var(--elevate-2)", borderRadius: 8, padding: "10px 12px" }}>
+                <div style={{ fontWeight: 700, color: "var(--text-main)", marginBottom: 4 }}>{s.label}</div>
+                <div style={{ fontSize: 13.5, color: dim, lineHeight: 1.45, marginBottom: 8 }}>{s.rule}</div>
+                {s.keywords.length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                    {s.keywords.map((k) => <span key={k} style={{ fontSize: 12, ...mono, padding: "1px 7px", borderRadius: 999, border: "1px solid var(--border-col)", color: "var(--text-main)" }}>{k}</span>)}
+                  </div>
+                ) : <div style={{ fontSize: 12.5, color: dim }}>No keywords: anything not mainly about the three subjects.</div>}
               </div>
             ))}
-            {list.length > shown && <button style={{ ...chip(false), alignSelf: "flex-start" }} onClick={() => setShown((n) => n + 20)}>Show 20 more</button>}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      <Section n={1} title="Scope summary" note="How many posts are in each scope. Click a scope to show only it; click more to add them.">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 }}>
+          <button onClick={() => { setScopes(null); setShown(20); }} style={{ ...card, textAlign: "left", padding: "12px 14px", cursor: "pointer", borderColor: scopes === null ? "var(--text-main)" : undefined, color: "var(--text-main)" }}>
+            <div style={{ fontSize: 13, color: dim, textTransform: "uppercase", letterSpacing: ".08em" }}>All scopes</div>
+            <div style={{ fontSize: 30, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{totalAll}</div>
+            <div style={{ fontSize: 12.5, color: dim }}>posts{platforms.length !== 3 ? " on the chosen platforms" : ""}</div>
+          </button>
+          {ds.scopes.map((s) => {
+            const on = scopes === null || scopes.includes(s.id);
+            return (
+              <button key={s.id} title={SCOPE_NOTE[s.id]} onClick={() => toggleScope(s.id)} style={{ ...card, textAlign: "left", padding: "12px 14px", cursor: "pointer", opacity: on ? 1 : 0.45, borderColor: scopes !== null && on ? SCOPE_COLOUR[s.id] : undefined, color: "var(--text-main)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: dim, textTransform: "uppercase", letterSpacing: ".08em" }}><span style={{ width: 10, height: 10, borderRadius: "50%", background: SCOPE_COLOUR[s.id] }} />{s.label}</div>
+                <div style={{ fontSize: 30, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{totals[s.id]}</div>
+                <div style={{ fontSize: 12.5, color: dim }}>{pct(totals[s.id], totalAll)} of posts</div>
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section n={2} title="Filters" note="Apply to every section below.">
+        <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13.5, color: dim }}>Platform:</span>
+            {PLATFORMS.map((pl) => <button key={pl.id} style={chip(platforms.includes(pl.id))} onClick={() => { setPlatforms((cur) => { const n = toggle(cur, pl.id); return n.length === 0 ? cur : n; }); setShown(20); }}>{pl.label}</button>)}
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 13.5, color: dim }}>Chart shows:</span>
+            <button style={chip(!percent)} onClick={() => setPercent(false)}>Posts</button>
+            <button style={chip(percent)} onClick={() => setPercent(true)}>% of each organisation's posts</button>
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 13.5, color: dim }}>Order by:</span>
+            <select value={sort.key} onChange={(e) => setSort({ key: e.target.value, dir: e.target.value === "name" ? 1 : -1 })} style={{ background: "var(--elevate-1)", border: "1px solid var(--border-col)", borderRadius: 8, padding: "6px 10px", color: "var(--text-main)", fontSize: 13.5 }}>
+              <option value="total">Most posts in the scopes shown</option>
+              <option value="all">Most posts overall</option>
+              <option value="name">Organisation A to Z</option>
+              {ds.scopes.map((s) => <option key={s.id} value={s.id}>Most {s.label}</option>)}
+            </select>
+          </div>
+          {dirty && <button style={{ ...chip(false), color: "var(--accent-amber)" }} onClick={reset}>Reset all</button>}
+        </div>
+      </Section>
+
+      <Section n={3} title="Organisations by scope (chart)" note={`Posts per organisation in each scope, ${platformNote}. Click a name or a bar to focus; hover for the numbers.`}>
+        <div style={{ ...card, padding: "18px 12px 8px" }}>
+          <div style={{ width: "100%", height: Math.max(360, rows.length * 30 + 50) }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, left: 20, bottom: 4 }} barCategoryGap={4}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-col)" horizontal={false} />
+                <XAxis type="number" domain={percent ? [0, 100] : [0, "auto"]} allowDecimals={false} tick={{ fill: "var(--text-sub)", fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: "var(--border-col)" }} tickLine={false} unit={percent ? "%" : ""} />
+                <YAxis
+                  type="category" dataKey="org" width={200} interval={0} axisLine={false} tickLine={false}
+                  tick={(tp: { x: number; y: number; payload: { value: string } }) => (
+                    <text x={tp.x} y={tp.y} dy={4} textAnchor="end" onClick={() => toggleFocus(tp.payload.value)} style={{ cursor: "pointer", fill: dimmed(tp.payload.value) ? "var(--text-dim)" : "var(--text-main)", fontSize: 12.5, fontWeight: focused.has(tp.payload.value) ? 700 : 400, fontFamily: "'DM Mono', monospace" }}>
+                      {shortOrg(tp.payload.value)}
+                    </text>
+                  )}
+                />
+                <Tooltip content={tip as never} cursor={{ fill: "rgba(128,128,128,.12)" }} />
+                {visible.map((s) => (
+                  <Bar key={s} dataKey={s} stackId="s" fill={SCOPE_COLOUR[s]} cursor="pointer" onClick={(d: { org?: string }) => d?.org && toggleFocus(d.org)} isAnimationActive={false}>
+                    {chartData.map((r) => <Cell key={String(r.org)} fill={SCOPE_COLOUR[s]} fillOpacity={dimmed(String(r.org)) ? 0.22 : 1} />)}
+                  </Bar>
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ fontSize: 13, color: dim, padding: "6px 8px 4px" }}>
+            {focus.length ? <>Showing {focus.map((o, i) => <span key={o}>{i ? ", " : ""}<strong style={{ color: "var(--text-main)" }}>{o}</strong></span>)}; the other organisations are faded. Click a name or bar again to deselect.</> : "Click an organisation (its name or bar) to focus on it. Hover for the numbers."}
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        n={4}
+        title="Benchmark table: you against the field"
+        note={`Posts by scope, ${platformNote}. Total of all ${rows.length} organisations, the median organisation, and the organisations you pick.`}
+        actions={
+          <>
+            <select
+              value="" onChange={(e) => { if (e.target.value) { setFocus((f) => (f.includes(e.target.value) ? f : [...f, e.target.value])); } }}
+              style={{ background: "var(--elevate-1)", border: "1px solid var(--border-col)", borderRadius: 8, padding: "6px 10px", color: "var(--text-main)", fontSize: 13.5 }}
+            >
+              <option value="">Add an organisation…</option>
+              {[...ds.orgs].sort((a, b) => a.localeCompare(b)).filter((o) => !focus.includes(o)).map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+            {focus.length > 0 && <button style={chip(false)} onClick={() => setFocus([])}>Clear selection</button>}
+            <button style={chip(false)} onClick={csvBenchmark}>⬇ CSV</button>
+          </>
+        }
+      >
+        <div style={{ ...card, padding: 14, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 3, fontSize: 14 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", color: dim, fontWeight: 600, padding: "4px 8px" }}> </th>
+                {benchmark.cols.map((c) => <th key={c} style={{ color: c === "all" ? dim : SCOPE_COLOUR[c], fontWeight: 700, padding: "4px 8px" }}>{colLabel(c)}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ padding: "6px 8px", color: "var(--text-main)", fontWeight: 700 }}>Total (all organisations)</td>
+                {benchmark.cols.map((c) => <td key={c} style={{ textAlign: "center", padding: "6px 8px", background: "var(--elevate-2)", borderRadius: 6, color: "var(--text-main)", fontWeight: 700, ...mono }}>{benchmark.total[c]}</td>)}
+              </tr>
+              <tr>
+                <td style={{ padding: "6px 8px", color: "var(--text-main)", fontWeight: 700 }} title="Half of the organisations posted fewer than this, half more">Median organisation</td>
+                {benchmark.cols.map((c) => <td key={c} style={{ textAlign: "center", padding: "6px 8px", background: "var(--elevate-2)", borderRadius: 6, color: "var(--text-main)", fontWeight: 700, ...mono }}>{num(benchmark.med[c])}</td>)}
+              </tr>
+              {benchmark.mine.length === 0 ? (
+                <tr><td colSpan={benchmark.cols.length + 1} style={{ padding: "10px 8px", color: dim, fontSize: 13.5 }}>Pick an organisation with “Add an organisation…”, or click one in the chart or the table below, to compare it here.</td></tr>
+              ) : benchmark.mine.map((r) => (
+                <tr key={r.org}>
+                  <td style={{ padding: "6px 8px", color: "var(--accent-amber)", fontWeight: 700 }}>{r.org}</td>
+                  {benchmark.cols.map((c) => {
+                    const v = benchmark.val(r, c), m = benchmark.med[c];
+                    return (
+                      <td key={c} title={`${r.org}: ${v} · median ${num(m)} · ${v > m ? "above" : v < m ? "below" : "at"} the median`} style={{ textAlign: "center", padding: "6px 8px", border: "1px solid var(--accent-amber)", borderRadius: 6, color: "var(--text-main)", fontWeight: 700, ...mono }}>
+                        {v}<span style={{ color: dim, fontWeight: 400, fontSize: 11.5 }}> {v > m ? "▲" : v < m ? "▼" : "="}</span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ fontSize: 12.5, color: dim, padding: "8px 8px 2px" }}>▲ above, ▼ below, = equal to the median organisation.</div>
+        </div>
+      </Section>
+
+      <Section
+        n={5}
+        title="All organisations (table)"
+        note="The numbers behind the chart. Click a column heading to sort by it (again to reverse); click a number to see exactly those posts."
+        actions={<button style={chip(false)} onClick={csvAll}>⬇ CSV</button>}
+      >
+        <div style={{ ...card, padding: 14, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 3, fontSize: 14 }}>
+            <thead>
+              <tr>
+                <th onClick={() => sortBy("name")} style={{ ...th, textAlign: "left", color: sort.key === "name" ? "var(--text-main)" : dim }}>Organisation{arrow("name")}</th>
+                {ds.scopes.map((s) => (
+                  <th key={s.id} onClick={() => sortBy(s.id)} title={`Sort by ${s.label}`} style={{ ...th, color: SCOPE_COLOUR[s.id], textDecoration: sort.key === s.id ? "underline" : "none" }}>{s.label}{arrow(s.id)}</th>
+                ))}
+                <th onClick={() => sortBy("all")} title="Sort by all posts" style={{ ...th, color: sort.key === "all" ? "var(--text-main)" : dim }}>All{arrow("all")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.org} style={{ opacity: dimmed(r.org) ? 0.4 : 1 }}>
+                  <td onClick={() => toggleFocus(r.org)} style={{ cursor: "pointer", padding: "4px 8px", color: "var(--text-main)", fontWeight: focused.has(r.org) ? 700 : 400, ...mono, fontSize: 13, whiteSpace: "nowrap" }}>{r.org}</td>
+                  {scopeIds.map((s) => {
+                    const v = r.counts[s];
+                    return (
+                      <td
+                        key={s}
+                        title={`${r.org}: ${v} ${labelOf(s)} posts (${pct(v, r.all)} of its ${r.all})`}
+                        onClick={() => { setFocus([r.org]); setScopes([s]); setShown(20); }}
+                        style={{ cursor: "pointer", textAlign: "center", padding: "5px 8px", borderRadius: 6, color: "var(--text-main)", fontWeight: v ? 700 : 400, ...mono, background: v ? `color-mix(in srgb, ${SCOPE_COLOUR[s]} ${Math.round(12 + 55 * (v / maxCell[s]))}%, transparent)` : "transparent", opacity: v ? 1 : 0.5 }}
+                      >{v}</td>
+                    );
+                  })}
+                  <td style={{ textAlign: "center", padding: "5px 8px", color: "var(--text-main)", ...mono }}>{r.all}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      <Section n={6} title="Posts" note={`${list.length} posts in the current view, most engagement first.`}>
+        <div style={{ ...card, padding: 16 }}>
+          {list.length === 0 ? <div style={{ color: dim }}>No posts match.</div> : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {list.slice(0, shown).map((p, i) => (
+                <div key={`${p.u}-${i}`} style={{ borderLeft: `3px solid ${SCOPE_COLOUR[p.s ?? "other"]}`, background: "var(--elevate-2)", borderRadius: "0 8px 8px 0", padding: "8px 12px" }}>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", fontSize: 12.5, color: dim, ...mono }}>
+                    <strong style={{ color: "var(--text-main)" }}>{p.o}</strong>
+                    <span>{PLATFORM_LABEL[p.p]}</span>
+                    <span style={{ color: SCOPE_COLOUR[p.s ?? "other"], fontWeight: 700 }}>{labelOf(p.s ?? "other")}</span>
+                    <span>{fmtDate(p.d)}</span>
+                    <span>♥ {p.l} · 💬 {p.c} · ↗ {p.h}{p.v ? ` · 👁 ${p.v}` : ""}</span>
+                    {p.u && <a href={p.u} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-amber)" }}>Open ↗</a>}
+                  </div>
+                  <div style={{ fontSize: 14, color: "var(--text-main)", marginTop: 4, lineHeight: 1.45 }}>{p.t.length > 260 ? `${p.t.slice(0, 260)}…` : p.t || "(no text)"}</div>
+                </div>
+              ))}
+              {list.length > shown && <button style={{ ...chip(false), alignSelf: "flex-start" }} onClick={() => setShown((n) => n + 20)}>Show 20 more</button>}
+            </div>
+          )}
+        </div>
+      </Section>
     </div>
   );
 }

@@ -64,11 +64,10 @@ function reportName({ subject = "AQ", kind = "Full", dateFrom, dateTo, orgs, org
   return `${s}-${k}-${slug(org)}-${p}.html`;
 }
 
-/** The interactive posts file of a period (what the Interactive tab reads): AQ-Posts-Wk1-Nov26-21orgs.json */
-function interactiveName({ subject = "AQ", dateFrom, dateTo, orgs }) {
-  const s = SUBJECTS.find((x) => x.toLowerCase() === String(subject).toLowerCase()) || SUBJECT_BY_FRAMEWORK[subject];
-  if (!s) throw new Error(`subject must be AQ, Climt or Sust (got ${subject})`);
-  return `${s}-Posts-${period(dateFrom, dateTo)}-${orgs}orgs.json`;
+/** The interactive file of a period (what the Interactive tab reads): All-Scope-Wk1-Nov26-21orgs.json. "All Scope" = every post,
+ *  sorted into air quality / climate / sustainability / other, so it carries no single subject prefix (AQ / Climt / Sust). */
+function interactiveName({ dateFrom, dateTo, orgs }) {
+  return `All-Scope-${period(dateFrom, dateTo)}-${orgs}orgs.json`;
 }
 
 /** "Snap" / "Bench" files, new or legacy (aq-snapshot-…); null for a full report. */

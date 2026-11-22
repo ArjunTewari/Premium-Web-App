@@ -22,7 +22,6 @@ const cacheFile = L.arg("cache");
 const gh = (args, input) => execFileSync("gh", args, { input, maxBuffer: 1 << 28, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] });
 
 const CP = L.pipe("checkpoint.js"), S = L.pipe("post-scopes.js"), { askClaude, usage } = L.pipe("claude-cli.js");
-const SUBJECT = { "air-quality": "AQ", climate: "Climt", sustainability: "Sust" };
 
 (async () => {
   const chk = CP.unpack(fs.readFileSync(file));
@@ -34,8 +33,8 @@ const SUBJECT = { "air-quality": "AQ", climate: "Climt", sustainability: "Sust" 
   await S.labelPosts(posts, { askClaude, cache, log: (m) => console.log(m) });
   if (cacheFile) fs.writeFileSync(cacheFile, JSON.stringify(cache));
 
-  const name = N.interactiveName({ subject: SUBJECT[fp.framework] || "AQ", dateFrom: fp.dateFrom, dateTo: fp.dateTo, orgs: fp.orgs.length });
-  const ds = S.buildDataset({ posts, from: fp.dateFrom, to: fp.dateTo, framework: fp.framework, orgs: fp.orgs, reportName: name });
+  const name = N.interactiveName({ dateFrom: fp.dateFrom, dateTo: fp.dateTo, orgs: fp.orgs.length });
+  const ds = S.buildDataset({ posts, from: fp.dateFrom, to: fp.dateTo, framework: "all", orgs: fp.orgs, reportName: name });
   fs.mkdirSync(out, { recursive: true });
   const body = JSON.stringify(ds);
   fs.writeFileSync(path.join(out, name), body);

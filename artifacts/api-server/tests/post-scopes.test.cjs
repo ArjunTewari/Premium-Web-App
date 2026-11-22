@@ -58,6 +58,8 @@ eq("the prompt lists every post by number", S.batchPrompt(posts).includes("[0] (
 
   const ds = S.buildDataset({ posts: bad, from: "2026-11-02", to: "2026-11-08", framework: "air-quality", orgs: ["A", "B"], reportName: "x" });
   eq("the dataset says how many posts have no scope", [ds.unlabelled, ds.posts.length, ds.scopes.map((s) => s.id)], [3, 3, ["air-quality", "climate", "sustainability", "other"]]);
+  eq("the dataset carries each scope's rule and the subject's keywords (none for Other)", ds.scopeInfo.map((x) => [x.id, x.keywords.length > 5, !!x.rule]), [["air-quality", true, true], ["climate", true, true], ["sustainability", true, true], ["other", false, true]]);
+  eq("the keywords are the framework's, listed once each", [ds.scopeInfo[0].keywords.includes("PM2.5"), new Set(ds.scopeInfo[0].keywords.map((k) => k.toLowerCase())).size === ds.scopeInfo[0].keywords.length], [true, true]);
   eq("the dataset uses short keys", Object.keys(ds.posts[0]).join(","), "o,p,s,d,t,u,l,c,h,v");
 
   console.log(fail ? `${fail} FAILED` : "all passed"); process.exit(fail ? 1 : 0);
