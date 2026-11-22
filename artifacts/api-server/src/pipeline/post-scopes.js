@@ -20,6 +20,20 @@ const SCOPES = [
 ];
 const BY_CODE = Object.fromEntries(SCOPES.map((s) => [s.code, s.id]));
 
+// The words each subject's weekly report uses to find its posts (the framework's scope keywords and post-filter terms). They are
+// SHOWN to the client for transparency; they do not decide a post's scope — the label reads the post for its main subject.
+const FRAMEWORK_OF = { "air-quality": "air-quality", climate: "climate", sustainability: "sustainability" };
+function scopeKeywords(id) {
+  if (!FRAMEWORK_OF[id]) return [];
+  const fw = require("./frameworks").getFramework(FRAMEWORK_OF[id]);
+  const seen = new Set(), out = [];
+  for (const k of [...(fw.defaultScope || []), ...(fw.postFilterTerms || [])]) {
+    const t = String(k).trim();
+    if (t && !seen.has(t.toLowerCase())) { seen.add(t.toLowerCase()); out.push(t); }
+  }
+  return out;
+}
+
 const PLATFORMS = { li: "LinkedIn", x: "X", ig: "Instagram" };
 
 const day = (d) => String(d || "").slice(0, 10);
@@ -130,10 +144,12 @@ function buildDataset({ posts, from, to, framework, orgs, reportName, generatedA
   return {
     version: 1,
     report: reportName || null,
-    framework: framework || "air-quality",
+    framework: framework || "all",
     dateFrom: from, dateTo: to,
     generatedAt: generatedAt || new Date().toISOString(),
     scopes: SCOPES.map((s) => ({ id: s.id, label: s.label })),
+    // how the scopes are defined, for the client: the rule each is sorted by and the subject's keywords
+    scopeInfo: SCOPES.map((s) => ({ id: s.id, label: s.label, rule: s.rule, keywords: scopeKeywords(s.id) })),
     orgs: orgs || [...new Set(posts.map((p) => p.org))].sort(),
     unlabelled,
     // short keys keep the file small; the UI knows them: o=org, p=platform, s=scope, d=date, t=text, u=url, l=likes, c=comments, h=shares, v=views
