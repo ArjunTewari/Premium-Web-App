@@ -1323,6 +1323,7 @@ ${batchText}`;
       cb(`  CHECKPOINT · could not update the saved data: ${e.message}`, "warn");
     }
   }
+  html = require("./report-tag").injectReportTag(html); // top-right label: the kind and the period, click = back to the top
   fs.writeFileSync(htmlFile, html, "utf8");
   cb(`  HTML: ${base}.html (${Math.round(html.length / 1024)}KB)`, "ok");
 

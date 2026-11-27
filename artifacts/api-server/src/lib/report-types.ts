@@ -2,6 +2,10 @@
 import _dashboard from "../pipeline/single-org-dashboard.js";
 // @ts-ignore — CommonJS module
 import _naming from "../pipeline/report-naming.js";
+// @ts-ignore — CommonJS module
+import _tag from "../pipeline/report-tag.js";
+// @ts-ignore — CommonJS module
+import _interactive from "../pipeline/interactive-report.js";
 import raahgiriProfile from "../pipeline/single-org-profiles/raahgiri.json";
 
 // Report types. "full" is the multi-organisation report the pipeline writes.
@@ -43,6 +47,23 @@ export function parseReportType(v: unknown): ReportType | null {
 /** The current name of a report stored under the older scheme (matches old run-log rows to renamed files). */
 export function currentReportName(name: string): string {
   return naming.currentName(name);
+}
+
+/** The report with its top-right label (kind and period, click = back to the top); a report that has it is returned unchanged. */
+export function withReportTag(html: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const t = ((_tag as any).injectReportTag ? _tag : (_tag as any).default) as { injectReportTag(h: string): string };
+  return t.injectReportTag(html);
+}
+
+export type InteractiveTopic = "full" | "air-quality" | "climate" | "sustainability";
+export const INTERACTIVE_TOPICS: readonly InteractiveTopic[] = ["full", "air-quality", "climate", "sustainability"];
+
+/** One page of the Interactive section (a topic, and optionally some organisations) as a stand-alone report. */
+export function renderInteractive(dataset: unknown, opts: { topic: InteractiveTopic; orgs: string[] }): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const m = ((_interactive as any).renderInteractiveReport ? _interactive : (_interactive as any).default) as { renderInteractiveReport(d: unknown, o: unknown): string };
+  return m.renderInteractiveReport(dataset, opts);
 }
 
 export function reportTypeOfName(htmlName: string): ReportType {

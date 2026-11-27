@@ -9,9 +9,9 @@ import { type ReportTrendSummary, frameworkIds, listFrameworks, parseCheckpointN
 import { generateAndDeliverReport, loadReportHtml, persistReportToGithub, OUT_DIR } from "../lib/generate-report.js";
 import { getCheckpoint, listCheckpoints, isConfigured as isGithubConfigured } from "../lib/report-storage.js";
 import { CLAUDE_VIA_CLI } from "../lib/preflight.js";
-import { currentReportName, deriveReport, listReportOrgs, parseReportType, priceForType, reportPeriod, reportTypeOfName, reportTypeOfHtml } from "../lib/report-types.js";
+import { currentReportName, deriveReport, listReportOrgs, parseReportType, priceForType, reportPeriod, reportTypeOfName, reportTypeOfHtml, withReportTag, renderInteractive, INTERACTIVE_TOPICS, type InteractiveTopic } from "../lib/report-types.js";
 import { toClientView } from "../lib/client-view.js";
-import { sendReportFileEmail } from "../lib/mailer.js";
+import { sendReportFileEmail, sendInteractiveReportEmail } from "../lib/mailer.js";
 import {
   listReports,
   listReportDataFiles,
@@ -358,7 +358,7 @@ router.get("/download/:file", requireAuth, async (req: Request, res: Response) =
   if (content == null) return res.status(404).send("File not found");
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${fname}"`);
-  return res.send(content);
+  return res.send(/\.html$/i.test(fname) ? withReportTag(content) : content);
 });
 
 // ── GET /view/:file — open a report in the browser instead of downloading it ──
@@ -558,6 +558,67 @@ router.get("/interactive/:name", requireAuth, async (req: Request, res: Response
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "private, max-age=300");
   return res.send(body);
+});
+
+// The Interactive section as a stand-alone report: ?topic=full|air-quality|climate|sustainability & orgs=A|B (none = all organisations).
+// GET /interactive/:name/report            opens it in the browser (sandboxed like /view)
+// GET /interactive/:name/report?download=1 downloads it
+// POST /interactive/email                  { name, topic, orgs[], to, note? } — emails it as an attachment
+async function interactiveReport(name: string, topicIn: unknown, orgsIn: unknown) {
+  const body = await getInteractiveDataset(name);
+  if (!body) return null;
+  let dataset: { orgs?: string[]; dateFrom?: string; dateTo?: string };
+  try { dataset = JSON.parse(body); } catch { return null; }
+  const topic = (INTERACTIVE_TOPICS as readonly string[]).includes(String(topicIn)) ? (String(topicIn) as InteractiveTopic) : "full";
+  const orgs = (Array.isArray(orgsIn) ? orgsIn : String(orgsIn ?? "").split("|")).map((o) => String(o)).filter(Boolean).slice(0, 60);
+  const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const file = `${name.replace(/\.json$/i, "")}-${topic === "full" ? "Full" : slug(topic)}${orgs.length === 1 ? `-${slug(orgs[0])}` : orgs.length > 1 ? `-${orgs.length}-selected` : ""}.html`;
+  return { html: renderInteractive(dataset, { topic, orgs }), file, topic, orgs, dataset };
+}
+
+router.get("/interactive/:name/report", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const r = await interactiveReport(String(req.params.name ?? ""), req.query.topic, req.query.orgs);
+    if (!r) return res.status(404).send("Not found");
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Content-Disposition", req.query.download ? `attachment; filename="${r.file}"` : "inline");
+    res.setHeader("Content-Security-Policy", "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "private, no-store");
+    return res.send(r.html);
+  } catch (e) {
+    console.error("Interactive report failed:", e);
+    return res.status(500).send("Could not build the report");
+  }
+});
+
+// Same rule as /outputs/email: admins may send to any address, other accounts only to their own signup email.
+router.post("/interactive/email", requireAuth, async (req: Request, res: Response) => {
+  const body = req.body || {};
+  const to = String(body.to || "").trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: "Enter a valid email address" });
+  try {
+    if (req.user?.role !== "admin") {
+      const [me] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.username, req.user?.username ?? ""));
+      if (!me?.email || me.email.toLowerCase() !== to.toLowerCase()) return res.status(403).json({ error: "You can only email a report to your own account address" });
+    }
+    const r = await interactiveReport(String(body.name ?? ""), body.topic, body.orgs);
+    if (!r) return res.status(404).json({ error: "Report not found" });
+    const topicLabel = r.topic === "full" ? "Full report" : r.topic === "air-quality" ? "Air quality report" : r.topic === "climate" ? "Climate report" : "Sustainability report";
+    const title = `${topicLabel}${r.orgs.length ? ` · ${r.orgs.slice(0, 3).join(", ")}${r.orgs.length > 3 ? ` +${r.orgs.length - 3}` : ""}` : ""}`;
+    const ok = await sendInteractiveReportEmail(to, {
+      title,
+      period: `${r.dataset.dateFrom} to ${r.dataset.dateTo}`,
+      attachment: { filename: r.file, content: r.html },
+      note: String(body.note ?? "").slice(0, 500) || undefined,
+      sentBy: req.user?.username,
+    });
+    if (!ok) return res.status(502).json({ error: "Email could not be sent — check RESEND_API_KEY / EMAIL_FROM on the server" });
+    return res.json({ status: "ok", to, file: r.file });
+  } catch (e) {
+    console.error("Email interactive report failed:", e);
+    return res.status(500).json({ error: "Email failed" });
+  }
 });
 
 export default router;

@@ -7,7 +7,7 @@ import { sendAdminReportEmail, sendClientReportEmail } from "./mailer.js";
 import { uploadReport, uploadReportData, uploadCheckpoint, getReportContent, isConfigured as isGithubStorageConfigured } from "./report-storage.js";
 import { toClientView } from "./client-view.js";
 import { preflight } from "./preflight.js";
-import { deriveReport, priceForType, reportTypeOfName, type ReportType } from "./report-types.js";
+import { deriveReport, priceForType, reportTypeOfName, withReportTag, type ReportType } from "./report-types.js";
 
 // Shared by both trigger paths: a manual POST /run (routes/pipeline.ts,
 // streams progress over SSE) and the weekly scheduler (report-scheduler.ts,
@@ -113,8 +113,9 @@ export interface GenerateReportParams {
 export async function loadReportHtml(htmlName: string): Promise<string | null> {
   const name = path.basename(htmlName);
   const fpath = path.join(OUT_DIR, name);
-  if (fs.existsSync(fpath)) return fs.readFileSync(fpath, "utf8");
-  return getReportContent(name);
+  if (fs.existsSync(fpath)) return withReportTag(fs.readFileSync(fpath, "utf8"));
+  const stored = await getReportContent(name);
+  return stored == null ? null : withReportTag(stored);
 }
 
 export interface GenerateReportResult {

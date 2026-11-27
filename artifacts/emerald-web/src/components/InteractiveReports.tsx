@@ -20,6 +20,32 @@ const SCOPE_NOTE: Record<string, string> = {
   sustainability: "Sustainability, energy transition, waste, water, biodiversity, sustainable cities and mobility.",
   other: "None of these: events, hiring, greetings, awards, organisation news.",
 };
+const PLATFORM_COLOUR: Record<string, string> = { li: "#0a66c2", x: "#4b5563", ig: "#c13584" };
+const TOPIC_BUTTONS: { id: string; label: string }[] = [{ id: "full", label: "Full report" }, { id: "air-quality", label: "Air quality" }, { id: "sustainability", label: "Sustainability" }, { id: "climate", label: "Climate" }];
+
+interface Slice { label: string; value: number; colour: string }
+// A pie drawn as SVG; one slice is a whole circle, none an empty ring.
+function Pie({ slices, size = 112, dimmed }: { slices: Slice[]; size?: number; dimmed?: boolean }) {
+  const total = slices.reduce((a, x) => a + x.value, 0);
+  const r = size / 2 - 2, c = size / 2;
+  const live = slices.filter((x) => x.value > 0);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ opacity: dimmed ? 0.25 : 1 }} role="img">
+      {total === 0 ? <circle cx={c} cy={c} r={r} fill="none" stroke="var(--border-col)" strokeWidth={2} />
+        : live.length === 1 ? <circle cx={c} cy={c} r={r} fill={live[0].colour}><title>{`${live[0].label}: ${live[0].value}`}</title></circle>
+        : (() => {
+          let a0 = -Math.PI / 2;
+          return live.map((x) => {
+            const a1 = a0 + (x.value / total) * Math.PI * 2;
+            const d = `M${c},${c} L${c + r * Math.cos(a0)},${c + r * Math.sin(a0)} A${r},${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${c + r * Math.cos(a1)},${c + r * Math.sin(a1)} Z`;
+            a0 = a1;
+            return <path key={x.label} d={d} fill={x.colour} stroke="var(--elevate-1)" strokeWidth={1.5}><title>{`${x.label}: ${x.value} (${pct(x.value, total)})`}</title></path>;
+          });
+        })()}
+    </svg>
+  );
+}
+
 // "total" = posts in the scopes on show, "all" = posts in every scope, "name" = A to Z, or a scope id
 type SortKey = "total" | "all" | "name" | string;
 interface SortState { key: SortKey; dir: 1 | -1 }
@@ -128,6 +154,10 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   const [shown, setShown] = useState(20);
   const [showRules, setShowRules] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailNote, setEmailNote] = useState("");
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailMsg, setEmailMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -190,6 +220,10 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
   const reset = () => { setFocus([]); setScopes(null); setPlatforms(["li", "x", "ig"]); setPercent(false); setSort(DEFAULT_SORT); setShown(20); };
 
   const focused = new Set(focus);
+  // The topic a stand-alone report can have: one subject, or the full report.
+  const topic = scopes !== null && scopes.length === 1 && scopes[0] !== "other" ? scopes[0] : "full";
+  const reportQuery = `topic=${encodeURIComponent(topic)}${focus.length ? `&orgs=${encodeURIComponent(focus.join("|"))}` : ""}`;
+  const reportUrl = `/api/interactive/${encodeURIComponent(entry.name)}/report?${reportQuery}`;
   const dimmed = (o: string) => focus.length > 0 && !focused.has(o);
 
   const list = useMemo(() => byPlatform
@@ -205,6 +239,16 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
     const mine = focus.map((o) => rows.find((r) => r.org === o)).filter((r): r is (typeof rows)[number] => !!r);
     return { cols, total, med, mine, val };
   }, [rows, scopeIds, focus]);
+
+  async function sendEmail() {
+    setEmailBusy(true); setEmailMsg(null);
+    try {
+      const res = await fetch("/api/interactive/email", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: entry.name, topic, orgs: focus, to: emailTo.trim(), note: emailNote.trim() }) });
+      const data = await res.json().catch(() => ({}));
+      setEmailMsg(res.ok ? { ok: true, text: `Sent to ${emailTo.trim()}: ${data.file ?? "the report"}` } : { ok: false, text: data.error || "The email could not be sent." });
+    } catch { setEmailMsg({ ok: false, text: "The email could not be sent." }); }
+    setEmailBusy(false);
+  }
 
   if (error) return <div style={{ paddingTop: 40 }}><button onClick={onBack} style={chip(false)}>← Back</button><div style={{ ...card, padding: 30, marginTop: 16, color: dim }}>{error}</div></div>;
   if (!ds) return <div style={{ paddingTop: 40 }}><button onClick={onBack} style={chip(false)}>← Back</button><div style={{ color: dim, padding: "40px 0", textAlign: "center" }}>Loading…</div></div>;
@@ -253,6 +297,11 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
 
   return (
     <div style={{ paddingTop: 32 }}>
+      <a
+        href="#top" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+        title="Click to go to the top"
+        style={{ position: "fixed", top: 66, right: 16, zIndex: 40, ...mono, fontSize: 13, fontWeight: 600, padding: "7px 14px", borderRadius: 20, background: "var(--elevate-1)", border: "1px solid var(--border-col)", color: "var(--text-main)", textDecoration: "none", boxShadow: "0 2px 8px rgba(0,0,0,.18)" }}
+      >{topic === "full" ? "Full report" : `${labelOf(topic)} report`} <span style={{ fontWeight: 400, opacity: 0.85 }}>· {ds.dateFrom} → {ds.dateTo}</span></a>
       <button onClick={onBack} style={{ ...chip(false), marginBottom: 14 }}>← All interactive reports</button>
       <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: ".2em", textTransform: "uppercase", color: "var(--accent-amber)", marginBottom: 8 }}>Interactive · All Scope</div>
       <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 30, fontWeight: 700, letterSpacing: "-.02em", color: "var(--text-main)", margin: 0, wordBreak: "break-all" }}>{baseName}</h2>
@@ -282,7 +331,49 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
         </div>
       )}
 
-      <Section n={1} title="Scope summary" note="How many posts are in each scope. Click a scope to show only it; click more to add them.">
+      <Section n={1} title="Choose your report" note="Pick a topic and, if you like, one or more organisations. Everything below and the report you send follow this choice.">
+        <div style={{ ...card, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13.5, color: dim, minWidth: 64 }}>Topic:</span>
+            {TOPIC_BUTTONS.map((t) => (
+              <button key={t.id} style={chip(t.id === topic && (t.id !== "full" || scopes === null))} onClick={() => { setScopes(t.id === "full" ? null : [t.id]); setShown(20); }}>{t.label}</button>
+            ))}
+            {scopes !== null && !(scopes.length === 1 && scopes[0] !== "other") && <span style={{ fontSize: 12.5, color: dim }}>(a mix of scopes is shown here; the report you send will be the full report)</span>}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13.5, color: dim, minWidth: 64 }}>Organisations:</span>
+            {focus.length === 0 && <span style={{ fontSize: 13.5, color: dim }}>all {ds.orgs.length}</span>}
+            {focus.map((o) => <button key={o} style={chip(true)} onClick={() => toggleFocus(o)} title="Remove">{o} ✕</button>)}
+            <select
+              value="" onChange={(e) => { if (e.target.value) setFocus((f) => (f.includes(e.target.value) ? f : [...f, e.target.value])); }}
+              style={{ background: "var(--elevate-1)", border: "1px solid var(--border-col)", borderRadius: 8, padding: "6px 10px", color: "var(--text-main)", fontSize: 13.5 }}
+            >
+              <option value="">Add an organisation…</option>
+              {[...ds.orgs].sort((x, y) => x.localeCompare(y)).filter((o) => !focus.includes(o)).map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+            {focus.length > 0 && <button style={chip(false)} onClick={() => setFocus([])}>All organisations</button>}
+          </div>
+        </div>
+      </Section>
+
+      <Section n={2} title="Send this report" note="The report you have chosen, as a stand-alone page: scope summary, a pie for each organisation, the benchmark table and the top posts.">
+        <div style={{ ...card, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <a href={reportUrl} target="_blank" rel="noopener noreferrer" style={{ ...chip(false), textDecoration: "none" }}>Open it ↗</a>
+            <a href={`${reportUrl}&download=1`} style={{ ...chip(false), textDecoration: "none" }}>⬇ Download</a>
+            <span style={{ fontSize: 13, color: dim }}>{topic === "full" ? "Full report" : `${labelOf(topic)} report`}{focus.length ? ` · ${focus.length === 1 ? focus[0] : `${focus.length} organisations`}` : " · all organisations"}</span>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <input value={emailTo} onChange={(e) => setEmailTo(e.target.value)} placeholder="Email address" type="email" style={{ background: "var(--elevate-1)", border: "1px solid var(--border-col)", borderRadius: 8, padding: "7px 10px", color: "var(--text-main)", fontSize: 14, minWidth: 240 }} />
+            <input value={emailNote} onChange={(e) => setEmailNote(e.target.value)} placeholder="Note (optional)" maxLength={500} style={{ background: "var(--elevate-1)", border: "1px solid var(--border-col)", borderRadius: 8, padding: "7px 10px", color: "var(--text-main)", fontSize: 14, flex: 1, minWidth: 220 }} />
+            <button disabled={emailBusy || !emailTo.includes("@")} onClick={sendEmail} style={{ ...chip(true), opacity: emailBusy || !emailTo.includes("@") ? 0.5 : 1 }}>{emailBusy ? "Sending…" : "✉ Send"}</button>
+          </div>
+          {emailMsg && <div style={{ fontSize: 13.5, color: emailMsg.ok ? "var(--accent-green)" : "#e05a5a" }}>{emailMsg.text}</div>}
+          <div style={{ fontSize: 12.5, color: dim }}>Admins can send to any address; other accounts only to their own.</div>
+        </div>
+      </Section>
+
+      <Section n={3} title="Scope summary" note="How many posts are in each scope. Click a scope to show only it; click more to add them.">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 }}>
           <button onClick={() => { setScopes(null); setShown(20); }} style={{ ...card, textAlign: "left", padding: "12px 14px", cursor: "pointer", borderColor: scopes === null ? "var(--text-main)" : undefined, color: "var(--text-main)" }}>
             <div style={{ fontSize: 13, color: dim, textTransform: "uppercase", letterSpacing: ".08em" }}>All scopes</div>
@@ -302,7 +393,7 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
         </div>
       </Section>
 
-      <Section n={2} title="Filters" note="Apply to every section below.">
+      <Section n={4} title="Filters" note="Apply to every section below.">
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "center" }}>
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{ fontSize: 13.5, color: dim }}>Platform:</span>
@@ -326,7 +417,29 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
         </div>
       </Section>
 
-      <Section n={3} title="Organisations by scope (chart)" note={`Posts per organisation in each scope, ${platformNote}. Click a name or a bar to focus; hover for the numbers.`}>
+      <Section n={5} title={topic === "full" ? "Each organisation's posts by scope (pies)" : `Each organisation's ${labelOf(topic)} posts by platform (pies)`} note="One pie per organisation. Click a pie to focus on that organisation; hover a slice for the numbers.">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+          {rows.map((r) => {
+            const slices: Slice[] = topic === "full"
+              ? scopeIds.map((id) => ({ label: labelOf(id), value: r.counts[id], colour: SCOPE_COLOUR[id] }))
+              : PLATFORMS.map((pl) => ({ label: pl.label, value: byPlatform.filter((x) => x.o === r.org && x.s === topic && x.p === pl.id).length, colour: PLATFORM_COLOUR[pl.id] }));
+            const total = slices.reduce((a2, x) => a2 + x.value, 0);
+            return (
+              <button key={r.org} onClick={() => toggleFocus(r.org)} title={`${r.org}: ${total} posts`} style={{ ...card, padding: 12, textAlign: "center", cursor: "pointer", color: "var(--text-main)", borderColor: focused.has(r.org) ? "var(--accent-amber)" : undefined }}>
+                <div style={{ fontWeight: 700, minHeight: 40, fontSize: 14 }}>{r.org}</div>
+                <Pie slices={slices} dimmed={dimmed(r.org)} />
+                <div style={{ ...mono, fontSize: 13, fontWeight: 600, margin: "4px 0" }}>{total} post{total === 1 ? "" : "s"}</div>
+                <ul style={{ listStyle: "none", margin: 0, padding: 0, textAlign: "left", fontSize: 12.5, opacity: dimmed(r.org) ? 0.4 : 1 }}>
+                  {slices.filter((x) => x.value > 0).map((x) => <li key={x.label}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: x.colour, marginRight: 6 }} />{x.label} <b>{x.value}</b> <span style={{ color: dim }}>{pct(x.value, total)}</span></li>)}
+                  {total === 0 && <li style={{ color: dim }}>no posts</li>}
+                </ul>
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section n={6} title="Organisations by scope (chart)" note={`Posts per organisation in each scope, ${platformNote}. Click a name or a bar to focus; hover for the numbers.`}>
         <div style={{ ...card, padding: "18px 12px 8px" }}>
           <div style={{ width: "100%", height: Math.max(360, rows.length * 30 + 50) }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -357,7 +470,7 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
       </Section>
 
       <Section
-        n={4}
+        n={7}
         title="Benchmark table: you against the field"
         note={`Posts by scope, ${platformNote}. Total of all ${rows.length} organisations, the median organisation, and the organisations you pick.`}
         actions={
@@ -413,7 +526,7 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
       </Section>
 
       <Section
-        n={5}
+        n={8}
         title="All organisations (table)"
         note="The numbers behind the chart. Click a column heading to sort by it (again to reverse); click a number to see exactly those posts."
         actions={<button style={chip(false)} onClick={csvAll}>⬇ CSV</button>}
@@ -452,7 +565,7 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
         </div>
       </Section>
 
-      <Section n={6} title="Posts" note={`${list.length} posts in the current view, most engagement first.`}>
+      <Section n={9} title="Posts" note={`${list.length} posts in the current view, most engagement first.`}>
         <div style={{ ...card, padding: 16 }}>
           {list.length === 0 ? <div style={{ color: dim }}>No posts match.</div> : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
