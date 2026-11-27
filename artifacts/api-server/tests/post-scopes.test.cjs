@@ -29,6 +29,17 @@ eq("text is cleaned and engagement is numbers", [by("li:https://li/1").text, by(
 eq("X replies are comments, retweets are shares, views kept", [by("x:https://x/1").comments, by("x:https://x/1").shares, by("x:https://x/1").views], [1, 0, 40]);
 eq("an organisation with no saved posts adds nothing", S.collectPosts([{ org: "B" }], "2026-11-02", "2026-11-08"), []);
 
+const withYt = S.collectPosts(saved, "2026-11-02", "2026-11-08", [
+  { org: "A", videos: [{ videoId: "v1", url: "https://youtube.com/watch?v=v1", title: "A  video", publishedAt: "2026-11-04T05:00:00Z", views: "40", likes: "2", comments: "1" }, { videoId: "v2", url: "https://youtube.com/watch?v=v2", title: "old", publishedAt: "2026-10-01T05:00:00Z" }] },
+]);
+eq("YouTube videos are posts too (title as text, views kept), the period applied", [withYt.filter((p) => p.platform === "yt").map((p) => [p.id, p.text, p.views, p.comments])], [[["yt:https://youtube.com/watch?v=v1", "A video", 40, 1]]]);
+
+const arts = { A: [{ title: "Smog <b> in Delhi", url: "https://n/1", source: "NDTV", date: "2026-11-03" }, { title: "Old", url: "https://n/2", source: "Mint", date: "2026-10-01" }, { title: "Not about the subject", url: "https://n/3", source: "Mint", date: "2026-11-04" }] };
+const cls = { A: [{ index: "0", aq_relevant: "True" }, { index: "1", aq_relevant: "True" }, { index: "2", aq_relevant: "False" }] };
+const ca = S.collectArticles(arts, cls, "2026-11-02", "2026-11-08");
+eq("articles: the relevant ones of the period, TV by outlet, all in air quality", ca.map((a) => [a.org, a.kind, a.scope, a.sample]), [["A", "tv", "air-quality", false]]);
+const sa = S.sampleArticles(["A", "B", "C", "D"], "2026-11-02", "2026-11-08");
+eq("sample articles are flagged, addressless, outside air quality, in the period, and the same every time", [sa.length > 0, sa.every((x) => x.sample && !x.url && x.scope !== "air-quality" && x.date >= "2026-11-02" && x.date <= "2026-11-08" && /placeholder/.test(x.title)), JSON.stringify(sa) === JSON.stringify(S.sampleArticles(["A", "B", "C", "D"], "2026-11-02", "2026-11-08"))], [true, true, true]);
 eq("labels are read from a reply, bad entries ignored", S.parseLabels('Sure: [{"i":0,"s":"AQ"},{"i":1,"s":"zz"},{"i":9,"s":"CL"},{"i":2,"s":"su"}]', 3), { 0: "air-quality", 2: "sustainability" });
 eq("a reply without JSON gives no labels", S.parseLabels("I cannot", 3), {});
 eq("the prompt lists every post by number", S.batchPrompt(posts).includes("[0] (Instagram, A) a photo"), true);
@@ -60,6 +71,8 @@ eq("the prompt lists every post by number", S.batchPrompt(posts).includes("[0] (
   eq("the dataset says how many posts have no scope", [ds.unlabelled, ds.posts.length, ds.scopes.map((s) => s.id)], [3, 3, ["air-quality", "climate", "sustainability", "other"]]);
   eq("the dataset carries each scope's rule and the subject's keywords (none for Other)", ds.scopeInfo.map((x) => [x.id, x.keywords.length > 5, !!x.rule]), [["air-quality", true, true], ["climate", true, true], ["sustainability", true, true], ["other", false, true]]);
   eq("the keywords are the framework's, listed once each", [ds.scopeInfo[0].keywords.includes("PM2.5"), new Set(ds.scopeInfo[0].keywords.map((k) => k.toLowerCase())).size === ds.scopeInfo[0].keywords.length], [true, true]);
+  const dsA = S.buildDataset({ posts: bad, articles: [...ca, ...sa], from: "2026-11-02", to: "2026-11-08", orgs: ["A"] });
+  eq("the dataset carries the articles and says when some are samples", [dsA.articles.length === ca.length + sa.length, dsA.articlesSample, dsA.articles[0].k], [true, true, "tv"]);
   eq("the dataset uses short keys", Object.keys(ds.posts[0]).join(","), "o,p,s,d,t,u,l,c,h,v");
 
   console.log(fail ? `${fail} FAILED` : "all passed"); process.exit(fail ? 1 : 0);

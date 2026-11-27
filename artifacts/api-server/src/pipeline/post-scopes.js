@@ -34,7 +34,7 @@ function scopeKeywords(id) {
   return out;
 }
 
-const PLATFORMS = { li: "LinkedIn", x: "X", ig: "Instagram" };
+const PLATFORMS = { li: "LinkedIn", x: "X", ig: "Instagram", yt: "YouTube" };
 
 const day = (d) => String(d || "").slice(0, 10);
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
@@ -46,7 +46,7 @@ const clean = (t) => String(t || "").replace(/\s+/g, " ").trim();
  * organisation's own post); a post returned twice is kept once; on LinkedIn the same message posted several times with the
  * same engagement (a repost pattern the data source returns) is kept once.
  */
-function collectPosts(socialERResults, from, to) {
+function collectPosts(socialERResults, from, to, youtubeERResults) {
   const posts = [];
   const inWin = (d) => { const t = day(d); return t >= from && t <= to; };
   for (const r of socialERResults || []) {
@@ -71,6 +71,17 @@ function collectPosts(socialERResults, from, to) {
       add("x", p, clean(p.text), { likes: num(p.likes), comments: num(p.replies), shares: num(p.retweets), views: num(p.views) });
     }
     for (const p of (r.igData && r.igData.rawPosts) || []) add("ig", p, clean(p.snippet || p.text), { likes: num(p.likes), comments: num(p.comments), shares: 0, views: num(p.views) });
+  }
+  // YouTube: each video is a post (its title is its text); counted by the day it was published
+  for (const y of youtubeERResults || []) {
+    const seen = new Set();
+    for (const v of y.videos || []) {
+      const d = String(v.publishedAt || "").slice(0, 19).replace("T", " ");
+      const url = v.url || (v.videoId ? `https://www.youtube.com/watch?v=${v.videoId}` : "");
+      if (!inWin(d) || seen.has(url)) continue;
+      seen.add(url);
+      posts.push({ id: `yt:${url}`, org: y.org, platform: "yt", url, text: clean(v.title), date: d, likes: num(v.likes), comments: num(v.comments), shares: 0, views: num(v.views) });
+    }
   }
   return posts.sort((a, b) => (a.org === b.org ? b.date.localeCompare(a.date) : a.org.localeCompare(b.org)));
 }
@@ -138,8 +149,60 @@ async function labelPosts(posts, { askClaude, cache = {}, batchSize = 30, model 
   return posts;
 }
 
+// ── Articles (press and TV) ─────────────────────────────────────────────────
+// TV = the five channel sites the app already treats as TV; everything else it collects is press.
+const TV_OUTLETS = ["NDTV", "News18", "India Today", "India TV", "ABP News"];
+const PRESS_OUTLETS = ["Times of India", "Hindustan Times", "The Hindu", "Indian Express", "Deccan Herald"];
+const kindOfOutlet = (outlet) => (TV_OUTLETS.some((t) => t.toLowerCase() === String(outlet || "").toLowerCase()) ? "tv" : "press");
+
+/**
+ * The press and TV articles the collection holds for the period, one record each. Today the collection is air-quality only, so every
+ * one is in the air-quality scope; once articles on every subject are collected they will be labelled like the posts.
+ */
+function collectArticles(arts, cls, from, to) {
+  const out = [];
+  for (const org of Object.keys(arts || {})) {
+    const c = new Map((cls[org] || []).map((x) => [Number(x.index), x]));
+    (arts[org] || []).forEach((a, i) => {
+      const m = c.get(i);
+      if (!m || !(m.aq_relevant === true || String(m.aq_relevant).toLowerCase() === "true")) return;
+      const d = String(a.date || m.date || "").slice(0, 10);
+      if (!(d >= from && d <= to)) return;
+      out.push({ org, kind: kindOfOutlet(a.source || m.outlet), outlet: a.source || m.outlet || "", scope: "air-quality", date: d, title: clean(a.title), url: a.url || "", sample: false });
+    });
+  }
+  return out;
+}
+
+// A small deterministic generator, so a sample is the same every time it is made.
+function rng(seed) { let x = seed >>> 0; return () => ((x = (Math.imul(x, 1664525) + 1013904223) >>> 0) / 4294967296); }
+const hash = (str) => { let h = 2166136261; for (const ch of String(str)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0; return h; };
+
+/**
+ * PLACEHOLDER articles in the three other scopes, so the Articles chart can be seen with all four. They are generated, not
+ * collected: every one carries sample: true, a title that says so, and no address. Remove this once articles on every subject
+ * are collected and labelled.
+ */
+function sampleArticles(orgs, from, to) {
+  const out = [];
+  const days = Math.max(1, Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 864e5) + 1);
+  const outlets = [...PRESS_OUTLETS, ...TV_OUTLETS];
+  const scopes = ["climate", "sustainability", "other"];
+  for (const org of orgs) {
+    const r = rng(hash(`${org}|${from}|${to}`));
+    const n = Math.floor(r() * 7); // 0 to 6 sample articles
+    for (let i = 0; i < n; i++) {
+      const outlet = outlets[Math.floor(r() * outlets.length)];
+      const day = new Date(Date.parse(`${from}T00:00:00Z`) + Math.floor(r() * days) * 864e5).toISOString().slice(0, 10);
+      const scope = scopes[Math.floor(r() * scopes.length)];
+      out.push({ org, kind: kindOfOutlet(outlet), outlet, scope, date: day, title: `Sample article ${i + 1} (placeholder, not a real article)`, url: "", sample: true });
+    }
+  }
+  return out;
+}
+
 /** The file the Interactive tab reads. */
-function buildDataset({ posts, from, to, framework, orgs, reportName, generatedAt }) {
+function buildDataset({ posts, articles, from, to, framework, orgs, reportName, generatedAt }) {
   const unlabelled = posts.filter((p) => !p.scope).length;
   return {
     version: 1,
@@ -152,9 +215,12 @@ function buildDataset({ posts, from, to, framework, orgs, reportName, generatedA
     scopeInfo: SCOPES.map((s) => ({ id: s.id, label: s.label, rule: s.rule, keywords: scopeKeywords(s.id) })),
     orgs: orgs || [...new Set(posts.map((p) => p.org))].sort(),
     unlabelled,
+    // press and TV articles: k = press|tv, x = outlet, s = scope, z = 1 when it is a placeholder sample
+    articles: (articles || []).map((a) => ({ o: a.org, k: a.kind, x: a.outlet, s: a.scope, d: a.date, t: a.title, u: a.url, ...(a.sample ? { z: 1 } : {}) })),
+    articlesSample: (articles || []).some((a) => a.sample),
     // short keys keep the file small; the UI knows them: o=org, p=platform, s=scope, d=date, t=text, u=url, l=likes, c=comments, h=shares, v=views
     posts: posts.map((p) => ({ o: p.org, p: p.platform, s: p.scope, d: p.date, t: p.text.slice(0, 400), u: p.url, l: p.likes, c: p.comments, h: p.shares, v: p.views })),
   };
 }
 
-module.exports = { SCOPES, PLATFORMS, collectPosts, labelPosts, parseLabels, batchPrompt, buildDataset };
+module.exports = { SCOPES, PLATFORMS, TV_OUTLETS, collectArticles, sampleArticles, collectPosts, labelPosts, parseLabels, batchPrompt, buildDataset };
