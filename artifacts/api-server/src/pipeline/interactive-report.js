@@ -6,14 +6,15 @@
  *
  * `dataset` is a week's (or any period's) posts file (see post-scopes.js). `topic` is "full" (every scope, including Other) or one
  * of air-quality / climate / sustainability; `orgs` limits the page to those organisations (none = all of them).
- * Each organisation gets a pie: in the full report by scope, in a topic report by platform. Everything is drawn in the page
- * itself (SVG, no script), so the file opens anywhere. Nothing here reads or uses the AI-assistant (AEO) measurement.
+ * Each organisation gets a bar: in the full report split by scope, in a topic report by platform; a second chart does the same for
+ * press and TV articles. Everything is drawn in the page itself (no script), so the file opens anywhere. Nothing here reads or uses the AI-assistant (AEO) measurement.
  */
 
 const { injectReportTag } = require("./report-tag");
 
-const COLOUR = { "air-quality": "#3d8ef0", climate: "#e8743b", sustainability: "#34a56f", other: "#8b93a1", li: "#0a66c2", x: "#4b5563", ig: "#c13584" };
-const PLATFORM = { li: "LinkedIn", x: "X", ig: "Instagram" };
+const COLOUR = { "air-quality": "#3d8ef0", climate: "#e8743b", sustainability: "#34a56f", other: "#8b93a1", li: "#0a66c2", x: "#4b5563", ig: "#c13584", yt: "#d92d20", press: "#7a5af8", tv: "#0e9384" };
+const PLATFORM = { li: "LinkedIn", x: "X", ig: "Instagram", yt: "YouTube" };
+const KIND = { press: "Press", tv: "TV" };
 const TOPICS = { full: "Full report", "air-quality": "Air quality", climate: "Climate", sustainability: "Sustainability" };
 
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -21,22 +22,14 @@ const median = (xs) => { if (!xs.length) return 0; const s = [...xs].sort((a, b)
 const num = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 const pct = (n, d) => (d ? `${Math.round((n / d) * 1000) / 10}%` : "0%");
 
-/** An SVG pie of [{label, value, colour}]; a single slice is a full circle, no slices an empty ring. */
-function pie(slices, size = 120) {
-  const total = slices.reduce((a, s) => a + s.value, 0);
-  const r = size / 2 - 2, c = size / 2;
-  if (!total) return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="no posts"><circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--line)" stroke-width="2"/></svg>`;
-  const live = slices.filter((s) => s.value > 0);
-  if (live.length === 1) return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img"><title>${esc(live[0].label)}: ${live[0].value}</title><circle cx="${c}" cy="${c}" r="${r}" fill="${live[0].colour}"/></svg>`;
-  let a0 = -Math.PI / 2;
-  const paths = live.map((s) => {
-    const a1 = a0 + (s.value / total) * Math.PI * 2;
-    const x0 = c + r * Math.cos(a0), y0 = c + r * Math.sin(a0), x1 = c + r * Math.cos(a1), y1 = c + r * Math.sin(a1);
-    const d = `M${c},${c} L${x0.toFixed(2)},${y0.toFixed(2)} A${r},${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z`;
-    a0 = a1;
-    return `<path d="${d}" fill="${s.colour}" stroke="var(--card)" stroke-width="1.5"><title>${esc(s.label)}: ${s.value} (${pct(s.value, total)})</title></path>`;
-  });
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img">${paths.join("")}</svg>`;
+/** One stacked bar per organisation: rows = [{ org, total, segs: [{ label, value, colour }] }]; bars share one scale. */
+function bars(rows) {
+  const max = Math.max(1, ...rows.map((r) => r.total));
+  return rows.map((r) => {
+    const segs = r.segs.filter((x) => x.value > 0).map((x) => `<span class="seg" style="width:${((x.value / max) * 100).toFixed(2)}%;background:${x.colour}" title="${esc(x.label)}: ${x.value} (${pct(x.value, r.total)})"></span>`).join("");
+    const legend = r.segs.filter((x) => x.value > 0).map((x) => `<span class="lg"><span class="dot" style="background:${x.colour}"></span>${esc(x.label)} <b>${x.value}</b></span>`).join(" ");
+    return `<div class="bar"><div class="bn">${esc(r.org)}</div><div class="bb">${segs || '<span class="mut">none</span>'}</div><div class="bt2"><b>${r.total}</b></div><div class="bl">${legend}</div></div>`;
+  }).join("");
 }
 
 function renderInteractiveReport(ds, opts = {}) {
@@ -65,14 +58,24 @@ function renderInteractiveReport(ds, opts = {}) {
     return `<div class="tile" style="border-top:3px solid ${COLOUR[s]}"><div class="tl">${esc(labelOf(s))}</div><div class="tn">${n}</div><div class="ts">${pct(n, posts.length)} of ${topic === "full" ? "all posts" : "this topic"}</div></div>`;
   }).join("");
 
-  const pies = orgs.map((o) => {
+  const postBars = bars(orgs.map((o) => {
     const r = perOrg.find((x) => x.org === o);
-    const slices = topic === "full"
-      ? scopes.map((s) => ({ label: labelOf(s), value: r.byScope[s] || 0, colour: COLOUR[s] }))
+    const segs = topic === "full"
+      ? scopes.map((sc) => ({ label: labelOf(sc), value: r.byScope[sc] || 0, colour: COLOUR[sc] }))
       : Object.keys(PLATFORM).map((p) => ({ label: PLATFORM[p], value: r.byPlatform[p] || 0, colour: COLOUR[p] }));
-    const legend = slices.filter((s) => s.value > 0).map((s) => `<li><span class="dot" style="background:${s.colour}"></span>${esc(s.label)} <b>${s.value}</b> <span class="mut">${pct(s.value, r.total)}</span></li>`).join("") || '<li class="mut">no posts</li>';
-    return `<div class="pie"><div class="pn">${esc(o)}</div>${pie(slices)}<div class="pt">${r.total} post${r.total === 1 ? "" : "s"}</div><ul>${legend}</ul></div>`;
-  }).join("");
+    return { org: o, total: r.total, segs };
+  }));
+
+  // articles (press and TV): the same chart; a topic report stacks them by press / TV
+  const arts = (ds.articles || []).filter((a) => shown.includes(a.s));
+  const artBars = bars(orgs.map((o) => {
+    const mine = arts.filter((a) => a.o === o);
+    const segs = topic === "full"
+      ? scopes.map((sc) => ({ label: labelOf(sc), value: mine.filter((a) => a.s === sc).length, colour: COLOUR[sc] }))
+      : Object.keys(KIND).map((k) => ({ label: KIND[k], value: mine.filter((a) => a.k === k).length, colour: COLOUR[k] }));
+    return { org: o, total: mine.length, segs };
+  }));
+  const sampleNote = ds.articlesSample ? '<p class="warn"><b>Sample data.</b> The air-quality articles are the ones collected. The climate, sustainability and other articles are placeholders to show the chart; they are not real articles. Fetching articles on every subject is not built yet.</p>' : "";
 
   const bench = `<table class="bt"><thead><tr><th></th>${cols.map((c) => `<th style="color:${COLOUR[c] || "inherit"}">${esc(colLabel(c))}</th>`).join("")}</tr></thead><tbody>
 <tr><td><b>Total (all ${ds.orgs.length} organisations)</b></td>${cols.map((c) => `<td class="c">${totals[c]}</td>`).join("")}</tr>
@@ -91,8 +94,7 @@ main{max-width:1100px;margin:0 auto;padding:28px 18px 60px}
 .rm{color:var(--mut)}.mut{color:var(--mut)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:14px}.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 .tl{font:600 12px 'DM Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}.tn{font-size:30px;font-weight:700}.ts{font-size:12.5px;color:var(--mut)}
-.pies{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}.pie{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
-.pn{font-weight:700;margin-bottom:6px;min-height:42px}.pt{font:600 13px 'DM Mono',monospace;margin:4px 0}.pie ul{list-style:none;margin:6px 0 0;padding:0;text-align:left;font-size:13px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+.charts{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px}.bar{display:grid;grid-template-columns:220px 1fr 40px;gap:2px 10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)}.bar:last-child{border-bottom:none}.bn{font-weight:600;font-size:14px}.bb{display:flex;height:16px;background:rgba(128,128,128,.10);border-radius:4px;overflow:hidden}.seg{display:block;height:100%}.bt2{text-align:right;font-family:'DM Mono',monospace}.bl{grid-column:2/4;font-size:12px;color:var(--mut)}.lg{margin-right:10px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}.warn{background:rgba(201,146,42,.12);border:1px solid rgba(201,146,42,.35);border-radius:8px;padding:8px 12px;font-size:13.5px}@media(max-width:700px){.bar{grid-template-columns:1fr 40px}.bn{grid-column:1/3}.bb{grid-column:1/2}}
 .bt{width:100%;border-collapse:separate;border-spacing:3px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px}.bt th{font-weight:700;padding:4px 8px}.bt td{padding:6px 8px}.c{text-align:center;font-family:'DM Mono',monospace;font-weight:700;background:rgba(128,128,128,.12);border-radius:6px}.me td{outline:1px solid var(--amber)}
 .post{background:var(--card);border:1px solid var(--line);border-radius:0 8px 8px 0;padding:8px 12px;margin-bottom:8px}.pm{font:12.5px 'DM Mono',monospace;color:var(--mut)}.pm a{color:var(--amber)}.pb{margin-top:4px}
 footer{margin-top:34px;color:var(--mut);font-size:13px}`;
@@ -103,11 +105,12 @@ footer{margin-top:34px;color:var(--mut);font-size:13px}`;
 <div class="rm">Period: ${esc(ds.dateFrom)} &rarr; ${esc(ds.dateTo)} &middot; ${ds.posts.length} posts from ${ds.orgs.length} organisations &middot; generated ${esc(generated)}</div>
 <p class="mut">Each post is put in the one scope it is mainly about: air quality, climate, sustainability, or other.${topic === "full" ? "" : ` This report shows only the ${esc(labelOf(topic))} posts.`}</p>
 <h2>Scope summary</h2><div class="tiles">${tiles}</div>
-<h2>${topic === "full" ? "Each organisation's posts by scope" : `Each organisation's ${esc(labelOf(topic))} posts by platform`}</h2><div class="pies">${pies}</div>
+<h2>${topic === "full" ? "Posts by scope, per organisation" : `${esc(labelOf(topic))} posts by platform, per organisation`}</h2><div class="charts">${postBars}</div>
+<h2>${topic === "full" ? "Press and TV articles by scope, per organisation" : `${esc(labelOf(topic))} press and TV articles, per organisation`}</h2>${sampleNote}<div class="charts">${artBars}</div>
 <h2>Benchmark table</h2>${bench}
 <h2>Posts <span class="mut" style="font-size:14px;font-weight:400">(most engagement first, up to 20)</span></h2>${topHtml}
 <footer>Emerald AI · Triple Media Pulse · publicly available data</footer></main></body></html>`;
   return injectReportTag(html, { kind: opts.topic && opts.topic !== "full" ? `${TOPICS[topic]} report` : "Full report", from: ds.dateFrom, to: ds.dateTo });
 }
 
-module.exports = { renderInteractiveReport, pie, TOPICS };
+module.exports = { renderInteractiveReport, bars, TOPICS };

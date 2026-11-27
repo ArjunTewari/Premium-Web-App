@@ -4,6 +4,7 @@
 //   node scopes.cjs <collection.json.gz> [--out dir] [--cache scope-cache.json] [--yes]
 //   --out    where the file is written (default ./work/interactive)
 //   --cache  labels already made (by post address) are reused, new ones added: a second run on the same posts costs nothing
+//   --no-sample  leave out the placeholder (sample) articles; by default they are added in the other scopes and flagged
 //   --yes    also puts it in the reports repo: interactive/<name>.json and interactive/index.json (what the tab lists)
 // The collection is one saved by a run (or merged / trimmed by merge-weeks.cjs / trim-period.cjs); its period decides which posts
 // are taken. Nothing is fetched. The labels are made with the Claude CLI, never the API.
@@ -26,15 +27,20 @@ const CP = L.pipe("checkpoint.js"), S = L.pipe("post-scopes.js"), { askClaude, u
 (async () => {
   const chk = CP.unpack(fs.readFileSync(file));
   const fp = chk.fingerprint;
-  const posts = S.collectPosts(chk.state.socialERResults, fp.dateFrom, fp.dateTo);
+  const posts = S.collectPosts(chk.state.socialERResults, fp.dateFrom, fp.dateTo, chk.state.youtubeERResults);
   console.log(`${fp.dateFrom} to ${fp.dateTo}: ${posts.length} posts from ${new Set(posts.map((p) => p.org)).size} organisations`);
   const cache = cacheFile && fs.existsSync(cacheFile) ? JSON.parse(fs.readFileSync(cacheFile, "utf8")) : {};
   const before = Object.keys(cache).length;
   await S.labelPosts(posts, { askClaude, cache, log: (m) => console.log(m) });
   if (cacheFile) fs.writeFileSync(cacheFile, JSON.stringify(cache));
 
+  // press and TV articles: the real (air-quality) ones the collection holds, plus clearly flagged PLACEHOLDER articles in the other scopes
+  // until articles on every subject are collected; --no-sample leaves the placeholders out
+  const real = S.collectArticles(chk.state.arts, chk.state.cls, fp.dateFrom, fp.dateTo);
+  const articles = [...real, ...(process.argv.includes("--no-sample") ? [] : S.sampleArticles(fp.orgs, fp.dateFrom, fp.dateTo))];
+  console.log(`${real.length} real articles${articles.length > real.length ? ` + ${articles.length - real.length} placeholder (sample) articles` : ""}`);
   const name = N.interactiveName({ dateFrom: fp.dateFrom, dateTo: fp.dateTo, orgs: fp.orgs.length });
-  const ds = S.buildDataset({ posts, from: fp.dateFrom, to: fp.dateTo, framework: "all", orgs: fp.orgs, reportName: name });
+  const ds = S.buildDataset({ posts, articles, from: fp.dateFrom, to: fp.dateTo, framework: "all", orgs: fp.orgs, reportName: name });
   fs.mkdirSync(out, { recursive: true });
   const body = JSON.stringify(ds);
   fs.writeFileSync(path.join(out, name), body);

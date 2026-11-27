@@ -5,13 +5,16 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 // each in ONE scope (air quality / climate / sustainability / other), as an explorable view: every number is a control.
 
 interface IndexEntry { name: string; size: number; mtime: string; dateFrom: string; dateTo: string; orgs: number; posts: number; counts?: Record<string, number> }
-type Platform = "li" | "x" | "ig";
+type Platform = "li" | "x" | "ig" | "yt";
 interface Post { o: string; p: Platform; s: string | null; d: string; t: string; u: string; l: number; c: number; h: number; v: number }
+interface Article { o: string; k: "press" | "tv"; x: string; s: string; d: string; t: string; u: string; z?: number }
 interface ScopeInfo { id: string; label: string; rule: string; keywords: string[] }
-interface Dataset { report: string | null; dateFrom: string; dateTo: string; scopes: { id: string; label: string }[]; scopeInfo?: ScopeInfo[]; orgs: string[]; unlabelled: number; posts: Post[] }
+interface Dataset { report: string | null; dateFrom: string; dateTo: string; scopes: { id: string; label: string }[]; scopeInfo?: ScopeInfo[]; articles?: Article[]; articlesSample?: boolean; orgs: string[]; unlabelled: number; posts: Post[] }
 
-const PLATFORMS: { id: Platform; label: string }[] = [{ id: "li", label: "LinkedIn" }, { id: "x", label: "X" }, { id: "ig", label: "Instagram" }];
-const PLATFORM_LABEL: Record<string, string> = { li: "LinkedIn", x: "X", ig: "Instagram" };
+const PLATFORMS: { id: Platform; label: string }[] = [{ id: "li", label: "LinkedIn" }, { id: "x", label: "X" }, { id: "ig", label: "Instagram" }, { id: "yt", label: "YouTube" }];
+const PLATFORM_LABEL: Record<string, string> = { li: "LinkedIn", x: "X", ig: "Instagram", yt: "YouTube" };
+const ALL_PLATFORMS: Platform[] = ["li", "x", "ig", "yt"];
+const KIND_LABEL: Record<string, string> = { press: "Press", tv: "TV" };
 // Mid-lightness colours: each holds 3:1 against both the light and the dark card.
 const SCOPE_COLOUR: Record<string, string> = { "air-quality": "#3d8ef0", climate: "#e8743b", sustainability: "#34a56f", other: "#8b93a1" };
 const SCOPE_NOTE: Record<string, string> = {
@@ -20,31 +23,7 @@ const SCOPE_NOTE: Record<string, string> = {
   sustainability: "Sustainability, energy transition, waste, water, biodiversity, sustainable cities and mobility.",
   other: "None of these: events, hiring, greetings, awards, organisation news.",
 };
-const PLATFORM_COLOUR: Record<string, string> = { li: "#0a66c2", x: "#4b5563", ig: "#c13584" };
 const TOPIC_BUTTONS: { id: string; label: string }[] = [{ id: "full", label: "Full report" }, { id: "air-quality", label: "Air quality" }, { id: "sustainability", label: "Sustainability" }, { id: "climate", label: "Climate" }];
-
-interface Slice { label: string; value: number; colour: string }
-// A pie drawn as SVG; one slice is a whole circle, none an empty ring.
-function Pie({ slices, size = 112, dimmed }: { slices: Slice[]; size?: number; dimmed?: boolean }) {
-  const total = slices.reduce((a, x) => a + x.value, 0);
-  const r = size / 2 - 2, c = size / 2;
-  const live = slices.filter((x) => x.value > 0);
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ opacity: dimmed ? 0.25 : 1 }} role="img">
-      {total === 0 ? <circle cx={c} cy={c} r={r} fill="none" stroke="var(--border-col)" strokeWidth={2} />
-        : live.length === 1 ? <circle cx={c} cy={c} r={r} fill={live[0].colour}><title>{`${live[0].label}: ${live[0].value}`}</title></circle>
-        : (() => {
-          let a0 = -Math.PI / 2;
-          return live.map((x) => {
-            const a1 = a0 + (x.value / total) * Math.PI * 2;
-            const d = `M${c},${c} L${c + r * Math.cos(a0)},${c + r * Math.sin(a0)} A${r},${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${c + r * Math.cos(a1)},${c + r * Math.sin(a1)} Z`;
-            a0 = a1;
-            return <path key={x.label} d={d} fill={x.colour} stroke="var(--elevate-1)" strokeWidth={1.5}><title>{`${x.label}: ${x.value} (${pct(x.value, total)})`}</title></path>;
-          });
-        })()}
-    </svg>
-  );
-}
 
 // "total" = posts in the scopes on show, "all" = posts in every scope, "name" = A to Z, or a scope id
 type SortKey = "total" | "all" | "name" | string;
@@ -147,7 +126,8 @@ export default function InteractiveReports() {
 function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) {
   const [ds, setDs] = useState<Dataset | null>(null);
   const [error, setError] = useState("");
-  const [platforms, setPlatforms] = useState<Platform[]>(["li", "x", "ig"]);
+  const [platforms, setPlatforms] = useState<Platform[]>(ALL_PLATFORMS);
+  const [kinds, setKinds] = useState<("press" | "tv")[]>(["press", "tv"]);
   const [scopes, setScopes] = useState<string[] | null>(null); // null = all
   const [focus, setFocus] = useState<string[]>([]);
   const [percent, setPercent] = useState(false);
@@ -195,6 +175,29 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
     return row;
   }), [rows, visible, percent]);
 
+  // articles: the same organisation x scope counts, after the press / TV filter
+  const artRows = useMemo(() => {
+    if (!ds) return [];
+    const mine = (ds.articles ?? []).filter((a) => kinds.includes(a.k));
+    const out = ds.orgs.map((o) => {
+      const counts: Record<string, number> = {}, press: Record<string, number> = {}, tv: Record<string, number> = {}, sample: Record<string, number> = {};
+      for (const sc of scopeIds) {
+        const xs = mine.filter((a) => a.o === o && a.s === sc);
+        counts[sc] = xs.length; press[sc] = xs.filter((a) => a.k === "press").length; tv[sc] = xs.filter((a) => a.k === "tv").length; sample[sc] = xs.filter((a) => a.z).length;
+      }
+      const all = scopeIds.reduce((n, sc) => n + counts[sc], 0);
+      const vis = visible.reduce((n, sc) => n + counts[sc], 0);
+      return { org: o, counts, press, tv, sample, all, vis };
+    });
+    return out.sort((a, b) => (sort.key === "name" ? sort.dir * a.org.localeCompare(b.org) : (sort.key === "all" ? b.all - a.all : sort.key === "total" ? b.vis - a.vis : (b.counts[sort.key] ?? 0) - (a.counts[sort.key] ?? 0)) || a.org.localeCompare(b.org)));
+  }, [ds, kinds, scopeIds, visible, sort]);
+  const artData = useMemo(() => artRows.map((r) => {
+    const row: Record<string, string | number> = { org: r.org };
+    for (const sc of visible) row[sc] = percent ? (r.vis ? Math.round((r.counts[sc] / r.vis) * 1000) / 10 : 0) : r.counts[sc];
+    return row;
+  }), [artRows, visible, percent]);
+  const artTotal = artRows.reduce((n, r) => n + r.vis, 0);
+
   const totals = useMemo(() => {
     const t: Record<string, number> = {};
     for (const s of scopeIds) t[s] = byPlatform.filter((p) => p.s === s).length;
@@ -216,8 +219,8 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
   // A column heading sorts by that column (largest first); the same heading again reverses it.
   const sortBy = (key: SortKey) => setSort((cur) => (cur.key === key ? { key, dir: (cur.dir * -1) as 1 | -1 } : { key, dir: key === "name" ? 1 : -1 }));
   const arrow = (key: SortKey) => (sort.key === key ? (sort.dir === -1 ? " ▼" : " ▲") : "");
-  const dirty = focus.length > 0 || scopes !== null || platforms.length !== 3 || percent || sort.key !== DEFAULT_SORT.key || sort.dir !== DEFAULT_SORT.dir;
-  const reset = () => { setFocus([]); setScopes(null); setPlatforms(["li", "x", "ig"]); setPercent(false); setSort(DEFAULT_SORT); setShown(20); };
+  const dirty = focus.length > 0 || scopes !== null || platforms.length !== ALL_PLATFORMS.length || kinds.length !== 2 || percent || sort.key !== DEFAULT_SORT.key || sort.dir !== DEFAULT_SORT.dir;
+  const reset = () => { setFocus([]); setScopes(null); setPlatforms(ALL_PLATFORMS); setKinds(["press", "tv"]); setPercent(false); setSort(DEFAULT_SORT); setShown(20); };
 
   const focused = new Set(focus);
   // The topic a stand-alone report can have: one subject, or the full report.
@@ -255,7 +258,7 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
 
   const baseName = entry.name.replace(/\.json$/, "");
   const colLabel = (c: string) => (c === "all" ? "All posts" : labelOf(c));
-  const platformNote = platforms.length === 3 ? "all platforms" : platforms.map((p) => PLATFORM_LABEL[p]).join(" + ");
+  const platformNote = platforms.length === ALL_PLATFORMS.length ? "all platforms" : platforms.map((p) => PLATFORM_LABEL[p]).join(" + ");
 
   const tip = (p: { active?: boolean; payload?: { payload: { org: string } }[] }) => {
     if (!p.active || !p.payload?.length) return null;
@@ -276,6 +279,28 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
           </div>
         ))}
         <div style={{ borderTop: "1px solid var(--border-col)", marginTop: 4, paddingTop: 4, color: dim }}>All posts in this view: {r.all} · click to focus</div>
+      </div>
+    );
+  };
+
+  const artTip = (p: { active?: boolean; payload?: { payload: { org: string } }[] }) => {
+    if (!p.active || !p.payload?.length) return null;
+    const org = p.payload[0].payload.org;
+    const r = artRows.find((x) => x.org === org);
+    if (!r) return null;
+    return (
+      <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-col)", borderRadius: 8, padding: "8px 12px", fontSize: 13, ...mono, color: "var(--text-main)", boxShadow: "0 8px 24px rgba(0,0,0,.25)", maxWidth: 340 }}>
+        <div style={{ fontWeight: 700, marginBottom: 6 }}>{org}</div>
+        {visible.map((sc) => (
+          <div key={sc} style={{ marginBottom: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: SCOPE_COLOUR[sc] }} />
+              <strong>{labelOf(sc)}: {r.counts[sc]}</strong><span style={{ color: dim }}>({pct(r.counts[sc], r.all)} of its articles)</span>
+            </div>
+            <div style={{ paddingLeft: 14, color: dim }}>Press {r.press[sc]} · TV {r.tv[sc]}{r.sample[sc] ? ` · ${r.sample[sc]} sample` : ""}</div>
+          </div>
+        ))}
+        <div style={{ borderTop: "1px solid var(--border-col)", marginTop: 4, paddingTop: 4, color: dim }}>All articles in this view: {r.all} · click to focus</div>
       </div>
     );
   };
@@ -356,7 +381,7 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
         </div>
       </Section>
 
-      <Section n={2} title="Send this report" note="The report you have chosen, as a stand-alone page: scope summary, a pie for each organisation, the benchmark table and the top posts.">
+      <Section n={2} title="Send this report" note="The report you have chosen, as a stand-alone page: scope summary, a chart for each of posts and articles, the benchmark table and the top posts.">
         <div style={{ ...card, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <a href={reportUrl} target="_blank" rel="noopener noreferrer" style={{ ...chip(false), textDecoration: "none" }}>Open it ↗</a>
@@ -378,7 +403,7 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
           <button onClick={() => { setScopes(null); setShown(20); }} style={{ ...card, textAlign: "left", padding: "12px 14px", cursor: "pointer", borderColor: scopes === null ? "var(--text-main)" : undefined, color: "var(--text-main)" }}>
             <div style={{ fontSize: 13, color: dim, textTransform: "uppercase", letterSpacing: ".08em" }}>All scopes</div>
             <div style={{ fontSize: 30, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{totalAll}</div>
-            <div style={{ fontSize: 12.5, color: dim }}>posts{platforms.length !== 3 ? " on the chosen platforms" : ""}</div>
+            <div style={{ fontSize: 12.5, color: dim }}>posts{platforms.length !== ALL_PLATFORMS.length ? " on the chosen platforms" : ""}</div>
           </button>
           {ds.scopes.map((s) => {
             const on = scopes === null || scopes.includes(s.id);
@@ -399,8 +424,12 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
             <span style={{ fontSize: 13.5, color: dim }}>Platform:</span>
             {PLATFORMS.map((pl) => <button key={pl.id} style={chip(platforms.includes(pl.id))} onClick={() => { setPlatforms((cur) => { const n = toggle(cur, pl.id); return n.length === 0 ? cur : n; }); setShown(20); }}>{pl.label}</button>)}
           </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13.5, color: dim }}>Articles:</span>
+            {(["press", "tv"] as const).map((k) => <button key={k} style={chip(kinds.includes(k))} onClick={() => setKinds((cur) => { const n = toggle(cur, k); return n.length === 0 ? cur : n; })}>{KIND_LABEL[k]}</button>)}
+          </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <span style={{ fontSize: 13.5, color: dim }}>Chart shows:</span>
+            <span style={{ fontSize: 13.5, color: dim }}>Charts show:</span>
             <button style={chip(!percent)} onClick={() => setPercent(false)}>Posts</button>
             <button style={chip(percent)} onClick={() => setPercent(true)}>% of each organisation's posts</button>
           </div>
@@ -417,29 +446,7 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
         </div>
       </Section>
 
-      <Section n={5} title={topic === "full" ? "Each organisation's posts by scope (pies)" : `Each organisation's ${labelOf(topic)} posts by platform (pies)`} note="One pie per organisation. Click a pie to focus on that organisation; hover a slice for the numbers.">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
-          {rows.map((r) => {
-            const slices: Slice[] = topic === "full"
-              ? scopeIds.map((id) => ({ label: labelOf(id), value: r.counts[id], colour: SCOPE_COLOUR[id] }))
-              : PLATFORMS.map((pl) => ({ label: pl.label, value: byPlatform.filter((x) => x.o === r.org && x.s === topic && x.p === pl.id).length, colour: PLATFORM_COLOUR[pl.id] }));
-            const total = slices.reduce((a2, x) => a2 + x.value, 0);
-            return (
-              <button key={r.org} onClick={() => toggleFocus(r.org)} title={`${r.org}: ${total} posts`} style={{ ...card, padding: 12, textAlign: "center", cursor: "pointer", color: "var(--text-main)", borderColor: focused.has(r.org) ? "var(--accent-amber)" : undefined }}>
-                <div style={{ fontWeight: 700, minHeight: 40, fontSize: 14 }}>{r.org}</div>
-                <Pie slices={slices} dimmed={dimmed(r.org)} />
-                <div style={{ ...mono, fontSize: 13, fontWeight: 600, margin: "4px 0" }}>{total} post{total === 1 ? "" : "s"}</div>
-                <ul style={{ listStyle: "none", margin: 0, padding: 0, textAlign: "left", fontSize: 12.5, opacity: dimmed(r.org) ? 0.4 : 1 }}>
-                  {slices.filter((x) => x.value > 0).map((x) => <li key={x.label}><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: x.colour, marginRight: 6 }} />{x.label} <b>{x.value}</b> <span style={{ color: dim }}>{pct(x.value, total)}</span></li>)}
-                  {total === 0 && <li style={{ color: dim }}>no posts</li>}
-                </ul>
-              </button>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Section n={6} title="Organisations by scope (chart)" note={`Posts per organisation in each scope, ${platformNote}. Click a name or a bar to focus; hover for the numbers.`}>
+      <Section n={5} title="Posts by scope (chart)" note={`Posts per organisation in each scope, ${platformNote}. Click a name or a bar to focus; hover for the numbers.`}>
         <div style={{ ...card, padding: "18px 12px 8px" }}>
           <div style={{ width: "100%", height: Math.max(360, rows.length * 30 + 50) }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -458,6 +465,41 @@ function Explorer({ entry, onBack }: { entry: IndexEntry; onBack: () => void }) 
                 {visible.map((s) => (
                   <Bar key={s} dataKey={s} stackId="s" fill={SCOPE_COLOUR[s]} cursor="pointer" onClick={(d: { org?: string }) => d?.org && toggleFocus(d.org)} isAnimationActive={false}>
                     {chartData.map((r) => <Cell key={String(r.org)} fill={SCOPE_COLOUR[s]} fillOpacity={dimmed(String(r.org)) ? 0.22 : 1} />)}
+                  </Bar>
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ fontSize: 13, color: dim, padding: "6px 8px 4px" }}>
+            {focus.length ? <>Showing {focus.map((o, i) => <span key={o}>{i ? ", " : ""}<strong style={{ color: "var(--text-main)" }}>{o}</strong></span>)}; the other organisations are faded. Click a name or bar again to deselect.</> : "Click an organisation (its name or bar) to focus on it. Hover for the numbers."}
+          </div>
+        </div>
+      </Section>
+
+      <Section n={6} title="Press and TV articles by scope (chart)" note={`Articles per organisation in each scope, ${kinds.length === 2 ? "press and TV" : KIND_LABEL[kinds[0]]}. Click a name or a bar to focus; hover for the numbers.`}>
+        {ds.articlesSample && (
+          <div style={{ background: "rgba(201,146,42,.12)", border: "1px solid rgba(201,146,42,.35)", borderRadius: 8, padding: "8px 12px", fontSize: 13.5, color: "var(--text-main)", marginBottom: 10 }}>
+            <strong>Sample data.</strong> The air-quality articles are the ones collected. The climate, sustainability and other articles are placeholders to show the chart; they are not real articles. Fetching articles on every subject is not built yet.
+          </div>
+        )}
+        <div style={{ ...card, padding: "18px 12px 8px" }}>
+          <div style={{ width: "100%", height: Math.max(360, artRows.length * 30 + 50) }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={artData} layout="vertical" margin={{ top: 4, right: 24, left: 20, bottom: 4 }} barCategoryGap={4}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-col)" horizontal={false} />
+                <XAxis type="number" domain={percent ? [0, 100] : [0, "auto"]} allowDecimals={false} tick={{ fill: "var(--text-sub)", fontSize: 12, fontFamily: "'DM Mono', monospace" }} axisLine={{ stroke: "var(--border-col)" }} tickLine={false} unit={percent ? "%" : ""} />
+                <YAxis
+                  type="category" dataKey="org" width={200} interval={0} axisLine={false} tickLine={false}
+                  tick={(tp: { x: number; y: number; payload: { value: string } }) => (
+                    <text x={tp.x} y={tp.y} dy={4} textAnchor="end" onClick={() => toggleFocus(tp.payload.value)} style={{ cursor: "pointer", fill: dimmed(tp.payload.value) ? "var(--text-dim)" : "var(--text-main)", fontSize: 12.5, fontWeight: focused.has(tp.payload.value) ? 700 : 400, fontFamily: "'DM Mono', monospace" }}>
+                      {shortOrg(tp.payload.value)}
+                    </text>
+                  )}
+                />
+                <Tooltip content={artTip as never} cursor={{ fill: "rgba(128,128,128,.12)" }} />
+                {visible.map((s) => (
+                  <Bar key={s} dataKey={s} stackId="a" fill={SCOPE_COLOUR[s]} cursor="pointer" onClick={(d: { org?: string }) => d?.org && toggleFocus(d.org)} isAnimationActive={false}>
+                    {artData.map((r) => <Cell key={String(r.org)} fill={SCOPE_COLOUR[s]} fillOpacity={dimmed(String(r.org)) ? 0.22 : 1} />)}
                   </Bar>
                 ))}
               </BarChart>
