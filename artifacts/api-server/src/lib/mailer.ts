@@ -352,3 +352,32 @@ export async function sendReportFileEmail(
     attachments: [opts.attachment],
   });
 }
+
+export async function sendInteractiveReportEmail(
+  to: string,
+  opts: { title: string; period: string; attachment: EmailAttachment; note?: string; sentBy?: string },
+): Promise<boolean> {
+  const text = [
+    "Emerald AI — report attached",
+    "",
+    `Report : ${opts.title}`,
+    `Period : ${opts.period}`,
+    opts.note ? `Note   : ${opts.note}` : "",
+    opts.sentBy ? `Sent by : ${opts.sentBy}` : "",
+    "",
+    "Open the attached HTML file in any browser.",
+  ].filter((l, i, arr) => l !== "" || arr[i - 1] !== "").join("\n");
+  const html = `
+<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#1a2232">
+  <div style="background:#0f1923;padding:18px 22px;border-radius:8px 8px 0 0">
+    <h2 style="margin:0;color:#c9922a;font-size:17px">Emerald AI — Report attached</h2>
+  </div>
+  <div style="border:1px solid #dde3ef;border-top:none;padding:22px;border-radius:0 0 8px 8px;font-size:14px">
+    <p style="margin:0 0 6px"><strong>${esc(opts.title)}</strong></p>
+    <p style="margin:0 0 10px;color:#5a6a80">${esc(opts.period)}</p>
+    ${opts.note ? `<p style="margin:0 0 10px">${esc(opts.note)}</p>` : ""}
+    <p style="margin:0;color:#5a6a80">The report is attached as <code>${esc(opts.attachment.filename)}</code>. Open it in any browser.</p>
+  </div>
+</div>`;
+  return send({ to, subject: `Emerald AI — ${opts.title} (${opts.period})`, text, html, attachments: [opts.attachment] });
+}

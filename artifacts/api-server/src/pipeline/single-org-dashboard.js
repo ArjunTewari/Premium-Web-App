@@ -1425,7 +1425,7 @@ function buildSingleOrgDashboard(baseHtml, opts = {}) {
       html = html.replace("<title>", '<meta name="emerald-framework" content="' + fwId + '">\n<title>');
     }
   }
-  return view === "snapshot" ? toSnapshot(html) : html;
+  return require("./report-tag").injectReportTag(view === "snapshot" ? toSnapshot(html) : html);
 }
 
 function slug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
